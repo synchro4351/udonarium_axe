@@ -36,6 +36,7 @@
             <span class="tip msg-from" [title]="chatMessage.from">{{ shortFrom(chatMessage.from) }}</span>
             <span class="tip"> | </span>
             <span class="tip msg-timestamp">{{ chatMessage.timestamp | date: 'y/M/d H:mm' }}</span>
+            <chat-speech-controls [message]="chatMessage" />
             @if (!isEditing()) {
               @if (canInteract) {
                 <i
@@ -218,6 +219,7 @@
             }
             @if (simpleDispFlagTime()) {
               <font class="tip msg-timestamp">{{ chatMessage.timestamp | date: 'H:mm' }}</font>
+              <chat-speech-controls [message]="chatMessage" />
             }
             @if (simpleDispFlagUserId() || simpleDispFlagTime()) {
               <span class="tip">　</span>

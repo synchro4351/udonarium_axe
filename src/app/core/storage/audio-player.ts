@@ -26,12 +26,30 @@ export class AudioPlayer {
   }
 
   private static _volume: number = 0.5;
+  private static _speechDucking: number = 1;
   static get volume(): number {
     return AudioPlayer._volume;
   }
   static set volume(volume: number) {
     AudioPlayer._volume = volume;
-    AudioPlayer.masterGainNode.gain.setTargetAtTime(AudioPlayer._volume, AudioPlayer.audioContext.currentTime, 0.01);
+    AudioPlayer.updateMasterGain(true);
+  }
+
+  /** Temporarily scales BGM routed through the master bus while speech is playing. */
+  static setSpeechDucking(multiplier: number): void {
+    AudioPlayer._speechDucking = Number.isFinite(multiplier) ? Math.min(1, Math.max(0, multiplier)) : 1;
+    // Do not create an AudioContext merely because the preference changed before playback.
+    if (AudioPlayer._masterGainNode) AudioPlayer.updateMasterGain(false);
+  }
+
+  private static updateMasterGain(create: boolean): void {
+    if (!AudioPlayer._masterGainNode && !create) return;
+    const masterGainNode = AudioPlayer.masterGainNode;
+    masterGainNode.gain.setTargetAtTime(
+      AudioPlayer._volume * AudioPlayer._speechDucking,
+      AudioPlayer.audioContext.currentTime,
+      0.01
+    );
   }
 
   private static _auditionVolume: number = 0.5;
@@ -51,7 +69,10 @@ export class AudioPlayer {
   private static get masterGainNode(): GainNode {
     if (!AudioPlayer._masterGainNode) {
       const masterGain = AudioPlayer.audioContext.createGain();
-      masterGain.gain.setValueAtTime(AudioPlayer._volume, AudioPlayer.audioContext.currentTime);
+      masterGain.gain.setValueAtTime(
+        AudioPlayer._volume * AudioPlayer._speechDucking,
+        AudioPlayer.audioContext.currentTime
+      );
       masterGain.connect(AudioPlayer.audioContext.destination);
       AudioPlayer._masterGainNode = masterGain;
     }

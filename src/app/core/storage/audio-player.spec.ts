@@ -95,6 +95,7 @@ type AudioPlayerPrivateStatic = {
   _masterGainNode: unknown;
   _auditionGainNode: unknown;
   _seGainNode: unknown;
+  _speechDucking: number;
   cacheMap: Map<string, { url: string; blob: Blob }>;
   MAX_CACHE_SIZE: number;
   evictCacheIfNeeded: () => void;
@@ -222,6 +223,32 @@ describe('AudioPlayer', () => {
       expect(AudioPlayer.volume).toBe(0.8);
       const gainNode = audioCtxMock.createGain.mock.results[0].value as GainNodeMock;
       expect(gainNode.gain.setTargetAtTime).toHaveBeenCalledWith(0.8, 0, 0.01);
+    });
+  });
+
+  describe('speech ducking', () => {
+    it('scales the master bus without changing its base volume', () => {
+      AudioPlayer.volume = 0.8;
+      const masterGain = audioCtxMock.createGain.mock.results[0].value as GainNodeMock;
+
+      AudioPlayer.setSpeechDucking(0.25);
+      expect(AudioPlayer.volume).toBe(0.8);
+      expect(masterGain.gain.setTargetAtTime).toHaveBeenLastCalledWith(0.2, 0, 0.01);
+
+      AudioPlayer.volume = 0.6;
+      expect(masterGain.gain.setTargetAtTime).toHaveBeenLastCalledWith(0.15, 0, 0.01);
+
+      AudioPlayer.setSpeechDucking(1);
+      expect(masterGain.gain.setTargetAtTime).toHaveBeenLastCalledWith(0.6, 0, 0.01);
+    });
+
+    it('clamps the multiplier and does not create audio until needed', () => {
+      AudioPlayer.setSpeechDucking(-1);
+      expect(audioCtxMock.createGain).not.toHaveBeenCalled();
+      AudioPlayer.setSpeechDucking(2);
+      AudioPlayer.volume = 0.4;
+      const masterGain = audioCtxMock.createGain.mock.results[0].value as GainNodeMock;
+      expect(masterGain.gain.setTargetAtTime).toHaveBeenLastCalledWith(0.4, 0, 0.01);
     });
   });
 

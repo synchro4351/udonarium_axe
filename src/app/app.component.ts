@@ -40,6 +40,7 @@ import { HandRailComponent } from '@axe/features/card/hand-rail/hand-rail.compon
 import { ChatPortraitImageComponent } from '@axe/features/chat/chat-portrait-img/chat-portrait-img.component';
 import { ChatSettingsEventHandlerService } from '@axe/features/chat/chat-settings-event-handler.service';
 import { ChatSoundEventHandlerService } from '@axe/features/chat/chat-sound-event-handler.service';
+import { ChatSpeechEventHandlerService } from '@axe/features/chat/chat-speech-event-handler.service';
 import { DiceChatEventHandlerService } from '@axe/features/dice/dice-chat-event-handler.service';
 import { EffectChatEventHandlerService } from '@axe/features/effect/effect-chat-event-handler.service';
 import { GmToolbarComponent } from '@axe/features/gm-tools/gm-toolbar/gm-toolbar.component';
@@ -168,6 +169,7 @@ export class AppComponent {
     inject(DiceChatEventHandlerService);
     inject(ChatSettingsEventHandlerService);
     inject(ChatSoundEventHandlerService);
+    inject(ChatSpeechEventHandlerService);
     inject(EffectChatEventHandlerService);
     inject(VoteEventHandlerService);
     inject(CutInEventHandlerService);

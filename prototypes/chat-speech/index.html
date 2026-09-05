@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>チャット読み上げ 試作</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">STANDALONE PROTOTYPE</p>
+        <h1>チャット読み上げ</h1>
+        <p class="notice">実際のルームには接続していない試作です。設定やチャットは保存されません。</p>
+      </header>
+      <section class="panel controls" aria-labelledby="settings-title">
+        <h2 id="settings-title">読み上げ設定</h2>
+        <div class="row">
+          <label for="voice">声</label
+          ><select id="voice">
+            <option value="">音声を読み込み中…</option></select
+          ><label class="check"><input id="remote" type="checkbox" /> リモート音声を許可</label>
+        </div>
+        <p class="notice">リモート音声を選ぶと、本文が音声提供サービスへ送信される場合があります。</p>
+        <div class="row sliders">
+          <label for="rate">速度 <output id="rate-value">1.0</output></label
+          ><input id="rate" type="range" min="0.5" max="2" step="0.1" value="1" /><label for="volume"
+            >音量 <output id="volume-value">100%</output></label
+          ><input id="volume" type="range" min="0" max="1" step="0.05" value="1" />
+        </div>
+        <div class="row actions">
+          <button id="start" class="primary">自動読み上げを開始</button
+          ><button id="stop" disabled>停止して待機列を空にする</button
+          ><span id="status" role="status" aria-live="polite">開始すると読み上げできます。</span>
+        </div>
+      </section>
+      <section class="chat-grid" aria-label="チャットチャンネル">
+        <article class="panel channel" data-channel="main">
+          <div class="channel-head">
+            <h2>メイン</h2>
+            <label class="check"><input class="auto" type="checkbox" /> 自動で読む</label>
+          </div>
+          <div class="messages"></div>
+          <form class="composer">
+            <label class="sr-only" for="main-input">メインに送る</label
+            ><input id="main-input" maxlength="5000" placeholder="メインにメッセージ…" /><button>送信</button>
+          </form>
+        </article>
+        <article class="panel channel" data-channel="sub">
+          <div class="channel-head">
+            <h2>雑談</h2>
+            <label class="check"><input class="auto" type="checkbox" /> 自動で読む</label>
+          </div>
+          <div class="messages"></div>
+          <form class="composer">
+            <label class="sr-only" for="sub-input">雑談に送る</label
+            ><input id="sub-input" maxlength="5000" placeholder="雑談にメッセージ…" /><button>送信</button>
+          </form>
+        </article>
+      </section>
+      <p class="footnote">
+        自動読み上げは初期状態でオフです。発言ごとの「読む」は現在の読み上げを中断して、すぐ再生します。
+      </p>
+    </main>
+    <script src="speech.js"></script>
+  </body>
+</html>

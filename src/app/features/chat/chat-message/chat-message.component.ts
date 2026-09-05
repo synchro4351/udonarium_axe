@@ -33,6 +33,7 @@ import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { TextNote } from '@axe/domain/tabletop/text-note';
 import { encodeVnEmote, vnBodyOf, vnEmoteOf } from '@axe/domain/visual-novel/vn-emote';
+import { ChatSpeechControlsComponent } from '@axe/features/chat/chat-speech-controls/chat-speech-controls.component';
 import { SystemAvatarMenuService } from '@axe/features/chat/system-avatar-menu.service';
 import { vnEmoteLabels } from '@axe/features/visual-novel/visual-novel-emote-label';
 import { ChatColorStylePipe } from '@axe/ui/pipes/chat-color-style.pipe';
@@ -50,7 +51,17 @@ import { TranslocoModule } from '@jsverse/transloco';
     '[class.chat-message-highlight]': 'isHighlighted()',
   },
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgClass, NgStyle, DatePipe, FormsModule, LinkifyPipe, ChatColorStylePipe, SafePipe, TranslocoModule],
+  imports: [
+    NgClass,
+    NgStyle,
+    DatePipe,
+    FormsModule,
+    LinkifyPipe,
+    ChatColorStylePipe,
+    SafePipe,
+    TranslocoModule,
+    ChatSpeechControlsComponent,
+  ],
 })
 export class ChatMessageComponent {
   private readonly chatMessageService = inject(ChatMessageService);

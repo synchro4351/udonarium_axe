@@ -1,4 +1,113 @@
 <form name="chat-setting" class="px-3 py-2">
+  <section class="mb-3" aria-labelledby="chat-speech-title">
+    <h3
+      id="chat-speech-title"
+      class="border-ui-border-panel text-ui-dim m-0 mb-1.5 border-b border-solid pb-1 text-[10px] font-semibold"
+    >
+      {{ 'feature.chat.speech.title' | transloco }}
+    </h3>
+    <p class="text-ui-dim m-0 mb-2 text-[11px]">{{ 'feature.chat.speech.localSettings' | transloco }}</p>
+    <p role="status" class="text-ui-muted m-0 mb-1 text-[12px]">
+      {{ speech.status() | transloco }} ·
+      {{ 'feature.chat.speech.pending' | transloco: { count: speech.pendingCount() } }}
+    </p>
+    <label class="flex items-center justify-between gap-2 py-1">
+      <span>{{ 'feature.chat.speech.voice' | transloco }}</span>
+      <select
+        class="bg-ui-input text-ui-text max-w-48 min-w-0 text-[12px]"
+        [ngModel]="speech.settings().voiceURI"
+        (ngModelChange)="speech.patchSettings({ voiceURI: $event })"
+        name="speechVoice"
+      >
+        <option value="">{{ 'feature.chat.speech.noVoice' | transloco }}</option>
+        @for (voice of speech.voices(); track voice.voiceURI) {
+          @if (voice.localService || speech.settings().remoteVoices) {
+            <option [value]="voice.voiceURI">
+              {{ voice.name }} ({{ voice.lang }}) —
+              {{
+                (voice.localService ? 'feature.chat.speech.localVoice' : 'feature.chat.speech.remoteVoice') | transloco
+              }}
+            </option>
+          }
+        }
+      </select>
+    </label>
+    <label class="flex items-center gap-2 py-1 text-[12px]"
+      ><input
+        type="checkbox"
+        name="speechRemote"
+        [ngModel]="speech.settings().remoteVoices"
+        (ngModelChange)="speech.patchSettings({ remoteVoices: $event })"
+      />{{ 'feature.chat.speech.remoteAllowed' | transloco }}</label
+    >
+    <p class="text-ui-dim m-0 text-[11px]">{{ 'feature.chat.speech.remoteNote' | transloco }}</p>
+    <label class="flex items-center justify-between gap-2 py-1"
+      ><span>{{ 'feature.chat.speech.rate' | transloco }} {{ speech.settings().rate }}</span
+      ><input
+        type="range"
+        min="0.5"
+        max="2"
+        step="0.1"
+        [ngModel]="speech.settings().rate"
+        (input)="setSpeechNumber('rate', $event)"
+        name="speechRate"
+    /></label>
+    <label class="flex items-center justify-between gap-2 py-1"
+      ><span>{{ 'feature.chat.speech.volume' | transloco }} {{ toPercent(speech.settings().volume) }}%</span
+      ><input
+        type="range"
+        min="0"
+        max="1"
+        step="0.05"
+        [ngModel]="speech.settings().volume"
+        (input)="setSpeechNumber('volume', $event)"
+        name="speechVolume"
+    /></label>
+    <label class="flex items-center gap-2 py-1 text-[12px]"
+      ><input
+        type="checkbox"
+        [ngModel]="speech.settings().duckBgm"
+        (ngModelChange)="speech.patchSettings({ duckBgm: $event })"
+        name="duckBgm"
+      />{{ 'feature.chat.speech.duckBgm' | transloco }}</label
+    >
+    @if (speech.settings().duckBgm) {
+      <label class="flex items-center justify-between gap-2 py-1"
+        ><span>{{ 'feature.chat.speech.duckLevel' | transloco }} {{ toPercent(speech.settings().duckLevel) }}%</span
+        ><input
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          [ngModel]="speech.settings().duckLevel"
+          (input)="setSpeechNumber('duckLevel', $event)"
+          name="speechDuckLevel"
+      /></label>
+      <p class="text-ui-dim m-0 text-[11px]">{{ 'feature.chat.speech.duckNote' | transloco }}</p>
+    }
+    <fieldset class="border-ui-border-panel my-2 border border-solid p-2">
+      <legend>{{ 'feature.chat.speech.tabs' | transloco }}</legend>
+      @for (tab of tabRows(); track tab.identifier) {
+        <label class="flex items-center justify-between gap-2 py-1 text-[12px]"
+          ><span class="truncate">{{ tab.name }}</span
+          ><input
+            type="checkbox"
+            [ngModel]="speech.tabEnabled(tab.name)"
+            (ngModelChange)="toggleSpeechTab(tab.name, $event)"
+            [name]="'speechTab-' + tab.identifier"
+        /></label>
+      }
+    </fieldset>
+    <div class="mt-1 flex flex-wrap gap-1">
+      <button type="button" [disabled]="!speech.supported || speech.enabled()" (click)="speech.start()">
+        {{ 'feature.chat.speech.start' | transloco }}
+      </button>
+      <button type="button" (click)="speech.stop()">{{ 'feature.chat.speech.stop' | transloco }}</button>
+      <button type="button" [disabled]="!speech.enabled()" (click)="speech.disable()">
+        {{ 'feature.chat.speech.disable' | transloco }}
+      </button>
+    </div>
+  </section>
   <section class="mb-3">
     <h3
       class="border-ui-border-panel text-ui-dim m-0 mb-1.5 border-b border-solid pb-1 text-[10px] font-semibold tracking-[0.06em] uppercase"

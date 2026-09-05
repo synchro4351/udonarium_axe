@@ -7,6 +7,7 @@ import {
   ChatPreferencesService,
   ChatSettingScope,
 } from '@axe/application/chat/chat-preferences.service';
+import { ChatSpeechService } from '@axe/application/chat/chat-speech.service';
 import { SystemAvatarKind, SystemAvatarService } from '@axe/application/chat/system-avatar.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
@@ -37,6 +38,15 @@ export class ChatMessageSettingComponent {
   private readonly rolePermission = inject(RolePermissionService);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly chatSound = inject(ChatSoundEventHandlerService);
+  readonly speech = inject(ChatSpeechService);
+
+  setSpeechNumber(key: 'rate' | 'volume' | 'duckLevel', event: Event): void {
+    this.speech.patchSettings({ [key]: (event.target as HTMLInputElement).valueAsNumber });
+  }
+
+  toggleSpeechTab(name: string, value: boolean): void {
+    this.speech.setTabEnabled(name, value);
+  }
 
   readonly systemAvatarVisible = this.systemAvatar.isVisible;
   readonly speakerAvatarVisible = this.systemAvatar.isSpeakerVisible;

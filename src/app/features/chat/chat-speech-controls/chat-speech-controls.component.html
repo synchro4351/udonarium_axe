@@ -1,0 +1,30 @@
+@if (speech.supported && canRead()) {
+  <span class="ml-1 inline-flex items-center gap-0.5 align-middle">
+    <button
+      type="button"
+      class="text-ui-dim hover:text-ui-accent inline-flex size-6 cursor-pointer items-center justify-center rounded-sm border-0 bg-transparent p-0"
+      [attr.aria-label]="'feature.chat.speech.read' | transloco"
+      [title]="'feature.chat.speech.read' | transloco"
+      (click)="speak()"
+    >
+      <i
+        aria-hidden="true"
+        class="material-icons text-[15px]!"
+        [class.text-ui-accent]="speech.speakingId() === message().identifier"
+        >volume_up</i
+      >
+    </button>
+    <button
+      type="button"
+      class="text-ui-dim hover:text-ui-accent inline-flex size-6 cursor-pointer items-center justify-center rounded-sm border-0 bg-transparent p-0"
+      [attr.aria-label]="'feature.chat.speech.stop' | transloco"
+      [title]="'feature.chat.speech.stop' | transloco"
+      (click)="stop()"
+    >
+      <i aria-hidden="true" class="material-icons text-[15px]!">stop</i>
+    </button>
+  </span>
+  @if (speech.skippedIds().has(message().identifier)) {
+    <span class="text-ui-muted text-[11px]">{{ 'feature.chat.speech.skipped' | transloco }}</span>
+  }
+}
