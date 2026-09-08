@@ -1,5 +1,13 @@
 # Udonarium Axe
 
+> [!NOTE]
+> このブランチは、Synworkのセッションで使用する独自機能を組み合わせる統合版です。
+> 一般利用できる機能は、公式Axeの`main`を基準とした独立ブランチで開発・公開します。
+> 公式プロジェクトの外部コントリビューション受け入れ体制が整うまでは、こちらから機能提案Issueや
+> Pull Requestを送らず、採用・回答・レビューを求めません。公式側で有用と判断されたブランチは、
+> MITライセンスの範囲でmergeまたはcherry-pickしていただいて構いません。
+> Synwork固有の配備設定と、この統合ブランチ全体は上流への取り込み対象として想定していません。
+
 [![Latest release](https://img.shields.io/github/v/release/Xelltis/udonarium_axe?logo=github)](https://github.com/Xelltis/udonarium_axe/releases/latest)
 [![Release](https://github.com/Xelltis/udonarium_axe/actions/workflows/release.yml/badge.svg)](https://github.com/Xelltis/udonarium_axe/actions/workflows/release.yml)
 [![Docs](https://img.shields.io/badge/Docs-利用ガイド-5C73E7?logo=vitepress&logoColor=white)](https://xelltis.github.io/udonarium_axe/)
