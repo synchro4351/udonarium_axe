@@ -34,10 +34,10 @@ describe('ChatSpeechEventHandlerService', () => {
     emitMessageAdded({ tabIdentifier: tab.identifier, messageIdentifier: fresh.identifier });
     expect(speech.readAutomatically).toHaveBeenCalledExactlyOnceWith(fresh);
   });
-  it('ignores historical messages received after initialization', () => {
+  it('forwards newly received messages despite sender clock skew', () => {
     TestBed.inject(ChatSpeechEventHandlerService);
-    tab.addMessage({ text: 'history', timestamp: Date.now() - 60_000 });
-    expect(speech.readAutomatically).not.toHaveBeenCalled();
+    const skewed = tab.addMessage({ text: 'new from skewed clock', timestamp: Date.now() - 60_000 });
+    expect(speech.readAutomatically).toHaveBeenCalledExactlyOnceWith(skewed);
   });
   it('disables speech on room close and room load', () => {
     TestBed.inject(ChatSpeechEventHandlerService);

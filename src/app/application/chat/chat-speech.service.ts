@@ -34,7 +34,6 @@ export class ChatSpeechService {
   private current: SpeechItem | null = null;
   private utterance: SpeechSynthesisUtterance | null = null;
   private generation = 0;
-  private enabledSince = 0;
   private watchdog: ReturnType<typeof setTimeout> | undefined;
   private releaseTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly refreshVoices = () => {
@@ -94,7 +93,6 @@ export class ChatSpeechService {
       return;
     }
     this.enabled.set(true);
-    this.enabledSince = Date.now();
     this.status.set('feature.chat.speech.ready');
   }
 
@@ -137,7 +135,6 @@ export class ChatSpeechService {
   }
 
   readAutomatically(message: ChatMessage): void {
-    if (message.timestamp < this.enabledSince) return;
     if (!this.enabled() || !this.canRead(message) || message.isSendFromSelf || message.isSystem || message.isDirect)
       return;
     if (!this.tabEnabled(this.tabName(message.identifier))) return;

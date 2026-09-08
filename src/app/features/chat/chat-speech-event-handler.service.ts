@@ -14,7 +14,6 @@ export class ChatSpeechEventHandlerService {
   private readonly store = inject(ObjectStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly seen = new Set<string>();
-  private since = Date.now();
 
   constructor() {
     for (const message of this.store.getObjects<ChatMessage>(ChatMessage)) this.seen.add(message.identifier);
@@ -22,7 +21,7 @@ export class ChatSpeechEventHandlerService {
       if (this.seen.has(messageIdentifier)) return;
       this.seen.add(messageIdentifier);
       const message = this.store.get<ChatMessage>(messageIdentifier);
-      if (!message || message.timestamp < this.since || Date.now() - message.timestamp > 30_000) return;
+      if (!message) return;
       this.speech.readAutomatically(message);
     }, this.destroyRef);
     this.changes.onObjectChangedForAlias(
@@ -44,7 +43,6 @@ export class ChatSpeechEventHandlerService {
 
   private reset(): void {
     this.speech.disable();
-    this.since = Date.now();
     this.seen.clear();
     for (const message of this.store.getObjects<ChatMessage>(ChatMessage)) this.seen.add(message.identifier);
   }
