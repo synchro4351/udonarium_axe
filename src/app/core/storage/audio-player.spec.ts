@@ -96,6 +96,9 @@ type AudioPlayerPrivateStatic = {
   _auditionGainNode: unknown;
   _seGainNode: unknown;
   _speechDucking: number;
+  _volume: number;
+  _auditionVolume: number;
+  _seVolume: number;
   cacheMap: Map<string, { url: string; blob: Blob }>;
   MAX_CACHE_SIZE: number;
   evictCacheIfNeeded: () => void;
@@ -105,6 +108,8 @@ type AudioPlayerPrivateStatic = {
 type AudioPlayerPrivateInstance = {
   _audioElm?: unknown;
 };
+
+const DEFAULT_VOLUME = 0.5;
 
 const audioPlayerPrivate = AudioPlayer as unknown as AudioPlayerPrivateStatic;
 const asAudioPlayerPrivate = (player: AudioPlayer): AudioPlayerPrivateInstance =>
@@ -116,6 +121,11 @@ function resetStaticState() {
   audioPlayerPrivate._masterGainNode = undefined;
   audioPlayerPrivate._auditionGainNode = undefined;
   audioPlayerPrivate._seGainNode = undefined;
+  // written to rather than set through the setters, which would build the gain graph a test
+  // has yet to ask for. A test that reads a default has to find one whatever ran before it.
+  audioPlayerPrivate._volume = DEFAULT_VOLUME;
+  audioPlayerPrivate._auditionVolume = DEFAULT_VOLUME;
+  audioPlayerPrivate._seVolume = DEFAULT_VOLUME;
   audioPlayerPrivate.cacheMap.clear();
 }
 
