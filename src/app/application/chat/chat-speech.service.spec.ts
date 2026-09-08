@@ -140,6 +140,17 @@ describe('ChatSpeechService', () => {
     service.readAutomatically(message('next'));
     expect(service.pendingCount()).toBe(0);
   });
+  it('automatically reads a newly received message despite sender clock skew', () => {
+    service.start();
+    service.setTabEnabled('Main', true);
+    const skewed = tab.addMessage({
+      text: 'new from skewed clock',
+      timestamp: Date.now() - 60_000,
+      from: 'someone-else',
+    });
+    service.readAutomatically(skewed);
+    expect(lastUtterance().text).toBe('new from skewed clock');
+  });
   it('retains every code point of a long message', () => {
     const text = '日本語😀'.repeat(100);
     service.speak(message(text));
