@@ -2427,6 +2427,7 @@
         "voice": "Voice",
         "rate": "Speed",
         "volume": "Volume",
+        "readSelf": "Read my own messages",
         "duckBgm": "Lower BGM while reading",
         "tabs": "Read tabs",
         "start": "Start automatic reading",

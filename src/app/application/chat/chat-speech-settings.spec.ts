@@ -6,11 +6,16 @@ describe('chat speech settings', () => {
       voiceURI: '',
       rate: 2,
       volume: 0,
+      readSelf: true,
       duckBgm: false,
       duckLevel: 1,
       remoteVoices: false,
       tabs: {},
     });
+  });
+
+  it("retains the option to skip the reader's own messages", () => {
+    expect(readSpeechSettings({ readSelf: false }).readSelf).toBe(false);
   });
 
   it('keeps only boolean tab preferences and the newest 64 entries', () => {

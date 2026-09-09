@@ -41,6 +41,14 @@
       />{{ 'feature.chat.speech.remoteAllowed' | transloco }}</label
     >
     <p class="text-ui-dim m-0 text-[11px]">{{ 'feature.chat.speech.remoteNote' | transloco }}</p>
+    <label class="flex items-center gap-2 py-1 text-[12px]"
+      ><input
+        type="checkbox"
+        name="speechReadSelf"
+        [ngModel]="speech.settings().readSelf"
+        (ngModelChange)="speech.patchSettings({ readSelf: $event })"
+      />{{ 'feature.chat.speech.readSelf' | transloco }}</label
+    >
     <label class="flex items-center justify-between gap-2 py-1"
       ><span>{{ 'feature.chat.speech.rate' | transloco }} {{ speech.settings().rate }}</span
       ><input

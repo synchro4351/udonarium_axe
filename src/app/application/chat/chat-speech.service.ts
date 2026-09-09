@@ -135,7 +135,13 @@ export class ChatSpeechService {
   }
 
   readAutomatically(message: ChatMessage): void {
-    if (!this.enabled() || !this.canRead(message) || message.isSendFromSelf || message.isSystem || message.isDirect)
+    if (
+      !this.enabled() ||
+      !this.canRead(message) ||
+      (message.isSendFromSelf && !this.settings().readSelf) ||
+      message.isSystem ||
+      message.isDirect
+    )
       return;
     if (!this.tabEnabled(this.tabName(message.identifier))) return;
     this.enqueue(message, true);
