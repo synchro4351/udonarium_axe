@@ -162,18 +162,41 @@ export default defineConfig({
   },
   themeConfig: {
     nav: [
-      { text: 'ガイド', link: '/guide/getting-started' },
+      { text: '遊びかた', link: '/play/' },
       { text: '操作マニュアル', link: '/manual/' },
-      { text: 'バックエンド', link: '/guide/backend' },
+      { text: 'できること', link: '/guide/features' },
+      { text: '設置する', link: '/guide/quickstart' },
       { text: 'リリースノート', link: '/release-notes/' },
     ],
     sidebar: {
+      '/play/': [
+        {
+          text: '遊びかた',
+          items: [
+            { text: '遊びはじめる', link: '/play/' },
+            { text: '招待リンクをもらったら', link: '/play/join' },
+            { text: 'はじめてのセッション', link: '/play/first-session' },
+            { text: '遊ぶときの困りごと', link: '/play/faq' },
+          ],
+        },
+        {
+          text: 'そのあと',
+          items: [
+            { text: '操作マニュアル', link: '/manual/' },
+            { text: 'できること', link: '/guide/features' },
+            { text: '自分の環境を用意する', link: '/guide/quickstart' },
+          ],
+        },
+      ],
       '/manual/': [
         {
           text: 'はじめに',
           items: [
             { text: '画面の見かた', link: '/manual/' },
+            { text: '部屋とロビー', link: '/manual/rooms' },
             { text: 'スマートフォンで使う', link: '/manual/mobile' },
+            { text: '遊びはじめる', link: '/play/' },
+            { text: '遊ぶときの困りごと', link: '/play/faq' },
           ],
         },
         {
@@ -255,6 +278,7 @@ export default defineConfig({
           text: 'リリースノート',
           items: [
             { text: '一覧', link: '/release-notes/' },
+            { text: 'v1.50.0', link: '/release-notes/v1.50.0' },
             { text: 'v1.49.0', link: '/release-notes/v1.49.0' },
             { text: 'v1.48.0', link: '/release-notes/v1.48.0' },
             { text: 'v1.47.0', link: '/release-notes/v1.47.0' },
@@ -316,24 +340,26 @@ export default defineConfig({
       ],
       '/guide/': [
         {
-          text: 'はじめに',
+          text: '自分で設置する',
           items: [
-            { text: 'Udonarium Axe とは', link: '/guide/getting-started' },
-            { text: '必要なもの', link: '/guide/requirements' },
-          ],
-        },
-        {
-          text: '導入',
-          items: [
+            { text: 'なぜバックエンドが要るのか', link: '/guide/requirements' },
             { text: 'クイックスタート', link: '/guide/quickstart' },
             { text: 'バックエンドの選択肢', link: '/guide/backend' },
+            { text: '自分で設置するときの質問', link: '/guide/faq' },
           ],
         },
         {
-          text: 'リファレンス',
+          text: 'Axe について',
           items: [
-            { text: '主な機能', link: '/guide/features' },
-            { text: 'よくある質問', link: '/guide/faq' },
+            { text: 'Udonarium Axe とは', link: '/guide/getting-started' },
+            { text: 'できること', link: '/guide/features' },
+          ],
+        },
+        {
+          text: '遊ぶほうへ',
+          items: [
+            { text: '遊びはじめる', link: '/play/' },
+            { text: '操作マニュアル', link: '/manual/' },
           ],
         },
       ],
