@@ -2427,6 +2427,7 @@
         "voice": "음성",
         "rate": "속도",
         "volume": "볼륨",
+        "readSelf": "내 메시지도 읽기",
         "duckBgm": "읽는 동안 BGM 낮추기",
         "tabs": "읽을 탭",
         "start": "자동 읽기 시작",

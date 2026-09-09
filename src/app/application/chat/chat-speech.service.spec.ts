@@ -151,6 +151,18 @@ describe('ChatSpeechService', () => {
     service.readAutomatically(skewed);
     expect(lastUtterance().text).toBe('new from skewed clock');
   });
+  it("automatically reads the reader's own message by default and can skip it by preference", () => {
+    service.start();
+    service.setTabEnabled('Main', true);
+    const own = message('こんにちは', { from: 'me' });
+    service.readAutomatically(own);
+    expect(lastUtterance().text).toBe('こんにちは');
+
+    service.stop();
+    service.patchSettings({ readSelf: false });
+    service.readAutomatically(message('skip me', { from: 'me' }));
+    expect(synth.speak).toHaveBeenCalledTimes(1);
+  });
   it('retains every code point of a long message', () => {
     const text = '日本語😀'.repeat(100);
     service.speak(message(text));

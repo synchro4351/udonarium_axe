@@ -2,6 +2,7 @@ export interface SpeechSettings {
   voiceURI: string;
   rate: number;
   volume: number;
+  readSelf: boolean;
   duckBgm: boolean;
   duckLevel: number;
   remoteVoices: boolean;
@@ -28,6 +29,7 @@ export function readSpeechSettings(value: unknown): SpeechSettings {
     voiceURI: typeof source['voiceURI'] === 'string' ? source['voiceURI'] : '',
     rate: bounded('rate', 1, 0.5, 2),
     volume: bounded('volume', 1, 0, 1),
+    readSelf: source['readSelf'] !== false,
     duckBgm: source['duckBgm'] === true,
     duckLevel: bounded('duckLevel', 0.25, 0, 1),
     remoteVoices: source['remoteVoices'] === true,
