@@ -35,6 +35,7 @@ import {
 import { DiceSymbol } from '@axe/domain/dice/dice-symbol';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { CharacterSheetTarget } from '@axe/domain/tabletop/character-sheet-target';
+import { GameTableMask } from '@axe/domain/tabletop/game-table-mask';
 import { GameTableScratchMask } from '@axe/domain/tabletop/game-table-scratch-mask';
 import { RangeArea } from '@axe/domain/tabletop/range';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
@@ -350,6 +351,39 @@ export class GameCharacterSheetComponent {
   }
   get scratchMask(): GameTableScratchMask | null {
     return this.tabletopObject instanceof GameTableScratchMask ? this.tabletopObject : null;
+  }
+  get mapMask(): GameTableMask | null {
+    const mask = this.tabletopObject instanceof GameTableMask ? this.tabletopObject : null;
+    if (mask) this.objectChange.versionOf(mask.identifier)();
+    return mask;
+  }
+  get mapMaskCommonElements(): DataElement[] {
+    return (this.mapMask?.commonDataElement?.children ?? []).filter(
+      (element) => !['text', 'fontsize', 'color', 'textoutline', 'outlinecolor'].includes(element.name)
+    );
+  }
+  onMapMaskText(event: Event): void {
+    const mask = this.mapMask;
+    if (mask) mask.text = (event.target as HTMLTextAreaElement).value;
+  }
+  onMapMaskFontSize(event: Event): void {
+    const value = (event.target as HTMLInputElement).valueAsNumber;
+    if (this.mapMask && Number.isFinite(value)) this.mapMask.fontSize = value;
+  }
+  onMapMaskColor(event: Event): void {
+    const mask = this.mapMask;
+    if (mask) mask.color = (event.target as HTMLInputElement).value;
+  }
+  onMapMaskBgColor(event: Event): void {
+    const mask = this.mapMask;
+    if (mask) mask.bgcolor = (event.target as HTMLInputElement).value;
+  }
+  onMapMaskOutline(event: Event): void {
+    if (this.mapMask) this.mapMask.textOutline = (event.target as HTMLInputElement).checked;
+  }
+  onMapMaskOutlineColor(event: Event): void {
+    const mask = this.mapMask;
+    if (mask) mask.outlineColor = (event.target as HTMLInputElement).value;
   }
   get rangeArea(): RangeArea | null {
     return this.tabletopObject instanceof RangeArea ? this.tabletopObject : null;

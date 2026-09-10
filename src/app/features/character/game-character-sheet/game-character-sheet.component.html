@@ -41,6 +41,75 @@
   </div>
 }
 
+@if (mapMask; as mask) {
+  <section
+    class="bg-ui-elevated border-ui-border-panel text-ui-text rounded-ui-sm m-1 flex flex-col gap-2 border border-solid p-3"
+    data-map-mask-text-editor
+  >
+    <label class="flex flex-col gap-1 text-[0.78em]">
+      <span class="text-ui-muted">{{ 'feature.inventory.sheet.mapMaskText' | transloco }}</span>
+      <textarea
+        class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent w-full resize-y border border-solid px-2 py-1 outline-none"
+        rows="4"
+        [value]="mask.text"
+        (input)="onMapMaskText($event)"
+      ></textarea>
+    </label>
+    <span class="text-ui-faint text-[0.68em]">{{ 'feature.card.field.textHint' | transloco }}</span>
+    <div class="flex flex-wrap items-center gap-3">
+      <label class="flex items-center gap-2 text-[0.78em]">
+        <span class="text-ui-muted">{{ 'feature.inventory.sheet.fontSize' | transloco }}</span>
+        <input
+          class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent w-20 border border-solid px-2 py-1 outline-none"
+          type="number"
+          min="1"
+          max="120"
+          [value]="mask.fontSize"
+          (input)="onMapMaskFontSize($event)"
+        />
+      </label>
+      <label class="flex items-center gap-2 text-[0.78em]">
+        <span class="text-ui-muted">{{ 'feature.inventory.sheet.mapMaskFontColor' | transloco }}</span>
+        <input
+          class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent h-8 w-14 cursor-pointer border border-solid p-0.5 outline-none"
+          type="color"
+          [value]="mask.color"
+          (input)="onMapMaskColor($event)"
+        />
+      </label>
+      <label class="flex items-center gap-2 text-[0.78em]">
+        <span class="text-ui-muted">{{ 'feature.inventory.sheet.mapMaskBackground' | transloco }}</span>
+        <input
+          class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent h-8 w-14 cursor-pointer border border-solid p-0.5 outline-none"
+          type="color"
+          [value]="mask.bgcolor"
+          (input)="onMapMaskBgColor($event)"
+        />
+      </label>
+      <label class="flex items-center gap-2 text-[0.78em]">
+        <input
+          class="accent-ui-accent size-4 cursor-pointer"
+          type="checkbox"
+          [checked]="mask.textOutline"
+          (change)="onMapMaskOutline($event)"
+        />
+        <span class="text-ui-muted">{{ 'feature.inventory.sheet.outline' | transloco }}</span>
+      </label>
+      @if (mask.textOutline) {
+        <label class="flex items-center gap-2 text-[0.78em]">
+          <span class="text-ui-muted">{{ 'feature.inventory.sheet.mapMaskOutlineColor' | transloco }}</span>
+          <input
+            class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent h-8 w-14 cursor-pointer border border-solid p-0.5 outline-none"
+            type="color"
+            [value]="mask.outlineColor"
+            (input)="onMapMaskOutlineColor($event)"
+          />
+        </label>
+      }
+    </div>
+  </section>
+}
+
 @if (tabletopObject) {
   @if (disclosableObject; as disclosable) {
     <disclosure-control [object]="disclosable" />
@@ -1275,12 +1344,23 @@
             class="bg-ui-elevated border-ui-border-panel text-ui-text rounded-ui-sm m-1 box-border min-w-50 flex-[1_0_auto] border border-solid px-2.5 py-2"
           >
             <div class="box-border table w-full">
-              <div
-                class="[&>div]:border-ui-border-panel box-border table-row [&>div]:box-border [&>div]:table-cell [&>div]:border [&>div]:border-solid [&>div]:align-top"
-                game-data-element
-                [gameDataElement]="tabletopObject.commonDataElement"
-                [isTagLocked]="true"
-              ></div>
+              @if (mapMask) {
+                @for (element of mapMaskCommonElements; track element.identifier) {
+                  <div
+                    class="[&>div]:border-ui-border-panel box-border table-row [&>div]:box-border [&>div]:table-cell [&>div]:border [&>div]:border-solid [&>div]:align-top"
+                    game-data-element
+                    [gameDataElement]="element"
+                    [isTagLocked]="true"
+                  ></div>
+                }
+              } @else {
+                <div
+                  class="[&>div]:border-ui-border-panel box-border table-row [&>div]:box-border [&>div]:table-cell [&>div]:border [&>div]:border-solid [&>div]:align-top"
+                  game-data-element
+                  [gameDataElement]="tabletopObject.commonDataElement"
+                  [isTagLocked]="true"
+                ></div>
+              }
             </div>
           </div>
         }

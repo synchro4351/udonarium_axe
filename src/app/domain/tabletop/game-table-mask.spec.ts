@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { DataElement } from '@axe/domain/data/data-element';
 import { GameTableMask } from '@axe/domain/tabletop/game-table-mask';
@@ -113,10 +114,81 @@ describe('GameTableMask', () => {
     });
   });
 
+  describe('text settings', () => {
+    it('provides defaults without mutating a legacy mask', () => {
+      const mask = GameTableMask.create('legacy', 1, 1, 100);
+      const before = mask.commonDataElement!.children.length;
+      expect(mask.text).toBe('');
+      expect(mask.fontSize).toBe(18);
+      expect(mask.textOutline).toBe(false);
+      expect(mask.outlineColor).toBe('#ffffff');
+      expect(mask.commonDataElement!.children.length).toBe(before);
+    });
+
+    it('creates missing text fields lazily with stable identifiers', () => {
+      const mask = GameTableMask.create('legacy', 1, 1, 100, 'mask-id');
+      mask.text = 'hello';
+      mask.text = 'updated';
+      mask.fontSize = 24;
+      mask.textOutline = true;
+      mask.outlineColor = '#123456';
+      expect(mask.commonDataElement!.getFirstElementByName('text')!.identifier).toBe('text_mask-id');
+      expect(mask.commonDataElement!.getFirstElementByName('fontsize')!.identifier).toBe('fontsize_mask-id');
+      expect(mask.commonDataElement!.getFirstElementByName('textoutline')!.identifier).toBe('textoutline_mask-id');
+      expect(mask.text).toBe('updated');
+      expect(mask.commonDataElement!.getFirstElementByName('text')!.currentValue).toBe('updated');
+      expect(mask.fontSize).toBe(24);
+      expect(mask.textOutline).toBe(true);
+      expect(mask.outlineColor).toBe('#123456');
+    });
+
+    it('creates the paired color element without losing background semantics', () => {
+      const mask = GameTableMask.create('legacy', 1, 1, 100, 'mask-id');
+      mask.color = '#112233';
+      mask.bgcolor = '#445566';
+      const color = mask.commonDataElement!.getFirstElementByName('color')!;
+      expect(color.type).toBe('colors');
+      expect(color.value).toBe('#112233');
+      expect(color.currentValue).toBe('#445566');
+    });
+  });
+
   describe('what it inherits', () => {
     it('starts on the table', () => {
       const mask = GameTableMask.create('test', 1, 1, 100);
       expect(mask.location.name).toBe('table');
     });
+  });
+
+  it('round-trips text, outline, and paired colours through XML', () => {
+    const mask = GameTableMask.create('mask', 2, 2, 100, 'mask-id');
+    mask.text = 'A & B\n|漢《かん》';
+    mask.fontSize = 32;
+    mask.color = '#112233';
+    mask.bgcolor = '#445566';
+    mask.textOutline = true;
+    mask.outlineColor = '#abcdef';
+    const xml = mask.toXml().replace(/location\.[a-z]+="[^"]*"\s*/g, '');
+    const restored = ObjectSerializer.instance.parseXml(xml) as GameTableMask;
+    expect(restored.text).toBe(mask.text);
+    expect(restored.fontSize).toBe(32);
+    expect(restored.color).toBe('#112233');
+    expect(restored.bgcolor).toBe('#445566');
+    expect(restored.textOutline).toBe(true);
+    expect(restored.outlineColor).toBe('#abcdef');
+  });
+
+  it('clamps invalid imported font size and falls back invalid outline colour', () => {
+    const mask = GameTableMask.create('Imported mask', 1, 1, 100);
+    mask.commonDataElement!.appendChild(DataElement.create('fontsize', '999'));
+    mask.commonDataElement!.appendChild(DataElement.create('outlinecolor', 'invalid'));
+    expect(mask.fontSize).toBe(120);
+    expect(mask.outlineColor).toBe('#ffffff');
+    const size = mask.commonDataElement!.getFirstElementByName('fontsize')!;
+    size.value = '-1';
+    expect(mask.fontSize).toBe(1);
+    size.value = 'invalid';
+    expect(mask.fontSize).toBe(18);
+    mask.destroy();
   });
 });
