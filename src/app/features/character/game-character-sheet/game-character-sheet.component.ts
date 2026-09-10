@@ -273,6 +273,22 @@ export class GameCharacterSheetComponent {
     if (!this.canReadCardFace(c)) return;
     c.faceFontColor = (event.target as HTMLInputElement).value;
   }
+  cardOwnFaceTextOutline(c: Card): boolean {
+    this.objectChange.versionOf(c.identifier)();
+    return this.canReadCardFace(c) && c.faceTextOutline;
+  }
+  setCardOwnFaceTextOutline(c: Card, event: Event): void {
+    if (!this.canReadCardFace(c)) return;
+    c.faceTextOutline = (event.target as HTMLInputElement).checked;
+  }
+  cardOwnFaceOutlineColor(c: Card): string {
+    this.objectChange.versionOf(c.identifier)();
+    return this.canReadCardFace(c) ? c.faceOutlineColor : Card.DEFAULT_FACE_OUTLINE_COLOR;
+  }
+  setCardOwnFaceOutlineColor(c: Card, event: Event): void {
+    if (!this.canReadCardFace(c)) return;
+    c.faceOutlineColor = (event.target as HTMLInputElement).value;
+  }
 
   textNoteTitle(note: TextNote): string {
     this.objectChange.versionOf(note.identifier)();

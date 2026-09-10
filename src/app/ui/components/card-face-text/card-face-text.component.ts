@@ -33,6 +33,9 @@ export class CardFaceTextComponent {
     return (this.trackCardFace().faceFontSize + 9) * this.scale();
   });
   readonly fontColor = computed(() => this.trackCardFace().faceFontColor);
+  readonly textOutline = computed(() => this.trackCardFace().faceTextOutline);
+  readonly outlineColor = computed(() => this.trackCardFace().faceOutlineColor);
+  readonly outlineWidth = computed(() => `${this.fontSize() * 0.075}px`);
   readonly padding = computed(() => 8 * this.scale());
   readonly transformCss = computed(() => `rotateZ(${this.rotation()}deg)`);
 }

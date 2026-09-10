@@ -83,6 +83,36 @@ describe('CardFaceTextComponent', () => {
     expect(face.style.color).toBe('#ff8800');
   });
 
+  it('applies a sharp outline only when enabled', async () => {
+    card.faceText = 'outlined';
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    expect(component.textOutline()).toBe(false);
+
+    card.faceTextOutline = true;
+    card.faceOutlineColor = '#ffffff';
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(component.textOutline()).toBe(true);
+    expect(component.outlineWidth()).toBe('2.025px');
+    expect(component.outlineColor()).toBe('#ffffff');
+
+    fixture.componentRef.setInput('scale', 0.5);
+    fixture.detectChanges();
+    expect(component.outlineWidth()).toBe('1.0125px');
+  });
+
+  it('reacts when synchronized outline settings are disabled', async () => {
+    card.faceText = 'outline';
+    card.faceTextOutline = true;
+    fixture.detectChanges();
+    card.faceTextOutline = false;
+    objectChange.notifyChanged(card.identifier);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.textOutline()).toBe(false);
+  });
+
   it('follows synchronized child values and stack rotation', async () => {
     card.faceText = 'before';
     fixture.componentRef.setInput('rotation', 180);

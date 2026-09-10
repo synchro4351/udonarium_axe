@@ -963,6 +963,26 @@
                   />
                 </label>
                 <label class="flex items-center gap-2 text-[0.78em]">
+                  <input
+                    type="checkbox"
+                    class="accent-ui-accent size-4 cursor-pointer"
+                    [checked]="cardOwnFaceTextOutline(c)"
+                    (change)="setCardOwnFaceTextOutline(c, $event)"
+                  />
+                  <span class="text-ui-muted">{{ 'feature.card.field.textOutline' | transloco }}</span>
+                </label>
+                @if (cardOwnFaceTextOutline(c)) {
+                  <label class="flex items-center gap-2 text-[0.78em]">
+                    <span class="text-ui-muted">{{ 'feature.card.field.outlineColor' | transloco }}</span>
+                    <input
+                      type="color"
+                      class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent h-8 w-14 cursor-pointer border border-solid p-0.5 outline-none"
+                      [value]="cardOwnFaceOutlineColor(c)"
+                      (input)="setCardOwnFaceOutlineColor(c, $event)"
+                    />
+                  </label>
+                }
+                <label class="flex items-center gap-2 text-[0.78em]">
                   <span class="text-ui-muted">{{ 'feature.card.field.fontColor' | transloco }}</span>
                   <input
                     type="color"
