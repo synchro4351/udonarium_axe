@@ -83,6 +83,40 @@ describe('CardFaceTextComponent', () => {
     expect(face.style.color).toBe('#ff8800');
   });
 
+  it('applies a centred halo without changing the ink or layout', async () => {
+    card.faceText = 'outlined';
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    expect(component.textOutline()).toBe(false);
+    expect(component.outlineShadow()).toBe('none');
+    expect(fixture.nativeElement.querySelector('div').classList.contains('font-bold')).toBe(true);
+
+    card.faceTextOutline = true;
+    card.faceOutlineColor = '#ffffff';
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(component.textOutline()).toBe(true);
+    expect(component.outlineShadow().split(', ')).toEqual(Array(8).fill('0px 0px 2.025px #ffffff'));
+    expect(component.outlineColor()).toBe('#ffffff');
+    expect(fixture.nativeElement.querySelector('div').classList.contains('font-bold')).toBe(true);
+
+    fixture.componentRef.setInput('scale', 0.5);
+    fixture.detectChanges();
+    expect(component.outlineShadow().split(', ')).toEqual(Array(8).fill('0px 0px 1.0125px #ffffff'));
+  });
+
+  it('reacts when synchronized outline settings are disabled', async () => {
+    card.faceText = 'outline';
+    card.faceTextOutline = true;
+    fixture.detectChanges();
+    card.faceTextOutline = false;
+    objectChange.notifyChanged(card.identifier);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.textOutline()).toBe(false);
+    expect(fixture.componentInstance.outlineShadow()).toBe('none');
+  });
+
   it('follows synchronized child values and stack rotation', async () => {
     card.faceText = 'before';
     fixture.componentRef.setInput('rotation', 180);

@@ -18,6 +18,7 @@ export enum CardState {
 export class Card extends OwnedTabletopObject {
   static readonly DEFAULT_FACE_FONT_SIZE = 18;
   static readonly DEFAULT_FACE_FONT_COLOR = '#16171c';
+  static readonly DEFAULT_FACE_OUTLINE_COLOR = '#ffffff';
   @SyncVar() isLock: boolean = false;
   @SyncVar() dispLockMark: boolean = true;
 
@@ -66,6 +67,20 @@ export class Card extends OwnedTabletopObject {
   }
   set faceFontColor(value: string) {
     this.setOrCreateCommonValue('fontcolor', FACE_FONT_COLOR.test(value) ? value : Card.DEFAULT_FACE_FONT_COLOR);
+  }
+  get faceTextOutline(): boolean {
+    const value = this.commonDataElement?.getFirstElementByName('textoutline')?.value;
+    return String(value).toLowerCase() === 'true' || String(value) === '1';
+  }
+  set faceTextOutline(value: boolean) {
+    this.setOrCreateCommonValue('textoutline', value ? 1 : 0);
+  }
+  get faceOutlineColor(): string {
+    const value = String(this.getCommonValue('outlinecolor', Card.DEFAULT_FACE_OUTLINE_COLOR));
+    return FACE_FONT_COLOR.test(value) ? value : Card.DEFAULT_FACE_OUTLINE_COLOR;
+  }
+  set faceOutlineColor(value: string) {
+    this.setOrCreateCommonValue('outlinecolor', FACE_FONT_COLOR.test(value) ? value : Card.DEFAULT_FACE_OUTLINE_COLOR);
   }
   private setOrCreateCommonValue(name: string, value: string | number, attributes: Attributes = {}): void {
     const existing = this.commonDataElement?.getFirstElementByName(name);

@@ -203,6 +203,30 @@ describe('GameCharacterSheetComponent', () => {
     }
   });
 
+  it('guards outline settings while the card face is hidden', () => {
+    const card = Card.create('Hidden outline', 'front.png', 'back.png');
+    card.faceTextOutline = true;
+    card.faceOutlineColor = '#123456';
+    card.state = CardState.BACK;
+    card.owner = 'another-user';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = false;
+    const picker = document.createElement('input');
+    picker.type = 'color';
+    picker.value = '#00ff00';
+    try {
+      expect(component.cardOwnFaceTextOutline(card)).toBe(false);
+      expect(component.cardOwnFaceOutlineColor(card)).toBe(Card.DEFAULT_FACE_OUTLINE_COLOR);
+      component.setCardOwnFaceTextOutline(card, { target: checkbox } as unknown as Event);
+      component.setCardOwnFaceOutlineColor(card, { target: picker } as unknown as Event);
+      expect(card.faceTextOutline).toBe(true);
+      expect(card.faceOutlineColor).toBe('#123456');
+    } finally {
+      card.destroy();
+    }
+  });
+
   it('does not put a hidden card face text into the editing DOM', () => {
     const card = Card.create('Hidden card', 'front.png', 'back.png');
     card.faceText = 'secret text';

@@ -662,7 +662,9 @@
         "text": "カード文章",
         "textHint": "ルビは |漢字《かんじ》、引用は行頭の > で指定できます。",
         "fontSize": "文字サイズ",
-        "fontColor": "文字色"
+        "fontColor": "文字色",
+        "textOutline": "文字の縁取り",
+        "outlineColor": "縁取り色"
       },
       "drawDialog": {
         "title": "カードを引く",

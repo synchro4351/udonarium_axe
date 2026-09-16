@@ -5,6 +5,7 @@ import { ImageFile } from '@axe/core/storage/image-file';
 import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card, CardState } from '@axe/domain/card/card';
+import { DataElement } from '@axe/domain/data/data-element';
 
 describe('Card', () => {
   let store: ObjectStore;
@@ -126,6 +127,8 @@ describe('Card', () => {
       const card = Card.create('Information', 'front.png', 'back.png');
       card.faceText = 'Sword & shield\n|剣《つるぎ》';
       card.faceFontSize = 32;
+      card.faceTextOutline = true;
+      card.faceOutlineColor = '#ffffff';
       // happy-dom's XML parser rejects attribute names containing dots, so remove only location data.
       // The assertion still verifies that every card-specific face value survives the round trip.
       const xml = card.toXml().replace(/location\.[a-z]+="[^"]*"\s*/g, '');
@@ -136,6 +139,28 @@ describe('Card', () => {
 
       expect(restored.faceText).toBe('Sword & shield\n|剣《つるぎ》');
       expect(restored.faceFontSize).toBe(32);
+      expect(restored.faceTextOutline).toBe(true);
+      expect(restored.faceOutlineColor).toBe('#ffffff');
+    });
+
+    it('accepts serialized outline flags', () => {
+      const card = Card.create('Outlined', 'front.png', 'back.png');
+      try {
+        const flag =
+          card.commonDataElement!.getFirstElementByName('textoutline') ??
+          DataElement.create('textoutline', 'true', {}, `textoutline_${card.identifier}`);
+        card.commonDataElement!.appendChild(flag);
+        for (const value of [1, '1', 'true', 'TRUE']) {
+          flag.value = value;
+          expect(card.faceTextOutline).toBe(true);
+        }
+        for (const value of [0, '0', 'false', '', 'invalid']) {
+          flag.value = value;
+          expect(card.faceTextOutline).toBe(false);
+        }
+      } finally {
+        card.destroy();
+      }
     });
   });
 
@@ -561,6 +586,34 @@ describe('the colour of a card face', () => {
 
       card.faceFontColor = 'red';
       expect(card.faceFontColor).toBe(Card.DEFAULT_FACE_FONT_COLOR);
+    } finally {
+      card.destroy();
+    }
+  });
+});
+
+describe('the outline of a card face', () => {
+  it('is disabled by default and preserves legacy cards', () => {
+    const card = Card.create('plain', 'front.png', 'back.png');
+    try {
+      expect(card.faceTextOutline).toBe(false);
+      expect(card.faceOutlineColor).toBe(Card.DEFAULT_FACE_OUTLINE_COLOR);
+      expect(card.commonDataElement!.getFirstElementByName('textoutline')).toBeNull();
+      expect(card.commonDataElement!.getFirstElementByName('outlinecolor')).toBeNull();
+    } finally {
+      card.destroy();
+    }
+  });
+
+  it('round-trips the enabled state and validates the colour', () => {
+    const card = Card.create('outlined', 'front.png', 'back.png');
+    try {
+      card.faceTextOutline = true;
+      card.faceOutlineColor = '#Ff8800';
+      expect(card.faceTextOutline).toBe(true);
+      expect(card.faceOutlineColor).toBe('#Ff8800');
+      card.faceOutlineColor = 'red';
+      expect(card.faceOutlineColor).toBe(Card.DEFAULT_FACE_OUTLINE_COLOR);
     } finally {
       card.destroy();
     }
