@@ -163,6 +163,57 @@ describe('GameTableMaskComponent', () => {
     });
   });
 
+  describe('face text', () => {
+    let mask: GameTableMask;
+
+    beforeEach(() => {
+      mask = GameTableMask.create('text mask', 2, 2, 1);
+      mask.text = 'a|b《c》d\n<script>second</script>';
+      fixture.componentRef.setInput('gameTableMask', mask);
+      fixture.detectChanges();
+    });
+
+    afterEach(() => mask.destroy());
+
+    it('renders escaped ruby text with line breaks in an inline child', () => {
+      const text = fixture.nativeElement.querySelector('.z-1 span') as HTMLElement | null;
+      expect(text).toBeTruthy();
+      expect(text?.querySelector('ruby')?.textContent).toBe('bc');
+      expect(text?.querySelector('script')).toBeNull();
+      expect(text?.textContent).toBe('abcd\n<script>second</script>');
+      expect(text?.parentElement?.children.length).toBe(1);
+      expect(text?.parentElement?.style.fontSize).toBe('27px');
+    });
+
+    it('hides the text while the mask is being scratched and restores it afterwards', async () => {
+      mask.owner = 'someone';
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.z-1 span')).toBeNull();
+      mask.owner = '';
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.z-1 span')).toBeTruthy();
+    });
+
+    it('uses eight centered shadows derived from the rendered font size', () => {
+      mask.textOutline = true;
+      fixture.detectChanges();
+      const shadow = `0px 0px ${(mask.fontSize + 9) * 0.075}px ${mask.outlineColor}`;
+      expect(component.outlineShadowCss).toBe(Array<string>(8).fill(shadow).join(', '));
+    });
+
+    it('updates synchronized text and follows the table rotation', async () => {
+      mask.commonDataElement!.getFirstElementByName('text')!.value = 'updated';
+      TestBed.inject(UiSignalService).notifyTableViewRotation(50, 20, 180);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const text = fixture.nativeElement.querySelector('.z-1 span') as HTMLElement;
+      expect(text.textContent).toBe('updated');
+      expect(text.parentElement?.style.transform).toBe('rotateZ(180deg)');
+    });
+  });
+
   describe('the scratching buttons', () => {
     let mask: GameTableMask;
 

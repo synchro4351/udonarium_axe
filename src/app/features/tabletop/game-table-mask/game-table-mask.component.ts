@@ -44,6 +44,7 @@ import { SelectableDirective } from '@axe/ui/directives/selectable.directive';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { setupInputHandler, setupMovableForPiece } from '@axe/ui/tabletop/setup-tabletop-piece';
 import { translateZCss, Z_OFFSET_MASK_PX } from '@axe/ui/tabletop/z-offset';
+import { decorateChatStyleText } from '@axe/ui/text-decoration/decorate-chat-text';
 import { TranslocoModule } from '@jsverse/transloco';
 
 @Component({
@@ -173,6 +174,28 @@ export class GameTableMaskComponent {
   get bgcolor(): string {
     const mask = this.gameTableMask();
     return mask?.bgcolor ?? '';
+  }
+
+  get text(): string {
+    this.maskVersion();
+    return this.gameTableMask()?.text ?? '';
+  }
+  get fontSize(): number {
+    this.maskVersion();
+    return this.gameTableMask()?.fontSize ?? 18;
+  }
+  get textOutline(): boolean {
+    this.maskVersion();
+    return this.gameTableMask()?.textOutline ?? false;
+  }
+  get outlineColor(): string {
+    this.maskVersion();
+    return this.gameTableMask()?.outlineColor ?? '#ffffff';
+  }
+  readonly decoratedText = computed(() => decorateChatStyleText(this.text));
+  get outlineShadowCss(): string {
+    const shadow = `0px 0px ${(this.fontSize + 9) * 0.075}px ${this.outlineColor}`;
+    return Array<string>(8).fill(shadow).join(', ');
   }
   set bgcolor(bgcolor: string) {
     const mask = this.gameTableMask();

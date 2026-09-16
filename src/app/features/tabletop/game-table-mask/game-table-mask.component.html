@@ -43,6 +43,17 @@
             />
           }
         </div>
+        @if (!isScratching && text.length) {
+          <div
+            class="pointer-events-none absolute inset-0 z-1 flex items-center justify-center overflow-hidden p-2 text-center leading-[1.65] font-bold wrap-anywhere whitespace-pre-line backface-hidden transform-3d"
+            [style.transform]="isInverse ? 'rotateZ(180deg)' : null"
+            [style.font-size.px]="fontSize + 9"
+            [style.color]="color"
+            [style.text-shadow]="textOutline ? outlineShadowCss : 'none'"
+          >
+            <span [innerHTML]="decoratedText() | safe"></span>
+          </div>
+        }
         <div
           class="pointer-events-none size-full overflow-hidden backface-hidden transform-3d"
           [class.outline-2]="!hexOutlineMask"
