@@ -193,8 +193,9 @@ export class GameTableMaskComponent {
     return this.gameTableMask()?.outlineColor ?? '#ffffff';
   }
   readonly decoratedText = computed(() => decorateChatStyleText(this.text));
-  get textStrokeCss(): string {
-    return `${this.outlineColor} ${(this.fontSize + 9) * 0.075}px`;
+  get outlineShadowCss(): string {
+    const shadow = `0px 0px ${(this.fontSize + 9) * 0.075}px ${this.outlineColor}`;
+    return Array<string>(8).fill(shadow).join(', ');
   }
   set bgcolor(bgcolor: string) {
     const mask = this.gameTableMask();

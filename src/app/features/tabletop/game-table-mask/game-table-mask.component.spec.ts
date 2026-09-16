@@ -196,10 +196,11 @@ describe('GameTableMaskComponent', () => {
       expect(fixture.nativeElement.querySelector('.z-1 span')).toBeTruthy();
     });
 
-    it('uses the outline width derived from the rendered font size', () => {
+    it('uses eight centered shadows derived from the rendered font size', () => {
       mask.textOutline = true;
       fixture.detectChanges();
-      expect(component.textStrokeCss).toBe(`${mask.outlineColor} ${(mask.fontSize + 9) * 0.075}px`);
+      const shadow = `0px 0px ${(mask.fontSize + 9) * 0.075}px ${mask.outlineColor}`;
+      expect(component.outlineShadowCss).toBe(Array<string>(8).fill(shadow).join(', '));
     });
 
     it('updates synchronized text and follows the table rotation', async () => {

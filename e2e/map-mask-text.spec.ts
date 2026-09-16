@@ -23,7 +23,8 @@ test('map mask text preserves styling and legacy masks stay unlabeled', async ({
   await createMapMask(page);
   const sheet = await openMaskEditor(page);
 
-  const text = 'a|漢字《かんじ》d\n二行目';
+  const text =
+    'a|漢字《かんじ》d 長い文章でも縁取りの切替で改行位置が変わらないことを確認します。\n二行目も同じ太さで表示します。';
   const textInput = sheet.locator('[data-map-mask-text-editor] textarea');
   await textInput.fill(text);
   await textInput.blur();
@@ -45,7 +46,30 @@ test('map mask text preserves styling and legacy masks stay unlabeled', async ({
   const editor = sheet.locator('[data-map-mask-text-editor]');
   const outlineToggle = editor.locator('input[type="checkbox"]');
   await expect(outlineToggle).not.toBeChecked();
-  await expect(renderedText).toHaveCSS('-webkit-text-stroke', /0px/);
+  await expect(renderedText).toHaveCSS('text-shadow', 'none');
+  await expect(renderedText).toHaveCSS('font-weight', '700');
+  const textRects = async () =>
+    renderedText.evaluate((element) => {
+      const origin = element.getBoundingClientRect();
+      const range = document.createRange();
+      const textNodes: Text[] = [];
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      let node: Node | null;
+      while ((node = walker.nextNode())) {
+        if (node.textContent) textNodes.push(node as Text);
+      }
+      return textNodes.flatMap((textNode) => {
+        range.selectNodeContents(textNode);
+        return [...range.getClientRects()].map((rect) => [
+          rect.x - origin.x,
+          rect.y - origin.y,
+          rect.width,
+          rect.height,
+        ]);
+      });
+    });
+  const unoutlinedRects = await textRects();
+  expect(unoutlinedRects.length).toBeGreaterThan(3);
   await outlineToggle.check();
   const outlineColor = editor.getByText('縁取り色').locator('..').locator('input[type="color"]');
   await outlineColor.fill('#ff00aa');
@@ -53,8 +77,16 @@ test('map mask text preserves styling and legacy masks stay unlabeled', async ({
   await expect(outlineToggle).toBeChecked();
   await expect(renderedText).toHaveCSS('font-size', '39px');
   await expect(renderedText).toHaveCSS('color', 'rgb(0, 170, 255)');
-  await expect(renderedText).toHaveCSS('-webkit-text-stroke-width', '2.925px');
-  await expect(renderedText).toHaveCSS('-webkit-text-stroke-color', 'rgb(255, 0, 170)');
+  await expect(renderedText).toHaveCSS('font-weight', '700');
+  const shadow = await renderedText.evaluate((element) => getComputedStyle(element).textShadow);
+  expect((shadow.match(/rgb\(255, 0, 170\)/g) ?? []).length).toBe(8);
+  await expect(renderedText).toHaveCSS('-webkit-text-stroke-width', '0px');
+  expect(await textRects()).toEqual(unoutlinedRects);
+  await outlineToggle.uncheck();
+  await expect(renderedText).toHaveCSS('text-shadow', 'none');
+  await expect(renderedText).toHaveCSS('font-weight', '700');
+  expect(await textRects()).toEqual(unoutlinedRects);
+  await outlineToggle.check();
   await expect(renderedText.locator('ruby')).toContainText('かんじ');
 
   await renderedText.screenshot({ path: testInfo.outputPath('map-mask-text.png') });
