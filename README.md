@@ -1,4 +1,37 @@
-# Udonarium Axe
+# Udonarium_Axe_tyoitashi
+
+> [!IMPORTANT]
+> このリポジトリは、[Udonarium Axe](https://github.com/Xelltis/udonarium_axe)を基盤に個人利用向けの機能を追加するフォークです。公式版ではありません。
+
+## このフォークの方針
+
+- 当面の開発基準は、公式Axe v1.50.0の[`7a4692c2`](https://github.com/Xelltis/udonarium_axe/commit/7a4692c200f94edfd3514ef1ce095ef7ba26865e)です。公式更新は監視しますが、互換性確認と採用判断なしに基準を進めません。
+- 汎用的な追加機能は、一機能ごとに固定基準から独立したブランチとして実装します。私家統合版の差分を機能ブランチへ混ぜません。
+- 現在、上流への機能提案IssueやPull Requestは原則として送りません。公開ブランチは、必要な方がMITライセンスの範囲で参照・cherry-pickできる形に保ちます。採用やレビューを求めるものではありません。
+- 通常利用向けの全機能版は[`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)で管理し、機能ブランチから一方向に統合します。
+
+## 追加機能ブランチ
+
+| 機能 | 状態 | ブランチ | 基準・補足 |
+| --- | --- | --- | --- |
+| カード表面への文章 | 公式v1.48.0へ採用済み・参照用 | [`feature/card-face-text`](https://github.com/synchro4351/udonarium_axe/tree/feature/card-face-text) | 旧提案ブランチ。今後の拡張には使用しません |
+| チャット読み上げ | 実装済み・私家統合版へ統合済み | [`codex/chat-speech`](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-speech) | ブラウザのSpeechSynthesisを利用する端末ローカル設定 |
+| マップマスク文章・縁取り | 実装済み・重点検証済み | [`codex/map-mask-text`](https://github.com/synchro4351/udonarium_axe/tree/codex/map-mask-text) | Fly互換を考慮。保存ZIPと2クライアント実通信の手動確認は未完了 |
+| カード文章の縁取り | 開発中 | [`codex/card-text-outline`](https://github.com/synchro4351/udonarium_axe/tree/codex/card-text-outline) | 初期実装を公開。視認性調整と最終検証を継続中 |
+
+ブランチを新しく作成した時点で、この表へ機能名・状態・ブランチ・基準を追加します。実装、検証、私家統合、公式採用、保留または廃止の判断が変わった場合も状態を更新し、過去の公開ブランチは用途が分かるように記録を残します。
+
+### 今後の候補
+
+- カットイン・テキストレイヤーのフォント選択
+- カットイン・帯レイヤーのグラデーション設定表示の修正
+- セッション用依頼・Todoリスト
+- 主観ビューモード、3Dオブジェクト配置（低優先度）
+- 外部AIツール向けAPI（安全な権限設計を先に行うため後回し）
+
+---
+
+## ベースプロジェクト: Udonarium Axe
 
 [![Latest release](https://img.shields.io/github/v/release/Xelltis/udonarium_axe?logo=github)](https://github.com/Xelltis/udonarium_axe/releases/latest)
 [![Release](https://github.com/Xelltis/udonarium_axe/actions/workflows/release.yml/badge.svg)](https://github.com/Xelltis/udonarium_axe/actions/workflows/release.yml)
