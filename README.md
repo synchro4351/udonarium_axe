@@ -16,8 +16,8 @@
 | --- | --- | --- | --- |
 | カード表面への文章 | 公式v1.48.0へ採用済み・参照用 | [`feature/card-face-text`](https://github.com/synchro4351/udonarium_axe/tree/feature/card-face-text) | 旧提案ブランチ。今後の拡張には使用しません |
 | チャット読み上げ | 実装済み・私家統合版へ統合済み | [`codex/chat-speech`](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-speech) | ブラウザのSpeechSynthesisを利用する端末ローカル設定 |
-| マップマスク文章・縁取り | 実装済み・重点検証済み | [`codex/map-mask-text`](https://github.com/synchro4351/udonarium_axe/tree/codex/map-mask-text) | Fly互換を考慮。保存ZIPと2クライアント実通信の手動確認は未完了 |
-| カード文章の縁取り | 実装済み・重点検証済み | [`codex/card-text-outline`](https://github.com/synchro4351/udonarium_axe/tree/codex/card-text-outline) | 太字と光彩方式で視認性を調整。保存ZIPと2クライアント実通信の手動確認は未完了 |
+| マップマスク文章・縁取り | 私家統合版へ統合済み・重点検証済み | [`codex/map-mask-text`](https://github.com/synchro4351/udonarium_axe/tree/codex/map-mask-text) | v1.50.0 / `7a4692c2` 基準。常時太字と光彩方式。Flyのデータ構造を考慮。保存ZIPと2クライアント実通信の手動確認は未完了 |
+| カード文章の縁取り | 私家統合版へ統合済み・ローカル目視確認済み | [`codex/card-text-outline`](https://github.com/synchro4351/udonarium_axe/tree/codex/card-text-outline) | v1.50.0 / `7a4692c2` 基準。常時太字と光彩方式で、縁取り切替時の改行位置を維持。保存ZIPと2クライアント実通信の手動確認は未完了 |
 
 ブランチを新しく作成した時点で、この表へ機能名・状態・ブランチ・基準を追加します。実装、検証、私家統合、公式採用、保留または廃止の判断が変わった場合も状態を更新し、過去の公開ブランチは用途が分かるように記録を残します。
 
