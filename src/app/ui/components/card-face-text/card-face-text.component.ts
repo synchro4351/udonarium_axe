@@ -35,7 +35,12 @@ export class CardFaceTextComponent {
   readonly fontColor = computed(() => this.trackCardFace().faceFontColor);
   readonly textOutline = computed(() => this.trackCardFace().faceTextOutline);
   readonly outlineColor = computed(() => this.trackCardFace().faceOutlineColor);
-  readonly outlineWidth = computed(() => `${this.fontSize() * 0.075}px`);
+  readonly outlineShadow = computed(() => {
+    if (!this.textOutline()) return 'none';
+    // A repeated, centred halo separates the ink from artwork without painting over thin glyph strokes.
+    const shadow = `0px 0px ${this.fontSize() * 0.075}px ${this.outlineColor()}`;
+    return Array<string>(8).fill(shadow).join(', ');
+  });
   readonly padding = computed(() => 8 * this.scale());
   readonly transformCss = computed(() => `rotateZ(${this.rotation()}deg)`);
 }
