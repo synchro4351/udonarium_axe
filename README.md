@@ -5,10 +5,10 @@
 
 ## このフォークの方針
 
-- 当面の開発基準は、公式Axe v1.50.0の[`7a4692c2`](https://github.com/Xelltis/udonarium_axe/commit/7a4692c200f94edfd3514ef1ce095ef7ba26865e)です。公式更新は監視しますが、互換性確認と採用判断なしに基準を進めません。
-- 汎用的な追加機能は、一機能ごとに固定基準から独立したブランチとして実装します。私家統合版の差分を機能ブランチへ混ぜません。
-- 現在、上流への機能提案IssueやPull Requestは原則として送りません。公開ブランチは、必要な方がMITライセンスの範囲で参照・cherry-pickできる形に保ちます。採用やレビューを求めるものではありません。
-- 通常利用向けの全機能版は[`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)で管理し、機能ブランチから一方向に統合します。
+- 正式基準は公式Axe v1.50.0の[`7a4692c2`](https://github.com/Xelltis/udonarium_axe/commit/7a4692c200f94edfd3514ef1ce095ef7ba26865e)です。v1.57.1を更新候補として検証中で、採用判断なしに正式基準を進めません。
+- 開発の本流は、全機能を含む[`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)です。追加機能は本流の固定コミットから短期ブランチで作り、検証後に戻します。
+- 上流への機能提案IssueやPull Requestは原則として送りません。MITライセンスの範囲での参照・再利用・cherry-pickを歓迎しますが、採用やレビューを求めません。本流由来のコミットには他機能への依存があり、独立したexportブランチは必要になった時だけ作ります。
+- 公式追従は本流から作る一時更新ブランチでまとめて検証します。過去の公開機能ブランチは参照用に保持し、リリースごとに個別移植し直しません。
 
 ## 追加機能ブランチ
 
@@ -18,6 +18,7 @@
 | チャット読み上げ | 実装済み・私家統合版へ統合済み | [`codex/chat-speech`](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-speech) | ブラウザのSpeechSynthesisを利用する端末ローカル設定 |
 | マップマスク文章・縁取り | 私家統合版へ統合済み・重点検証済み | [`codex/map-mask-text`](https://github.com/synchro4351/udonarium_axe/tree/codex/map-mask-text) | v1.50.0 / `7a4692c2` 基準。常時太字と光彩方式。Flyのデータ構造を考慮。保存ZIPと2クライアント実通信の手動確認は未完了 |
 | カード文章の縁取り | 私家統合版へ統合済み・ローカル目視確認済み | [`codex/card-text-outline`](https://github.com/synchro4351/udonarium_axe/tree/codex/card-text-outline) | v1.50.0 / `7a4692c2` 基準。常時太字と光彩方式で、縁取り切替時の改行位置を維持。保存ZIPと2クライアント実通信の手動確認は未完了 |
+| v1.57.1追従・再参加待機 | 更新候補・正式採用前 | `codex/synwork-update-v1.57.1` | 私家本流`8ac1ce23`＋公式`85c89f98`。旧接続の消滅を期限付きで待ち、他の接続を強制切断しない。ローカル実SkyWayで即時reload後の自動復帰・同一ID・再同期を確認。実卓・見た目・音声の確認は別途必要 |
 
 ブランチを新しく作成した時点で、この表へ機能名・状態・ブランチ・基準を追加します。実装、検証、私家統合、公式採用、保留または廃止の判断が変わった場合も状態を更新し、過去の公開ブランチは用途が分かるように記録を残します。
 
