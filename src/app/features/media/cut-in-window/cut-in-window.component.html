@@ -8,12 +8,13 @@
       #videoPlayerComponent
       [style.visibility]="isVisible()"
       [videoId]="videoId"
+      [disablePlaceholder]="true"
       [width]="youTubeWidth"
       [height]="youTubeHeight"
       suggestedQuality="default"
       [playerVars]="{
         autoplay: 0,
-        controls: 0,
+        controls: 1,
         start: videoStartSeconds,
         loop: cutIn && cutIn.isLoop ? 1 : 0,
         playsinline: 1,
@@ -30,9 +31,6 @@
       (stateChange)="onPlayerStateChange($event)"
     >
     </youtube-player>
-    @if (videoId) {
-      <div class="yt-click-guard"></div>
-    }
     @if (!videoId && cutInImageUrl()) {
       <img class="size-full" [src]="cutInImageUrl() | safe: 'resourceUrl'" draggable="false" />
     }
