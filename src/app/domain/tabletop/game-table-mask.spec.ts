@@ -90,7 +90,14 @@ describe('GameTableMask', () => {
   describe('color', () => {
     it('falls back to a default colour when it carries none', () => {
       const mask = GameTableMask.create('test', 1, 1, 100);
-      expect(mask.color).toBe('#555555');
+      expect(mask.color).toBe('#ffffff');
+    });
+
+    it('keeps white text when the background is set before the text color', () => {
+      const mask = GameTableMask.create('test', 1, 1, 100);
+      mask.bgcolor = '#000000';
+      expect(mask.color).toBe('#ffffff');
+      expect(mask.bgcolor).toBe('#000000');
     });
 
     it('returns the colour it carries', () => {

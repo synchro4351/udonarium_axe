@@ -177,7 +177,7 @@ export class GameTableMask extends TabletopObject {
    */
   get color(): string {
     const element = this.getElement('color', this.commonDataElement);
-    return element ? `${element.value}` : '#555555';
+    return element ? `${element.value}` : '#ffffff';
   }
   set color(color: string) {
     const element = this.getElement('color', this.commonDataElement);
@@ -203,7 +203,7 @@ export class GameTableMask extends TabletopObject {
     if (element) element.currentValue = bgcolor;
     else
       this.commonDataElement?.appendChild(
-        DataElement.create('color', '#555555', { type: 'colors', currentValue: bgcolor }, `color_${this.identifier}`)
+        DataElement.create('color', '#ffffff', { type: 'colors', currentValue: bgcolor }, `color_${this.identifier}`)
       );
   }
 
