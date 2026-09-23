@@ -14,6 +14,8 @@
 
 | 機能 | 状態 | ブランチ | 基準・補足 |
 | --- | --- | --- | --- |
+| カットイン文字フォント選択 | 私家本流へ統合済み・未配備 | [`codex/cut-in-font-picker`](https://github.com/synchro4351/udonarium_axe/tree/codex/cut-in-font-picker) | `6ba6751a`起点、`14101a33`。既定・ゴシック・明朝・丸ゴシック・等幅の選択と任意入力を併用。端末により字形差あり。保存形式・同期項目は維持。機能タスクで対象59件を両テスト経路、全体12,518件成功・1件skip、build成功 |
+| YouTubeカットイン再生 | 調査・修正中、未統合 | `codex/cut-in-youtube-playback` | `6ba6751a`起点。サムネイルから再生が始まらない問題を調査中。公開可能コミット・検証結果は未受領 |
 | カード表面への文章 | 公式v1.48.0へ採用済み・参照用 | [`feature/card-face-text`](https://github.com/synchro4351/udonarium_axe/tree/feature/card-face-text) | 旧提案ブランチ。今後の拡張には使用しません |
 | チャット読み上げ | 実装済み・私家統合版へ統合済み | [`codex/chat-speech`](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-speech) | ブラウザのSpeechSynthesisを利用する端末ローカル設定 |
 | マップマスク文章・縁取り | 私家統合版へ統合済み・重点検証済み | [`codex/map-mask-text`](https://github.com/synchro4351/udonarium_axe/tree/codex/map-mask-text) | v1.50.0 / `7a4692c2` 基準。常時太字と光彩方式。Flyのデータ構造を考慮。保存ZIPと2クライアント実通信の手動確認は未完了 |
@@ -25,7 +27,6 @@
 
 ### 今後の候補
 
-- カットイン・テキストレイヤーのフォント選択
 - カットイン・帯レイヤーのグラデーション設定表示の修正
 - セッション用依頼・Todoリスト
 - 主観ビューモード、3Dオブジェクト配置（低優先度）
