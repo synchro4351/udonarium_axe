@@ -5,7 +5,7 @@
 
 ## このフォークの方針
 
-- 正式基準は公式Axe v1.50.0の[`7a4692c2`](https://github.com/Xelltis/udonarium_axe/commit/7a4692c200f94edfd3514ef1ce095ef7ba26865e)です。v1.57.1を更新候補として検証中で、採用判断なしに正式基準を進めません。
+- 開発基準は公式Axe v1.57.1の[`85c89f98`](https://github.com/Xelltis/udonarium_axe/commit/85c89f98ec11f2a82cb0b7bcbcf54351496d4457)です。私家版本流への統合は完了し、配備は別途承認を経て行います。
 - 開発の本流は、全機能を含む[`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)です。追加機能は本流の固定コミットから短期ブランチで作り、検証後に戻します。
 - 上流への機能提案IssueやPull Requestは原則として送りません。MITライセンスの範囲での参照・再利用・cherry-pickを歓迎しますが、採用やレビューを求めません。本流由来のコミットには他機能への依存があり、独立したexportブランチは必要になった時だけ作ります。
 - 公式追従は本流から作る一時更新ブランチでまとめて検証します。過去の公開機能ブランチは参照用に保持し、リリースごとに個別移植し直しません。
@@ -18,7 +18,8 @@
 | チャット読み上げ | 実装済み・私家統合版へ統合済み | [`codex/chat-speech`](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-speech) | ブラウザのSpeechSynthesisを利用する端末ローカル設定 |
 | マップマスク文章・縁取り | 私家統合版へ統合済み・重点検証済み | [`codex/map-mask-text`](https://github.com/synchro4351/udonarium_axe/tree/codex/map-mask-text) | v1.50.0 / `7a4692c2` 基準。常時太字と光彩方式。Flyのデータ構造を考慮。保存ZIPと2クライアント実通信の手動確認は未完了 |
 | カード文章の縁取り | 私家統合版へ統合済み・ローカル目視確認済み | [`codex/card-text-outline`](https://github.com/synchro4351/udonarium_axe/tree/codex/card-text-outline) | v1.50.0 / `7a4692c2` 基準。常時太字と光彩方式で、縁取り切替時の改行位置を維持。保存ZIPと2クライアント実通信の手動確認は未完了 |
-| v1.57.1追従・再参加待機 | 更新候補・正式採用前 | `codex/synwork-update-v1.57.1` | 私家本流`8ac1ce23`＋公式`85c89f98`。旧接続の消滅を期限付きで待ち、他の接続を強制切断しない。ローカル実SkyWayで即時reload後の自動復帰・同一ID・再同期を確認。実卓・見た目・音声の確認は別途必要 |
+| v1.57.1追従・再参加待機 | 私家本流へ統合済み・配備準備 | [`codex/synwork-update-v1.57.1`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-update-v1.57.1) | 本流`6ba6751a`。公式`85c89f98`をmerge。旧接続の消滅を期限付きで待ち、他の接続を強制切断しない。ローカル実SkyWayで同一IDの自動復帰・再同期を確認。全体テスト12,516件成功・1件skip。文章表示・マスク編集・読み上げはユーザー確認済み。カットイン・パーティの目視と弱回線実卓は未確認 |
+| マップマスクの既定文字色 | 私家本流へ統合済み | [`6ba6751a`](https://github.com/synchro4351/udonarium_axe/commit/6ba6751a2361d4a200584b150288e3ffd772a7ae) | 未指定の文字色を白に変更。明示指定・保存済みの色を維持。関連52件のテストが直接Vitest・Angular経由の両方で成功 |
 
 ブランチを新しく作成した時点で、この表へ機能名・状態・ブランチ・基準を追加します。実装、検証、私家統合、公式採用、保留または廃止の判断が変わった場合も状態を更新し、過去の公開ブランチは用途が分かるように記録を残します。
 
