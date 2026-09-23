@@ -50,6 +50,13 @@ export interface RoomRules {
   /** Whether a piece weighs what it covers in that reckoning, rather than one apiece. */
   engagementCountsSize: boolean;
   facingMark: string;
+  /**
+   * Whether a piece is drawn no taller than the cell it stands on.
+   *
+   * A tall picture towers over its cell, which over a table laid flat smears it across
+   * whatever is behind. The room answers for it so that everyone reads the same board.
+   */
+  pieceImageInCell: boolean;
 }
 
 /** The same rules in the looser terms a table holds them and an attribute carries them. */
@@ -80,6 +87,7 @@ export const ROOM_RULE_DEFAULTS: RoomRules = {
   breakOutCost: DEFAULT_BREAK_OUT_COST,
   engagementCountsSize: true,
   facingMark: DEFAULT_TABLE_FACING_MARK,
+  pieceImageInCell: false,
 };
 
 /** The rules that are set together, and so are handed back to the table together. */
@@ -105,6 +113,7 @@ export const ROOM_RULE_GROUPS = {
     'engagementCountsSize',
   ],
   facing: ['facingMark'],
+  flatPieces: ['pieceImageInCell'],
 } as const satisfies Record<string, readonly (keyof RoomRules)[]>;
 
 export type RoomRuleGroup = keyof typeof ROOM_RULE_GROUPS;
@@ -126,6 +135,7 @@ export function readRuleFlag(held: unknown): boolean | null {
   return null;
 }
 
+/** Writes a yes or no the way readRuleFlag reads it: `1`, `0`, or empty for no answer. */
 export function writeRuleFlag(answer: boolean | null): string {
   if (answer === null) return ROOM_RULE_UNANSWERED;
   return answer ? '1' : '0';
@@ -140,6 +150,10 @@ export function readRuleNumber(held: unknown): number | null {
   return amount;
 }
 
+/**
+ * Writes a number the way readRuleNumber reads it, with -1 for no answer or for anything that is
+ * not a finite number of zero or more.
+ */
 export function writeRuleNumber(answer: number | null): number {
   if (answer === null || !Number.isFinite(answer) || answer < 0) return -1;
   return answer;
@@ -151,6 +165,7 @@ export function readRuleText(held: unknown): string | null {
   return text.length > 0 ? text : null;
 }
 
+/** Writes a word the way readRuleText reads it, with empty for no answer. */
 export function writeRuleText(answer: string | null): string {
   return answer === null ? ROOM_RULE_UNANSWERED : answer;
 }
@@ -199,5 +214,6 @@ export function resolveRoomRules(
     breakOutCost: settled('breakOutCost'),
     engagementCountsSize: settled('engagementCountsSize'),
     facingMark: settled('facingMark'),
+    pieceImageInCell: settled('pieceImageInCell'),
   };
 }

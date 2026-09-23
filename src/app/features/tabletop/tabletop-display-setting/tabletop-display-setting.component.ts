@@ -37,9 +37,12 @@ import { asTableFacingMark, TABLE_FACING_MARKS, TableFacingMark } from '@axe/dom
 import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
 import {
   asMultiAngleMotionMode,
+  TABLETOP_MODE_KEYS,
   TABLETOP_MODE_SETTINGS,
+  TabletopDisplayKey,
   TabletopDisplaySettings,
 } from '@axe/domain/tabletop/tabletop-display';
+import { TABLETOP_MENU_STYLES, TabletopMenuStyle } from '@axe/domain/tabletop/tabletop-menu-style';
 import { VIEW_MODES, ViewMode } from '@axe/domain/ui/view-mode';
 import { DisplayCalibrationComponent } from '@axe/ui/components/display-calibration/display-calibration.component';
 import { TranslocoModule } from '@jsverse/transloco';
@@ -47,11 +50,11 @@ import { TranslocoModule } from '@jsverse/transloco';
 /**
  * Everything about looking at the table in one place.
  *
- * The settings gathered here were reached through three menus that each said something about
- * two dimensions: the view this seat is taking, the view the table recommends, and how a table
- * seen from above is drawn. Which of them a reader wanted was never obvious from any one of
- * them, so they are put side by side in the order they take effect, and each is still where it
- * was for anyone who knows the way there.
+ * The settings gathered here also live in three menus that each say something about two
+ * dimensions: the view this seat is taking, the view the table recommends, and how a table seen
+ * from above is drawn. Which of them a reader wants is not obvious from any one of them, so they
+ * are put side by side in the order they take effect, and each stays in its own menu for anyone
+ * who knows the way there.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -87,10 +90,15 @@ export class TabletopDisplaySettingComponent {
     queueMicrotask(() => (this.panelService.title = this.t('feature.tabletop.displaySetting.title')));
   }
 
-  /** Whether this reader may speak for the table, which only the recommended view asks. */
+  /**
+   * Whether this reader may speak for the room and its tables.
+   *
+   * These few settings reach every screen, and the chips beside them say so. A player may set
+   * the rules of play, but not what everyone sees.
+   */
   protected readonly isEditable = computed(() => {
     this.objectChange.trackMyCursor();
-    return this.rolePermission.canEditTabletop;
+    return this.rolePermission.canEditShared;
   });
 
   /** What this seat asked for: the table's own recommendation, or a view of its own. */
@@ -99,28 +107,32 @@ export class TabletopDisplaySettingComponent {
   protected readonly laysFlat = this.tabletop.mode2d;
   protected readonly recommendsFlat = this.tabletop.recommendsFlat;
 
+  /** Chooses how this seat looks at the table, remembered in this browser. */
   chooseViewMode(mode: ViewMode): void {
     this.viewMode.choose(mode);
   }
 
   /**
-   * Whether this screen is set up as the table itself: laid flat, and dressed for it.
+   * Whether this screen carries everything a table with seats around it asks for.
    *
-   * Looking straight down is the whole of what the rest of this panel is for, so the mode is
-   * read from the view rather than written down beside it. Turning it on lays the screen flat
-   * and puts in what a flat screen wants; turning it off only stands the view back up, since
-   * everything it put in is dead in that view anyway and is a reader's to keep.
+   * Being looked at from above is not the same as being set up as a table, so this answers for
+   * the settings rather than for the view: the view is chosen just below, by name. Taking one
+   * of them away afterwards leaves this unticked until the lot is asked for again.
    */
-  get tabletopMode(): boolean {
-    return this.laysFlat();
+  get tabletopRecommended(): boolean {
+    const now = this.settings;
+    return (Object.keys(TABLETOP_MODE_SETTINGS) as TabletopDisplayKey[]).every(
+      (key) => now[key] === TABLETOP_MODE_SETTINGS[key]
+    );
   }
-  set tabletopMode(wanted: boolean) {
-    if (!wanted) {
-      this.viewMode.choose('perspective');
-      return;
-    }
-    this.viewMode.choose('flat');
-    this.set(TABLETOP_MODE_SETTINGS);
+  set tabletopRecommended(wanted: boolean) {
+    if (wanted) this.set(TABLETOP_MODE_SETTINGS);
+    // Letting go of them is not the same as pinning the defaults: a table that carries its own
+    // value for one of these would never be heard again if this screen wrote over it.
+    else this.display.forgetOnly(TABLETOP_MODE_KEYS);
+    // Asking for the tabletop is asking to look down on it; letting go of the settings is not
+    // asking to stand back up, since a reader may well want to go on looking down.
+    if (wanted) this.viewMode.choose('flat');
   }
 
   /** The view the table asks for, which is the table's to set and so the master's to change. */
@@ -134,20 +146,6 @@ export class TabletopDisplaySettingComponent {
     const table = this.tableSelecter.viewTable;
     if (!this.isEditable() || !table) return;
     table.mode2d = value;
-    triggerUpdateGameObject(table.toContext());
-  }
-
-  /** Whether a piece keeps its face to the reader, which the table answers for everyone. */
-  get imageBillboard(): boolean {
-    this.objectChange.versionOf(this.tableSelecter.identifier)();
-    const table = this.tableSelecter.viewTable;
-    if (table) this.objectChange.versionOf(table.identifier)();
-    return table?.imageBillboard ?? false;
-  }
-  set imageBillboard(value: boolean) {
-    const table = this.tableSelecter.viewTable;
-    if (!this.isEditable() || !table) return;
-    table.imageBillboard = value;
     triggerUpdateGameObject(table.toContext());
   }
 
@@ -171,6 +169,13 @@ export class TabletopDisplaySettingComponent {
     config.facingMark = asTableFacingMark(value);
   }
 
+  /**
+   * Whether cut-ins are repeated towards readers on other sides of the screen, and towards which
+   * sides.
+   *
+   * Like the other display settings here, a change applies to this screen alone and is remembered
+   * in this browser; until then the table's own value holds.
+   */
   get cutInMultiDirectionMode(): CutInMultiDirectionMode {
     return this.settings.cutInMultiDirectionMode;
   }
@@ -195,6 +200,7 @@ export class TabletopDisplaySettingComponent {
     this.display.forget();
   }
 
+  /** Whether the flat table is drawn without perspective; a change applies to this screen alone. */
   get orthographicProjection(): boolean {
     return this.settings.orthographicProjection;
   }
@@ -202,6 +208,10 @@ export class TabletopDisplaySettingComponent {
     this.set({ orthographicProjection: value });
   }
 
+  /**
+   * Where a piece's hover detail appears on the 2D table, beside the piece or at the screen edges;
+   * a change applies to this screen alone.
+   */
   get hoverDetailPlacement(): HoverDetailPlacement {
     return this.settings.hoverDetailPlacement;
   }
@@ -209,13 +219,10 @@ export class TabletopDisplaySettingComponent {
     this.set({ hoverDetailPlacement: asHoverDetailPlacement(value) });
   }
 
-  get pieceImageInCell(): boolean {
-    return this.settings.pieceImageInCell;
-  }
-  set pieceImageInCell(value: boolean) {
-    this.set({ pieceImageInCell: value });
-  }
-
+  /**
+   * Whether windows carry the button that turns them a quarter at a time; a change applies to this
+   * screen alone.
+   */
   get panelRotationEnabled(): boolean {
     return this.settings.panelRotationEnabled;
   }
@@ -223,13 +230,17 @@ export class TabletopDisplaySettingComponent {
     this.set({ panelRotationEnabled: value });
   }
 
-  get radialMenuEnabled(): boolean {
-    return this.settings.radialMenuEnabled;
+  protected readonly menuStyles = TABLETOP_MENU_STYLES;
+
+  /** Which menu a right-click on the table opens; a change applies to this screen alone. */
+  get tabletopMenuStyle(): TabletopMenuStyle {
+    return this.settings.tabletopMenuStyle;
   }
-  set radialMenuEnabled(value: boolean) {
-    this.set({ radialMenuEnabled: value });
+  set tabletopMenuStyle(value: TabletopMenuStyle) {
+    this.set({ tabletopMenuStyle: value });
   }
 
+  /** How fast the ring menu turns, in degrees a second; a change applies to this screen alone. */
   get radialMenuRotationSpeed(): number {
     return this.settings.radialMenuRotationSpeed;
   }
@@ -237,6 +248,10 @@ export class TabletopDisplaySettingComponent {
     this.set({ radialMenuRotationSpeed: Number(value) });
   }
 
+  /**
+   * Whether piece names curve and orbit round the pieces on the 2D table; a change applies to this
+   * screen alone.
+   */
   get multiAngleEnabled(): boolean {
     return this.settings.multiAngleEnabled;
   }
@@ -244,6 +259,10 @@ export class TabletopDisplaySettingComponent {
     this.set({ multiAngleEnabled: value });
   }
 
+  /**
+   * Whether up to four resources and buffs orbit a piece along with its name; a change applies to
+   * this screen alone.
+   */
   get multiAngleResourceBuffEnabled(): boolean {
     return this.settings.multiAngleResourceBuffEnabled;
   }
@@ -251,6 +270,10 @@ export class TabletopDisplaySettingComponent {
     this.set({ multiAngleResourceBuffEnabled: value });
   }
 
+  /**
+   * The text size shared by the 2D menus, the piece labels and the edge ticker; a change applies to
+   * this screen alone.
+   */
   get multiAngleFontScale(): MultiAngleFontScale {
     return this.settings.multiAngleFontScale;
   }
@@ -258,6 +281,13 @@ export class TabletopDisplaySettingComponent {
     this.set({ multiAngleFontScale: asMultiAngleFontScale(value) });
   }
 
+  /**
+   * How orbiting names move: turning without stopping, or a quarter turn and a pause, for
+   * everything or the piece alone.
+   *
+   * Choosing a mode also resets the time a piece takes for a lap, to the default for continuous
+   * motion and to five seconds otherwise. It applies to this screen alone.
+   */
   get multiAngleMotionMode(): MultiAngleMotionMode {
     return this.settings.multiAngleMotionMode;
   }
@@ -269,6 +299,7 @@ export class TabletopDisplaySettingComponent {
     });
   }
 
+  /** How many seconds orbiting names take for one lap; a change applies to this screen alone. */
   get multiAngleRevolutionSeconds(): number {
     return this.settings.multiAngleRevolutionSeconds;
   }
@@ -276,6 +307,10 @@ export class TabletopDisplaySettingComponent {
     this.set({ multiAngleRevolutionSeconds: Number(value) });
   }
 
+  /**
+   * How many seconds orbiting names rest after each quarter turn; a change applies to this screen
+   * alone.
+   */
   get multiAnglePauseSeconds(): number {
     return this.settings.multiAnglePauseSeconds;
   }
@@ -283,6 +318,10 @@ export class TabletopDisplaySettingComponent {
     this.set({ multiAnglePauseSeconds: Number(value) });
   }
 
+  /**
+   * How many seconds a piece takes for one lap when the piece turns on its own; a change applies to
+   * this screen alone.
+   */
   get multiAnglePieceRevolutionSeconds(): number {
     return this.settings.multiAnglePieceRevolutionSeconds;
   }
@@ -290,6 +329,7 @@ export class TabletopDisplaySettingComponent {
     this.set({ multiAnglePieceRevolutionSeconds: Number(value) });
   }
 
+  /** Whether chat lines sent to the ticker run along the edge of the flat table on this screen. */
   get tickerEnabled(): boolean {
     return this.settings.multiAngleTickerEnabled;
   }
@@ -297,6 +337,9 @@ export class TabletopDisplaySettingComponent {
     this.set({ multiAngleTickerEnabled: value });
   }
 
+  /**
+   * How fast the edge ticker scrolls, in pixels a second; a change applies to this screen alone.
+   */
   get tickerPixelsPerSecond(): number {
     return this.settings.multiAngleTickerPixelsPerSecond;
   }
@@ -304,6 +347,10 @@ export class TabletopDisplaySettingComponent {
     this.set({ multiAngleTickerPixelsPerSecond: Number(value) });
   }
 
+  /**
+   * How wide one square is meant to measure on the glass in millimetres, for a screen laid flat
+   * under miniatures; writes are clamped and apply to this screen alone.
+   */
   get cellMm(): number {
     return this.settings.cellMm;
   }
@@ -324,6 +371,11 @@ export class TabletopDisplaySettingComponent {
     };
   });
 
+  /**
+   * Whether the table is shown at real size on this screen, which locks the view as well.
+   *
+   * Asking for it on a screen that has never been measured opens the calibration instead.
+   */
   get realSizeEnabled(): boolean {
     return this.displayCalibration.realSizeEnabled();
   }
@@ -336,6 +388,10 @@ export class TabletopDisplaySettingComponent {
     this.displayCalibration.setRealSizeEnabled(value);
   }
 
+  /**
+   * Whether the table view refuses to be panned, zoomed or turned on this client; it is neither
+   * shared nor remembered.
+   */
   get viewLocked(): boolean {
     return this.viewLock.locked();
   }
@@ -343,15 +399,24 @@ export class TabletopDisplaySettingComponent {
     this.viewLock.set(value);
   }
 
+  /** Opens the dialog that measures this screen, so the table can be shown at real size. */
   openCalibration(): void {
     // Without this the shell holds a fixed 800px and clips the frame the card is matched against.
     void this.modalService.open(DisplayCalibrationComponent, { fitWidth: true });
   }
 
+  /**
+   * Adjusts the measured scale by small steps, for settling it by eye against a miniature's base on
+   * a square; does nothing on a screen that has never been measured.
+   */
   nudgeScale(steps: number): void {
     this.displayCalibration.nudge(steps);
   }
 
+  /**
+   * Forgets this screen's measurement, turning real size off and freeing the table view along with
+   * it.
+   */
   resetCalibration(): void {
     this.displayCalibration.reset();
   }

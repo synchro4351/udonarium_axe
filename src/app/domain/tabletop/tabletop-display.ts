@@ -28,6 +28,11 @@ import {
   MAX_RADIAL_MENU_ROTATION_SPEED,
   MIN_RADIAL_MENU_ROTATION_SPEED,
 } from '@axe/domain/tabletop/radial-menu';
+import {
+  asTabletopMenuStyle,
+  DEFAULT_TABLETOP_MENU_STYLE,
+  TabletopMenuStyle,
+} from '@axe/domain/tabletop/tabletop-menu-style';
 
 /**
  * How a table laid flat is drawn and reached, for the reader looking straight down on it.
@@ -41,8 +46,8 @@ export interface TabletopDisplaySettings {
   orthographicProjection: boolean;
   /** How wide one square is meant to measure on the glass, for a screen laid flat under miniatures. */
   cellMm: number;
-  /** Whether the four-way menus turn, rather than standing in four straight lists. */
-  radialMenuEnabled: boolean;
+  /** Which menu a right-click opens: the ordinary list, four straight lists, or a turning ring. */
+  tabletopMenuStyle: TabletopMenuStyle;
   radialMenuRotationSpeed: number;
   hoverDetailPlacement: HoverDetailPlacement;
   multiAngleEnabled: boolean;
@@ -58,14 +63,6 @@ export interface TabletopDisplaySettings {
   cutInMultiDirectionMode: CutInMultiDirectionMode;
   /** Whether a window carries the button that turns it a quarter at a time. */
   panelRotationEnabled: boolean;
-  /**
-   * Whether a piece is drawn no taller than the ground it stands on.
-   *
-   * A piece is drawn from the cell up, so a tall picture towers over the cell it belongs to.
-   * Standing over a table that has been laid flat, that tower is smeared across whatever is
-   * behind it, and telling which piece is on which cell becomes guesswork.
-   */
-  pieceImageInCell: boolean;
 }
 
 export type TabletopDisplayKey = keyof TabletopDisplaySettings;
@@ -76,7 +73,7 @@ export type TabletopDisplayOwn = Partial<TabletopDisplaySettings>;
 export const DEFAULT_TABLETOP_DISPLAY_SETTINGS: TabletopDisplaySettings = {
   orthographicProjection: false,
   cellMm: DEFAULT_CELL_MM,
-  radialMenuEnabled: false,
+  tabletopMenuStyle: DEFAULT_TABLETOP_MENU_STYLE,
   radialMenuRotationSpeed: DEFAULT_RADIAL_MENU_ROTATION_SPEED,
   hoverDetailPlacement: DEFAULT_HOVER_DETAIL_PLACEMENT,
   multiAngleEnabled: false,
@@ -90,7 +87,6 @@ export const DEFAULT_TABLETOP_DISPLAY_SETTINGS: TabletopDisplaySettings = {
   multiAngleTickerPixelsPerSecond: DEFAULT_MULTI_ANGLE_TICKER_PIXELS_PER_SECOND,
   cutInMultiDirectionMode: DEFAULT_CUT_IN_MULTI_DIRECTION_MODE,
   panelRotationEnabled: false,
-  pieceImageInCell: false,
 };
 
 /**
@@ -107,13 +103,21 @@ export const DEFAULT_TABLETOP_DISPLAY_SETTINGS: TabletopDisplaySettings = {
 export const TABLETOP_MODE_SETTINGS: Readonly<Partial<TabletopDisplaySettings>> = {
   orthographicProjection: true,
   hoverDetailPlacement: 'screen-edges',
-  radialMenuEnabled: true,
+  tabletopMenuStyle: 'radial',
   panelRotationEnabled: true,
   multiAngleEnabled: true,
   multiAngleTickerEnabled: true,
   cutInMultiDirectionMode: 'four-directions',
-  pieceImageInCell: true,
 };
+
+/**
+ * What asking for the tabletop puts in, named so that it can be let go of again.
+ *
+ * Asking for it is asking for the lot, so letting go is letting go of the lot — by taking
+ * these off this screen rather than by writing the defaults, which would be a different
+ * thing: a table carrying its own value for one of them would never be heard again.
+ */
+export const TABLETOP_MODE_KEYS = Object.keys(TABLETOP_MODE_SETTINGS) as readonly TabletopDisplayKey[];
 
 export const MIN_MULTI_ANGLE_REVOLUTION_SECONDS = 1;
 export const MAX_MULTI_ANGLE_REVOLUTION_SECONDS = 120;
@@ -122,6 +126,7 @@ export const MAX_MULTI_ANGLE_PAUSE_SECONDS = 30;
 export const MIN_MULTI_ANGLE_PIECE_REVOLUTION_SECONDS = 5;
 export const MAX_MULTI_ANGLE_PIECE_REVOLUTION_SECONDS = 300;
 
+/** Reads a stored multi-angle motion mode, falling back to continuous for anything unknown. */
 export function asMultiAngleMotionMode(value: unknown): MultiAngleMotionMode {
   return value === 'quarter-turn' || value === 'piece-quarter-turn' ? value : 'continuous';
 }
@@ -151,7 +156,7 @@ export function normalizeTabletopDisplaySettings(value: unknown): TabletopDispla
       source['cellMm'] === '' || source['cellMm'] === null || source['cellMm'] === undefined
         ? defaults.cellMm
         : clampCellMm(Number(source['cellMm'])),
-    radialMenuEnabled: booleanOr(source['radialMenuEnabled'], defaults.radialMenuEnabled),
+    tabletopMenuStyle: asTabletopMenuStyle(source['tabletopMenuStyle'], source['radialMenuEnabled']),
     radialMenuRotationSpeed: finiteInRange(
       source['radialMenuRotationSpeed'],
       defaults.radialMenuRotationSpeed,
@@ -194,7 +199,6 @@ export function normalizeTabletopDisplaySettings(value: unknown): TabletopDispla
     ),
     cutInMultiDirectionMode: asCutInMultiDirectionMode(source['cutInMultiDirectionMode']),
     panelRotationEnabled: booleanOr(source['panelRotationEnabled'], defaults.panelRotationEnabled),
-    pieceImageInCell: booleanOr(source['pieceImageInCell'], defaults.pieceImageInCell),
   };
 }
 
@@ -207,11 +211,15 @@ export function normalizeTabletopDisplayOwn(value: unknown): TabletopDisplayOwn 
     if (!(key in source)) continue;
     Object.assign(own, { [key]: held[key] });
   }
+  // A screen told to turn its menus before the style had a name said so under the old key.
+  if (!('tabletopMenuStyle' in source) && 'radialMenuEnabled' in source) {
+    own.tabletopMenuStyle = held.tabletopMenuStyle;
+  }
   return own;
 }
 
 /**
- * What is in force on this screen: what it has been told, over what the table used to carry.
+ * What is in force on this screen: what it has been told, over what the table still carries.
  *
  * The table is read first so that a room saved while these were still the table's own keeps
  * looking the way it did until this screen says otherwise.

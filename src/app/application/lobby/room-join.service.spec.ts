@@ -5,7 +5,9 @@ import { EventChannel } from '@axe/core/event/event-channel';
 import { Network } from '@axe/core/index';
 import { IPeerContext, PeerContext } from '@axe/core/network/peer-context';
 import { IRoomInfo, RoomInfo } from '@axe/core/network/room-info';
+import { clearIdentity, saveIdentity } from '@axe/core/storage/identity-storage';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import { PeerRole } from '@axe/domain/peer/peer-role';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
 class StubObjectChangeService {
@@ -46,6 +48,7 @@ describe('RoomJoinService', () => {
   });
 
   afterEach(() => {
+    clearIdentity();
     PeerCursor.myCursor = originalMyCursor;
     vi.restoreAllMocks();
     TestBed.resetTestingModule();
@@ -83,6 +86,55 @@ describe('RoomJoinService', () => {
       expect(Network.connect).toHaveBeenCalledTimes(2);
     });
 
+    it('comes into the room as a player when this seat was left as game master, before anyone sees it', () => {
+      PeerCursor.myCursor = { peerId: '', role: PeerRole.GameMaster } as PeerCursor;
+      let roleWhenOpened: PeerRole | null = null;
+      vi.mocked(Network.open).mockImplementation(() => {
+        roleWhenOpened = PeerCursor.myCursor.role;
+      });
+
+      void service.join([peerContext('peer-1', 'abc', 'room')], '');
+
+      expect(roleWhenOpened).toBe(PeerRole.Player);
+      expect(PeerCursor.myCursor.role).toBe(PeerRole.Player);
+    });
+
+    it('leaves a player and a guest as they chose', () => {
+      for (const role of [PeerRole.Player, PeerRole.Guest]) {
+        PeerCursor.myCursor = { peerId: '', role } as PeerCursor;
+
+        void service.join([peerContext('peer-1', 'abc', 'room')], '');
+
+        expect(PeerCursor.myCursor.role).toBe(role);
+      }
+    });
+
+    it('keeps the role when there is no room to join', async () => {
+      PeerCursor.myCursor = { peerId: '', role: PeerRole.GameMaster } as PeerCursor;
+
+      await service.join([], '');
+
+      expect(PeerCursor.myCursor.role).toBe(PeerRole.GameMaster);
+    });
+
+    it('keeps a game master coming back to the room this tab was last in', () => {
+      saveIdentity({ userId: 'user', roomId: 'abc', roomName: 'room', role: PeerRole.GameMaster, reConnectPass: '' });
+      PeerCursor.myCursor = { peerId: '', role: PeerRole.GameMaster } as PeerCursor;
+
+      void service.join([peerContext('peer-1', 'abc', 'room')], '');
+
+      expect(PeerCursor.myCursor.role).toBe(PeerRole.GameMaster);
+    });
+
+    it('puts a game master down in any room but the one this tab was last in', () => {
+      saveIdentity({ userId: 'user', roomId: 'xyz', roomName: 'other', role: PeerRole.GameMaster, reConnectPass: '' });
+      PeerCursor.myCursor = { peerId: '', role: PeerRole.GameMaster } as PeerCursor;
+
+      void service.join([peerContext('peer-1', 'abc', 'room')], '');
+
+      expect(PeerCursor.myCursor.role).toBe(PeerRole.Player);
+    });
+
     it('reports success when a connection survives every attempt', async () => {
       const peers = [peerContext('peer-1', 'abc', 'room'), peerContext('peer-2', 'abc', 'room')];
       const joined = service.join(peers, '');
@@ -105,6 +157,33 @@ describe('RoomJoinService', () => {
 
       await expect(joined).resolves.toBe(false);
       expect(Network.openStandby).toHaveBeenCalledOnce();
+    });
+
+    it('allows membership expiry before starting the peer connection timeout', async () => {
+      vi.useFakeTimers();
+      let settled = false;
+      const peer = peerContext('peer-1', 'abc', 'room');
+      const joined = service.join([peer], '').then((result) => {
+        settled = true;
+        return result;
+      });
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(settled).toBe(false);
+      expect(Network.openStandby).not.toHaveBeenCalled();
+      stubChange.networkOpen$.emit({ peerId: 'my-peer' });
+      connectedPeers = [peer];
+      stubChange.peerConnect$.emit({ peerId: 'peer-1' });
+      await expect(joined).resolves.toBe(true);
+      vi.useRealTimers();
+    });
+
+    it('times out an opening that never completes', async () => {
+      vi.useFakeTimers();
+      const joined = service.join([peerContext('peer-1', 'abc', 'room')], '');
+      await vi.advanceTimersByTimeAsync(75_000);
+      await expect(joined).resolves.toBe(false);
+      expect(Network.openStandby).toHaveBeenCalledOnce();
+      vi.useRealTimers();
     });
 
     it('settles on the timeout when no one ever answers', async () => {

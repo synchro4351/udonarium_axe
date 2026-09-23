@@ -5,7 +5,7 @@
     <i class="material-icons text-ui-accent text-[20px]" [class.vibration-amine]="isJoining()">
       {{ isJoining() ? 'meeting_room' : 'error_outline' }}
     </i>
-    <span class="truncate text-[0.82rem]">{{ message() }}</span>
+    <span class="text-[0.82rem]" role="status">{{ message() }}</span>
     @if (!isJoining()) {
       <button
         class="rounded-ui-sm border-ui-accent bg-ui-accent hover:border-ui-accent-hover hover:bg-ui-accent-hover cursor-pointer border border-solid px-[1.1em] py-[0.4em] text-[0.8rem] text-white hover:shadow-[0_0_0_3px_var(--ui-accent-glow)]"

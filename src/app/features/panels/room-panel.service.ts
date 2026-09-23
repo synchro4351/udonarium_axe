@@ -1,7 +1,8 @@
-import { inject, Injectable, Type } from '@angular/core';
+import { inject, Injectable, Injector, Type, ViewContainerRef } from '@angular/core';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PanelOption, PanelService } from '@axe/application/ui/panel.service';
 import { panelLabelKey, RoomPanelName, STATUS_AILMENT_PANEL } from '@axe/domain/ui/room-panel';
+import { PanelWindowService } from '@axe/features/panels/panel-window.service';
 
 interface RoomPanel {
   load: () => Promise<Type<unknown>>;
@@ -12,20 +13,79 @@ interface RoomPanel {
 export class RoomPanelService {
   private readonly panelService = inject(PanelService);
   private readonly t = inject(TRANSLATE_FN);
+  private readonly injector = inject(Injector);
+
   private opened = 0;
 
-  open<T = unknown>(name: RoomPanelName, extra: PanelOption = {}, setup?: (instance: T) => void): void {
+  /**
+   * Opens one of the room's named panels, loading its component on first use.
+   *
+   * Each panel opened steps a little down and right of the last, and `extra` overrides that place
+   * and the panel's default size. `setup` is handed the component once it exists. `host` is the layer
+   * of a window of its own to draw into; without it the panel stands on the table with a button to
+   * move it into one.
+   */
+  open<T = unknown>(
+    name: RoomPanelName,
+    extra: PanelOption = {},
+    setup?: (instance: T) => void,
+    host?: ViewContainerRef
+  ): void {
     const panel = this.panelOf(name);
     const option: PanelOption = {
       title: this.t(panelLabelKey(name)),
+      windowed: host !== undefined,
+      controls: host ? [] : this.popOutControl(name, extra, setup),
       ...panel.option,
       top: ((this.opened % 10) + 1) * 20,
       left: 100 + ((this.opened % 20) + 1) * 5,
       ...extra,
     };
     this.opened += 1;
-    if (setup) this.panelService.openLazy(panel.load, option, setup as (instance: unknown) => void);
+    // Passed on exactly as far as there is something to pass: a trailing `undefined` is a
+    // different call to anything watching, and nothing here needs to make one.
+    if (host) this.panelService.openLazy(panel.load, option, setup as (instance: unknown) => void, host);
+    else if (setup) this.panelService.openLazy(panel.load, option, setup as (instance: unknown) => void);
     else this.panelService.openLazy(panel.load, option);
+  }
+
+  /**
+   * The button that sends a panel to a window of its own.
+   *
+   * It is offered only on a panel standing on the table: one already in a window has the
+   * operating system's own frame to close, and closing it brings the panel back here.
+   */
+  private popOutControl<T>(
+    name: RoomPanelName,
+    extra: PanelOption,
+    setup?: (instance: T) => void
+  ): PanelOption['controls'] {
+    const windows = this.injector.get(PanelWindowService);
+    if (!windows.isSupported) return [];
+    return [
+      {
+        icon: 'open_in_new',
+        label: this.t('common.panel.popOut'),
+        press: (owner) => {
+          if (owner.windowed()) return;
+          const frame = owner.standingFrame;
+          if (frame && frame.panelCount() > 1) {
+            windows.popOutGroup(frame, this.panelService);
+            return;
+          }
+          const went = windows.popOut({
+            key: `room:${name}`,
+            // Opened again the way it was opened here, so a panel asked for at a size, with a
+            // title of its own or something to set up keeps all of it on the way out and back.
+            open: (host) => this.open(name, { ...extra, left: 0, top: 0 }, setup, host),
+            restore: () => this.open(name, extra, setup),
+          });
+          // Closed only once the window is really there: one the browser refuses would
+          // otherwise take the panel with it.
+          if (went) owner.close();
+        },
+      },
+    ];
   }
 
   private panelOf(name: RoomPanelName): RoomPanel {
@@ -62,7 +122,7 @@ export class RoomPanelService {
             import('@axe/features/inventory/game-object-inventory/game-object-inventory.component').then(
               (m) => m.GameObjectInventoryComponent
             ),
-          option: { width: 450, height: 600, minimizeToContent: true },
+          option: { width: 450, height: 600 },
         };
       case 'objectList':
         return {
@@ -172,7 +232,15 @@ export class RoomPanelService {
             import('@axe/features/replay/replay-workspace/replay-workspace.component').then(
               (m) => m.ReplayWorkspaceComponent
             ),
-          option: { width: 900, height: 640, minWidth: 600, minHeight: 420 },
+          option: { width: 1180, height: 760, minWidth: 720, minHeight: 480 },
+        };
+      case 'diceTableSetting':
+        return {
+          load: () =>
+            import('@axe/features/dice/dice-table-setting/dice-table-setting.component').then(
+              (m) => m.DiceTableSettingComponent
+            ),
+          option: { width: 650, height: 400 },
         };
       case 'tabletopDisplay':
         return {
@@ -181,6 +249,11 @@ export class RoomPanelService {
               (m) => m.TabletopDisplaySettingComponent
             ),
           option: { width: 480, height: 640, minWidth: 380, minHeight: 420 },
+        };
+      case 'skin':
+        return {
+          load: () => import('@axe/features/skin/skin-panel/skin-panel.component').then((m) => m.SkinPanelComponent),
+          option: { width: 720, height: 860, minWidth: 460, minHeight: 520 },
         };
     }
   }

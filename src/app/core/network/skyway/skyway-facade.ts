@@ -15,6 +15,9 @@ import {
   Subscription,
 } from '@skyway-sdk/core';
 
+// The SDK's default heartbeat and grace period can retain an unloaded member for 60 seconds.
+const PREVIOUS_MEMBER_TIMEOUT_MS = 65_000;
+
 export class SkyWayFacade {
   url = '';
   context: SkyWayContext | null = null;
@@ -26,6 +29,7 @@ export class SkyWayFacade {
   publication: Publication<LocalDataStream> | null = null;
 
   peer: PeerContext = PeerContext.parse('???');
+  /** Whether open has finished and the session has not been closed since. */
   get isOpen(): boolean {
     return this.peer.isOpen;
   }
@@ -38,6 +42,12 @@ export class SkyWayFacade {
   onSubscribed: ((peer: IPeerContext, subscription: Subscription) => void) | null = null;
   onRoomRestore: ((peer: IPeerContext) => void) | null = null;
 
+  /**
+   * Creates a SkyWay context with a backend token, then joins the room and a lobby as the peer.
+   *
+   * An open session is closed first. Failures are reported through onFatalError, not thrown, and
+   * onOpen fires at the end. A peer that is not in a room gets a context but joins no channel.
+   */
   async open(peer: IPeerContext) {
     if (this.isOpen) await this.close();
     try {
@@ -48,18 +58,22 @@ export class SkyWayFacade {
       this.isDestroyed = false;
 
       await this.createContext();
-      await this.joinRoom();
-      await this.joinLobby();
+      const joinDeadline = Date.now() + PREVIOUS_MEMBER_TIMEOUT_MS;
+      await this.joinRoom(joinDeadline);
+      await this.joinLobby(joinDeadline);
+      if (this.isDestroyed) return;
 
       this.peer.isOpen = true;
 
       this.onOpen?.(this.peer);
     } catch (err) {
+      if (this.isDestroyed) return;
       AppLogger.error('[SkyWay] open失敗', err);
       this.onFatalError?.(this.peer, (err as Error).name, (err as Error).message, err as Error);
     }
   }
 
+  /** Leaves the lobby and room and disposes the context; errors are logged, not thrown. */
   async close() {
     try {
       this.peer = PeerContext.parse('???');
@@ -73,6 +87,7 @@ export class SkyWayFacade {
     }
   }
 
+  /** Starts leaving the room and lobby without waiting, for a page that is unloading; never throws. */
   leaveImmediately() {
     try {
       if (this.roomPerson?.state !== 'left') {
@@ -86,6 +101,11 @@ export class SkyWayFacade {
     }
   }
 
+  /**
+   * Joins the room and lobby again as the same peer after leaveImmediately, with a new data stream.
+   *
+   * For when the page did not unload after all. Does nothing once closed or with the context disposed.
+   */
   async rejoinAfterLeave() {
     if (this.isDestroyed || !this.context || this.context.disposed) return;
     try {
@@ -154,9 +174,9 @@ export class SkyWayFacade {
     this.context = context;
   }
 
-  private async joinLobby() {
+  private async joinLobby(deadline = Date.now() + PREVIOUS_MEMBER_TIMEOUT_MS) {
     await this.joinLobbyChannel();
-    await this.joinLobbyPerson();
+    await this.joinLobbyPerson(deadline);
   }
 
   private async joinLobbyChannel() {
@@ -190,9 +210,10 @@ export class SkyWayFacade {
     this.lobby = joinLobby;
   }
 
-  private async joinLobbyPerson() {
+  private async joinLobbyPerson(deadline = Date.now() + PREVIOUS_MEMBER_TIMEOUT_MS) {
     await this.leaveLobbyPerson();
     if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.lobby == null) return;
+    if (!(await this.waitForPreviousMember(this.lobby, deadline))) return;
 
     const lobbyPerson = await this.lobby.join({
       name: this.peer.peerId,
@@ -209,9 +230,9 @@ export class SkyWayFacade {
     this.lobbyPerson = lobbyPerson;
   }
 
-  private async joinRoom() {
+  private async joinRoom(deadline = Date.now() + PREVIOUS_MEMBER_TIMEOUT_MS) {
     await this.joinRoomChannel();
-    await this.joinRoomPerson();
+    await this.joinRoomPerson(deadline);
     await this.createRoomDataStream();
   }
 
@@ -235,9 +256,10 @@ export class SkyWayFacade {
     this.room = room;
   }
 
-  private async joinRoomPerson() {
+  private async joinRoomPerson(deadline = Date.now() + PREVIOUS_MEMBER_TIMEOUT_MS) {
     await this.leaveRoomPerson();
     if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.room == null) return;
+    if (!(await this.waitForPreviousMember(this.room, deadline))) return;
 
     const roomPerson = await this.room.join({
       name: this.peer.peerId,
@@ -255,6 +277,17 @@ export class SkyWayFacade {
     });
 
     this.roomPerson = roomPerson;
+  }
+
+  private async waitForPreviousMember(channel: Channel, deadline: number): Promise<boolean> {
+    // Do not evict a matching member: a duplicated tab may still be using it.
+    // Poll the SDK's local member list, not the server, and stop promptly when this attempt closes.
+    while (channel.members.some((member) => member.name === this.peer.peerId)) {
+      if (this.isDestroyed) return false;
+      if (Date.now() >= deadline) throw new Error('Timed out waiting for the previous SkyWay membership');
+      await new Promise<void>((resolve) => setTimeout(resolve, 250));
+    }
+    return !this.isDestroyed;
   }
 
   private async createRoomDataStream() {
@@ -350,6 +383,7 @@ export class SkyWayFacade {
     await this.roomPerson?.unpublish(publication);
   }
 
+  /** Peer ids of every member of the lobbies the token covers; empty while the session is closed. */
   async listAllPeers(): Promise<string[]> {
     if (this.isDestroyed || !this.isOpen) return [];
 
@@ -381,6 +415,11 @@ export class SkyWayFacade {
     return allPeerIds;
   }
 
+  /**
+   * Every lobby member with the room name from its metadata, for the room list; empty while closed.
+   *
+   * A member whose metadata does not parse is listed with an empty room name.
+   */
   async listAllLobbyMembers(): Promise<{ peerId: string; roomName: string }[]> {
     if (this.isDestroyed || !this.isOpen) return [];
     if (!this.context) return [];

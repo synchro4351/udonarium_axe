@@ -1,6 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TabletopDisplayPreferenceService } from '@axe/application/ui/tabletop-display-preference.service';
+import { ViewModePreferenceService } from '@axe/application/ui/view-mode-preference.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { GameCharacter } from '@axe/domain/character/game-character';
+import { DataElement, DataElementAttribute, DataElementRole, DataElementType } from '@axe/domain/data/data-element';
 import { Party } from '@axe/domain/party/party';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
@@ -70,6 +73,22 @@ describe('RoomSettingsPanelComponent', () => {
     expect(Config.instance.zocMode).toBe('block');
     expect(component.answersFor('zoc')).toBe(true);
     expect(component.answersFor('moveRange')).toBe(false);
+  });
+
+  it('leaves the shared settings to the master, though a player may set the rules of play', () => {
+    PeerCursor.myCursor.role = PeerRole.Player;
+
+    component.zocMode = 'block';
+    component.facingMark = 'arrow';
+    component.imageBillboard = true;
+    component.defaultDiceBot = 'Cthulhu7th';
+
+    expect(component.isReadOnly()).toBe(false);
+    expect(component.isSharedReadOnly()).toBe(true);
+    expect(Config.instance.zocMode).toBe('block');
+    expect(component.facingMark).not.toBe('arrow');
+    expect(table.imageBillboard).toBe(false);
+    expect(component.defaultDiceBot).not.toBe('Cthulhu7th');
   });
 
   it('writes nothing for a reader who may not edit the table', () => {
@@ -192,14 +211,6 @@ describe('RoomSettingsPanelComponent', () => {
       expect(component.showsDiagonalOption).toBe(false);
     });
 
-    it('asks what a cell stands for only where it is not ruled in cells', () => {
-      component.cellDistanceUnit = 'cell';
-      expect(component.showsCellDistance).toBe(false);
-
-      component.cellDistanceUnit = 'foot';
-      expect(component.showsCellDistance).toBe(true);
-    });
-
     it('asks nothing more where an enemy holds no ground', () => {
       component.zocMode = 'none';
 
@@ -238,6 +249,25 @@ describe('RoomSettingsPanelComponent', () => {
       component.cellDistance = Number.NaN;
 
       expect(component.cellDistance).toBe(0);
+    });
+
+    it('starts a table turned over to cells again at one cell a cell', () => {
+      component.cellDistanceUnit = 'foot';
+      component.cellDistance = 1.5;
+
+      component.cellDistanceUnit = 'cell';
+
+      expect(component.cellDistance).toBe(1);
+    });
+
+    it('keeps what a cell stands for on a table that was counted in cells already', () => {
+      component.cellDistanceUnit = 'cell';
+      component.cellDistance = 0.5;
+
+      component.cellDistanceUnit = 'cell';
+      component.cellDistanceUnit = 'metre';
+
+      expect(component.cellDistance).toBe(0.5);
     });
 
     it('opens on the general part and shows only that part', async () => {
@@ -282,6 +312,23 @@ describe('RoomSettingsPanelComponent', () => {
       expect(opened).toEqual(['characterImport']);
     });
 
+    it('opens the replay from the utility part, for someone watching as well', async () => {
+      const opened: string[] = [];
+      vi.spyOn(TestBed.inject(RoomPanelService), 'open').mockImplementation(((name: string) => {
+        opened.push(name);
+      }) as never);
+      PeerCursor.myCursor.role = PeerRole.Guest;
+      component.tab.set('utility');
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const button = fixture.nativeElement.querySelector('[data-testid="room-settings-replay"]') as HTMLButtonElement;
+      expect(button.closest('[inert]')).toBeNull();
+      button.click();
+
+      expect(opened).toEqual(['replay']);
+    });
+
     it('shows the boxes only once an enemy holds ground', async () => {
       function boxes(): string[] {
         return [...fixture.nativeElement.querySelectorAll('input[type="number"]')].map(
@@ -313,7 +360,7 @@ describe('RoomSettingsPanelComponent', () => {
       component.orthographicProjection = true;
       component.multiAngleEnabled = true;
       component.multiAngleFontScale = 'large';
-      component.radialMenuEnabled = true;
+      component.tabletopMenuStyle = 'radial';
       component.radialMenuRotationSpeed = 9;
       component.hoverDetailPlacement = 'screen-edges';
       component.cellMm = 30;
@@ -323,7 +370,7 @@ describe('RoomSettingsPanelComponent', () => {
         orthographicProjection: true,
         multiAngleEnabled: true,
         multiAngleFontScale: 'large',
-        radialMenuEnabled: true,
+        tabletopMenuStyle: 'radial',
         radialMenuRotationSpeed: 9,
         hoverDetailPlacement: 'screen-edges',
         cellMm: 30,
@@ -387,24 +434,106 @@ describe('RoomSettingsPanelComponent', () => {
       expect(table.imageBillboard).toBe(false);
     });
 
-    it('shows what the room shares apart from what this screen keeps', async () => {
+    async function openUi(part: 'shared' | 'skin' | 'tabletop'): Promise<HTMLElement> {
       component.tab.set('ui');
+      component.uiTab.set(part);
       fixture.detectChanges();
       await fixture.whenStable();
-      const root = fixture.nativeElement as HTMLElement;
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('opens the UI settings on what the room shows everyone', () => {
+      expect(component.uiTab()).toBe('shared');
+    });
+
+    it('keeps a piece inside its cell for the whole room, from the shared part', async () => {
+      const root = await openUi('shared');
+      const block = root.querySelector('[data-testid="room-settings-flat-pieces"]');
+
+      expect(block).toBeTruthy();
+      expect(block!.querySelector('[data-testid="piece-image-in-cell"]')).toBeTruthy();
+
+      component.pieceImageInCell = true;
+
+      expect(component.pieceImageInCell).toBe(true);
+      expect(Config.instance.pieceImageInCell).toBe(true);
+    });
+
+    it('leaves a piece in its cell to the master', () => {
+      PeerCursor.myCursor.role = PeerRole.Player;
+
+      component.pieceImageInCell = true;
+
+      expect(component.pieceImageInCell).toBe(false);
+      expect(Config.instance.pieceImageInCell).toBeNull();
+    });
+
+    it('keeps what the room shows everyone under its own part', async () => {
+      const root = await openUi('shared');
       const shared = root.querySelector('[data-testid="room-settings-shared"]');
+
+      expect(shared).toBeTruthy();
+      expect(shared!.querySelector('[data-testid="facing-mark"]')).toBeTruthy();
+      expect(shared!.querySelector('[data-testid="image-billboard"]')).toBeTruthy();
+      expect(root.querySelector('[data-testid="room-settings-own"]')).toBeNull();
+      expect(root.querySelector('[data-testid="room-settings-skin"]')).toBeNull();
+    });
+
+    it('keeps the colours this screen is dressed in under their own part', async () => {
+      const root = await openUi('skin');
+
+      expect(root.querySelector('[data-testid="room-settings-skin"]')).toBeTruthy();
+      expect(root.querySelector('[data-testid="room-settings-shared"]')).toBeNull();
+      expect(root.querySelector('[data-testid="room-settings-own"]')).toBeNull();
+    });
+
+    it('puts in what a tabletop display wants, and takes it back out again', () => {
+      expect(component.tabletopRecommended).toBe(false);
+
+      component.tabletopRecommended = true;
+
+      expect(component.tabletopRecommended).toBe(true);
+      expect(TestBed.inject(ViewModePreferenceService).mode()).toBe('flat');
+      expect(component.tabletopMenuStyle).toBe('radial');
+      expect(component.multiAngleEnabled).toBe(true);
+      expect(component.panelRotationEnabled).toBe(true);
+
+      component.tabletopRecommended = false;
+
+      expect(component.tabletopRecommended).toBe(false);
+      expect(component.tabletopMenuStyle).toBe('standard');
+      expect(component.multiAngleEnabled).toBe(false);
+      expect(component.panelRotationEnabled).toBe(false);
+    });
+
+    it('leaves the real size alone, which is measured rather than recommended', () => {
+      component.cellMm = 30;
+
+      component.tabletopRecommended = true;
+
+      expect(component.cellMm).toBe(30);
+    });
+
+    it('keeps what a screen laid on a table wants under its own part', async () => {
+      const root = await openUi('tabletop');
       const own = root.querySelector('[data-testid="room-settings-own"]');
 
-      expect(shared?.querySelector('[data-testid="facing-mark"]')).not.toBeNull();
-      expect(shared?.querySelector('[data-testid="image-billboard"]')).not.toBeNull();
-      expect(own?.querySelector('[data-testid="orthographic-projection"]')).not.toBeNull();
-      expect(own?.querySelector('[data-testid="multi-angle-enabled"]')).not.toBeNull();
-      expect(own?.querySelector('[data-testid="ticker-enabled"]')).not.toBeNull();
-      expect(own?.querySelector('[data-testid="cell-mm"]')).not.toBeNull();
-      expect(own?.querySelector('[data-testid="real-size-enabled"]')).not.toBeNull();
-      expect(own?.querySelector('[data-testid="panel-rotation-enabled"]')).not.toBeNull();
-      expect(own?.querySelector('[data-testid="forget-own-display"]')).not.toBeNull();
+      expect(own).toBeTruthy();
+      for (const control of [
+        'tabletop-recommended',
+        'tabletop-menu-style',
+        'orthographic-projection',
+        'multi-angle-enabled',
+        'ticker-enabled',
+        'cell-mm',
+        'real-size-enabled',
+        'panel-rotation-enabled',
+        'forget-own-display',
+      ]) {
+        expect(own!.querySelector(`[data-testid="${control}"]`)).toBeTruthy();
+      }
       expect(root.querySelector('[data-testid="reset-calibration"]')).toBeNull();
+      expect(root.querySelector('[data-testid="room-settings-shared"]')).toBeNull();
     });
 
     it('keeps the measuring tool under the utility part', async () => {
@@ -415,6 +544,79 @@ describe('RoomSettingsPanelComponent', () => {
 
       expect(root.querySelector('[data-testid="reset-calibration"]')).not.toBeNull();
       expect(root.querySelector('[data-testid="real-size-enabled"]')).toBeNull();
+    });
+  });
+
+  describe('the items the remotes show', () => {
+    function pieceCarrying(...items: string[]): GameCharacter {
+      const character = new GameCharacter();
+      character.initialize();
+      character.createDataElements();
+      for (const item of items) {
+        character.detailDataElement!.appendChild(
+          DataElement.create(item, 5, {
+            [DataElementAttribute.ROLE]: DataElementRole.FIELD,
+            type: DataElementType.NUMBER_RESOURCE,
+            currentValue: 5,
+          })
+        );
+      }
+      return character;
+    }
+
+    function chips(): HTMLInputElement[] {
+      const section = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="room-settings-controller-resources"]'
+      );
+      return [...(section?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])];
+    }
+
+    beforeEach(() => {
+      pieceCarrying('HP', 'MP');
+      pieceCarrying('HP', '信仰');
+    });
+
+    it('lists what every piece carries, each item once, all shown while nothing is picked', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(chips().map((chip) => chip.dataset['resource'])).toEqual(['HP', 'MP', '信仰']);
+      expect(chips().every((chip) => chip.checked)).toBe(true);
+      expect(Config.instance.controllerResources).toBeNull();
+    });
+
+    it('takes one item off the remotes and leaves the rest on', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const mp = chips().find((chip) => chip.dataset['resource'] === 'MP')!;
+      mp.checked = false;
+      mp.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(Config.instance.controllerResources).toEqual(['HP', '信仰']);
+      expect(chips().find((chip) => chip.dataset['resource'] === 'MP')!.checked).toBe(false);
+    });
+
+    it('puts an item back, and shows every item again when asked', () => {
+      component.hideEveryControllerResource();
+      expect(Config.instance.controllerResources).toEqual([]);
+
+      component.setControllerResourceShown('信仰', true);
+      expect(Config.instance.controllerResources).toEqual(['信仰']);
+
+      component.showEveryControllerResource();
+      expect(Config.instance.controllerResources).toBeNull();
+    });
+
+    it('leaves the pick to the master', () => {
+      PeerCursor.myCursor.role = PeerRole.Player;
+
+      component.setControllerResourceShown('MP', false);
+      component.hideEveryControllerResource();
+
+      expect(component.isSharedReadOnly()).toBe(true);
+      expect(Config.instance.controllerResources).toBeNull();
     });
   });
 

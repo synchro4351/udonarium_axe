@@ -114,6 +114,7 @@ describe('Config', () => {
         breakOutCost: null,
         engagementCountsSize: null,
         facingMark: null,
+        pieceImageInCell: null,
       });
     });
 
@@ -189,6 +190,44 @@ describe('Config', () => {
 
       expect(Config.instance.moveRangeEnabled).toBe(false);
       expect(Config.instance.cellDistance).toBe(5);
+    });
+  });
+
+  describe('the items the remote controllers show', () => {
+    it('shows every item until the room picks some out', () => {
+      expect(Config.instance.controllerResources).toBeNull();
+    });
+
+    it('returns the pick it is given, a pick of nothing included', () => {
+      Config.instance.controllerResources = ['HP', 'MP'];
+      expect(Config.instance.controllerResources).toEqual(['HP', 'MP']);
+
+      Config.instance.controllerResources = [];
+      expect(Config.instance.controllerResources).toEqual([]);
+    });
+
+    it('goes back to showing everything when the pick is taken away', () => {
+      Config.instance.controllerResources = ['HP'];
+
+      Config.instance.controllerResources = null;
+
+      expect(Config.instance.controllerResources).toBeNull();
+    });
+
+    it('shows everything for a room from an older build, which carries no attribute for it', () => {
+      Config.instance.controllerResources = ['HP'];
+
+      Config.instance.removeAttribute('_controllerResources');
+
+      expect(Config.instance.controllerResources).toBeNull();
+    });
+
+    it('reads the pick back out of the text a loaded room carries', () => {
+      Config.instance.controllerResources = ['HP', '敏捷度'];
+
+      Config.instance.setAttribute('_controllerResources', `${Config.instance.getAttribute('_controllerResources')}`);
+
+      expect(Config.instance.controllerResources).toEqual(['HP', '敏捷度']);
     });
   });
 

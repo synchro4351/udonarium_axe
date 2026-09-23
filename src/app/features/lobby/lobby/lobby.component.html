@@ -1,17 +1,23 @@
 @if (!isConnected()) {
   <div class="mb-4 flex gap-2">
-    <button (click)="reload()" [disabled]="isReloading()">
+    <button (click)="reload()" [disabled]="isReloading() || joiningRoomName() !== null">
       <i class="material-icons" style="font-size: 14px; vertical-align: middle; margin-right: 3px">refresh</i
       >{{ 'feature.lobby.lobby.reload' | transloco }}
     </button>
     <button
       class="rounded-ui-sm border-ui-accent bg-ui-accent hover:border-ui-accent-hover hover:bg-ui-accent-hover cursor-pointer border border-solid px-[1em] py-[0.4em] text-[0.875rem] whitespace-nowrap text-white hover:shadow-[0_0_0_3px_var(--ui-accent-glow)]"
       (click)="showRoomSetting()"
+      [disabled]="joiningRoomName() !== null"
     >
       <i class="material-icons" style="font-size: 14px; vertical-align: middle; margin-right: 3px">add</i
       >{{ 'feature.lobby.lobby.createRoom' | transloco }}
     </button>
   </div>
+  @if (joiningRoomName() !== null) {
+    <p class="text-ui-muted text-[0.8rem] leading-[1.6]" role="status">
+      {{ 'feature.lobby.invite.joining' | transloco: { roomName: joiningRoomName() } }}
+    </p>
+  }
   @if (rooms().length) {
     <table class="w-full border-collapse text-[0.8rem]">
       <thead>
@@ -73,7 +79,7 @@
               @if (0 < room.alias.length) {
                 <button
                   class="rounded-ui-sm border-ui-accent text-ui-accent hover:bg-ui-accent-bg cursor-pointer border border-solid bg-transparent px-2.5 py-0.5 text-[0.8rem] whitespace-nowrap hover:shadow-[0_0_0_2px_var(--ui-accent-glow)]"
-                  [disabled]="room.peerContexts[0]?.roomId === currentRoom"
+                  [disabled]="joiningRoomName() !== null || room.peerContexts[0]?.roomId === currentRoom"
                   type="button"
                   (click)="connect(room.peerContexts)"
                 >

@@ -1,7 +1,11 @@
 import { inject, Injectable } from '@angular/core';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { TabletopDisplayPreferenceService } from '@axe/application/ui/tabletop-display-preference.service';
-import { resolveTabletopDisplay, TabletopDisplaySettings } from '@axe/domain/tabletop/tabletop-display';
+import {
+  resolveTabletopDisplay,
+  TabletopDisplayKey,
+  TabletopDisplaySettings,
+} from '@axe/domain/tabletop/tabletop-display';
 
 /**
  * The one place the settings of a flat table are read and written from.
@@ -26,10 +30,17 @@ export class TabletopDisplayService {
     return resolveTabletopDisplay(this.tabletop.currentTable, this.seat.own());
   }
 
+  /** Changes settings for this screen alone, remembered in this browser. */
   set(patch: Partial<TabletopDisplaySettings>): void {
     this.seat.set(patch);
   }
 
+  /** Lets go of the named settings, so the table answers for them again. */
+  forgetOnly(keys: readonly TabletopDisplayKey[]): void {
+    this.seat.forgetOnly(keys);
+  }
+
+  /** Lets go of every setting this screen was given, so the table answers for all of them again. */
   forget(): void {
     this.seat.forget();
   }

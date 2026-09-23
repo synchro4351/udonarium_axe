@@ -44,13 +44,13 @@
             >
               <i class="material-icons text-ui-accent shrink-0 text-[14px]! opacity-75">subject</i>
               <span
-                class="text-ui-muted flex-1 truncate text-[11px] font-bold tracking-[0.06em] uppercase"
+                class="text-ui-titlebar-muted flex-1 truncate text-[11px] font-bold tracking-[0.06em] uppercase"
                 [style.filter]="canView() ? null : 'blur(4px)'"
                 [class.select-none]="!canView()"
                 >{{ canView() ? title() : maskedTitle() }}</span
               >
               @if (isLock) {
-                <i class="material-icons text-ui-dim shrink-0 text-[13px]!">lock</i>
+                <i class="material-icons text-ui-titlebar-muted shrink-0 text-[13px]!">lock</i>
               }
             </div>
           }
@@ -83,12 +83,12 @@
       @if (!isLock) {
         <div [ngStyle]="{ transform: 'translateZ(' + altitude * gridSize + 'px)' }">
           <div
-            class="rotate-grab bg-ui-elevated text-ui-muted absolute -top-3.5 -left-5.25 z-1 box-border h-7 w-10.5 cursor-default rounded-[28px] p-0.5 text-center text-[8px] opacity-0 group-hover:opacity-50 group-active:opacity-0 hover:opacity-100! active:opacity-100! [&_.material-icons]:hidden group-hover:[&_.material-icons]:inline group-active:[&_.material-icons]:inline"
+            class="rotate-grab bg-ui-elevated text-ui-muted absolute -top-3.5 -left-5.25 z-1 box-border h-7 w-10.5 cursor-default rounded-[28px] p-0.5 text-center text-[8px] opacity-0 group-hover:opacity-50 group-active:opacity-0 hover:opacity-100! active:opacity-100! [&_.material-icons]:hidden group-hover:[&_.material-icons]:inline group-active:[&_.material-icons]:inline pointer-coarse:[&_.material-icons]:inline"
           >
             <i class="material-icons">autorenew</i>
           </div>
           <div
-            class="rotate-grab bg-ui-elevated text-ui-muted absolute -top-3.5 -right-5.25 z-1 box-border h-7 w-10.5 cursor-default rounded-[28px] p-0.5 text-center text-[8px] opacity-0 group-hover:opacity-50 group-active:opacity-0 hover:opacity-100! active:opacity-100! [&_.material-icons]:hidden group-hover:[&_.material-icons]:inline group-active:[&_.material-icons]:inline"
+            class="rotate-grab bg-ui-elevated text-ui-muted absolute -top-3.5 -right-5.25 z-1 box-border h-7 w-10.5 cursor-default rounded-[28px] p-0.5 text-center text-[8px] opacity-0 group-hover:opacity-50 group-active:opacity-0 hover:opacity-100! active:opacity-100! [&_.material-icons]:hidden group-hover:[&_.material-icons]:inline group-active:[&_.material-icons]:inline pointer-coarse:[&_.material-icons]:inline"
           >
             <i class="material-icons">autorenew</i>
           </div>

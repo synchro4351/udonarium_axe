@@ -13,7 +13,7 @@ async function openMaskEditor(page: Page) {
   const menu = page.locator('context-menu');
   await expect(menu.locator('li').first()).toBeVisible({ timeout: 5000 });
   await menu.getByText('マスクを編集').click();
-  const sheet = page.locator('game-character-sheet');
+  const sheet = page.locator('game-table-mask-sheet');
   await expect(sheet).toBeVisible({ timeout: 10000 });
   return sheet;
 }

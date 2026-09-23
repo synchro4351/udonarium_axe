@@ -4,7 +4,6 @@ import { Card, CardState } from '@axe/domain/card/card';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DataElement, DataElementAttribute, DataElementRole } from '@axe/domain/data/data-element';
 import { DiceSymbol } from '@axe/domain/dice/dice-symbol';
-import { GameTableMask } from '@axe/domain/tabletop/game-table-mask';
 import { Terrain } from '@axe/domain/tabletop/terrain';
 import { GameCharacterSheetComponent } from '@axe/features/character/game-character-sheet/game-character-sheet.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -29,60 +28,6 @@ describe('GameCharacterSheetComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
-  });
-
-  it('edits legacy mask text and colours without duplicate common fields', async () => {
-    const mask = GameTableMask.create('Legacy mask', 2, 2, 100);
-    component.tabletopObject = mask;
-    try {
-      fixture.detectChanges();
-      const editor = fixture.nativeElement.querySelector('[data-map-mask-text-editor]') as HTMLElement;
-      expect(editor).toBeTruthy();
-      expect(mask.commonDataElement!.getFirstElementByName('text')).toBeNull();
-      const textarea = editor.querySelector('textarea')!;
-      textarea.value = 'a|b《c》d\nsecond';
-      textarea.dispatchEvent(new Event('input'));
-      const size = editor.querySelector('input[type=number]') as HTMLInputElement;
-      size.value = '32';
-      size.dispatchEvent(new Event('input'));
-      const colours = editor.querySelectorAll<HTMLInputElement>('input[type=color]');
-      colours[0].value = '#123456';
-      colours[0].dispatchEvent(new Event('input'));
-      colours[1].value = '#abcdef';
-      colours[1].dispatchEvent(new Event('input'));
-      const outline = editor.querySelector('input[type=checkbox]') as HTMLInputElement;
-      outline.checked = true;
-      outline.dispatchEvent(new Event('change'));
-      await fixture.whenStable();
-      fixture.detectChanges();
-      expect(mask.text).toBe(textarea.value);
-      expect(mask.fontSize).toBe(32);
-      expect(mask.color).toBe('#123456');
-      expect(mask.bgcolor).toBe('#abcdef');
-      expect(mask.textOutline).toBe(true);
-      expect(component.mapMaskCommonElements.map((element) => element.name)).toEqual([
-        'name',
-        'width',
-        'height',
-        'opacity',
-      ]);
-      expect(fixture.nativeElement.querySelectorAll('textarea')).toHaveLength(1);
-      expect(editor.querySelectorAll('input[type=color]')).toHaveLength(3);
-    } finally {
-      mask.destroy();
-    }
-  });
-
-  it('does not show mask text controls for a card', () => {
-    const card = Card.create('Card', 'front.png', 'back.png');
-    component.tabletopObject = card;
-    try {
-      fixture.detectChanges();
-      expect(fixture.nativeElement.querySelector('[data-map-mask-text-editor]')).toBeNull();
-      expect(component.mapMask).toBeNull();
-    } finally {
-      card.destroy();
-    }
   });
 
   describe('the width a card is set to', () => {

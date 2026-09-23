@@ -7,7 +7,8 @@ import { GameCharacter } from '@axe/domain/character/game-character';
 import { buildMacroMessage } from '@axe/domain/chat/character-macro';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
-import { DiceBot } from '@axe/domain/dice/dice-bot';
+import { DiceBot, PLAIN_DICE_BOT } from '@axe/domain/dice/dice-bot';
+import { Config } from '@axe/domain/peer/config';
 import GameSystemClass from 'bcdice/lib/game_system';
 
 export interface MacroSendOptions {
@@ -27,6 +28,16 @@ export interface MacroSendOptions {
   targets?: readonly GameCharacter[];
 }
 
+/**
+ * A system somebody actually chose, rather than the one everything starts with.
+ *
+ * A piece's palette and the room both carry `DiceBot` from the moment they are made, so
+ * reading either as an answer would mean nothing chosen further along could ever be heard.
+ */
+function chosenSystem(gameType: string | undefined | null): string {
+  return gameType && gameType !== PLAIN_DICE_BOT ? gameType : '';
+}
+
 @Injectable({ providedIn: 'root' })
 export class CharacterMacroService {
   private readonly objectStore = inject(ObjectStore);
@@ -41,6 +52,13 @@ export class CharacterMacroService {
       .filter((character) => character.location.name === 'table' && character.targeted);
   }
 
+  /**
+   * Speaks a palette line as a piece, with the game system already in hand or none at all.
+   *
+   * References to the piece's data in the line are filled in and the marked pieces stand in as the
+   * targets unless others are given. Answers null, sending nothing, when there is no tab to speak
+   * into.
+   */
   send(character: GameCharacter, line: string, options: MacroSendOptions = {}): ChatMessage | null {
     const tab = this.resolveTab(options.tab);
     if (!tab) return null;
@@ -65,6 +83,13 @@ export class CharacterMacroService {
     );
   }
 
+  /**
+   * Speaks a palette line as a piece, loading the dice system it is rolled under first.
+   *
+   * The system is the one asked for, else the piece's palette's, else the room's default, else
+   * whatever chat is set to; the plain bot the piece and the room start with does not count as a
+   * choice. A game system handed in skips the lookup.
+   */
   async sendAsCharacter(
     character: GameCharacter,
     line: string,
@@ -72,7 +97,11 @@ export class CharacterMacroService {
   ): Promise<ChatMessage | null> {
     if (options.gameSystem !== undefined) return this.send(character, line, options);
 
-    const gameType = options.gameType ?? character.chatPalette?.dicebot ?? this.chatMessageService.gameType;
+    const gameType =
+      options.gameType ||
+      chosenSystem(character.chatPalette?.dicebot) ||
+      chosenSystem(this.objectStore.get<Config>('Config')?.defaultDiceBot) ||
+      this.chatMessageService.gameType;
     const gameSystem = await DiceBot.loadGameSystemAsync(gameType);
     return this.send(character, line, { ...options, gameSystem });
   }

@@ -18,12 +18,14 @@ export const ROOM_PANELS = [
   'partyList',
   'buffManager',
   'statusAilment',
+  'diceTableSetting',
   'effectLibrary',
   'mapEditor',
   'dungeonGenerator',
   'roomSnapshot',
   'replay',
   'tabletopDisplay',
+  'skin',
 ] as const;
 
 export type CharacterPanelName = (typeof CHARACTER_PANELS)[number];
@@ -53,12 +55,14 @@ const LABEL_KEYS: Record<PanelName, string> = {
   partyList: 'feature.gmTools.party.title',
   buffManager: 'feature.buffManager.title',
   statusAilment: 'feature.statusAilment.title',
+  diceTableSetting: 'feature.dice.tableSetting.title',
   effectLibrary: 'feature.effect.panelTitle',
   mapEditor: 'feature.mapEditor.title',
   dungeonGenerator: 'feature.tabletop.dungeonGenerator.title',
   roomSnapshot: 'common.panel.roomSnapshot',
   replay: 'common.panel.replay',
   tabletopDisplay: 'feature.tabletop.displaySetting.title',
+  skin: 'feature.skin.title',
 };
 
 /** Anything unknown reads as the chat palette, which is where a panel slot starts. */

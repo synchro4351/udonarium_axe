@@ -1,5 +1,6 @@
 import { ComponentRef, inject, Injectable, ViewContainerRef } from '@angular/core';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
+import { OverlayLayers } from '@axe/application/ui/overlay-layers';
 import { PanelRotationDegrees } from '@axe/application/ui/panel.service';
 import { DEFAULT_RADIAL_MENU_ROTATION_SPEED } from '@axe/domain/tabletop/radial-menu';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
@@ -67,10 +68,22 @@ export class ContextMenuService {
   /** Where the menu sits, for a caller that lives above where menus usually go. Zero is the usual place. */
   layer: number = 0;
 
+  /**
+   * Whether a context menu opened through this service is still on screen.
+   *
+   * The service is provided once for the whole app and the menu components inject that same
+   * instance, so this answers for whichever caller opened the menu.
+   */
   get isShow(): boolean {
     return this.panelComponentRef !== null;
   }
 
+  /**
+   * Opens the plain context menu at a screen point, closing any menu this service already has open.
+   *
+   * Nothing opens for a peer who may not edit the table. Without a parent container the menu goes
+   * into the layer of the detached window that has the focus, or the app's default layer.
+   */
   open(position: ContextMenuPoint, actions: ContextMenuAction[], title?: string, options?: ContextMenuOpenOptions) {
     this.openComponent(
       ContextMenuService.ContextMenuComponentClass,
@@ -90,6 +103,12 @@ export class ContextMenuService {
     );
   }
 
+  /**
+   * Opens the plain menu turned to face one side of a table seen from above.
+   *
+   * The four-way radial menu hands on to this when an entry opens a list, so the list faces the
+   * same edge of the table and keeps this service's text scale.
+   */
   openDirectional(
     position: ContextMenuPoint,
     actions: ContextMenuAction[],
@@ -116,6 +135,17 @@ export class ContextMenuService {
     );
   }
 
+  /**
+   * Opens the four-way radial menu around the anchor point.
+   *
+   * With `radialMenuEnabled` the groups sit on a ring that rotates on its own, and a right-click
+   * turns it a step further. Without it the menu shows a close button and one launcher for each
+   * side of the table; choosing a side replaces it with the plain menu turned to face that side.
+   *
+   * The radial component is fetched the first time it is wanted and the menu appears once it
+   * arrives. If the fetch fails the plain menu opens with the same actions instead; with no loader
+   * registered, nothing opens. Nothing opens either for a peer who may not edit the table.
+   */
   openRadial(
     position: ContextMenuPoint,
     actions: ContextMenuAction[],
@@ -181,7 +211,8 @@ export class ContextMenuService {
     this.close();
     if (!this.rolePermission.canEditTabletop) return;
 
-    const parent = parentViewContainerRef ?? ContextMenuService.defaultParentViewContainerRef;
+    const parent =
+      parentViewContainerRef ?? OverlayLayers.current() ?? ContextMenuService.defaultParentViewContainerRef;
     const injector = parent.injector;
 
     const panelComponentRef = parent.createComponent(componentClass, {
@@ -218,6 +249,7 @@ export class ContextMenuService {
     });
   }
 
+  /** Closes the menu this service opened, if it is still up. */
   close() {
     if (this.panelComponentRef) {
       this.panelComponentRef.destroy();
