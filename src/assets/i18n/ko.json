@@ -546,6 +546,14 @@
         "strokeColor": "테두리 색",
         "strokeWidth": "테두리 굵기",
         "fontFamily": "폰트",
+        "fontOption": {
+          "default": "기본값",
+          "gothic": "고딕 (기기 글꼴)",
+          "mincho": "명조 (기기 글꼴)",
+          "rounded": "둥근 고딕 (기기 글꼴)",
+          "monospace": "고정폭 (기기 글꼴)",
+          "custom": "직접 입력한 글꼴 이름"
+        },
         "fontFamilyPlaceholder": "(기본 폰트)",
         "fillFrom": "색",
         "fillTo": "끝 색",

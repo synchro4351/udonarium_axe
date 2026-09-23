@@ -546,6 +546,14 @@
         "strokeColor": "Outline",
         "strokeWidth": "Outline px",
         "fontFamily": "Font",
+        "fontOption": {
+          "default": "Default",
+          "gothic": "Sans serif (device font)",
+          "mincho": "Serif (device font)",
+          "rounded": "Rounded (device font)",
+          "monospace": "Monospace (device font)",
+          "custom": "Custom font name"
+        },
         "fontFamilyPlaceholder": "(the default font)",
         "fillFrom": "Colour",
         "fillTo": "To colour",

@@ -29,6 +29,7 @@ import { CUT_IN_TRACKS, type CutInTrackName } from '@axe/domain/media/cut-in-key
 import { CUT_IN_TEXT_ALIGNS, CutInLayer, type CutInTextAlign, isCutInTextAlign } from '@axe/domain/media/cut-in-layer';
 import { applyLayerPreset, CUT_IN_LAYER_PRESETS } from '@axe/domain/media/cut-in-layer-presets';
 import { CUT_IN_WIPES, type CutInWipe, isCutInWipe } from '@axe/domain/media/cut-in-wipe';
+import { CUT_IN_FONT_OPTIONS, cutInFontOption } from '@axe/features/media/cut-in-editor/cut-in-font-options';
 import {
   easingAtMoment,
   hasKeyAt,
@@ -72,6 +73,7 @@ export class CutInLayerPropertiesComponent {
   readonly commit = output<void>();
 
   readonly textAligns = CUT_IN_TEXT_ALIGNS;
+  readonly fontOptions = CUT_IN_FONT_OPTIONS;
   readonly easings = CUT_IN_EASING_NAMES;
   readonly fillShapes = CUT_IN_FILL_SHAPES;
   readonly clips = CUT_IN_CLIPS;
@@ -301,6 +303,13 @@ export class CutInLayerPropertiesComponent {
   }
   set fontFamily(fontFamily: string) {
     this.write((layer) => (layer.fontFamily = fontFamily));
+  }
+
+  get selectedFontOption(): string {
+    return cutInFontOption(this.fontFamily);
+  }
+  set selectedFontOption(option: string) {
+    if (option !== 'custom') this.fontFamily = option;
   }
 
   /** A text layer's letter colour. */

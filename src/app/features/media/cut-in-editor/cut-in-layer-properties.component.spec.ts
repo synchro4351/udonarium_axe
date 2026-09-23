@@ -132,6 +132,33 @@ describe('CutInLayerPropertiesComponent', () => {
       expect(layer.textAlign).toBe('left');
     });
 
+    it('offers font presets without changing an existing custom font', () => {
+      component.fontFamily = 'My Table Font, serif';
+      expect(component.selectedFontOption).toBe('custom');
+      expect(layer.fontFamily).toBe('My Table Font, serif');
+
+      const mincho = component.fontOptions.find((option) => option.name === 'mincho');
+      expect(mincho).toBeDefined();
+      component.selectedFontOption = mincho!.value;
+      expect(component.selectedFontOption).toBe(mincho!.value);
+      expect(layer.fontFamily).toBe(mincho!.value);
+
+      component.selectedFontOption = '';
+      expect(layer.fontFamily).toBe('');
+    });
+
+    it('writes a selected font from the dropdown', async () => {
+      const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>(
+        'select[name="cut-in-layer-font-option"]'
+      );
+      expect(select).not.toBeNull();
+      select!.value = component.fontOptions[1].value;
+      select!.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+
+      expect(layer.fontFamily).toBe(component.fontOptions[1].value);
+    });
+
     it('holds the weight to what a font has', () => {
       component.fontWeight = 5000;
       expect(layer.fontWeight).toBe(900);

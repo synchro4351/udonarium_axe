@@ -171,6 +171,20 @@
           {{ 'feature.media.cutInEditor.vertical' | transloco }}
         </label>
         <label class="text-ui-muted text-[11px]">{{ 'feature.media.cutInEditor.fontFamily' | transloco }}</label>
+        <select
+          class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm box-border w-full border border-solid px-1.5 py-1 text-[12px] outline-none disabled:opacity-50"
+          name="cut-in-layer-font-option"
+          [(ngModel)]="selectedFontOption"
+          [attr.disabled]="!isEditable() ? '' : null"
+        >
+          @for (option of fontOptions; track option.name) {
+            <option [value]="option.value">
+              {{ 'feature.media.cutInEditor.fontOption.' + option.name | transloco }}
+            </option>
+          }
+          <option value="custom" disabled>{{ 'feature.media.cutInEditor.fontOption.custom' | transloco }}</option>
+        </select>
+        <label class="text-ui-muted text-[11px]">{{ 'feature.media.cutInEditor.fontOption.custom' | transloco }}</label>
         <input
           class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm box-border w-full border border-solid px-1.5 py-1 text-[12px] outline-none disabled:opacity-50"
           name="cut-in-layer-font-family"

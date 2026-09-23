@@ -546,6 +546,14 @@
         "strokeColor": "縁の色",
         "strokeWidth": "縁の太さ",
         "fontFamily": "フォント",
+        "fontOption": {
+          "default": "既定",
+          "gothic": "ゴシック（端末依存）",
+          "mincho": "明朝（端末依存）",
+          "rounded": "丸ゴシック（端末依存）",
+          "monospace": "等幅（端末依存）",
+          "custom": "任意のフォント名"
+        },
         "fontFamilyPlaceholder": "（既定のフォント）",
         "fillFrom": "色",
         "fillTo": "終わりの色",
