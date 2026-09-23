@@ -22,7 +22,9 @@ export class PointerDeviceService {
   private callbackOnPointerMove = (e: MouseEvent | TouchEvent) => this.onPointerMove(e);
   private callbackOnPointerUp = (e: MouseEvent | TouchEvent) => this.onPointerUp(e);
   private callbackOnContextMenu = (e: MouseEvent) => this.onContextMenu(e);
-  private callbackOnWindowBlur = () => this.resetDraggingState();
+  private callbackOnWindowBlur = (e: FocusEvent) => {
+    if (e.target === window) this.resetDraggingState();
+  };
   private callbackOnVisibilityChange = () => {
     if (document.visibilityState === 'hidden') this.resetDraggingState();
   };
