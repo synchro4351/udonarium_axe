@@ -1,5 +1,7 @@
 import { ChangeDetectorRef } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { YouTubePlayer } from '@angular/youtube-player';
 import { CutInSoundService } from '@axe/application/media/cut-in-sound.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { AudioFile } from '@axe/core/storage/audio-file';
@@ -44,6 +46,20 @@ describe('CutInWindowComponent', () => {
 
   it('should be created', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('loads the YouTube iframe and leaves its controls accessible', () => {
+    const cutIn = new CutIn('youtube-controls-test');
+    cutIn.initialize();
+    cutIn.isVideoCutIn = true;
+    cutIn.videoUrl = 'https://youtu.be/abcdefghijk';
+    component.cutIn = cutIn;
+    fixture.detectChanges();
+
+    const player = fixture.debugElement.query(By.directive(YouTubePlayer));
+    expect(player?.componentInstance.disablePlaceholder).toBe(true);
+    expect(player?.componentInstance.playerVars.controls).toBe(1);
+    expect(fixture.nativeElement.querySelector('.yt-click-guard')).toBeNull();
   });
 
   describe('the size of the video player', () => {
