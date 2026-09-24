@@ -48,16 +48,21 @@ describe('CutInWindowComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('loads the YouTube iframe and leaves its controls accessible', () => {
+  it('starts loading the YouTube iframe with autoplay when cut-in playback begins', () => {
     const cutIn = new CutIn('youtube-controls-test');
     cutIn.initialize();
     cutIn.isVideoCutIn = true;
     cutIn.videoUrl = 'https://youtu.be/abcdefghijk';
     component.cutIn = cutIn;
     fixture.detectChanges();
+    expect(fixture.debugElement.query(By.directive(YouTubePlayer))).toBeNull();
+
+    component.startCutIn();
+    fixture.detectChanges();
 
     const player = fixture.debugElement.query(By.directive(YouTubePlayer));
     expect(player?.componentInstance.disablePlaceholder).toBe(true);
+    expect(player?.componentInstance.playerVars.autoplay).toBe(1);
     expect(player?.componentInstance.playerVars.controls).toBe(1);
     expect(fixture.nativeElement.querySelector('.yt-click-guard')).toBeNull();
   });
