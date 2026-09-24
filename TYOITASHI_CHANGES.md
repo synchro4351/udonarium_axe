@@ -19,10 +19,15 @@
 | YouTube再生操作 | [f45a18c5](https://github.com/synchro4351/udonarium_axe/commit/f45a18c5) | 6ba6751a起点。プレイヤーのサムネイル待機を無効化、クリック遮断を除去、操作欄を表示 |
 | チャット入力後の初回ドラッグ | [0605e7ba](https://github.com/synchro4351/udonarium_axe/commit/0605e7ba) | 14101a33起点。入力要素のblurとwindowのblurを区別。保存・同期の変更なし |
 | YouTube自動再生（次版） | [42bdbd97](https://github.com/synchro4351/udonarium_axe/commit/42bdbd97) | be1fdb8a起点。f45a18c5の再生操作修正を前提とする。開始時にiframe生成・autoplay要求、既存の時刻合わせと操作欄を維持 |
+| ホットバーのエフェクトアイコン（次版） | [2a75e5c2](https://github.com/synchro4351/udonarium_axe/commit/2a75e5c2) | 42bdbd97起点。既存のeffect-shapesのSVGとng-selectを使用。保存値は従来のエフェクト名のまま |
+| 編集可能なカットイン見本3種（次版） | [13e18a3f](https://github.com/synchro4351/udonarium_axe/commit/13e18a3f) | 2a75e5c2の後続。既存のCutIn・シーン・レイヤー・アニメーションプリセットを使用。既存カットインに不干渉、保存・同期形式を追加しない |
+
+[小改善2件の機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hotbar-effect-icons-and-cutin-presets)は、公式v1.57.1に私家機能を加えた42bdbd97を基点としています。
 
 ## 検証と制限
 
-- 現在の次版候補は全体922ファイル／12,520件成功・1件skip、production build成功。
+- 現在の次版候補は全体923ファイル／12,525件成功・1件skip、production build成功（機能ブランチの検証済みコミットと同一）。
+- エフェクト選択欄とカットイン見本の実画面・演出は目視未確認。
 - フォント選択・YouTube表示・ポインター入力を組み合わせた92件は、r1で直接Vitest・Angular経由の両方に成功。自動再生追加は対象22件を両経路で確認。
 - 初回ドラッグはChromium・Firefox・WebKitで、チャットフォーカスあり／なしの計6件を確認。
 - 再読み込み後の同一ID再参加・双方向通信・再同期は確認済み。旧接続が残る場合は約1分待ち、他の参加者の強制退出やID変更はしない。

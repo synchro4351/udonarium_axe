@@ -8,10 +8,13 @@
 
 ## 次版（未リリース）
 
-- 現在の候補：[42bdbd97](https://github.com/synchro4351/udonarium_axe/commit/42bdbd977df1241a6e99a92c4aca7d64dc895201)
+- 現在の候補：[1c285e05](https://github.com/synchro4351/udonarium_axe/commit/1c285e0561768da03e99f9b999987f5cd3fa984e)
 - YouTubeカットイン開始時にiframeを生成し、自動再生を要求します。ブラウザの制限下では手動操作が必要です。
+- ホットバーのエフェクト選択に図形アイコンと名称を併記しました。
+- 編集可能なカットイン見本「戦闘開始」「成功！」「場面転換」を追加しました。外部画像・音声は不要です。
 - 保存形式・同期項目の変更はありません。
-- [r1からの差分](https://github.com/synchro4351/udonarium_axe/compare/be1fdb8a81037efab6300ad49260023552e87739...42bdbd977df1241a6e99a92c4aca7d64dc895201)
+- 全体12,525件成功・1件skip、production build成功。エフェクト選択欄と見本の演出は目視未確認です。
+- [r1からの差分](https://github.com/synchro4351/udonarium_axe/compare/be1fdb8a81037efab6300ad49260023552e87739...1c285e0561768da03e99f9b999987f5cd3fa984e)
 
 ## tyoitashi r1／Axe v1.57.1 — 2026-09-24
 
