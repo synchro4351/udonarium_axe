@@ -184,6 +184,7 @@ export class HandRailComponent {
   protected readonly fanWidthPx = computed(() => handFanWidthPx(this.fanOptions()));
 
   protected readonly hovered = signal<string | null>(null);
+  protected readonly sourceCardId = signal<string>('');
   protected readonly draggingId = signal<string | null>(null);
   private readonly insertAt = signal<number | null>(null);
 
@@ -215,8 +216,13 @@ export class HandRailComponent {
   }
 
   protected cardZIndex(card: Card): number {
-    if (this.hovered() === card.identifier) return this.cards().length + 1;
+    if (this.hovered() === card.identifier || this.sourceCardId() === card.identifier) return this.cards().length + 1;
     return this.layoutOf(card)?.zIndex ?? 0;
+  }
+
+  protected toggleCardSource(card: Card, event: MouseEvent): void {
+    event.stopPropagation();
+    this.sourceCardId.update((identifier) => (identifier === card.identifier ? '' : card.identifier));
   }
 
   protected isDragging(card: Card): boolean {

@@ -715,6 +715,8 @@
         "public": "公開中の手札",
         "autoSort": "スート・数字／名前順に自動整列",
         "manualOrder": "手動の並び順に戻す",
+        "fromParticipant": "{{name}} から受け取ったカード",
+        "receivedCard": "{{name}} から「{{card}}」を受け取りました",
         "discardPairs": "ペアを捨てる",
         "noPairs": "同じ数字の組がありません"
       },

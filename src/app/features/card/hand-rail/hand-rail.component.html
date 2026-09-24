@@ -102,6 +102,41 @@
                 />
               </div>
 
+              @if (card.lastHandGiverUserId) {
+                <button
+                  class="bg-ui-accent text-ui-text shadow-ui-sm absolute top-1 right-1 z-4 inline-flex size-5 cursor-pointer items-center justify-center rounded-full border-none p-0"
+                  type="button"
+                  data-testid="hand-card-source"
+                  [title]="
+                    'feature.card.hand.fromParticipant'
+                      | transloco: { name: card.lastHandGiverName || ('feature.card.hand.unnamed' | transloco) }
+                  "
+                  [attr.aria-label]="
+                    'feature.card.hand.fromParticipant'
+                      | transloco: { name: card.lastHandGiverName || ('feature.card.hand.unnamed' | transloco) }
+                  "
+                  (pointerdown)="$event.stopPropagation()"
+                  (click)="toggleCardSource(card, $event)"
+                >
+                  <i class="material-icons text-[13px]!">move_to_inbox</i>
+                </button>
+                @if (sourceCardId() === card.identifier) {
+                  <div
+                    class="bg-ui-panel text-ui-text shadow-ui-md border-ui-border-panel rounded-ui-sm absolute top-7 right-0 z-5 w-max max-w-48 border border-solid px-2 py-1 text-[11px] whitespace-normal"
+                    data-testid="hand-card-source-popup"
+                  >
+                    {{
+                      'feature.card.hand.receivedCard'
+                        | transloco
+                          : {
+                              card: displayName(card),
+                              name: card.lastHandGiverName || ('feature.card.hand.unnamed' | transloco),
+                            }
+                    }}
+                  </div>
+                }
+              }
+
               @if (hovered() === card.identifier) {
                 <div
                   class="bg-ui-panel/90 absolute inset-x-0 bottom-0 z-3 flex justify-center gap-0.5 rounded-b-sm py-0.5"

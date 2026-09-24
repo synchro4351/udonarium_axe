@@ -715,6 +715,8 @@
         "public": "Public hand",
         "autoSort": "Sort by suit and number / name",
         "manualOrder": "Use manual order",
+        "fromParticipant": "Card received from {{name}}",
+        "receivedCard": "{{card}} was received from {{name}}",
         "discardPairs": "Discard pairs",
         "noPairs": "No matching pair"
       },

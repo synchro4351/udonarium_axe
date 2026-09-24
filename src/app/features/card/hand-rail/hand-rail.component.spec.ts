@@ -122,6 +122,26 @@ describe('HandRailComponent', () => {
     expect(component.cards()).toEqual([second, first]);
   });
 
+  it('marks the received card and shows its last giver when opened', async () => {
+    const card = makeCard(handLocationOf('me'));
+    card.lastHandGiverUserId = 'other';
+    card.lastHandGiverName = 'あいて';
+    TestBed.inject(HandRailService).open();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const badge = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      '[data-testid="hand-card-source"]'
+    )!;
+    expect(badge).toBeTruthy();
+    badge.click();
+    fixture.detectChanges();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="hand-card-source-popup"]')?.textContent
+    ).toContain('あいて');
+  });
+
   it('offers another participant on a hand card context menu', () => {
     const other = new PeerCursor();
     other.userId = 'other';

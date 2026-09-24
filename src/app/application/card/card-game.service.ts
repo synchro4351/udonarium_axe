@@ -113,6 +113,8 @@ export class CardGameService {
     if (!recipient) return false;
 
     card.toHand(recipient.userId);
+    card.lastHandGiverUserId = myUserId;
+    card.lastHandGiverName = PeerCursor.myCursor?.name ?? '';
     SoundEffect.play(PresetSound.cardDraw);
     this.chatMessageService.sendSystemMessage(
       this.t('feature.card.message.gaveFromHand', { from: PeerCursor.myCursor?.name ?? '', to: recipient.name })

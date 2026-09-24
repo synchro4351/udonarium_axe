@@ -715,6 +715,8 @@
         "public": "공개된 패",
         "autoSort": "무늬와 숫자 / 이름순 정렬",
         "manualOrder": "수동 순서로 돌아가기",
+        "fromParticipant": "{{name}}에게서 받은 카드",
+        "receivedCard": "{{name}}에게서 「{{card}}」을(를) 받았습니다",
         "discardPairs": "페어 버리기",
         "noPairs": "같은 숫자의 짝이 없습니다"
       },

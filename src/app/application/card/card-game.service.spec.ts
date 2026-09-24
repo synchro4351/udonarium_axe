@@ -121,6 +121,8 @@ describe('CardGameService', () => {
 
       expect(card.location.name).toBe(handLocationOf('other'));
       expect(card.state).toBe(CardState.BACK);
+      expect(card.lastHandGiverUserId).toBe('me');
+      expect(card.lastHandGiverName).toBe('わたし');
       expect(service.handCardsOf('me')).toHaveLength(0);
       expect(sendSystemMessage).toHaveBeenCalledOnce();
     });
@@ -145,6 +147,20 @@ describe('CardGameService', () => {
 
       expect(service.giveFromHand(card, 'other')).toBe(false);
       expect(card.location.name).toBe(handLocationOf('me'));
+    });
+
+    it('replaces the previous giver when the card is passed on', () => {
+      peer('other', 'あいて');
+      peer('third', '第三者');
+      const card = trumpCard('s07');
+      card.toHand('me');
+      service.giveFromHand(card, 'other');
+      PeerCursor.myCursor.userId = 'other';
+      PeerCursor.myCursor.name = 'あいて';
+
+      expect(service.giveFromHand(card, 'third')).toBe(true);
+      expect(card.lastHandGiverUserId).toBe('other');
+      expect(card.lastHandGiverName).toBe('あいて');
     });
   });
 

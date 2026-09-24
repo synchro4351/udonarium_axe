@@ -400,6 +400,17 @@ describe('Card', () => {
       expect(card.isVisible).toBe(true);
     });
 
+    it('forgets a previous giver when the card enters a hand by another route', () => {
+      const card = new Card();
+      card.lastHandGiverUserId = 'old-giver';
+      card.lastHandGiverName = 'Old giver';
+
+      card.toHand('me');
+
+      expect(card.lastHandGiverUserId).toBe('');
+      expect(card.lastHandGiverName).toBe('');
+    });
+
     it('one in somebody elses cannot', () => {
       const card = new Card();
 

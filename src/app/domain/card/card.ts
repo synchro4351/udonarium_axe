@@ -27,6 +27,9 @@ export class Card extends OwnedTabletopObject {
   @SyncVar() owner: string = '';
   @SyncVar() zindex: number = 0;
   @SyncVar() handOrder: number = 0;
+  /** The participant who last deliberately gave this card into a hand. Empty after any other move. */
+  @SyncVar() lastHandGiverUserId: string = '';
+  @SyncVar() lastHandGiverName: string = '';
   @SyncVar() cutInIdentifier: string = '';
   @SyncVar() targetIdentifier: string = '';
   @SyncVar() disclosureMode: string = '';
@@ -157,6 +160,8 @@ export class Card extends OwnedTabletopObject {
     this.owner = '';
     this.state = CardState.BACK;
     this.handOrder = handOrder;
+    this.lastHandGiverUserId = '';
+    this.lastHandGiverName = '';
     this.setLocation(handLocationOf(userId));
   }
 
@@ -164,12 +169,16 @@ export class Card extends OwnedTabletopObject {
   playFaceUp() {
     this.setLocation('table');
     this.faceUp();
+    this.lastHandGiverUserId = '';
+    this.lastHandGiverName = '';
   }
 
   /** Puts the card on the table face down, as when playing it from a hand. */
   playFaceDown() {
     this.setLocation('table');
     this.faceDown();
+    this.lastHandGiverUserId = '';
+    this.lastHandGiverName = '';
   }
 
   /** Raises the card above every other card and card stack in the drawing order. */
