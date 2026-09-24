@@ -104,6 +104,22 @@ export class CardGameService {
     return true;
   }
 
+  /** Gives one of your hand cards to another participant, keeping it hidden in their hand. */
+  giveFromHand(card: Card, recipientUserId: string): boolean {
+    const myUserId = this.myUserId();
+    if (!myUserId || !canRoleEdit(PeerCursor.myRole) || recipientUserId === myUserId) return false;
+    if (!this.handCardsOf(myUserId).includes(card)) return false;
+    const recipient = this.participants().find((seat) => seat.userId === recipientUserId);
+    if (!recipient) return false;
+
+    card.toHand(recipient.userId);
+    SoundEffect.play(PresetSound.cardDraw);
+    this.chatMessageService.sendSystemMessage(
+      this.t('feature.card.message.gaveFromHand', { from: PeerCursor.myCursor?.name ?? '', to: recipient.name })
+    );
+    return true;
+  }
+
   /**
    * Discards every pair of the same rank among the cards, face up, onto the discard stack on the
    * table, and announces it.

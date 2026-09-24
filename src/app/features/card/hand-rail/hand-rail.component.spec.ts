@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
+import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { Card, CardState } from '@axe/domain/card/card';
 import { handLocationOf } from '@axe/domain/card/hand-location';
@@ -86,6 +88,33 @@ describe('HandRailComponent', () => {
     await fixture.whenStable();
 
     expect(fixture.nativeElement.querySelector('card-face-preview')).toBeTruthy();
+  });
+
+  it('offers another participant on a hand card context menu', () => {
+    const other = new PeerCursor();
+    other.userId = 'other';
+    other.name = 'あいて';
+    other.role = PeerRole.Player;
+    other.initialize();
+    const card = makeCard(handLocationOf('me'));
+    const menu = TestBed.inject(ContextMenuService);
+    const open = vi.spyOn(menu, 'open').mockImplementation(() => undefined);
+    vi.spyOn(TestBed.inject(ChatMessageService), 'sendSystemMessage').mockImplementation(() => null!);
+
+    try {
+      (component as unknown as { openGiveMenu: (c: Card, e: MouseEvent) => void }).openGiveMenu(
+        card,
+        new MouseEvent('contextmenu', { clientX: 15, clientY: 25, cancelable: true })
+      );
+
+      expect(open).toHaveBeenCalledOnce();
+      expect(open.mock.calls[0][1][0].name).toContain('あいて');
+      open.mock.calls[0][1][0].action?.();
+      expect(card.location.name).toBe(handLocationOf('other'));
+    } finally {
+      other.destroy();
+      card.destroy();
+    }
   });
 
   it('puts a card face up back onto the table and out of the hand', () => {

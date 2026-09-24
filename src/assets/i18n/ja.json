@@ -708,6 +708,8 @@
         "playFaceUp": "表向きで場に出す",
         "playFaceDown": "裏向きで場に出す",
         "drawFromOther": "相手の手札から引く",
+        "giveCard": "カードを渡す",
+        "giveTo": "{{name}} に渡す",
         "discardPairs": "ペアを捨てる",
         "noPairs": "同じ数字の組がありません"
       },
@@ -750,6 +752,7 @@
       "discardStackName": "捨て札",
       "message": {
         "drewFromHand": "{{to}} が {{from}} の手札から 1 枚引きました",
+        "gaveFromHand": "{{from}} が {{to}} に手札から 1 枚渡しました",
         "discardedPairs": "{{name}} が {{ranks}} のペアを捨てました"
       },
       "drawPanel": {

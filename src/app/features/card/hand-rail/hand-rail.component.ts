@@ -16,6 +16,7 @@ import { CoordinateService } from '@axe/application/input/coordinate.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
+import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { MobileLayoutService } from '@axe/application/ui/mobile-layout.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
@@ -42,6 +43,7 @@ import {
   layoutHandFan,
 } from '@axe/features/card/hand-rail/hand-fan';
 import { HandRailService } from '@axe/features/card/hand-rail/hand-rail.service';
+import { handTransferActions } from '@axe/features/card/hand-rail/hand-transfer-context-menu';
 import { CardFacePreviewComponent } from '@axe/ui/components/card-face-preview/card-face-preview.component';
 import { DraggableDirective } from '@axe/ui/directives/draggable.directive';
 import { TranslocoModule } from '@jsverse/transloco';
@@ -69,6 +71,7 @@ export class HandRailComponent {
   private readonly t = inject(TRANSLATE_FN);
   private readonly panelService = inject(PanelService);
   private readonly cardGame = inject(CardGameService);
+  private readonly contextMenu = inject(ContextMenuService);
 
   private dragPending: { card: Card; startX: number; startY: number; dragging: boolean } | null = null;
   private activePointerId: number | null = null;
@@ -226,6 +229,19 @@ export class HandRailComponent {
 
   protected discardPairs(): void {
     this.cardGame.discardPairs(this.cards());
+  }
+
+  protected openGiveMenu(card: Card, event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.cards().includes(card)) return;
+    const recipients = this.cardGame.participants().filter((seat) => seat.userId !== this.cardGame.myUserId());
+    if (recipients.length < 1) return;
+    this.contextMenu.open(
+      { x: event.clientX, y: event.clientY },
+      handTransferActions(recipients, (userId) => this.cardGame.giveFromHand(card, userId), this.t),
+      this.t('feature.card.hand.giveCard')
+    );
   }
 
   protected close(): void {

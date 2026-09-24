@@ -59,6 +59,7 @@
               (pointermove)="onCardPointerMove($event)"
               (pointerup)="onCardPointerUp($event)"
               (pointercancel)="onCardPointerCancel($event)"
+              (contextmenu)="openGiveMenu(card, $event)"
             >
               <div
                 class="border-ui-border-panel bg-ui-elevated shadow-ui-sm relative size-full overflow-hidden rounded-sm border border-solid"
@@ -77,6 +78,15 @@
                   class="bg-ui-panel/90 absolute inset-x-0 bottom-0 z-3 flex justify-center gap-0.5 rounded-b-sm py-0.5"
                   [ngClass]="isTouch() ? 'shadow-ui-sm top-[calc(100%+2px)]! bottom-auto! rounded-sm! py-1' : ''"
                 >
+                  <button
+                    class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5 transform-none cursor-pointer items-center justify-center border-none bg-transparent px-1 leading-none transition-colors"
+                    [ngClass]="isTouch() ? 'h-8! px-3!' : ''"
+                    [title]="'feature.card.hand.giveCard' | transloco"
+                    [attr.aria-label]="'feature.card.hand.giveCard' | transloco"
+                    (click)="openGiveMenu(card, $event)"
+                  >
+                    <i class="material-icons text-[13px]!" [ngClass]="isTouch() ? 'text-[18px]!' : ''">send</i>
+                  </button>
                   <button
                     class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5 transform-none cursor-pointer items-center justify-center border-none bg-transparent px-1 leading-none shadow-none transition-colors outline-none hover:border-transparent hover:shadow-none"
                     [ngClass]="isTouch() ? 'h-8! px-3!' : ''"

@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { CardGameService } from '@axe/application/card/card-game.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
-import { Card } from '@axe/domain/card/card';
+import { Card, CardState } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
 import { handLocationOf } from '@axe/domain/card/hand-location';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
@@ -108,6 +108,43 @@ describe('CardGameService', () => {
       expect(card.location.name).toBe(handLocationOf('me'));
       expect(service.handCardsOf('other')).toHaveLength(0);
       expect(sendSystemMessage).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('giveFromHand()', () => {
+    it('moves one of your cards to another participant without revealing its face', () => {
+      peer('other', 'あいて');
+      const card = trumpCard('s07');
+      card.toHand('me');
+
+      expect(service.giveFromHand(card, 'other')).toBe(true);
+
+      expect(card.location.name).toBe(handLocationOf('other'));
+      expect(card.state).toBe(CardState.BACK);
+      expect(service.handCardsOf('me')).toHaveLength(0);
+      expect(sendSystemMessage).toHaveBeenCalledOnce();
+    });
+
+    it("does not move somebody else's card or give a card to a guest", () => {
+      peer('guest', 'けんがく', PeerRole.Guest);
+      const card = trumpCard('s07');
+      card.toHand('other');
+
+      expect(service.giveFromHand(card, 'guest')).toBe(false);
+      card.toHand('me');
+      expect(service.giveFromHand(card, 'guest')).toBe(false);
+      expect(card.location.name).toBe(handLocationOf('me'));
+      expect(sendSystemMessage).not.toHaveBeenCalled();
+    });
+
+    it('does not give a card after its holder becomes a guest', () => {
+      peer('other', 'あいて');
+      const card = trumpCard('s07');
+      card.toHand('me');
+      PeerCursor.myCursor.role = PeerRole.Guest;
+
+      expect(service.giveFromHand(card, 'other')).toBe(false);
+      expect(card.location.name).toBe(handLocationOf('me'));
     });
   });
 
