@@ -713,6 +713,8 @@
         "makePublic": "Show your hand to everyone",
         "makePrivate": "Hide your hand from others",
         "public": "Public hand",
+        "autoSort": "Sort by suit and number / name",
+        "manualOrder": "Use manual order",
         "discardPairs": "Discard pairs",
         "noPairs": "No matching pair"
       },

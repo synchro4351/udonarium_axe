@@ -1,6 +1,11 @@
 import { Card } from '@axe/domain/card/card';
 import { handLocationOf } from '@axe/domain/card/hand-location';
-import { isHandCardOf, reorderHandCards, selectHandCards } from '@axe/features/card/hand-rail/hand-cards';
+import {
+  autoSortHandCards,
+  isHandCardOf,
+  reorderHandCards,
+  selectHandCards,
+} from '@axe/features/card/hand-rail/hand-cards';
 import { afterEach, describe, expect, it } from 'vitest';
 
 function makeCard(locationName: string): Card {
@@ -79,5 +84,26 @@ describe('reorderHandCards', () => {
   it('ignores a move from outside the hand', () => {
     expect(reorderHandCards(items, -1, 2)).toEqual(['a', 'b', 'c', 'd']);
     expect(reorderHandCards(items, 9, 2)).toEqual(['a', 'b', 'c', 'd']);
+  });
+});
+
+describe('autoSortHandCards', () => {
+  it('puts bundled playing cards by suit and number, then custom cards by name', () => {
+    const card = (name: string, front: string) => Card.create(name, front, 'back.png');
+    const heart = card('Heart', './assets/images/trump/h03.webp');
+    const clubTwo = card('Club two', './assets/images/trump/c02.webp');
+    const joker = card('Joker', './assets/images/trump/x01.webp');
+    const clubOne = card('Club one', './assets/images/trump/c01.webp');
+    const zebra = card('Zebra', 'zebra.png');
+    const apple = card('Apple', 'apple.png');
+
+    expect(autoSortHandCards([zebra, heart, clubTwo, joker, apple, clubOne])).toEqual([
+      clubOne,
+      clubTwo,
+      heart,
+      joker,
+      apple,
+      zebra,
+    ]);
   });
 });

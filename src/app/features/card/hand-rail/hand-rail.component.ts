@@ -29,7 +29,7 @@ import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
 import { HandDrawPanelComponent } from '@axe/features/card/hand-draw/hand-draw-panel.component';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
-import { reorderHandCards, selectHandCards } from '@axe/features/card/hand-rail/hand-cards';
+import { autoSortHandCards, reorderHandCards, selectHandCards } from '@axe/features/card/hand-rail/hand-cards';
 import { HandDragService } from '@axe/features/card/hand-rail/hand-drag.service';
 import {
   fitHandFanOptions,
@@ -47,6 +47,16 @@ import { handTransferActions } from '@axe/features/card/hand-rail/hand-transfer-
 import { CardFacePreviewComponent } from '@axe/ui/components/card-face-preview/card-face-preview.component';
 import { DraggableDirective } from '@axe/ui/directives/draggable.directive';
 import { TranslocoModule } from '@jsverse/transloco';
+
+const HAND_AUTO_SORT_KEY = 'ui-hand-auto-sort';
+
+function storedAutoSort(): boolean {
+  try {
+    return localStorage.getItem(HAND_AUTO_SORT_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -72,6 +82,7 @@ export class HandRailComponent {
   private readonly panelService = inject(PanelService);
   private readonly cardGame = inject(CardGameService);
   private readonly contextMenu = inject(ContextMenuService);
+  protected readonly autoSort = signal(storedAutoSort());
 
   private dragPending: { card: Card; startX: number; startY: number; dragging: boolean } | null = null;
   private activePointerId: number | null = null;
@@ -143,13 +154,24 @@ export class HandRailComponent {
     this.objectChange.notifyChanged(cursor.identifier);
   }
 
+  protected toggleAutoSort(): void {
+    const next = !this.autoSort();
+    this.autoSort.set(next);
+    try {
+      localStorage.setItem(HAND_AUTO_SORT_KEY, String(next));
+    } catch {
+      // The preference still works for this session when browser storage is unavailable.
+    }
+  }
+
   readonly cards = computed<Card[]>(() => {
     this.objectChange.collectionOf(Card.aliasName)();
     this.objectChange.trackMyCursor();
     const userId = this.cardGame.myUserId();
     const all = this.objectStore.getObjects<Card>(Card);
     for (const card of all) this.objectChange.versionOf(card.identifier)();
-    return selectHandCards(all, userId);
+    const hand = selectHandCards(all, userId);
+    return this.autoSort() ? autoSortHandCards(hand) : hand;
   });
 
   protected readonly cardWidthPx = HAND_CARD_WIDTH_PX;
@@ -358,6 +380,7 @@ export class HandRailComponent {
     if (from < 0) return;
 
     const reordered = reorderHandCards(cards, from, insertAt);
+    if (this.autoSort()) this.toggleAutoSort();
     reordered.forEach((entry, index) => {
       if (entry.handOrder === index) return;
       entry.handOrder = index;

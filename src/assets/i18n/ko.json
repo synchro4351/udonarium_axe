@@ -713,6 +713,8 @@
         "makePublic": "내 패 공개하기",
         "makePrivate": "내 패 숨기기",
         "public": "공개된 패",
+        "autoSort": "무늬와 숫자 / 이름순 정렬",
+        "manualOrder": "수동 순서로 돌아가기",
         "discardPairs": "페어 버리기",
         "noPairs": "같은 숫자의 짝이 없습니다"
       },

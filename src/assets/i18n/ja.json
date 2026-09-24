@@ -713,6 +713,8 @@
         "makePublic": "自分の手札を公開する",
         "makePrivate": "自分の手札を秘匿する",
         "public": "公開中の手札",
+        "autoSort": "スート・数字／名前順に自動整列",
+        "manualOrder": "手動の並び順に戻す",
         "discardPairs": "ペアを捨てる",
         "noPairs": "同じ数字の組がありません"
       },

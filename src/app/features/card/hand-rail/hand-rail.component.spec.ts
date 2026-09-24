@@ -24,6 +24,7 @@ describe('HandRailComponent', () => {
   }
 
   beforeEach(async () => {
+    localStorage.removeItem('ui-hand-auto-sort');
     await TestBed.configureTestingModule({
       imports: [HandRailComponent],
       providers: [...TEST_PROVIDERS],
@@ -36,6 +37,7 @@ describe('HandRailComponent', () => {
   });
 
   afterEach(() => {
+    localStorage.removeItem('ui-hand-auto-sort');
     PeerCursor.myCursor = null!;
   });
 
@@ -98,6 +100,26 @@ describe('HandRailComponent', () => {
     expect(PeerCursor.myCursor.handPublic).toBe(true);
     toggle();
     expect(PeerCursor.myCursor.handPublic).toBe(false);
+  });
+
+  it('keeps automatic sorting local and returns to manual order when rearranged', () => {
+    const first = makeCard(handLocationOf('me'));
+    const second = makeCard(handLocationOf('me'));
+    first.handOrder = 0;
+    second.handOrder = 1;
+    const controls = component as unknown as {
+      autoSort: () => boolean;
+      toggleAutoSort: () => void;
+      reorderTo: (card: Card, index: number) => void;
+    };
+
+    controls.toggleAutoSort();
+    expect(controls.autoSort()).toBe(true);
+    expect(localStorage.getItem('ui-hand-auto-sort')).toBe('true');
+
+    controls.reorderTo(first, 2);
+    expect(controls.autoSort()).toBe(false);
+    expect(component.cards()).toEqual([second, first]);
   });
 
   it('offers another participant on a hand card context menu', () => {
