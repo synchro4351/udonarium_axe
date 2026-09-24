@@ -5,6 +5,7 @@ import { ImageFile } from '@axe/core/storage/image-file';
 import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card, CardState } from '@axe/domain/card/card';
+import { handLocationOf } from '@axe/domain/card/hand-location';
 import { DataElement } from '@axe/domain/data/data-element';
 
 describe('Card', () => {
@@ -407,6 +408,20 @@ describe('Card', () => {
 
       card.toHand('me');
 
+      expect(card.lastHandGiverUserId).toBe('');
+      expect(card.lastHandGiverName).toBe('');
+    });
+
+    it('keeps the giver within a hand and clears it when the card leaves the hand', () => {
+      const card = new Card();
+      card.toHand('me');
+      card.lastHandGiverUserId = 'giver';
+      card.lastHandGiverName = 'Giver';
+
+      card.setLocation(handLocationOf('me'));
+      expect(card.lastHandGiverUserId).toBe('giver');
+
+      card.setLocation('table');
       expect(card.lastHandGiverUserId).toBe('');
       expect(card.lastHandGiverName).toBe('');
     });

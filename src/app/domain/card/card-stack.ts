@@ -174,6 +174,7 @@ export class CardStack extends OwnedTabletopObject {
     if (!cardRoot) return null;
     const topCard = this.topCard;
     if (!topCard) return this.putOnBottom(card);
+    card.clearLastHandGiver();
     card.owner = '';
     card.zindex = 0;
     let delta = Math.abs(card.rotate - this.rotate);
@@ -192,6 +193,7 @@ export class CardStack extends OwnedTabletopObject {
   putOnBottom(card: Card): Card | null {
     const cardRoot = this.cardRoot;
     if (!cardRoot) return null;
+    card.clearLastHandGiver();
     card.owner = '';
     card.zindex = 0;
     let delta = Math.abs(card.rotate - this.rotate);

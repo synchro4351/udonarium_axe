@@ -84,17 +84,29 @@ describe('CardStack', () => {
       const stack = CardStack.create('test');
       const card = Card.create('カード1', '', '', 2);
 
+      card.toHand('me');
+      card.lastHandGiverUserId = 'giver';
+      card.lastHandGiverName = 'Giver';
+
       stack.putOnTop(card);
       expect(stack.cards).toHaveLength(1);
       expect(stack.isEmpty).toBe(false);
+      expect(card.lastHandGiverUserId).toBe('');
+      expect(card.lastHandGiverName).toBe('');
     });
 
     it('puts one on the bottom', () => {
       const stack = CardStack.create('test');
       const card = Card.create('カード1', '', '', 2);
 
+      card.toHand('me');
+      card.lastHandGiverUserId = 'giver';
+      card.lastHandGiverName = 'Giver';
+
       stack.putOnBottom(card);
       expect(stack.cards).toHaveLength(1);
+      expect(card.lastHandGiverUserId).toBe('');
+      expect(card.lastHandGiverName).toBe('');
     });
 
     it('returns the last card put on as the top one', () => {

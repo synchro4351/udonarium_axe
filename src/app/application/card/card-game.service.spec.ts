@@ -170,6 +170,8 @@ describe('CardGameService', () => {
       const heart = trumpCard('h07');
       const odd = trumpCard('c03');
       for (const card of [spade, heart, odd]) card.toHand('me');
+      spade.lastHandGiverUserId = 'giver';
+      spade.lastHandGiverName = 'Giver';
 
       const pairs = service.discardPairs(service.handCardsOf('me'));
 
@@ -177,6 +179,8 @@ describe('CardGameService', () => {
       const discard = ObjectStore.instance.getObjects<CardStack>(CardStack).find((stack) => stack.name === '捨て札');
       expect(discard?.cards).toHaveLength(2);
       expect(spade.isFront).toBe(true);
+      expect(spade.lastHandGiverUserId).toBe('');
+      expect(spade.lastHandGiverName).toBe('');
       expect(service.handCardsOf('me')).toEqual([odd]);
       if (discard) created.push(discard);
     });
