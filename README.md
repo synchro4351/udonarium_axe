@@ -14,14 +14,15 @@
 
 | 機能 | 状態 | ブランチ | 基準・補足 |
 | --- | --- | --- | --- |
-| カットイン文字フォント選択 | 私家本流へ統合済み・未配備 | [`codex/cut-in-font-picker`](https://github.com/synchro4351/udonarium_axe/tree/codex/cut-in-font-picker) | `6ba6751a`起点、`14101a33`。既定・ゴシック・明朝・丸ゴシック・等幅の選択と任意入力を併用。端末により字形差あり。保存形式・同期項目は維持。機能タスクで対象59件を両テスト経路、全体12,518件成功・1件skip、build成功 |
-| YouTubeカットイン再生 | 私家本流へ統合済み・未配備 | [`codex/cut-in-youtube-playback`](https://github.com/synchro4351/udonarium_axe/tree/codex/cut-in-youtube-playback) | `6ba6751a`起点、`f45a18c5`。サムネイル待機とクリック遮断を解消し、手動再生できる操作欄を表示。実YouTube配信の手動再生は未確認。自動再生が制限される場合は操作が必要 |
-| チャット入力後の初回ドラッグ | 私家本流へ統合済み・未配備 | [`codex/chat-drag-focus`](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-drag-focus) | `14101a33`起点、`0605e7ba`。入力欄からフォーカスが外れた際にキャラクターの移動が解除される問題を修正。保存形式・同期プロトコルは不変。機能タスクでChromium・Firefox・WebKit各2件成功 |
+| YouTubeカットイン自動再生 | 私家本流へ統合済み・未配備 | [`codex/cut-in-youtube-autoplay`](https://github.com/synchro4351/udonarium_axe/tree/codex/cut-in-youtube-autoplay) | `be1fdb8a`起点、`42bdbd97`。開始時にiframeを生成して自動再生を要求。ブラウザが音声付き自動再生を制限する場合も手動再生可能。保存形式・同期項目は不変。機能タスクで対象22件を両テスト経路、全体12,520件成功・1件skip、build成功。実配信の目視は未確認 |
+| カットイン文字フォント選択 | 私家本流へ統合済み・配備済み | [`codex/cut-in-font-picker`](https://github.com/synchro4351/udonarium_axe/tree/codex/cut-in-font-picker) | `6ba6751a`起点、`14101a33`。既定・ゴシック・明朝・丸ゴシック・等幅の選択と任意入力を併用。端末により字形差あり。保存形式・同期項目は維持。機能タスクで対象59件を両テスト経路、全体12,518件成功・1件skip、build成功 |
+| YouTubeカットイン再生 | 私家本流へ統合済み・配備済み | [`codex/cut-in-youtube-playback`](https://github.com/synchro4351/udonarium_axe/tree/codex/cut-in-youtube-playback) | `6ba6751a`起点、`f45a18c5`。サムネイル待機とクリック遮断を解消し、手動再生できる操作欄を表示。実YouTube配信の手動再生は未確認。自動再生が制限される場合は操作が必要 |
+| チャット入力後の初回ドラッグ | 私家本流へ統合済み・配備済み | [`codex/chat-drag-focus`](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-drag-focus) | `14101a33`起点、`0605e7ba`。入力欄からフォーカスが外れた際にキャラクターの移動が解除される問題を修正。保存形式・同期プロトコルは不変。機能タスクでChromium・Firefox・WebKit各2件成功 |
 | カード表面への文章 | 公式v1.48.0へ採用済み・参照用 | [`feature/card-face-text`](https://github.com/synchro4351/udonarium_axe/tree/feature/card-face-text) | 旧提案ブランチ。今後の拡張には使用しません |
 | チャット読み上げ | 実装済み・私家統合版へ統合済み | [`codex/chat-speech`](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-speech) | ブラウザのSpeechSynthesisを利用する端末ローカル設定 |
 | マップマスク文章・縁取り | 私家統合版へ統合済み・重点検証済み | [`codex/map-mask-text`](https://github.com/synchro4351/udonarium_axe/tree/codex/map-mask-text) | v1.50.0 / `7a4692c2` 基準。常時太字と光彩方式。Flyのデータ構造を考慮。保存ZIPと2クライアント実通信の手動確認は未完了 |
 | カード文章の縁取り | 私家統合版へ統合済み・ローカル目視確認済み | [`codex/card-text-outline`](https://github.com/synchro4351/udonarium_axe/tree/codex/card-text-outline) | v1.50.0 / `7a4692c2` 基準。常時太字と光彩方式で、縁取り切替時の改行位置を維持。保存ZIPと2クライアント実通信の手動確認は未完了 |
-| v1.57.1追従・再参加待機 | 私家本流へ統合済み・配備準備 | [`codex/synwork-update-v1.57.1`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-update-v1.57.1) | 本流`6ba6751a`。公式`85c89f98`をmerge。旧接続の消滅を期限付きで待ち、他の接続を強制切断しない。ローカル実SkyWayで同一IDの自動復帰・再同期を確認。全体テスト12,516件成功・1件skip。文章表示・マスク編集・読み上げはユーザー確認済み。カットイン・パーティの目視と弱回線実卓は未確認 |
+| v1.57.1追従・再参加待機 | 私家本流へ統合済み・配備済み | [`codex/synwork-update-v1.57.1`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-update-v1.57.1) | 本流`6ba6751a`。公式`85c89f98`をmerge。旧接続の消滅を期限付きで待ち、他の接続を強制切断しない。ローカル実SkyWayで同一IDの自動復帰・再同期を確認。全体テスト12,516件成功・1件skip。文章表示・マスク編集・読み上げはユーザー確認済み。カットイン・パーティの目視と弱回線実卓は未確認 |
 | マップマスクの既定文字色 | 私家本流へ統合済み | [`6ba6751a`](https://github.com/synchro4351/udonarium_axe/commit/6ba6751a2361d4a200584b150288e3ffd772a7ae) | 未指定の文字色を白に変更。明示指定・保存済みの色を維持。関連52件のテストが直接Vitest・Angular経由の両方で成功 |
 
 ブランチを新しく作成した時点で、この表へ機能名・状態・ブランチ・基準を追加します。実装、検証、私家統合、公式採用、保留または廃止の判断が変わった場合も状態を更新し、過去の公開ブランチは用途が分かるように記録を残します。
