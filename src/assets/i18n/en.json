@@ -710,6 +710,9 @@
         "drawFromOther": "Draw from a hand",
         "giveCard": "Give card",
         "giveTo": "Give to {{name}}",
+        "makePublic": "Show your hand to everyone",
+        "makePrivate": "Hide your hand from others",
+        "public": "Public hand",
         "discardPairs": "Discard pairs",
         "noPairs": "No matching pair"
       },

@@ -44,6 +44,19 @@ describe('PeerCursor', () => {
       expect(cursor.name).toBe('');
     });
 
+    it('starts with a hidden hand', () => {
+      const cursor = new PeerCursor();
+      cursor.initialize();
+      expect(cursor.handPublic).toBe(false);
+    });
+
+    it('closes a public hand when the local cursor is rebuilt', () => {
+      const previous = PeerCursor.createMyCursor();
+      previous.handPublic = true;
+
+      expect(PeerCursor.createMyCursor().handPublic).toBe(false);
+    });
+
     it('starts with no picture', () => {
       const cursor = new PeerCursor();
       cursor.initialize();

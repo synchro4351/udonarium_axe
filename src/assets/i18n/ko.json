@@ -710,6 +710,9 @@
         "drawFromOther": "상대의 패에서 뽑기",
         "giveCard": "카드 건네기",
         "giveTo": "{{name}}에게 건네기",
+        "makePublic": "내 패 공개하기",
+        "makePrivate": "내 패 숨기기",
+        "public": "공개된 패",
         "discardPairs": "페어 버리기",
         "noPairs": "같은 숫자의 짝이 없습니다"
       },

@@ -90,6 +90,16 @@ describe('HandRailComponent', () => {
     expect(fixture.nativeElement.querySelector('card-face-preview')).toBeTruthy();
   });
 
+  it('lets the holder open and close the whole hand', () => {
+    const toggle = (component as unknown as { toggleHandPublic: () => void }).toggleHandPublic.bind(component);
+    expect(PeerCursor.myCursor.handPublic).toBe(false);
+
+    toggle();
+    expect(PeerCursor.myCursor.handPublic).toBe(true);
+    toggle();
+    expect(PeerCursor.myCursor.handPublic).toBe(false);
+  });
+
   it('offers another participant on a hand card context menu', () => {
     const other = new PeerCursor();
     other.userId = 'other';

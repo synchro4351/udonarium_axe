@@ -5,6 +5,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import { CardFacePreviewComponent } from '@axe/ui/components/card-face-preview/card-face-preview.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -12,6 +13,7 @@ export interface HandDrawTarget {
   userId: string;
   name: string;
   count: number;
+  handPublic: boolean;
 }
 
 @Component({
@@ -19,7 +21,7 @@ export interface HandDrawTarget {
   selector: 'hand-draw-panel',
   templateUrl: './hand-draw-panel.component.html',
   host: { class: 'text-ui-text block h-full overflow-y-auto p-3' },
-  imports: [SafePipe, TranslocoModule],
+  imports: [CardFacePreviewComponent, SafePipe, TranslocoModule],
 })
 export class HandDrawPanelComponent {
   private readonly objectStore = inject(ObjectStore);
@@ -33,6 +35,8 @@ export class HandDrawPanelComponent {
     this.objectChange.collectionOf(Card.aliasName)();
     this.objectChange.collectionOf(PeerCursor.aliasName)();
     const myUserId = this.cardGame.myUserId();
+    const cursors = this.objectStore.getObjects<PeerCursor>(PeerCursor);
+    for (const cursor of cursors) this.objectChange.versionOf(cursor.identifier)();
     return this.cardGame
       .participants()
       .filter((cursor) => cursor.userId !== myUserId)
@@ -40,6 +44,7 @@ export class HandDrawPanelComponent {
         userId: cursor.userId,
         name: cursor.name,
         count: this.cardGame.handCardsOf(cursor.userId).length,
+        handPublic: PeerCursor.findByUserId(cursor.userId)?.handPublic ?? false,
       }))
       .filter((target) => target.count > 0);
   });
@@ -64,6 +69,12 @@ export class HandDrawPanelComponent {
   backImageUrl(card: Card): string {
     this.objectChange.fileVersion();
     return this.imageService.getEmptyOr(card.backImage).url;
+  }
+
+  /** A public hand's card front, including the same card text the owner sees. */
+  frontImageUrl(card: Card): string {
+    this.objectChange.fileVersion();
+    return this.imageService.getEmptyOr(card.frontImage).url;
   }
 
   /** Opens the hand of the player the user picked from the list. */

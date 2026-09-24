@@ -13,6 +13,19 @@
     >
       <div class="absolute top-0 right-0 flex h-7 items-center gap-0.5 px-1.5">
         <button
+          class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5.5 items-center justify-center border-none bg-transparent px-1 py-0.5 leading-none"
+          type="button"
+          data-testid="hand-public-toggle"
+          [attr.aria-pressed]="handPublic()"
+          [title]="(handPublic() ? 'feature.card.hand.makePrivate' : 'feature.card.hand.makePublic') | transloco"
+          [attr.aria-label]="
+            (handPublic() ? 'feature.card.hand.makePrivate' : 'feature.card.hand.makePublic') | transloco
+          "
+          (click)="toggleHandPublic()"
+        >
+          <i class="material-icons text-[14px]!">{{ handPublic() ? 'visibility' : 'visibility_off' }}</i>
+        </button>
+        <button
           class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5.5 transform-none items-center justify-center border-none bg-transparent px-1 py-0.5 leading-none shadow-none transition-colors outline-none hover:border-transparent hover:shadow-none"
           [title]="'feature.card.hand.drawFromOther' | transloco"
           [attr.aria-label]="'feature.card.hand.drawFromOther' | transloco"
@@ -37,7 +50,7 @@
           <i class="material-icons text-[14px]!">close</i>
         </button>
       </div>
-      <div class="block truncate pr-8">
+      <div class="block truncate pr-24">
         {{ 'feature.card.hand.title' | transloco: { count: cards().length } }}
       </div>
     </div>

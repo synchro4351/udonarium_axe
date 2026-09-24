@@ -75,6 +75,26 @@ describe('HandDrawPanelComponent', () => {
 
     expect(component.cards()).toHaveLength(2);
     expect(fixture.nativeElement.querySelectorAll('img')).toHaveLength(2);
+    expect(fixture.nativeElement.querySelector('card-face-preview')).toBeNull();
+  });
+
+  it('shows card fronts only while that participant opens their hand', () => {
+    const other = peer('other', 'あいて');
+    card('s01', 'other');
+    fixture.detectChanges();
+    component.select('other');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('card-face-preview')).toBeNull();
+    other.handPublic = true;
+    TestBed.inject(ObjectChangeService).notifyChanged(other.identifier);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('card-face-preview')).toBeTruthy();
+
+    other.handPublic = false;
+    TestBed.inject(ObjectChangeService).notifyChanged(other.identifier);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('card-face-preview')).toBeNull();
   });
 
   it('takes a chosen card into your own hand and out of theirs', () => {

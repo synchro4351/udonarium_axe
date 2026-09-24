@@ -131,6 +131,18 @@ export class HandRailComponent {
     return canRoleEdit(PeerCursor.myRole);
   });
 
+  protected readonly handPublic = computed(() => {
+    this.objectChange.trackMyCursor();
+    return PeerCursor.myCursor?.handPublic ?? false;
+  });
+
+  protected toggleHandPublic(): void {
+    const cursor = PeerCursor.myCursor;
+    if (!cursor || !this.canHoldCards()) return;
+    cursor.handPublic = !cursor.handPublic;
+    this.objectChange.notifyChanged(cursor.identifier);
+  }
+
   readonly cards = computed<Card[]>(() => {
     this.objectChange.collectionOf(Card.aliasName)();
     this.objectChange.trackMyCursor();

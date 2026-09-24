@@ -710,6 +710,9 @@
         "drawFromOther": "相手の手札から引く",
         "giveCard": "カードを渡す",
         "giveTo": "{{name}} に渡す",
+        "makePublic": "自分の手札を公開する",
+        "makePrivate": "自分の手札を秘匿する",
+        "public": "公開中の手札",
         "discardPairs": "ペアを捨てる",
         "noPairs": "同じ数字の組がありません"
       },

@@ -22,6 +22,8 @@ export class PeerCursor extends GameObject {
   @SyncVar() name = '';
   @SyncVar() imageIdentifier = '';
   @SyncVar() role: PeerRole = DEFAULT_PEER_ROLE;
+  /** Whether this participant currently shows every card in their hand to the room. */
+  @SyncVar() handPublic: boolean = false;
 
   @SyncVar() lastControlImageIdentifier = '';
   @SyncVar() lastControlCharacterName = '';

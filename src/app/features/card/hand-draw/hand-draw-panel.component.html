@@ -19,7 +19,11 @@
         class="rounded-ui-sm border-ui-border-panel hover:border-ui-accent h-28 w-20 cursor-pointer overflow-hidden border border-solid bg-transparent p-0 transition-[border-color,transform] hover:-translate-y-1"
         (click)="draw(card)"
       >
-        <img class="size-full object-cover" [src]="backImageUrl(card) | safe: 'resourceUrl'" alt="" />
+        @if (target.handPublic) {
+          <card-face-preview [card]="card" [imageUrl]="frontImageUrl(card)" [frameWidth]="80" [frameHeight]="112" />
+        } @else {
+          <img class="size-full object-cover" [src]="backImageUrl(card) | safe: 'resourceUrl'" alt="" />
+        }
       </button>
     }
   </div>
@@ -32,6 +36,9 @@
       (click)="select(target.userId)"
     >
       <span class="truncate">{{ target.name }}</span>
+      @if (target.handPublic) {
+        <i class="material-icons text-[16px]!" [title]="'feature.card.hand.public' | transloco">visibility</i>
+      }
       <span class="text-ui-dim shrink-0 text-xs">
         {{ 'feature.card.drawPanel.cardCount' | transloco: { count: target.count } }}
       </span>
