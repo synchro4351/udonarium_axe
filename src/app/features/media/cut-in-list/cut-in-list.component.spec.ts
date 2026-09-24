@@ -34,6 +34,22 @@ describe('CutInListComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('creates a new editable scene from an example', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const picker = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>(
+      '[data-testid="cut-in-scene-template"]'
+    )!;
+    picker.value = 'battle';
+    picker.dispatchEvent(new Event('change'));
+
+    expect(component.getCutIns()).toHaveLength(1);
+    expect(component.selectedCutIn?.scene?.layers.map((layer) => layer.kind)).toEqual(['fill', 'text']);
+    expect(component.activeTab()).toBe('Scene');
+    expect(picker.value).toBe('');
+    component.selectedCutIn?.destroy();
+  });
+
   describe('a seat that is only watching', () => {
     function beSeat(role: PeerRole): void {
       PeerCursor.myCursor = { role, identifier: 'seat-cursor' } as PeerCursor;

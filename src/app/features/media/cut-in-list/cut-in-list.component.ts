@@ -16,6 +16,11 @@ import {
 } from '@axe/domain/tabletop/cut-in-multi-direction';
 import { CutInSceneEditorComponent } from '@axe/features/media/cut-in-editor/cut-in-scene-editor.component';
 import { CutInEditorComponent } from '@axe/features/media/cut-in-list/cut-in-editor.component';
+import {
+  createCutInSceneTemplate,
+  CUT_IN_SCENE_TEMPLATES,
+  type CutInSceneTemplate,
+} from '@axe/features/media/cut-in-list/cut-in-scene-templates';
 import { TranslocoModule } from '@jsverse/transloco';
 
 @Component({
@@ -58,6 +63,7 @@ export class CutInListComponent {
   /** The settings every cut-in has, and the layers it may be built from. */
   readonly tabs = ['Basic', 'Scene'] as const;
   readonly activeTab = signal<(typeof this.tabs)[number]>('Basic');
+  protected readonly sceneTemplates = CUT_IN_SCENE_TEMPLATES;
 
   readonly isSaving = signal(false);
   readonly progressPercent = signal(0);
@@ -123,6 +129,18 @@ export class CutInListComponent {
     cutIn.imageIdentifier = 'testTableBackgroundImage_image';
     cutIn.initialize();
     this.selectCutIn(cutIn.identifier);
+  }
+
+  /** Adds an editable example without changing any cut-in already in the room. */
+  protected createFromTemplate(event: Event): void {
+    const picker = event.target as HTMLSelectElement;
+    const kind = picker.value;
+    picker.value = '';
+    if (!this.canEditCutIns || !this.sceneTemplates.some((template) => template === kind)) return;
+    const title = this.t(`feature.media.cutIn.sceneTemplate_${kind}`);
+    const cutIn = createCutInSceneTemplate(kind as CutInSceneTemplate, title);
+    this.selectCutIn(cutIn.identifier);
+    this.activeTab.set('Scene');
   }
 
   /** Saves the picked cut-in to a file named after it, showing progress while the file is written. */

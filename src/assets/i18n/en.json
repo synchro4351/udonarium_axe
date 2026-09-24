@@ -521,7 +521,11 @@
         "multiDirection_vertical-right": "Top, bottom and right",
         "multiDirection_vertical-left": "Top, bottom and left",
         "multiDirection_four-directions": "Top, bottom, left and right",
-        "multiDirectionHint": "Faces the cut-in several ways, but only while the table is seen from above."
+        "multiDirectionHint": "Faces the cut-in several ways, but only while the table is seen from above.",
+        "sceneTemplatePick": "Create from example",
+        "sceneTemplate_battle": "Battle begins",
+        "sceneTemplate_success": "Success!",
+        "sceneTemplate_transition": "Scene transition"
       },
       "cutInEditor": {
         "tabBasic": "Settings",

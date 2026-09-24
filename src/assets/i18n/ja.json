@@ -521,7 +521,11 @@
         "multiDirection_vertical-right": "上下右",
         "multiDirection_vertical-left": "上下左",
         "multiDirection_four-directions": "上下左右",
-        "multiDirectionHint": "卓を真上から見ているあいだだけ、四方に向けて出します。"
+        "multiDirectionHint": "卓を真上から見ているあいだだけ、四方に向けて出します。",
+        "sceneTemplatePick": "見本から作成",
+        "sceneTemplate_battle": "戦闘開始",
+        "sceneTemplate_success": "成功！",
+        "sceneTemplate_transition": "場面転換"
       },
       "cutInEditor": {
         "tabBasic": "基本設定",

@@ -16,6 +16,20 @@
       }
     </div>
 
+    @if (canEditCutIns) {
+      <select
+        data-testid="cut-in-scene-template"
+        class="border-ui-border-panel bg-ui-input text-ui-text rounded-ui-sm mx-2 mt-2 border border-solid p-1 text-[12px]"
+        [attr.aria-label]="'feature.media.cutIn.sceneTemplatePick' | transloco"
+        (change)="createFromTemplate($event)"
+      >
+        <option value="">{{ 'feature.media.cutIn.sceneTemplatePick' | transloco }}</option>
+        @for (template of sceneTemplates; track template) {
+          <option [value]="template">{{ 'feature.media.cutIn.sceneTemplate_' + template | transloco }}</option>
+        }
+      </select>
+    }
+
     <ul class="m-0 flex-1 list-none overflow-y-auto px-0 py-1" role="listbox">
       @for (cutIn of getCutIns(); track cutIn.identifier) {
         <li
