@@ -24,9 +24,12 @@
 
 [小改善2件の機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hotbar-effect-icons-and-cutin-presets)は、公式v1.57.1に私家機能を加えた42bdbd97を基点としています。
 
+手札の受け渡し（次版）：[929eec63](https://github.com/synchro4351/udonarium_axe/commit/929eec63ca7c1f6424106b0c15a6256a12e95a99)、[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/card-player-transfer)。基点は上記2件を含む1c285e05。既存のCardGameServiceと手札UIへ追加し、既存のCard.toHandで移動するため保存・同期の新項目はありません。実行直前に手札の所在・操作側ロール・受取人を再確認します。公開手札・自動ソート・配布元表示は含みません。
+
 ## 検証と制限
 
-- 現在の次版候補は全体923ファイル／12,525件成功・1件skip、production build成功（機能ブランチの検証済みコミットと同一）。
+- 現在の次版候補は全体924ファイル／12,530件成功・1件skip、production build成功（機能ブランチの検証済みコミットと同一）。
+- 手札受け渡しの2クライアント実動作・画面目視は未確認。自動テストの成功と区別しています。
 - エフェクト選択欄とカットイン見本の実画面・演出は目視未確認。
 - フォント選択・YouTube表示・ポインター入力を組み合わせた92件は、r1で直接Vitest・Angular経由の両方に成功。自動再生追加は対象22件を両経路で確認。
 - 初回ドラッグはChromium・Firefox・WebKitで、チャットフォーカスあり／なしの計6件を確認。
