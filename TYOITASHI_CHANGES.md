@@ -10,7 +10,7 @@
 
 | 変更 | 元コミット・範囲 | 基点と取り込み時の注意 |
 | --- | --- | --- |
-| チャット読み上げ | [cde159ae](https://github.com/synchro4351/udonarium_axe/commit/cde159ae)、[時計差対応 1d52f8ba](https://github.com/synchro4351/udonarium_axe/commit/1d52f8ba)、[自己発言 4d0c50ab](https://github.com/synchro4351/udonarium_axe/commit/4d0c50ab) | 旧v1.50系。本体と新着判定・自己発言の修正を一緒に確認。設定は端末ローカル。現在の層構成への調整はv1.57.1統合時にも含まれる |
+| チャット読み上げ | [cde159ae](https://github.com/synchro4351/udonarium_axe/commit/cde159ae)、[時計差対応 1d52f8ba](https://github.com/synchro4351/udonarium_axe/commit/1d52f8ba)、[自己発言 4d0c50ab](https://github.com/synchro4351/udonarium_axe/commit/4d0c50ab) | 本体はv1.48.0、後続2修正はv1.49.0時点。本体と新着判定・自己発言の修正を一緒に確認。設定は端末ローカル。現在の層構成への調整はv1.57.1統合時にも含まれる |
 | カード文章の縁取り | [dd70db67](https://github.com/synchro4351/udonarium_axe/commit/dd70db67)、[太字・光彩 ba818f32](https://github.com/synchro4351/udonarium_axe/commit/ba818f32) | 旧v1.50系。公式採用済みのカード文章実装を前提にする。縁取り切替による改行位置の変化を抑える |
 | マップマスク文章・縁取り | [ae429977](https://github.com/synchro4351/udonarium_axe/commit/ae429977)、[描画調整 d1805678](https://github.com/synchro4351/udonarium_axe/commit/d1805678) | 旧v1.50系。カード文章との共通処理や後の公式マスク設定UIとの調整を確認。Flyのデータ構造を意識した実装 |
 | 再参加待機・v1.57.1への適応 | [889c0dfd](https://github.com/synchro4351/udonarium_axe/commit/889c0dfd) | 公式85c89f98と旧私家版のmerge。再参加だけの独立コミットではない。SkyWayFacade・RoomJoinService・参加画面の変更を抽出して確認する必要あり。Windows向け検証処理の調整も含む |
