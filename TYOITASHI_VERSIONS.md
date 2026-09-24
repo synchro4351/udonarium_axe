@@ -1,0 +1,30 @@
+# tyoitashiのバージョン履歴
+
+[紹介ページ](README.md) · [機能別の変更とコミット](TYOITASHI_CHANGES.md)
+
+公式Axeの番号と私家版の番号を分け、**tyoitashi rN／Axe vX.Y.Z**と表記します。rNは利用版を固定するたびに増やす通し番号で、Axeの基準を更新してもリセットしません。文書だけの修正や開発ブランチの作成では増やしません。
+
+この番号は2026-09-24から導入した、固定コミットに対する私家版の識別名です。GitHub Release・Gitタグ・アプリ内のバージョン表示とは別であり、現時点では公式由来のpackage.jsonや配布ZIP名を変更していません。どの版かを厳密に確認する場合はコミットを参照してください。
+
+## 次版（未リリース）
+
+- 現在の候補：[42bdbd97](https://github.com/synchro4351/udonarium_axe/commit/42bdbd977df1241a6e99a92c4aca7d64dc895201)
+- YouTubeカットイン開始時にiframeを生成し、自動再生を要求します。ブラウザの制限下では手動操作が必要です。
+- 保存形式・同期項目の変更はありません。
+- [r1からの差分](https://github.com/synchro4351/udonarium_axe/compare/be1fdb8a81037efab6300ad49260023552e87739...42bdbd977df1241a6e99a92c4aca7d64dc895201)
+
+## tyoitashi r1／Axe v1.57.1 — 2026-09-24
+
+既存の利用版に初めて識別名を付けたものです。この命名のための再配備は行っていません。
+
+- 固定ソース：[be1fdb8a](https://github.com/synchro4351/udonarium_axe/tree/be1fdb8a81037efab6300ad49260023552e87739)
+- 公式基準：[Axe v1.57.1 / 85c89f98](https://github.com/Xelltis/udonarium_axe/commit/85c89f98ec11f2a82cb0b7bcbcf54351496d4457)
+- チャット読み上げ、カードの縁取り、マップマスクの文章・縁取り・白い既定文字色、再参加待機を含みます。
+- 今回追加した内容：カットインのフォント選択、YouTube再生操作の修正、チャット入力後の初回ドラッグ修正。
+- 確認：関連92件を直接Vitest・Angular経由で成功、初回ドラッグを3ブラウザで計6件成功、全体12,520件成功・1件skip、production build成功。
+- 実卓採用試験はユーザーより完了報告あり。個別機能、とくに実YouTube再生の目視完了を意味するものではありません。
+- [公式基準からの全差分](https://github.com/synchro4351/udonarium_axe/compare/85c89f98ec11f2a82cb0b7bcbcf54351496d4457...be1fdb8a81037efab6300ad49260023552e87739)
+
+## 番号導入前
+
+旧v1.50系の機能ブランチと履歴は残しています。現在の公式基準へそのまま適用できることを保証するものではありません。再利用の入口は[機能別の対応表](TYOITASHI_CHANGES.md)をご覧ください。

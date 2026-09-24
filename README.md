@@ -1,214 +1,56 @@
 # Udonarium_Axe_tyoitashi
 
-> [!IMPORTANT]
-> このリポジトリは、[Udonarium Axe](https://github.com/Xelltis/udonarium_axe)を基盤に個人利用向けの機能を追加するフォークです。公式版ではありません。
+[Udonarium Axe](https://github.com/Xelltis/udonarium_axe)に、読みやすさや卓中の操作を助ける機能を少し足した非公式フォークです。
 
-## このフォークの方針
+基本機能・使い方・サーバー構築については[公式の利用ガイド](https://xelltis.github.io/udonarium_axe/)と[公式README](https://github.com/Xelltis/udonarium_axe#readme)をご覧ください。ここでは公式との差分だけを紹介します。
 
-- 開発基準は公式Axe v1.57.1の[`85c89f98`](https://github.com/Xelltis/udonarium_axe/commit/85c89f98ec11f2a82cb0b7bcbcf54351496d4457)です。私家版本流への統合は完了し、配備は別途承認を経て行います。
-- 開発の本流は、全機能を含む[`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)です。追加機能は本流の固定コミットから短期ブランチで作り、検証後に戻します。
-- 上流への機能提案IssueやPull Requestは原則として送りません。MITライセンスの範囲での参照・再利用・cherry-pickを歓迎しますが、採用やレビューを求めません。本流由来のコミットには他機能への依存があり、独立したexportブランチは必要になった時だけ作ります。
-- 公式追従は本流から作る一時更新ブランチでまとめて検証します。過去の公開機能ブランチは参照用に保持し、リリースごとに個別移植し直しません。
+## バージョンとソース
 
-## 追加機能ブランチ
+- **現在の利用版：tyoitashi r1／Axe v1.57.1** — [固定ソース `be1fdb8a`](https://github.com/synchro4351/udonarium_axe/tree/be1fdb8a81037efab6300ad49260023552e87739)
+- **次版の開発ソース** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)。r1にYouTubeカットインの自動再生を追加しています。
+- [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
-| 機能 | 状態 | ブランチ | 基準・補足 |
-| --- | --- | --- | --- |
-| YouTubeカットイン自動再生 | 私家本流へ統合済み・未配備 | [`codex/cut-in-youtube-autoplay`](https://github.com/synchro4351/udonarium_axe/tree/codex/cut-in-youtube-autoplay) | `be1fdb8a`起点、`42bdbd97`。開始時にiframeを生成して自動再生を要求。ブラウザが音声付き自動再生を制限する場合も手動再生可能。保存形式・同期項目は不変。機能タスクで対象22件を両テスト経路、全体12,520件成功・1件skip、build成功。実配信の目視は未確認 |
-| カットイン文字フォント選択 | 私家本流へ統合済み・配備済み | [`codex/cut-in-font-picker`](https://github.com/synchro4351/udonarium_axe/tree/codex/cut-in-font-picker) | `6ba6751a`起点、`14101a33`。既定・ゴシック・明朝・丸ゴシック・等幅の選択と任意入力を併用。端末により字形差あり。保存形式・同期項目は維持。機能タスクで対象59件を両テスト経路、全体12,518件成功・1件skip、build成功 |
-| YouTubeカットイン再生 | 私家本流へ統合済み・配備済み | [`codex/cut-in-youtube-playback`](https://github.com/synchro4351/udonarium_axe/tree/codex/cut-in-youtube-playback) | `6ba6751a`起点、`f45a18c5`。サムネイル待機とクリック遮断を解消し、手動再生できる操作欄を表示。実YouTube配信の手動再生は未確認。自動再生が制限される場合は操作が必要 |
-| チャット入力後の初回ドラッグ | 私家本流へ統合済み・配備済み | [`codex/chat-drag-focus`](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-drag-focus) | `14101a33`起点、`0605e7ba`。入力欄からフォーカスが外れた際にキャラクターの移動が解除される問題を修正。保存形式・同期プロトコルは不変。機能タスクでChromium・Firefox・WebKit各2件成功 |
-| カード表面への文章 | 公式v1.48.0へ採用済み・参照用 | [`feature/card-face-text`](https://github.com/synchro4351/udonarium_axe/tree/feature/card-face-text) | 旧提案ブランチ。今後の拡張には使用しません |
-| チャット読み上げ | 実装済み・私家統合版へ統合済み | [`codex/chat-speech`](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-speech) | ブラウザのSpeechSynthesisを利用する端末ローカル設定 |
-| マップマスク文章・縁取り | 私家統合版へ統合済み・重点検証済み | [`codex/map-mask-text`](https://github.com/synchro4351/udonarium_axe/tree/codex/map-mask-text) | v1.50.0 / `7a4692c2` 基準。常時太字と光彩方式。Flyのデータ構造を考慮。保存ZIPと2クライアント実通信の手動確認は未完了 |
-| カード文章の縁取り | 私家統合版へ統合済み・ローカル目視確認済み | [`codex/card-text-outline`](https://github.com/synchro4351/udonarium_axe/tree/codex/card-text-outline) | v1.50.0 / `7a4692c2` 基準。常時太字と光彩方式で、縁取り切替時の改行位置を維持。保存ZIPと2クライアント実通信の手動確認は未完了 |
-| v1.57.1追従・再参加待機 | 私家本流へ統合済み・配備済み | [`codex/synwork-update-v1.57.1`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-update-v1.57.1) | 本流`6ba6751a`。公式`85c89f98`をmerge。旧接続の消滅を期限付きで待ち、他の接続を強制切断しない。ローカル実SkyWayで同一IDの自動復帰・再同期を確認。全体テスト12,516件成功・1件skip。文章表示・マスク編集・読み上げはユーザー確認済み。カットイン・パーティの目視と弱回線実卓は未確認 |
-| マップマスクの既定文字色 | 私家本流へ統合済み | [`6ba6751a`](https://github.com/synchro4351/udonarium_axe/commit/6ba6751a2361d4a200584b150288e3ffd772a7ae) | 未指定の文字色を白に変更。明示指定・保存済みの色を維持。関連52件のテストが直接Vitest・Angular経由の両方で成功 |
+このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
 
-ブランチを新しく作成した時点で、この表へ機能名・状態・ブランチ・基準を追加します。実装、検証、私家統合、公式採用、保留または廃止の判断が変わった場合も状態を更新し、過去の公開ブランチは用途が分かるように記録を残します。
+## 公式Axe v1.57.1との違い
 
-### 今後の候補
+| 追加・変更 | 内容 |
+| --- | --- |
+| チャット読み上げ | ブラウザの音声合成で新着チャットを読み上げます。使用する声や設定は端末ごとです。 |
+| カード文章の縁取り | 文字を太字にし、光彩による縁取りを切り替えて、画像に重なった文章を読みやすくします。 |
+| マップマスクの文章 | マスク上に文章を表示し、文字色・大きさ・縁取りを編集できます。未指定の文字色は白です。 |
+| カットインのフォント選択 | ゴシック・明朝・丸ゴシック・等幅などの候補から選べます。フォント名の直接入力も残しています。 |
+| YouTubeカットインの再生操作 | サムネイル待機と操作を遮る要素を除き、手動再生できる操作欄を表示します。 |
+| 初回ドラッグの修正 | チャット入力欄にカーソルがある状態からコマをつかんだ際、移動が解除される問題を修正しています。 |
+| 再参加時の待機 | 再読み込み直後に旧接続が残っている場合、同じIDで期限付き待機します。他の接続を強制退出させません。 |
 
-- カットイン・帯レイヤーのグラデーション設定表示の修正
-- セッション用依頼・Todoリスト
-- 主観ビューモード、3Dオブジェクト配置（低優先度）
-- 外部AIツール向けAPI（安全な権限設計を先に行うため後回し）
+**次版の変更：** YouTubeカットインの開始時に自動再生を要求します。音声付きの自動再生が制限される場合は、プレイヤーから手動で再生できます。
 
----
+### 読み上げを足した理由
 
-## ベースプロジェクト: Udonarium Axe
+チャットを目で追い続けることに負担がある人にも、卓の会話を追いやすくするために作りました。読み上げが常に必須というほどではなくても、音声が少し補助してくれると遊びやすい、という使い方を想定しています。
 
-[![Latest release](https://img.shields.io/github/v/release/Xelltis/udonarium_axe?logo=github)](https://github.com/Xelltis/udonarium_axe/releases/latest)
-[![Release](https://github.com/Xelltis/udonarium_axe/actions/workflows/release.yml/badge.svg)](https://github.com/Xelltis/udonarium_axe/actions/workflows/release.yml)
-[![Docs](https://img.shields.io/badge/Docs-利用ガイド-5C73E7?logo=vitepress&logoColor=white)](https://xelltis.github.io/udonarium_axe/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)](https://angular.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+テキスト表示を置き換えるものではなく、必要な人が自分の端末で選べる補助機能です。ブラウザのSpeechSynthesisを使用するため、声の種類や品質は端末・ブラウザに依存します。
 
-> **AXE** — Adventure. eXperience. Encore.
-> 冒険を。経験に。もう一度。
+### カード・マスクの文字
 
-Udonarium Axe は、ブラウザ上で動作する TRPG オンラインセッション支援ツールです。
-テーブル上のオブジェクト（コマ・カード・ダイスなど）は WebRTC（SkyWay SDK v2）の P2P 通信で
-ブラウザ間に直接同期され、ゲームデータが中央サーバーに保存されることはありません。
+画像や暗い盤面の上でも文章を読み取りやすくするための追加です。Udonarium with Flyの文字データとの互換性を意識していますが、Flyの全機能・全セーブデータの互換性を保証するものではありません。
 
-[Udonarium](https://github.com/TK11235/udonarium)（TK11235）を源流とし、その派生である
-[Udonarium Lily](https://github.com/entyu/udonarium_lily)（entyu）の機能・コードを受け継いでいます。
-そのうえで実装基盤を Angular 22 / Zoneless + Signals で作り直し、独自の機能を加えました。
+## 利用上の注意
 
-> 動作推奨環境は **デスクトップ版 Chrome** です。スマートフォンからの操作は十分にサポートされていません。
+- フォントは端末にあるものを使うため、参加者間で字形が異なる場合があります。
+- YouTubeの自動再生や埋め込みは、ブラウザ設定・動画側の制限に影響されます。実動画での目視確認は未完了です。
+- 旧接続を待つ再参加では、復帰まで約1分かかることがあります。あらゆる通信切断を解決する機能ではありません。
+- 実卓採用試験は完了していますが、すべての環境・機能の動作保証ではありません。既存のセーブZIPは元のファイルを残してお試しください。
 
-## 必要なもの（バックエンドが要ります）
+## 変更を取り込みたい方へ
 
-ゲームデータ自体はブラウザ同士の P2P でやり取りしますが、その P2P 接続を確立するには
-SkyWay の **認証トークン** が要ります。トークンは SkyWay の App ID / Secret で署名して発行するもので、
-Secret をブラウザに置くわけにはいきません。そのため、**トークンを発行する小さなバックエンドを 1 つ用意する** 必要があります。
+MITライセンスの範囲で、参照・再利用を歓迎します。採用やレビューの依頼ではありません。
 
-```
-ブラウザ (Udonarium Axe) ──┬─→ バックエンド（トークン発行のみ）──→ SkyWay
-                           │
-                           └────────── P2P (WebRTC) ──────────→ 他のプレイヤーのブラウザ
-```
+[変更一覧](TYOITASHI_CHANGES.md)に、機能ごとのコミット、元の基点、依存関係、確認結果をまとめています。後の変更ほど他の追加機能を含む基点から作られているため、すべてが単独でcherry-pickできるわけではありません。
 
-つまり遊ぶには次の 3 つが必要です。
+カード表面の文章機能は、すでに公式Axe v1.48.0へ採用されています。現在の公式版との差分には数えず、[元の提案ブランチ](https://github.com/synchro4351/udonarium_axe/tree/feature/card-face-text)を参考資料として残しています。
 
-1. **SkyWay アカウント**（App ID / Secret。無料枠あり）
-2. **バックエンド**（トークン発行用。下記から 1 つ選んでデプロイ）
-3. **フロントエンド本体**（この成果物を静的ホスティングに配置）
+## ライセンス・謝辞
 
-※ 接続情報パネルの「オンライン／オフライン」でオフラインを選ぶと、SkyWay もバックエンドも使わずに単独のブラウザで動きます。他の人とはつながりません。選択はそのブラウザに残り、オンラインに戻すと通信を始めます。
-
-## クイックスタート
-
-1. **SkyWay でアプリを作成**
-   [SkyWay](https://skyway.ntt.com/) でアカウントを作成し、アプリケーションを 1 つ作成して
-   **App ID** と **Secret** を控えます。
-
-2. **バックエンドをデプロイ**
-   下の [バックエンドの選択肢](#バックエンドの選択肢) から 1 つ選んでデプロイし、次の環境変数を設定します。
-   - `SKYWAY_APP_ID` … 手順 1 の App ID
-   - `SKYWAY_SECRET` … 手順 1 の Secret
-   - `ACCESS_CONTROL_ALLOW_ORIGIN` … Axe を公開する URL（例: `https://your-axe.example.com`。`*` で全許可）
-
-   ブラウザや `curl` で `https://<バックエンドのURL>/v1/status` を開き、`OK` が返れば成功です。
-
-3. **フロントエンドを配置**
-   [Releases](https://github.com/Xelltis/udonarium_axe/releases) の `axe_x.y.z.zip` を展開し
-   （または自分でビルドした `dist/` を使い）、中身を任意の静的ホスティング
-   （Cloudflare Pages / Amazon S3 / レンタルサーバー など）に置きます。
-
-4. **接続先を設定**
-   配置したファイルの `assets/config.json` を開き、`backend.url` を手順 2 のバックエンド URL に書き換えます。
-
-   ```json
-   {
-     "backend": {
-       "url": "https://<バックエンドのURL>"
-     }
-   }
-   ```
-
-5. **Chrome で開く**
-   配置先の URL をデスクトップ版 Chrome で開き、ルームを作成すればセッションを開始できます。
-   同じ URL を共有された参加者が同じルームに入ると、テーブルが同期されます。
-
-## バックエンドの選択肢
-
-いずれも Axe が呼び出す API（`GET /v1/status`・`POST /v1/skyway2023/token`）に対応しており、そのまま利用できます。
-必要な環境変数（`SKYWAY_APP_ID` / `SKYWAY_SECRET` / `ACCESS_CONTROL_ALLOW_ORIGIN`）も共通です。
-
-| バックエンド                                                                    | 実装 / 配置先                                               | こんな人に                                   | デプロイ方法                                                |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------- |
-| [udonarium-backend-vercel](https://github.com/Xelltis/udonarium-backend-vercel) | TypeScript (Hono) / **Vercel Edge**                         | とにかく手軽に始めたい                       | ◎ README の **Deploy with Vercel** ボタンから               |
-| [udonarium_axe_backend](https://github.com/Xelltis/udonarium_axe_backend)       | **PHP 8.3 / Apache**                                        | レンタルサーバーを持っている                 | ○ Releases の zip を展開し `.env` を設定して docroot に配置 |
-| [udonarium-backend（本家）](https://github.com/TK11235/udonarium-backend)       | TypeScript (Hono) / Cloudflare Workers・AWS Lambda・Node.js | CF Workers / Lambda / 自前 Node で運用したい | ○ 各環境に自前でデプロイ（CLI）                             |
-
-> 本家 [TK11235/udonarium-backend](https://github.com/TK11235/udonarium-backend) も **そのまま利用できます**。
-> Axe が呼び出す API（`GET /v1/status`・`POST /v1/skyway2023/token`、レスポンス `{ "token": ... }`）と
-> 完全に同一の仕様です。Cloudflare Workers・AWS Lambda・Node.js のいずれかにデプロイしてください。
-
-## 主な機能
-
-テーブル（地形・マップ）、キャラクターコマ、カード／山札、ダイス（[BCDice](https://github.com/bcdice/BCDice)）、
-チャットとダイスボット、立ち絵差分、カットイン、投票、タイマー／アラーム、インベントリといった
-Udonarium の基本は、そのまま使えます。
-
-Axe で足したのは、遊びを進める側の道具です。移動範囲と ZOC を敷いて経路を決めてから動かす移動、
-ラウンドと陣営を回す部屋設定、盤面で再生するマップ演出、マップエディターとダンジョン生成、
-壁面サーフェスと 2D／3D の切り替え、ココフォリアやキャラクター保管所などからのキャラ取り込み、
-リプレイと自動保存、モバイル表示。画面を寝かせて卓を囲む卓上ディスプレイ向けの表示も、
-その画面だけの設定として入っています。
-
-何がどう動くかは [利用ガイド](https://xelltis.github.io/udonarium_axe/) に、
-足した機能の一覧と設計の理由は [docs/features.md](docs/features.md) にまとめてあります。
-
-## 名前について
-
-**A**dventure. e**X**perience. **E**ncore. — 冒険を、経験に、もう一度。
-
-卓の一晩は終わりますが、記録から読み物や動画やまとめとして呼び戻せます。
-
-## 系譜とクレジット
-
-本プロジェクトは以下の MIT ライセンス作品の系譜にあります（詳細は [LICENSE](LICENSE)）。
-Lily で追加された立ち絵差分・カットイン・バフ／デバフ管理・画像タグ等のコードを継承し、
-実装基盤を現行 Angular で作り直したうえで独自機能を加えています。
-Lycoris はコードの継承元ではなく、ホットバーの着想を得た作品として挙げています。
-
-| 作品                  | 作者                      | リポジトリ                                      | 位置づけ                                     |
-| --------------------- | ------------------------- | ----------------------------------------------- | -------------------------------------------- |
-| **Udonarium**         | TK11235                   | <https://github.com/TK11235/udonarium>          | オリジナル                                   |
-| **Udonarium Lily**    | entyu（円柱）             | <https://github.com/entyu/udonarium_lily>       | 派生・機能拡張版（画像タグ等のコードを継承） |
-| **Udonarium Lycoris** | oron1208                  | <https://github.com/oron1208/udonarium-lycoris> | 着想元（ホットバー）。コードの継承はなし     |
-| **Udonarium Axe**     | SavageChieftain / Xelltis | <https://github.com/Xelltis/udonarium_axe>      | 本リポジトリ                                 |
-
-> 注: 上記の機能の切り分けは本リポジトリの LICENSE・コード・公開情報を根拠にした暫定整理です。
-
-### 取り込ませていただいた仕事
-
-系譜とは別に、フォークや提案として作られた機能を本リポジトリへ取り込んでいます。
-コミットは著者名もハッシュもそのまま残しています。
-
-| 機能                                                                                                                                      | 作者        | 出どころ                                                                   |
-| ----------------------------------------------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------- |
-| **卓上ディスプレイ**（2D 多方向閲覧・回転メニュー・外周ティッカー・多方向カットイン・実寸表示）、**レイヤー**（盤面の下と上を流れる背景） | okamichi    | <https://github.com/okamichi/udonarium_axe/tree/2d-multi-view>             |
-| **カード文章**（カードの面に文字を重ねる）                                                                                                | synchro4351 | <https://github.com/synchro4351/udonarium_axe/tree/feature/card-face-text> |
-
-設定の置き場や保存先は取り込みにあたって変えたものがありますが、機能そのものは各作者の設計と実装によります。
-
-## 開発
-
-```sh
-npm install        # 依存インストール
-npm start          # 開発サーバー（ng serve）
-npm run build      # プロダクションビルド（dist/ と axe_x.y.z.zip を生成）
-npm test           # ユニットテスト（Vitest）
-npm run lint       # ESLint
-npm run e2e        # Playwright E2E
-```
-
-盤面や UI だけを手元で見るときは、開発サーバーを起動して開いたあと、接続情報パネルで
-「オフライン」を選んでください。SkyWay へつなぎに行かないので、バックエンドを立てなくても
-1 つのブラウザの中で操作できます。通信するときは「オンライン」に戻します。
-
-開発サーバーは既定で SkyWay バックエンドの URL を `assets/config.json`（`http://localhost:3000`）から読み込みます。
-ローカルで動かす場合はバックエンドをローカル起動するか、`assets/config.json` を公開済みバックエンドに向けてください。
-
-詳細な開発規範は以下を参照してください。
-
-| ドキュメント                                           | 内容                               |
-| ------------------------------------------------------ | ---------------------------------- |
-| [CLAUDE.md](CLAUDE.md)                                 | 開発規範の最小セット（まずはここ） |
-| [docs/features.md](docs/features.md)                   | Axe で追加・拡張した機能の一覧     |
-| [docs/multi-angle.md](docs/multi-angle.md)             | 2D 多方向閲覧と外周ティッカー      |
-| [docs/architecture.md](docs/architecture.md)           | 7 層アーキテクチャと設計思想       |
-| [docs/coding-guidelines.md](docs/coding-guidelines.md) | コーディング規範・コードスタイル   |
-| [docs/contribution.md](docs/contribution.md)           | コミット規約・lefthook フック      |
-
-## ライセンス
-
-[MIT License](LICENSE) — 上記すべての先行作品の著作権表示を含みます。
-
-同梱素材（画像・効果音）の帰属は [src/assets/copyright.txt](src/assets/copyright.txt) に
-1 ファイルでまとめています。形式は Debian machine-readable copyright format 1.0（DEP-5）で、
-ライセンス名には SPDX 短縮識別子を使っています。
+[MIT License](LICENSE)。Udonarium、Udonarium Lily、Udonarium Axeをはじめとする先行作品の著作権表示を保持しています。[素材のライセンス・帰属](src/assets/copyright.txt)も参照してください。
