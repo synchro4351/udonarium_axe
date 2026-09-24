@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChatSpeakerService } from '@axe/application/chat/chat-speaker.service';
+import { EffectLibraryService } from '@axe/application/effect/effect-library.service';
 import { HotbarStoreService } from '@axe/application/hotbar/hotbar-store.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
@@ -306,6 +307,23 @@ describe('HotbarSlotEditorComponent', () => {
   });
 
   describe('an effect slot', () => {
+    it('shows each effect glyph beside its name in the chooser', async () => {
+      const preset = TestBed.inject(EffectLibraryService).create('爆炎');
+      preset.kind = 'burst';
+      preset.colorPrimary = '#ff0000';
+      const draft = emptyHotbarSlotDraft('effect');
+      draft.value = preset.name;
+      component.setFrom({ page: 1, slotIndex: 3 }, draft);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const picker = root().querySelector<HTMLElement>('[data-testid="hotbar-editor-effect-choice"]')!;
+      expect(picker.textContent).toContain(preset.name);
+      expect(picker.querySelector('svg')).not.toBeNull();
+      preset.destroy();
+    });
+
     it('offers to pay no heed to what is targeted, and remembers the answer', () => {
       const draft = emptyHotbarSlotDraft('effect');
       draft.value = '守り';

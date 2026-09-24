@@ -13,6 +13,7 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { BUFF_COLORS } from '@axe/domain/character/buff-appearance';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { PaletteCommandGroup, paletteCommandGroups } from '@axe/domain/chat/palette-rows';
+import { kindGlyphSvg } from '@axe/domain/effect/effect-shapes';
 import { Hotbar } from '@axe/domain/hotbar/hotbar';
 import { hotbarSlotLabel } from '@axe/domain/hotbar/hotbar-appearance';
 import { emptyHotbarSlotDraft, HotbarSlotDraft } from '@axe/domain/hotbar/hotbar-draft';
@@ -44,7 +45,10 @@ import { CHARACTER_PANELS, DEFAULT_CHARACTER_PANEL, panelLabelKey } from '@axe/d
 import { findSlotActor } from '@axe/features/hotbar/hotbar-actor';
 import { HotbarRunnerService } from '@axe/features/hotbar/hotbar-runner.service';
 import { selectControllableCharacters } from '@axe/features/pl-tools/owned-character-list/owned-characters';
+import { NgSelectWindowDirective } from '@axe/ui/directives/ng-select-window.directive';
+import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
+import { NgLabelTemplateDirective, NgOptionTemplateDirective, NgSelectComponent } from '@ng-select/ng-select';
 
 /**
  * A trial belongs to no cell of the bar, so what it lays out is its own to take down again.
@@ -61,7 +65,15 @@ const DEFAULT_STEP_DELAY_MS = 300;
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'hotbar-slot-editor',
   templateUrl: './hotbar-slot-editor.component.html',
-  imports: [FormsModule, TranslocoModule],
+  imports: [
+    FormsModule,
+    TranslocoModule,
+    NgSelectComponent,
+    NgOptionTemplateDirective,
+    NgLabelTemplateDirective,
+    NgSelectWindowDirective,
+    SafePipe,
+  ],
 })
 export class HotbarSlotEditorComponent {
   private readonly panelService = inject(PanelService);
@@ -112,10 +124,14 @@ export class HotbarSlotEditorComponent {
   ];
 
   /** What a slot of this kind can point at, so nothing has to be typed from memory. */
-  protected readonly choices = computed<{ value: string; name: string }[]>(() => {
+  protected readonly choices = computed<{ value: string; name: string; glyph?: string }[]>(() => {
     switch (this.kind()) {
       case 'effect':
-        return this.effectLibrary.presets().map((preset) => ({ value: preset.name, name: preset.name }));
+        return this.effectLibrary.presets().map((preset) => ({
+          value: preset.name,
+          name: preset.name,
+          glyph: kindGlyphSvg(preset.effectKind, { core: preset.colorPrimary, edge: preset.colorSecondary }),
+        }));
       case 'sound':
         this.objectChange.fileVersion();
         return [...this.audioStorage.audios]
