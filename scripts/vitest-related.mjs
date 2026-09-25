@@ -82,9 +82,8 @@ function importedFrom(roots, imports) {
 }
 
 function run(args) {
-  const result = spawnSync('npx', ['vitest', 'run', ...args], {
+  const result = spawnSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', ...args], {
     stdio: 'inherit',
-    shell: process.platform === 'win32',
   });
   process.exit(result.status ?? 1);
 }
