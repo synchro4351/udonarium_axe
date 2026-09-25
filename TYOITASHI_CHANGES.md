@@ -26,10 +26,16 @@
 
 手札の受け渡し（次版）：[929eec63](https://github.com/synchro4351/udonarium_axe/commit/929eec63ca7c1f6424106b0c15a6256a12e95a99)、[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/card-player-transfer)。基点は上記2件を含む1c285e05。既存のCardGameServiceと手札UIへ追加し、既存のCard.toHandで移動するため保存・同期の新項目はありません。実行直前に手札の所在・操作側ロール・受取人を再確認します。公開手札・自動ソート・配布元表示は含みません。
 
+手札の公開・秘匿（次版）：[5a0cc8e4](https://github.com/synchro4351/udonarium_axe/commit/5a0cc8e4)。929eec63起点。公開設定はPeerCursorの同期値で、既定秘匿・再接続時も秘匿。ルームセーブ対象外です。
+
+自動ソート（次版）：[d9a3280a](https://github.com/synchro4351/udonarium_axe/commit/d9a3280a)。表示順だけを端末ごとに切り替え、共有のhandOrderは変更しません。設定はブラウザ内に保存します。
+
+直前の渡し主（次版）：[da07bbd8](https://github.com/synchro4351/udonarium_axe/commit/da07bbd8)、[消去経路修正 15189c35](https://github.com/synchro4351/udonarium_axe/commit/15189c35)。Cardに渡し主ID・名前の保存・同期項目を追加。明示的な受け渡しで更新し、手札から出ると消します。旧セーブには項目がありません。これらは[同じ機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/card-hand-visibility-sort-provenance)の後続コミットで、929eec63以降の私家機能を含みます。
+
 ## 検証と制限
 
-- 現在の次版候補は全体924ファイル／12,530件成功・1件skip、production build成功（機能ブランチの検証済みコミットと同一）。
-- 手札受け渡しの2クライアント実動作・画面目視は未確認。自動テストの成功と区別しています。
+- 現在の次版候補は全体924ファイル／12,540件成功・1件skip、production build成功（機能ブランチの検証済みコミットと同一）。
+- カード追加機能の2クライアント実動作・画面目視・セーブ再読込は未確認。自動テストの成功と区別しています。
 - エフェクト選択欄とカットイン見本の実画面・演出は目視未確認。
 - フォント選択・YouTube表示・ポインター入力を組み合わせた92件は、r1で直接Vitest・Angular経由の両方に成功。自動再生追加は対象22件を両経路で確認。
 - 初回ドラッグはChromium・Firefox・WebKitで、チャットフォーカスあり／なしの計6件を確認。
