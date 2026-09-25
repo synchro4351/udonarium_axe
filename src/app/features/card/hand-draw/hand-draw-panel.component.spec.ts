@@ -97,6 +97,26 @@ describe('HandDrawPanelComponent', () => {
     expect(fixture.nativeElement.querySelector('card-face-preview')).toBeNull();
   });
 
+  it('lets a public hand be viewed without taking a card', () => {
+    const other = peer('other', 'あいて');
+    const held = card('s01', 'other');
+    other.handPublic = true;
+    component.viewOnly.set(true);
+    fixture.detectChanges();
+
+    expect(component.targets().map((target) => target.userId)).toEqual(['other']);
+    component.select('other');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('card-face-preview')).toBeTruthy();
+    expect((fixture.nativeElement as HTMLElement).querySelector('button:disabled')).toBeTruthy();
+
+    component.draw(held);
+    expect(held.location.name).toBe(handLocationOf('other'));
+    other.handPublic = false;
+    TestBed.inject(ObjectChangeService).notifyChanged(other.identifier);
+    expect(component.selected()).toBeNull();
+  });
+
   it('takes a chosen card into your own hand and out of theirs', () => {
     peer('other', 'あいて');
     const drawn = card('s01', 'other');

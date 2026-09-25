@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
+import { CoordinateService } from '@axe/application/input/coordinate.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
@@ -92,13 +93,20 @@ describe('HandRailComponent', () => {
     expect(fixture.nativeElement.querySelector('card-face-preview')).toBeTruthy();
   });
 
-  it('lets the holder open and close the whole hand', () => {
-    const toggle = (component as unknown as { toggleHandPublic: () => void }).toggleHandPublic.bind(component);
+  it('requires a second explicit action to open the hand and hides it immediately', () => {
+    const controls = component as unknown as {
+      toggleHandPublic: () => void;
+      confirmHandPublic: () => void;
+      confirmPublic: () => boolean;
+    };
     expect(PeerCursor.myCursor.handPublic).toBe(false);
 
-    toggle();
+    controls.toggleHandPublic();
+    expect(PeerCursor.myCursor.handPublic).toBe(false);
+    expect(controls.confirmPublic()).toBe(true);
+    controls.confirmHandPublic();
     expect(PeerCursor.myCursor.handPublic).toBe(true);
-    toggle();
+    controls.toggleHandPublic();
     expect(PeerCursor.myCursor.handPublic).toBe(false);
   });
 
@@ -187,6 +195,43 @@ describe('HandRailComponent', () => {
     expect(card.location.name).toBe('table');
     expect(card.state).toBe(CardState.BACK);
     expect(card.owner).toBe('');
+  });
+
+  it('keeps a dropped card in hand until its face is chosen at the drop position', () => {
+    const card = makeCard(handLocationOf('me'));
+    const menu = TestBed.inject(ContextMenuService);
+    const open = vi.spyOn(menu, 'open').mockImplementation(() => undefined);
+    const surface = document.createElement('div');
+    surface.dataset['surface'] = 'table';
+    const originalElementsFromPoint = Object.getOwnPropertyDescriptor(document, 'elementsFromPoint');
+    Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: () => [surface] });
+    vi.spyOn(TestBed.inject(CoordinateService), 'calcTabletopLocalCoordinate').mockReturnValue({ x: 120, y: 90, z: 0 });
+    const controls = component as unknown as {
+      activePointerId: number;
+      dragPending: { card: Card; startX: number; startY: number; dragging: boolean };
+      onCardPointerUp: (event: PointerEvent) => void;
+    };
+    controls.activePointerId = 1;
+    controls.dragPending = { card, startX: 0, startY: 0, dragging: true };
+
+    try {
+      controls.onCardPointerUp({
+        pointerId: 1,
+        clientX: 120,
+        clientY: 90,
+        currentTarget: document.createElement('div'),
+      } as unknown as PointerEvent);
+
+      expect(card.location.name).toBe(handLocationOf('me'));
+      expect(open).toHaveBeenCalledOnce();
+      expect(open.mock.calls[0][1]).toHaveLength(2);
+      open.mock.calls[0][1][1].action?.();
+      expect(card.location.name).toBe('table');
+      expect(card.state).toBe(CardState.BACK);
+    } finally {
+      if (originalElementsFromPoint) Object.defineProperty(document, 'elementsFromPoint', originalElementsFromPoint);
+      else Reflect.deleteProperty(document, 'elementsFromPoint');
+    }
   });
 
   it('moves the view to the card just played', () => {

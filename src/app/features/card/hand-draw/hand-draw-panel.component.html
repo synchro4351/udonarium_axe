@@ -11,12 +11,15 @@
       {{ target.name }} — {{ 'feature.card.drawPanel.cardCount' | transloco: { count: target.count } }}
     </span>
   </div>
-  <p class="text-ui-dim m-0 mb-2 text-xs">{{ 'feature.card.drawPanel.pickCard' | transloco }}</p>
+  <p class="text-ui-dim m-0 mb-2 text-xs">
+    {{ (viewOnly() ? 'feature.card.drawPanel.viewPublicHand' : 'feature.card.drawPanel.pickCard') | transloco }}
+  </p>
   <div class="flex flex-wrap gap-2">
     @for (card of cards(); track card.identifier) {
       <button
         type="button"
         class="rounded-ui-sm border-ui-border-panel hover:border-ui-accent h-28 w-20 cursor-pointer overflow-hidden border border-solid bg-transparent p-0 transition-[border-color,transform] hover:-translate-y-1"
+        [disabled]="viewOnly()"
         (click)="draw(card)"
       >
         @if (target.handPublic) {
@@ -28,7 +31,9 @@
     }
   </div>
 } @else {
-  <p class="text-ui-dim m-0 mb-2 text-xs">{{ 'feature.card.drawPanel.pickPlayer' | transloco }}</p>
+  <p class="text-ui-dim m-0 mb-2 text-xs">
+    {{ (viewOnly() ? 'feature.card.drawPanel.pickPublicHand' : 'feature.card.drawPanel.pickPlayer') | transloco }}
+  </p>
   @for (target of targets(); track target.userId) {
     <button
       type="button"

@@ -13,6 +13,15 @@
     >
       <div class="absolute top-0 right-0 flex h-7 items-center gap-0.5 px-1.5">
         <button
+          class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5.5 items-center justify-center border-none bg-transparent px-1"
+          type="button"
+          [title]="'feature.card.hand.viewPublicHands' | transloco"
+          [attr.aria-label]="'feature.card.hand.viewPublicHands' | transloco"
+          (click)="openPublicHands()"
+        >
+          <i class="material-icons text-[14px]!">visibility</i>
+        </button>
+        <button
           class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5.5 transform-none items-center justify-center border-none bg-transparent px-1 py-0.5 leading-none shadow-none transition-colors outline-none hover:border-transparent hover:shadow-none"
           [title]="'feature.card.hand.drawFromOther' | transloco"
           [attr.aria-label]="'feature.card.hand.drawFromOther' | transloco"
@@ -42,7 +51,16 @@
       </div>
     </div>
 
-    <div class="border-ui-border-panel flex justify-center gap-2 border-b border-solid py-0.5">
+    <div class="border-ui-border-panel flex items-center justify-center gap-2 border-b border-solid px-2 py-1">
+      <span
+        class="rounded-ui-sm px-2 py-0.5 text-[11px] font-bold"
+        [class.bg-red-700]="handPublic()"
+        [class.text-white]="handPublic()"
+        [class.bg-ui-elevated]="!handPublic()"
+        data-testid="hand-public-status"
+      >
+        {{ (handPublic() ? 'feature.card.hand.publicStatus' : 'feature.card.hand.privateStatus') | transloco }}
+      </span>
       <button
         class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5.5 items-center justify-center border-none bg-transparent px-2"
         [class.text-ui-accent]="handPublic()"
@@ -57,6 +75,16 @@
       >
         <i class="material-icons text-[14px]!">{{ handPublic() ? 'visibility' : 'visibility_off' }}</i>
       </button>
+      @if (confirmPublic()) {
+        <button
+          class="rounded-ui-sm m-0 border border-solid border-red-500 bg-red-700 px-2 py-0.5 text-[11px] font-bold text-white"
+          type="button"
+          data-testid="hand-public-confirm"
+          (click)="confirmHandPublic()"
+        >
+          {{ 'feature.card.hand.confirmPublic' | transloco }}
+        </button>
+      }
       <button
         class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5.5 items-center justify-center border-none bg-transparent px-2"
         [class.text-ui-accent]="autoSort()"
@@ -104,7 +132,7 @@
 
               @if (card.lastHandGiverUserId) {
                 <button
-                  class="bg-ui-accent text-ui-text shadow-ui-sm absolute top-1 right-1 z-4 inline-flex size-5 cursor-pointer items-center justify-center rounded-full border-none p-0"
+                  class="bg-ui-accent text-ui-text shadow-ui-sm absolute top-[calc(100%+3px)] left-1/2 z-4 inline-flex size-5 -translate-x-1/2 cursor-pointer items-center justify-center overflow-hidden rounded-full border-none p-0"
                   type="button"
                   data-testid="hand-card-source"
                   [title]="
@@ -118,11 +146,15 @@
                   (pointerdown)="$event.stopPropagation()"
                   (click)="toggleCardSource(card, $event)"
                 >
-                  <i class="material-icons text-[13px]!">move_to_inbox</i>
+                  @if (giverImageUrl(card); as imageUrl) {
+                    <img class="size-full object-cover" [src]="imageUrl" alt="" />
+                  } @else {
+                    <i class="material-icons text-[13px]!">person</i>
+                  }
                 </button>
                 @if (sourceCardId() === card.identifier) {
                   <div
-                    class="bg-ui-panel text-ui-text shadow-ui-md border-ui-border-panel rounded-ui-sm absolute top-7 right-0 z-5 w-max max-w-48 border border-solid px-2 py-1 text-[11px] whitespace-normal"
+                    class="bg-ui-panel text-ui-text shadow-ui-md border-ui-border-panel rounded-ui-sm absolute top-[calc(100%+26px)] left-1/2 z-5 w-max max-w-48 -translate-x-1/2 border border-solid px-2 py-1 text-[11px] whitespace-normal"
                     data-testid="hand-card-source-popup"
                   >
                     {{
@@ -150,25 +182,6 @@
                     (click)="openGiveMenu(card, $event)"
                   >
                     <i class="material-icons text-[13px]!" [ngClass]="isTouch() ? 'text-[18px]!' : ''">send</i>
-                  </button>
-                  <button
-                    class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5 transform-none cursor-pointer items-center justify-center border-none bg-transparent px-1 leading-none shadow-none transition-colors outline-none hover:border-transparent hover:shadow-none"
-                    [ngClass]="isTouch() ? 'h-8! px-3!' : ''"
-                    [title]="'feature.card.hand.playFaceUp' | transloco"
-                    (click)="playFaceUp(card)"
-                  >
-                    <i class="material-icons text-[13px]!" [ngClass]="isTouch() ? 'text-[18px]!' : ''">visibility</i>
-                  </button>
-
-                  <button
-                    class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5 transform-none cursor-pointer items-center justify-center border-none bg-transparent px-1 leading-none shadow-none transition-colors outline-none hover:border-transparent hover:shadow-none"
-                    [ngClass]="isTouch() ? 'h-8! px-3!' : ''"
-                    [title]="'feature.card.hand.playFaceDown' | transloco"
-                    (click)="playFaceDown(card)"
-                  >
-                    <i class="material-icons text-[13px]!" [ngClass]="isTouch() ? 'text-[18px]!' : ''"
-                      >visibility_off</i
-                    >
                   </button>
                 </div>
               }

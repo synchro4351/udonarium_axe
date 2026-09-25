@@ -147,10 +147,25 @@ export class HandRailComponent {
     return PeerCursor.myCursor?.handPublic ?? false;
   });
 
+  protected readonly confirmPublic = signal(false);
+
   protected toggleHandPublic(): void {
     const cursor = PeerCursor.myCursor;
     if (!cursor || !this.canHoldCards()) return;
-    cursor.handPublic = !cursor.handPublic;
+    if (!cursor.handPublic) {
+      this.confirmPublic.set(!this.confirmPublic());
+      return;
+    }
+    cursor.handPublic = false;
+    this.confirmPublic.set(false);
+    this.objectChange.notifyChanged(cursor.identifier);
+  }
+
+  protected confirmHandPublic(): void {
+    const cursor = PeerCursor.myCursor;
+    if (!cursor || !this.canHoldCards() || !this.confirmPublic()) return;
+    cursor.handPublic = true;
+    this.confirmPublic.set(false);
     this.objectChange.notifyChanged(cursor.identifier);
   }
 
@@ -176,7 +191,7 @@ export class HandRailComponent {
 
   protected readonly cardWidthPx = HAND_CARD_WIDTH_PX;
   protected readonly cardHeightPx = HAND_CARD_HEIGHT_PX;
-  protected readonly fanHeightPx = HAND_CARD_HEIGHT_PX + HAND_FAN_ARC_PX;
+  protected readonly fanHeightPx = HAND_CARD_HEIGHT_PX + HAND_FAN_ARC_PX + 24;
 
   private readonly viewportSize = signal({ width: window.innerWidth, height: window.innerHeight });
 
@@ -237,6 +252,14 @@ export class HandRailComponent {
     return card.name.length ? card.name : this.t('feature.card.hand.unnamed');
   }
 
+  protected giverImageUrl(card: Card): string {
+    this.objectChange.collectionOf(PeerCursor.aliasName)();
+    this.objectChange.fileVersion();
+    const giver = PeerCursor.findByUserId(card.lastHandGiverUserId);
+    if (giver) this.objectChange.versionOf(giver.identifier)();
+    return giver?.image?.url ?? '';
+  }
+
   protected playFaceUp(card: Card, focus = true): void {
     card.playFaceUp();
     SoundEffect.play(PresetSound.cardDraw);
@@ -265,6 +288,15 @@ export class HandRailComponent {
       width: 420,
       height: 380,
     });
+  }
+
+  protected openPublicHands(): void {
+    const panel = this.panelService.open(HandDrawPanelComponent, {
+      title: this.t('feature.card.hand.viewPublicHands'),
+      width: 420,
+      height: 380,
+    });
+    panel.viewOnly.set(true);
   }
 
   protected discardPairs(): void {
@@ -354,10 +386,22 @@ export class HandRailComponent {
       { x: event.clientX, y: event.clientY, z: 0 },
       surface
     );
-    pending.card.location.x = local.x - (pending.card.size * this.gridSize) / 2;
-    pending.card.location.y = local.y - (pending.card.size * this.gridSize) / 2;
-    pending.card.posZ = local.z;
-    this.playFaceUp(pending.card, false);
+    const place = (faceUp: boolean) => {
+      if (!this.cards().includes(pending.card)) return;
+      pending.card.location.x = local.x - (pending.card.size * this.gridSize) / 2;
+      pending.card.location.y = local.y - (pending.card.size * this.gridSize) / 2;
+      pending.card.posZ = local.z;
+      if (faceUp) this.playFaceUp(pending.card, false);
+      else this.playFaceDown(pending.card, false);
+    };
+    this.contextMenu.open(
+      { x: event.clientX, y: event.clientY },
+      [
+        { name: this.t('feature.card.hand.playFaceUp'), action: () => place(true) },
+        { name: this.t('feature.card.hand.playFaceDown'), action: () => place(false) },
+      ],
+      this.t('feature.card.hand.chooseFaceAfterDrop')
+    );
   }
 
   protected onCardPointerCancel(event: PointerEvent): void {

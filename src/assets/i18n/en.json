@@ -724,6 +724,11 @@
         "giveTo": "Give to {{name}}",
         "makePublic": "Show your hand to everyone",
         "makePrivate": "Hide your hand from others",
+        "privateStatus": "Hand private",
+        "publicStatus": "Hand public",
+        "confirmPublic": "Show to everyone",
+        "viewPublicHands": "View public hands",
+        "chooseFaceAfterDrop": "Play at this position (cancel to keep in hand)",
         "public": "Public hand",
         "autoSort": "Sort by suit and number / name",
         "manualOrder": "Use manual order",
@@ -780,7 +785,9 @@
         "noPlayers": "Nobody is holding cards",
         "cardCount": "{{count}} cards",
         "back": "Pick another player",
-        "pickCard": "Pick a card to draw"
+        "pickCard": "Pick a card to draw",
+        "pickPublicHand": "Pick a public hand to view",
+        "viewPublicHand": "Viewing public hand (cards cannot be moved)"
       },
       "deckDialog": {
         "hint": "Makes one card per image carrying the tag, gathered into a single deck.",

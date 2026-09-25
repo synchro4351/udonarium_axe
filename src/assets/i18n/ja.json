@@ -724,6 +724,11 @@
         "giveTo": "{{name}} に渡す",
         "makePublic": "自分の手札を公開する",
         "makePrivate": "自分の手札を秘匿する",
+        "privateStatus": "手札は非公開",
+        "publicStatus": "手札を公開中",
+        "confirmPublic": "全員に公開する",
+        "viewPublicHands": "公開手札を見る",
+        "chooseFaceAfterDrop": "この位置にカードを出す（取消は手札に戻す）",
         "public": "公開中の手札",
         "autoSort": "スート・数字／名前順に自動整列",
         "manualOrder": "手動の並び順に戻す",
@@ -780,7 +785,9 @@
         "noPlayers": "手札を持っている参加者がいません",
         "cardCount": "{{count}} 枚",
         "back": "相手を選び直す",
-        "pickCard": "引くカードを選んでください"
+        "pickCard": "引くカードを選んでください",
+        "pickPublicHand": "見る公開手札を選んでください",
+        "viewPublicHand": "公開手札を表示中（カードは移動しません）"
       },
       "deckDialog": {
         "hint": "同じタグを付けた画像 1 枚につきカード 1 枚を作り、1 つの山札にまとめます。",

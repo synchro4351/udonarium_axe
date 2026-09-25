@@ -30,6 +30,7 @@ export class HandDrawPanelComponent {
   private readonly cardGame = inject(CardGameService);
 
   readonly selectedUserId = signal('');
+  readonly viewOnly = signal(false);
 
   readonly targets = computed<HandDrawTarget[]>(() => {
     this.objectChange.collectionOf(Card.aliasName)();
@@ -46,7 +47,7 @@ export class HandDrawPanelComponent {
         count: this.cardGame.handCardsOf(cursor.userId).length,
         handPublic: PeerCursor.findByUserId(cursor.userId)?.handPublic ?? false,
       }))
-      .filter((target) => target.count > 0);
+      .filter((target) => target.count > 0 && (!this.viewOnly() || target.handPublic));
   });
 
   readonly selected = computed<HandDrawTarget | null>(
@@ -95,7 +96,7 @@ export class HandDrawPanelComponent {
    */
   draw(card: Card): void {
     const target = this.selected();
-    if (!target) return;
+    if (!target || this.viewOnly()) return;
     this.cardGame.drawFromHand(card, target.name);
     if (this.cardGame.handCardsOf(target.userId).length < 1) this.clearSelection();
   }
