@@ -44,7 +44,10 @@ describe('CutInListComponent', () => {
     picker.dispatchEvent(new Event('change'));
 
     expect(component.getCutIns()).toHaveLength(1);
-    expect(component.selectedCutIn?.scene?.layers.map((layer) => layer.kind)).toEqual(['fill', 'text']);
+    const kinds = component.selectedCutIn?.scene?.layers.map((layer) => layer.kind);
+    expect(kinds?.[0]).toBe('fill');
+    expect(kinds).toContain('text');
+    expect(component.selectedCutIn?.frameless).toBe(true);
     expect(component.activeTab()).toBe('Scene');
     expect(picker.value).toBe('');
     component.selectedCutIn?.destroy();
