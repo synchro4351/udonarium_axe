@@ -735,7 +735,9 @@
         "fromParticipant": "{{name}} から受け取ったカード",
         "receivedCard": "{{name}} から「{{card}}」を受け取りました",
         "discardPairs": "ペアを捨てる",
-        "noPairs": "同じ数字の組がありません"
+        "noPairs": "同じ数字の組がありません",
+        "drawForbidden": "この部屋では他の人の手札から引けません",
+        "giveForbidden": "この部屋ではカードを渡せません"
       },
       "title": "カード",
       "settingTitle": "カード設定",
@@ -789,6 +791,7 @@
       },
       "handOverview": {
         "hint": "表が見えるのは公開中の手札だけです。自分の手札からカードを参加者の欄へドラッグすると、そのカードを渡せます。",
+        "hintGiveForbidden": "表が見えるのは公開中の手札だけです。この部屋ではカードを渡せません。",
         "you": "（自分）",
         "public": "公開中",
         "private": "非公開",
@@ -2446,6 +2449,10 @@
       "zocHint": "NPC かどうかが違うコマを敵とみなし、その周りのマスが移動を妨げる。自分に見えていないコマは ZOC を張らない。",
       "diceBotHint": "部屋に入ったときに選ばれるダイスボットです",
       "sectionControllerResources": "リモコンに出す数値とリソース",
+      "sectionHandCards": "手札",
+      "allowsHandDraw": "他の参加者の手札からカードを引けるようにする",
+      "allowsHandGive": "他の参加者へカードを渡せるようにする",
+      "handCardsHint": "オフにすると、手札のメニューやドラッグ操作からもできなくなります。",
       "controllerResourcesShowAll": "すべて出す",
       "controllerResourcesHideAll": "すべて外す",
       "controllerResourcesHintAll": "部屋のコマが持つ数値とリソースを、名前ごとに並べています。いまは全部出しています。外した項目は、リモコンのリソース操作にもコマの欄にも出ません。",

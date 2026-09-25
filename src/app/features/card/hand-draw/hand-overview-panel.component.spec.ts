@@ -3,6 +3,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { handLocationOf } from '@axe/domain/card/hand-location';
+import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { HandOverviewPanelComponent } from '@axe/features/card/hand-draw/hand-overview-panel.component';
@@ -21,7 +22,7 @@ describe('HandOverviewPanelComponent', () => {
     return object;
   }
 
-  function peer(userId: string, name: string, role = PeerRole.Player): PeerCursor {
+  function peer(userId: string, name: string, role: PeerRole = PeerRole.Player): PeerCursor {
     const cursor = new PeerCursor();
     cursor.userId = userId;
     cursor.peerId = `peer-${userId}`;
@@ -51,6 +52,7 @@ describe('HandOverviewPanelComponent', () => {
   afterEach(() => {
     fixture?.destroy();
     TestBed.inject(HandDragService).end();
+    Config.instance.allowsHandGive = true;
     for (const object of created.splice(0)) object.destroy();
     for (const cursor of ObjectStore.instance.getObjects<PeerCursor>(PeerCursor)) {
       if (cursor !== PeerCursor.myCursor) ObjectStore.instance.delete(cursor, false);
@@ -128,5 +130,25 @@ describe('HandOverviewPanelComponent', () => {
     fixture.detectChanges();
     expect(sectionOf('other').querySelector('[data-testid="hand-overview-drop-hint"]')).toBeTruthy();
     expect(sectionOf('me').querySelector('[data-testid="hand-overview-drop-hint"]')).toBeNull();
+  });
+
+  it('takes no dropped card while the room forbids giving, and follows the setting as it changes', () => {
+    peer('other', 'あいて');
+    const mine = card('h01', 'me');
+    Config.instance.allowsHandGive = false;
+    TestBed.inject(HandDragService).begin(mine);
+    fixture.detectChanges();
+
+    expect(sectionOf('other').hasAttribute('data-hand-drop-user-id')).toBe(false);
+    expect(sectionOf('other').querySelector('[data-testid="hand-overview-drop-hint"]')).toBeNull();
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="hand-overview-hint"]')?.textContent
+    ).toContain('この部屋ではカードを渡せません');
+
+    Config.instance.allowsHandGive = true;
+    TestBed.inject(ObjectChangeService).notifyChanged('Config');
+    fixture.detectChanges();
+    expect(sectionOf('other').getAttribute('data-hand-drop-user-id')).toBe('other');
+    expect(sectionOf('other').querySelector('[data-testid="hand-overview-drop-hint"]')).toBeTruthy();
   });
 });

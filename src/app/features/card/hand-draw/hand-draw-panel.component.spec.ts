@@ -5,6 +5,7 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { handLocationOf } from '@axe/domain/card/hand-location';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
+import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { HandDrawPanelComponent } from '@axe/features/card/hand-draw/hand-draw-panel.component';
@@ -46,6 +47,7 @@ describe('HandDrawPanelComponent', () => {
 
   afterEach(() => {
     fixture?.destroy();
+    Config.instance.allowsHandDraw = true;
     vi.restoreAllMocks();
     for (const object of created.splice(0)) object.destroy();
     for (const cursor of ObjectStore.instance.getObjects<PeerCursor>(PeerCursor)) {
@@ -126,5 +128,21 @@ describe('HandDrawPanelComponent', () => {
     fixture.detectChanges();
 
     expect(component.selected()).toBeNull();
+  });
+
+  it('keeps their cards out of reach while the room forbids drawing from hands', () => {
+    peer('other', 'あいて');
+    const held = card('s01', 'other');
+    Config.instance.allowsHandDraw = false;
+    fixture.detectChanges();
+    component.select('other');
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('[data-testid="hand-draw-forbidden"]')).toBeTruthy();
+    expect(root.querySelector<HTMLButtonElement>('[data-testid="hand-draw-card"]')!.disabled).toBe(true);
+    component.draw(held);
+    expect(held.location.name).toBe(handLocationOf('other'));
+    expect(component.selected()?.userId).toBe('other');
   });
 });

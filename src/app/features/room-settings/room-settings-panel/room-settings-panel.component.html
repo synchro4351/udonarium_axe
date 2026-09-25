@@ -120,6 +120,53 @@
             </p>
           }
         </div>
+
+        <div
+          class="border-ui-border-panel bg-ui-surface rounded-ui flex flex-col gap-2.5 border border-solid p-3"
+          data-testid="room-settings-hand-cards"
+        >
+          <div class="min-w-0">
+            <span class="text-ui-muted text-[11px] font-semibold tracking-[0.06em] uppercase">{{
+              'feature.roomSettings.sectionHandCards' | transloco
+            }}</span>
+            <p class="text-ui-dim m-0 text-[11px]">{{ 'feature.roomSettings.sharedHint' | transloco }}</p>
+          </div>
+          <label
+            class="text-ui-text flex items-center gap-1.5 text-[13px] select-none"
+            [class.cursor-pointer]="!isSharedReadOnly()"
+            [class.opacity-50]="isSharedReadOnly()"
+          >
+            <input
+              type="checkbox"
+              class="size-3.5 [accent-color:var(--ui-accent)] disabled:cursor-not-allowed"
+              [class.cursor-pointer]="!isSharedReadOnly()"
+              [(ngModel)]="allowsHandDraw"
+              name="allowsHandDraw"
+              data-testid="allows-hand-draw"
+              [disabled]="isSharedReadOnly()"
+            />
+            {{ 'feature.roomSettings.allowsHandDraw' | transloco }}
+          </label>
+          <label
+            class="text-ui-text flex items-center gap-1.5 text-[13px] select-none"
+            [class.cursor-pointer]="!isSharedReadOnly()"
+            [class.opacity-50]="isSharedReadOnly()"
+          >
+            <input
+              type="checkbox"
+              class="size-3.5 [accent-color:var(--ui-accent)] disabled:cursor-not-allowed"
+              [class.cursor-pointer]="!isSharedReadOnly()"
+              [(ngModel)]="allowsHandGive"
+              name="allowsHandGive"
+              data-testid="allows-hand-give"
+              [disabled]="isSharedReadOnly()"
+            />
+            {{ 'feature.roomSettings.allowsHandGive' | transloco }}
+          </label>
+          <p class="text-ui-muted m-0 text-[11px] leading-relaxed">
+            {{ 'feature.roomSettings.handCardsHint' | transloco }}
+          </p>
+        </div>
       </div>
     }
 

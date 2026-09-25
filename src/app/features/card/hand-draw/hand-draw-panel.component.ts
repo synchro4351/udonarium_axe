@@ -31,6 +31,12 @@ export class HandDrawPanelComponent {
 
   readonly selectedUserId = signal('');
 
+  /** Whether the room lets you take cards from other hands; while it does not, the cards cannot be picked. */
+  readonly allowsDraw = computed(() => {
+    this.objectChange.versionOf('Config')();
+    return this.cardGame.allowsHandDraw();
+  });
+
   readonly targets = computed<HandDrawTarget[]>(() => {
     this.objectChange.collectionOf(Card.aliasName)();
     this.objectChange.collectionOf(PeerCursor.aliasName)();
@@ -91,12 +97,13 @@ export class HandDrawPanelComponent {
    * Takes the clicked card from the selected player's hand into the local player's hand.
    *
    * The card game service announces the draw in chat. The panel goes back to the player list when
-   * that player has no cards left, and nothing happens when no player is selected.
+   * that player has no cards left, and nothing happens when no player is selected or the room forbids
+   * drawing from hands.
    */
   draw(card: Card): void {
     const target = this.selected();
     if (!target) return;
-    this.cardGame.drawFromHand(card, target.name);
+    if (!this.cardGame.drawFromHand(card, target.name)) return;
     if (this.cardGame.handCardsOf(target.userId).length < 1) this.clearSelection();
   }
 }

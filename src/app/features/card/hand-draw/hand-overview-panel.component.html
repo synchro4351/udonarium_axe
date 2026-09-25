@@ -1,9 +1,11 @@
-<p class="text-ui-dim m-0 mb-2 text-xs">{{ 'feature.card.handOverview.hint' | transloco }}</p>
+<p class="text-ui-dim m-0 mb-2 text-xs" data-testid="hand-overview-hint">
+  {{ (allowsGive() ? 'feature.card.handOverview.hint' : 'feature.card.handOverview.hintGiveForbidden') | transloco }}
+</p>
 @for (section of sections(); track section.userId) {
   <section
     class="rounded-ui mb-2 border-2 border-solid p-2 transition-colors"
     data-testid="hand-overview-section"
-    [attr.data-hand-drop-user-id]="section.isSelf ? null : section.userId"
+    [attr.data-hand-drop-user-id]="section.isSelf || !allowsGive() ? null : section.userId"
     [class.border-ui-border-panel]="!dropping() || section.isSelf"
     [class.border-dashed]="dropping() && !section.isSelf && drag.dropUserId() !== section.userId"
     [class.border-ui-accent]="dropping() && !section.isSelf"

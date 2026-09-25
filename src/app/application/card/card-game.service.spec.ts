@@ -6,6 +6,7 @@ import { Card, CardState } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
 import { handLocationOf } from '@axe/domain/card/hand-location';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
+import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -52,6 +53,8 @@ describe('CardGameService', () => {
   });
 
   afterEach(() => {
+    Config.instance.allowsHandDraw = true;
+    Config.instance.allowsHandGive = true;
     vi.restoreAllMocks();
     for (const object of created.splice(0)) object.destroy();
     for (const cursor of ObjectStore.instance.getObjects<PeerCursor>(PeerCursor)) {
@@ -109,6 +112,28 @@ describe('CardGameService', () => {
       expect(service.handCardsOf('other')).toHaveLength(0);
       expect(sendSystemMessage).toHaveBeenCalledOnce();
     });
+
+    it('does not take a card that lies on the table or is already yours', () => {
+      const onTable = trumpCard('s07');
+      const mine = trumpCard('s08');
+      mine.toHand('me');
+
+      expect(service.drawFromHand(onTable, 'あいて')).toBe(false);
+      expect(service.drawFromHand(mine, 'わたし')).toBe(false);
+      expect(onTable.location.name).toBe('table');
+      expect(sendSystemMessage).not.toHaveBeenCalled();
+    });
+
+    it('does not take a card while the room forbids drawing from hands', () => {
+      const card = trumpCard('s07');
+      card.toHand('other');
+      Config.instance.allowsHandDraw = false;
+
+      expect(service.allowsHandDraw()).toBe(false);
+      expect(service.drawFromHand(card, 'あいて')).toBe(false);
+      expect(card.location.name).toBe(handLocationOf('other'));
+      expect(sendSystemMessage).not.toHaveBeenCalled();
+    });
   });
 
   describe('giveFromHand()', () => {
@@ -147,6 +172,20 @@ describe('CardGameService', () => {
 
       expect(service.giveFromHand(card, 'other')).toBe(false);
       expect(card.location.name).toBe(handLocationOf('me'));
+    });
+
+    it('does not give a card while the room forbids giving, though drawing stays allowed', () => {
+      peer('other', 'あいて');
+      const card = trumpCard('s07');
+      card.toHand('me');
+      Config.instance.allowsHandGive = false;
+
+      expect(service.allowsHandGive()).toBe(false);
+      expect(service.allowsHandDraw()).toBe(true);
+      expect(service.giveFromHand(card, 'other')).toBe(false);
+      expect(card.location.name).toBe(handLocationOf('me'));
+      expect(card.lastHandGiverUserId).toBe('');
+      expect(sendSystemMessage).not.toHaveBeenCalled();
     });
 
     it('replaces the previous giver when the card is passed on', () => {

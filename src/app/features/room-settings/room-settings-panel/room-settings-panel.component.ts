@@ -662,6 +662,33 @@ export class RoomSettingsPanelComponent {
   }
 
   /**
+   * Whether participants may take a card from someone else's hand, read from the room's config.
+   *
+   * Only a user allowed to change the shared settings can set it.
+   */
+  get allowsHandDraw(): boolean {
+    this.objectChange.versionOf('Config')();
+    return this.config.allowsHandDraw;
+  }
+  set allowsHandDraw(allowed: boolean) {
+    if (!this.isSharedReadOnly()) this.config.allowsHandDraw = allowed;
+  }
+
+  /**
+   * Whether participants may give a card from their hand to someone else, read from the room's
+   * config.
+   *
+   * Only a user allowed to change the shared settings can set it.
+   */
+  get allowsHandGive(): boolean {
+    this.objectChange.versionOf('Config')();
+    return this.config.allowsHandGive;
+  }
+  set allowsHandGive(allowed: boolean) {
+    if (!this.isSharedReadOnly()) this.config.allowsHandGive = allowed;
+  }
+
+  /**
    * Loads a dice bot as soon as it is picked, by fetching its help text in the background; the text
    * itself is not used here.
    */

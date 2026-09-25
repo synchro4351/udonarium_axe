@@ -7,8 +7,10 @@ import { Card } from '@axe/domain/card/card';
 import { planDeal } from '@axe/domain/card/card-deal';
 import { CardStack } from '@axe/domain/card/card-stack';
 import { selectHandCardsOf } from '@axe/domain/card/hand-cards';
+import { handHolderOf } from '@axe/domain/card/hand-location';
 import { findTrumpPairs, selectExtraJokers, trumpRankOf } from '@axe/domain/card/trump-card';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
+import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
 
@@ -91,10 +93,27 @@ export class CardGameService {
     return { dealt: cards.length, participants: seats.length };
   }
 
-  /** Takes a card from someone else's hand into your own and says so in chat. False while you have no user id. */
+  /** Whether the room lets a participant take a card from someone else's hand. A room with no config yet allows it. */
+  allowsHandDraw(): boolean {
+    return this.objectStore.get<Config>('Config')?.allowsHandDraw ?? true;
+  }
+
+  /** Whether the room lets a participant give a card from their hand to someone else. A room with no config yet allows it. */
+  allowsHandGive(): boolean {
+    return this.objectStore.get<Config>('Config')?.allowsHandGive ?? true;
+  }
+
+  /**
+   * Takes a card from someone else's hand into your own and says so in chat.
+   *
+   * False, with nothing moved, while you have no user id or may not hold cards, when the card is in
+   * no other hand, or when the room forbids drawing from hands.
+   */
   drawFromHand(card: Card, fromName: string): boolean {
     const myUserId = this.myUserId();
-    if (myUserId.length < 1) return false;
+    if (myUserId.length < 1 || !canRoleEdit(PeerCursor.myRole) || !this.allowsHandDraw()) return false;
+    const holder = handHolderOf(card.location.name);
+    if (!holder || holder === myUserId) return false;
 
     card.toHand(myUserId);
     SoundEffect.play(PresetSound.cardDraw);
@@ -104,10 +123,11 @@ export class CardGameService {
     return true;
   }
 
-  /** Gives one of your hand cards to another participant, keeping it hidden in their hand. */
+  /** Gives one of your hand cards to another participant, keeping it hidden in their hand. False while the room forbids it. */
   giveFromHand(card: Card, recipientUserId: string): boolean {
     const myUserId = this.myUserId();
     if (!myUserId || !canRoleEdit(PeerCursor.myRole) || recipientUserId === myUserId) return false;
+    if (!this.allowsHandGive()) return false;
     if (!this.handCardsOf(myUserId).includes(card)) return false;
     const recipient = this.participants().find((seat) => seat.userId === recipientUserId);
     if (!recipient) return false;

@@ -735,7 +735,9 @@
         "fromParticipant": "Card received from {{name}}",
         "receivedCard": "{{card}} was received from {{name}}",
         "discardPairs": "Discard pairs",
-        "noPairs": "No matching pair"
+        "noPairs": "No matching pair",
+        "drawForbidden": "This room does not allow drawing from other hands",
+        "giveForbidden": "This room does not allow giving cards"
       },
       "title": "Card",
       "settingTitle": "Card settings",
@@ -789,6 +791,7 @@
       },
       "handOverview": {
         "hint": "Only public hands show their fronts. Drag a card from your hand onto a participant to give it to them.",
+        "hintGiveForbidden": "Only public hands show their fronts. This room does not allow giving cards.",
         "you": "(you)",
         "public": "Public",
         "private": "Private",
@@ -2446,6 +2449,10 @@
       "zocHint": "A piece is an enemy where the NPC mark differs from the one being moved, and the cells around it get in the way. A piece you cannot see holds no ground.",
       "diceBotHint": "The dice bot everyone joining the room starts on",
       "sectionControllerResources": "Values and resources on the remote",
+      "sectionHandCards": "Hand cards",
+      "allowsHandDraw": "Allow drawing a card from another participant's hand",
+      "allowsHandGive": "Allow giving a card to another participant",
+      "handCardsHint": "Turning one off also blocks it from the hand menus and drag and drop.",
       "controllerResourcesShowAll": "Show all",
       "controllerResourcesHideAll": "Hide all",
       "controllerResourcesHintAll": "Every value and resource the pieces in this room carry, by name. All of them are shown now. One you turn off leaves both the resource buttons and the piece cards of the remote.",

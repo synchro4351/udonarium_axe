@@ -735,7 +735,9 @@
         "fromParticipant": "{{name}}에게서 받은 카드",
         "receivedCard": "{{name}}에게서 「{{card}}」을(를) 받았습니다",
         "discardPairs": "페어 버리기",
-        "noPairs": "같은 숫자의 짝이 없습니다"
+        "noPairs": "같은 숫자의 짝이 없습니다",
+        "drawForbidden": "이 방에서는 다른 사람의 패에서 뽑을 수 없습니다",
+        "giveForbidden": "이 방에서는 카드를 건넬 수 없습니다"
       },
       "title": "카드",
       "settingTitle": "카드 설정",
@@ -789,6 +791,7 @@
       },
       "handOverview": {
         "hint": "공개된 패만 앞면이 보입니다. 내 패의 카드를 참가자 칸으로 끌어다 놓으면 그 카드를 건넬 수 있습니다.",
+        "hintGiveForbidden": "공개된 패만 앞면이 보입니다. 이 방에서는 카드를 건넬 수 없습니다.",
         "you": "(나)",
         "public": "공개 중",
         "private": "비공개",
@@ -2446,6 +2449,10 @@
       "zocHint": "NPC 여부가 다른 말을 적으로 보고, 그 주위 칸이 이동을 방해합니다. 자신에게 보이지 않는 말은 ZOC를 만들지 않습니다.",
       "diceBotHint": "방에 들어올 때 선택되는 다이스봇입니다",
       "sectionControllerResources": "리모컨에 표시할 수치와 리소스",
+      "sectionHandCards": "패",
+      "allowsHandDraw": "다른 참가자의 패에서 카드를 뽑을 수 있게 하기",
+      "allowsHandGive": "다른 참가자에게 카드를 건넬 수 있게 하기",
+      "handCardsHint": "끄면 패 메뉴나 드래그 조작으로도 할 수 없게 됩니다.",
       "controllerResourcesShowAll": "모두 표시",
       "controllerResourcesHideAll": "모두 끄기",
       "controllerResourcesHintAll": "방의 말이 가진 수치와 리소스를 이름별로 나열했습니다. 지금은 모두 표시합니다. 끈 항목은 리모컨의 리소스 조작에도 말 카드에도 나오지 않습니다.",

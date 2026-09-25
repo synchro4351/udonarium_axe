@@ -620,6 +620,44 @@ describe('RoomSettingsPanelComponent', () => {
     });
   });
 
+  describe('trading cards between hands', () => {
+    function toggle(testId: string): HTMLInputElement {
+      return (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>(`[data-testid="${testId}"]`)!;
+    }
+
+    it('allows both until the master forbids one, each on its own', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(component.allowsHandDraw).toBe(true);
+      expect(component.allowsHandGive).toBe(true);
+      expect(toggle('allows-hand-draw').checked).toBe(true);
+      expect(toggle('allows-hand-give').checked).toBe(true);
+
+      toggle('allows-hand-give').click();
+      fixture.detectChanges();
+
+      expect(Config.instance.allowsHandGive).toBe(false);
+      expect(Config.instance.allowsHandDraw).toBe(true);
+
+      component.allowsHandDraw = false;
+      expect(Config.instance.allowsHandDraw).toBe(false);
+    });
+
+    it('leaves them to the master', async () => {
+      PeerCursor.myCursor.role = PeerRole.Player;
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      component.allowsHandDraw = false;
+      component.allowsHandGive = false;
+
+      expect(toggle('allows-hand-draw').disabled).toBe(true);
+      expect(Config.instance.allowsHandDraw).toBe(true);
+      expect(Config.instance.allowsHandGive).toBe(true);
+    });
+  });
+
   it('does not throw when it is drawn', () => {
     expect(() => fixture.detectChanges()).not.toThrow();
   });

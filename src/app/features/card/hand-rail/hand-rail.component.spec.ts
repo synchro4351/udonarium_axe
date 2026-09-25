@@ -7,6 +7,7 @@ import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { Card, CardState } from '@axe/domain/card/card';
 import { handLocationOf } from '@axe/domain/card/hand-location';
+import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { HandRailComponent } from '@axe/features/card/hand-rail/hand-rail.component';
@@ -39,6 +40,8 @@ describe('HandRailComponent', () => {
 
   afterEach(() => {
     localStorage.removeItem('ui-hand-auto-sort');
+    Config.instance.allowsHandDraw = true;
+    Config.instance.allowsHandGive = true;
     PeerCursor.myCursor = null!;
   });
 
@@ -203,6 +206,32 @@ describe('HandRailComponent', () => {
     }
   });
 
+  it('opens no give menu and disables the give and draw buttons while the room forbids them', async () => {
+    const card = makeCard(handLocationOf('me'));
+    const open = vi.spyOn(TestBed.inject(ContextMenuService), 'open').mockImplementation(() => undefined);
+    Config.instance.allowsHandDraw = false;
+    Config.instance.allowsHandGive = false;
+    TestBed.inject(HandRailService).open();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+
+    try {
+      (component as unknown as { openGiveMenu: (c: Card, e: MouseEvent) => void }).openGiveMenu(
+        card,
+        new MouseEvent('contextmenu', { cancelable: true })
+      );
+      (component as unknown as { hovered: { set: (id: string) => void } }).hovered.set(card.identifier);
+      fixture.detectChanges();
+
+      expect(open).not.toHaveBeenCalled();
+      expect(root.querySelector<HTMLButtonElement>('[data-testid="hand-card-give"]')!.disabled).toBe(true);
+      expect(root.querySelector<HTMLButtonElement>('[data-testid="hand-draw-open"]')!.disabled).toBe(true);
+    } finally {
+      card.destroy();
+    }
+  });
+
   it('puts a card face up back onto the table and out of the hand', () => {
     const card = makeCard(handLocationOf('me'));
 
@@ -336,6 +365,20 @@ describe('HandRailComponent', () => {
       dropOver(card, [overviewSection('gone'), surface]);
 
       expect(card.location.name).toBe(handLocationOf('me'));
+      expect(open).not.toHaveBeenCalled();
+      card.destroy();
+    });
+
+    it('keeps the card, with no face menu, when dropped on a section while the room forbids giving', () => {
+      const card = makeCard(handLocationOf('me'));
+      const surface = document.createElement('div');
+      surface.dataset['surface'] = 'table';
+      Config.instance.allowsHandGive = false;
+
+      const open = dropOver(card, [overviewSection('other'), surface]);
+
+      expect(card.location.name).toBe(handLocationOf('me'));
+      expect(card.lastHandGiverUserId).toBe('');
       expect(open).not.toHaveBeenCalled();
       card.destroy();
     });

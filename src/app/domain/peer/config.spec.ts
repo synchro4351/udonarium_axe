@@ -231,6 +231,49 @@ describe('Config', () => {
     });
   });
 
+  describe('trading cards between hands', () => {
+    afterEach(() => {
+      Config.instance.allowsHandDraw = true;
+      Config.instance.allowsHandGive = true;
+    });
+
+    it('allows drawing and giving until the room forbids them', () => {
+      expect(Config.instance.allowsHandDraw).toBe(true);
+      expect(Config.instance.allowsHandGive).toBe(true);
+    });
+
+    it('forbids drawing and giving each on its own', () => {
+      Config.instance.allowsHandDraw = false;
+
+      expect(Config.instance.allowsHandDraw).toBe(false);
+      expect(Config.instance.allowsHandGive).toBe(true);
+
+      Config.instance.allowsHandDraw = true;
+      Config.instance.allowsHandGive = false;
+
+      expect(Config.instance.allowsHandDraw).toBe(true);
+      expect(Config.instance.allowsHandGive).toBe(false);
+    });
+
+    it('allows both for a room from an older build, which carries no attribute for them', () => {
+      Config.instance.allowsHandDraw = false;
+      Config.instance.allowsHandGive = false;
+
+      Config.instance.removeAttribute('_handDrawForbidden');
+      Config.instance.removeAttribute('_handGiveForbidden');
+
+      expect(Config.instance.allowsHandDraw).toBe(true);
+      expect(Config.instance.allowsHandGive).toBe(true);
+    });
+
+    it('reads a forbidding back the way a loaded room writes it', () => {
+      Config.instance.allowsHandGive = false;
+      Config.instance.setAttribute('_handGiveForbidden', `${Config.instance.getAttribute('_handGiveForbidden')}`);
+
+      expect(Config.instance.allowsHandGive).toBe(false);
+    });
+  });
+
   describe('system avatar', () => {
     it('starts with no picture of its own', () => {
       expect(Config.instance.systemAvatarIdentifier).toBe('');

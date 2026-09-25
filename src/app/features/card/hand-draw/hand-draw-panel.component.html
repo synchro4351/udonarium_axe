@@ -1,3 +1,8 @@
+@if (!allowsDraw()) {
+  <p class="text-ui-accent m-0 mb-2 text-xs font-bold" data-testid="hand-draw-forbidden">
+    {{ 'feature.card.hand.drawForbidden' | transloco }}
+  </p>
+}
 @if (selected(); as target) {
   <div class="mb-2 flex items-center gap-2">
     <button
@@ -18,7 +23,9 @@
     @for (card of cards(); track card.identifier) {
       <button
         type="button"
-        class="rounded-ui-sm border-ui-border-panel hover:border-ui-accent h-28 w-20 cursor-pointer overflow-hidden border border-solid bg-transparent p-0 transition-[border-color,transform] hover:-translate-y-1"
+        class="rounded-ui-sm border-ui-border-panel enabled:hover:border-ui-accent h-28 w-20 cursor-pointer overflow-hidden border border-solid bg-transparent p-0 transition-[border-color,transform] enabled:hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-50"
+        data-testid="hand-draw-card"
+        [disabled]="!allowsDraw()"
         (click)="draw(card)"
       >
         @if (target.handPublic) {

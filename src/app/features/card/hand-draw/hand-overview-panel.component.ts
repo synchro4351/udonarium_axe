@@ -55,8 +55,14 @@ export class HandOverviewPanelComponent {
     }));
   });
 
-  /** True while a card from your own hand is being dragged, so other sections show as drop targets. */
-  protected readonly dropping = computed(() => this.drag.card() !== null);
+  /** Whether the room lets you give cards away; while it does not, no section takes a dropped card. */
+  protected readonly allowsGive = computed(() => {
+    this.objectChange.versionOf('Config')();
+    return this.cardGame.allowsHandGive();
+  });
+
+  /** True while a card from your own hand is being dragged and may be given, so other sections show as drop targets. */
+  protected readonly dropping = computed(() => this.allowsGive() && this.drag.card() !== null);
 
   /** The URL of a card's back, which is all of a private hand that is shown. */
   backImageUrl(card: Card): string {

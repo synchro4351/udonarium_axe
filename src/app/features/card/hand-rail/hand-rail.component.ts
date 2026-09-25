@@ -149,6 +149,18 @@ export class HandRailComponent {
     return PeerCursor.myCursor?.handPublic ?? false;
   });
 
+  /** Whether the room lets you take cards from other hands, which the draw button follows. */
+  protected readonly allowsDraw = computed(() => {
+    this.objectChange.versionOf('Config')();
+    return this.cardGame.allowsHandDraw();
+  });
+
+  /** Whether the room lets you give cards away, by the menu or by dragging onto someone's hand. */
+  protected readonly allowsGive = computed(() => {
+    this.objectChange.versionOf('Config')();
+    return this.cardGame.allowsHandGive();
+  });
+
   protected readonly confirmPublic = signal(false);
 
   protected toggleHandPublic(): void {
@@ -285,6 +297,7 @@ export class HandRailComponent {
   protected readonly pairCount = computed(() => findTrumpPairs(this.cards()).length);
 
   protected openDrawPanel(): void {
+    if (!this.allowsDraw()) return;
     this.panelService.open(HandDrawPanelComponent, {
       title: this.t('feature.card.drawPanel.title'),
       width: 420,
@@ -307,7 +320,7 @@ export class HandRailComponent {
   protected openGiveMenu(card: Card, event: MouseEvent): void {
     event.preventDefault();
     event.stopPropagation();
-    if (!this.cards().includes(card)) return;
+    if (!this.allowsGive() || !this.cards().includes(card)) return;
     const recipients = this.cardGame.participants().filter((seat) => seat.userId !== this.cardGame.myUserId());
     if (recipients.length < 1) return;
     this.contextMenu.open(
@@ -347,6 +360,7 @@ export class HandRailComponent {
   }
 
   private recipientAt(targets: readonly HTMLElement[]): string {
+    if (!this.allowsGive()) return '';
     const participantIds = this.cardGame.participants().map((seat) => seat.userId);
     return handDropRecipientAt(targets, this.cardGame.myUserId(), participantIds);
   }

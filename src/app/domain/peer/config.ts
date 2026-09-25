@@ -35,6 +35,9 @@ export class Config extends ObjectNode implements InnerXml {
   @SyncVar('_hideSystemAvatar') private _hideSystemAvatar: string = '';
   @SyncVar('_showSpeakerAvatar') private _showSpeakerAvatar: string = '';
   @SyncVar('_controllerResources') private _controllerResources: string = '';
+  // Blank allows, so a room saved before these existed keeps letting hands trade cards.
+  @SyncVar('_handDrawForbidden') private _handDrawForbidden: string = '';
+  @SyncVar('_handGiveForbidden') private _handGiveForbidden: string = '';
 
   // How the round is taken, which is the room's own decision rather than a table's.
   @SyncVar('_turnOrderMode') private _turnOrderMode: string = '';
@@ -86,6 +89,22 @@ export class Config extends ObjectNode implements InnerXml {
   }
   set controllerResources(pick: ControllerResourcePick) {
     this._controllerResources = writeControllerResourcePick(pick);
+  }
+
+  /** Whether a participant may take a card from someone else's hand; allowed unless the room forbids it. */
+  get allowsHandDraw(): boolean {
+    return this._handDrawForbidden !== '1';
+  }
+  set allowsHandDraw(allowed: boolean) {
+    this._handDrawForbidden = allowed ? '' : '1';
+  }
+
+  /** Whether a participant may give a card from their hand to someone else; allowed unless the room forbids it. */
+  get allowsHandGive(): boolean {
+    return this._handGiveForbidden !== '1';
+  }
+  set allowsHandGive(allowed: boolean) {
+    this._handGiveForbidden = allowed ? '' : '1';
   }
 
   /** The room's master volume, shared by every peer; a change applied to the config updates the jukebox at once. */
