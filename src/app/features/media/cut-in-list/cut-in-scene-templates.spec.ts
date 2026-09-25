@@ -23,4 +23,15 @@ describe('cut-in scene examples', () => {
       cutIn.destroy();
     }
   });
+
+  it('offers visibly different cutout and fill patterns', () => {
+    const examples = CUT_IN_SCENE_TEMPLATES.map((kind) => createCutInSceneTemplate(kind, kind));
+    try {
+      const fills = examples.map((example) => example.scene!.layers[0]);
+      expect(new Set(fills.map((fill) => fill.clip)).size).toBeGreaterThan(4);
+      expect(new Set(fills.map((fill) => fill.fillShape)).size).toBeGreaterThan(3);
+    } finally {
+      for (const example of examples) example.destroy();
+    }
+  });
 });
