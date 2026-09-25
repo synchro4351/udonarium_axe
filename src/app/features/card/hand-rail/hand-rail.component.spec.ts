@@ -42,6 +42,7 @@ describe('HandRailComponent', () => {
     localStorage.removeItem('ui-hand-auto-sort');
     Config.instance.allowsHandDraw = true;
     Config.instance.allowsHandGive = true;
+    Config.instance.handVisibilityMode = 'choice';
     PeerCursor.myCursor = null!;
   });
 
@@ -85,6 +86,29 @@ describe('HandRailComponent', () => {
     expect(fixture.nativeElement.querySelector('.hand-rail')).toBeNull();
   });
 
+  it('opens on the first new hand card, then marks later hidden changes without reopening', async () => {
+    const rail = TestBed.inject(HandRailService);
+    fixture.detectChanges();
+    const first = makeCard('table');
+    first.toHand('me');
+    TestBed.inject(ObjectChangeService).notifyChanged(first.identifier);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(rail.isOpen()).toBe(true);
+
+    rail.close();
+    const second = makeCard('table');
+    second.toHand('me');
+    TestBed.inject(ObjectChangeService).notifyChanged(second.identifier);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(rail.isOpen()).toBe(false);
+    expect(rail.hasUpdate()).toBe(true);
+
+    rail.open();
+    expect(rail.hasUpdate()).toBe(false);
+  });
+
   it('draws the card text in your hand', async () => {
     const card = makeCard(handLocationOf('me'));
     card.faceText = '手札の文章';
@@ -110,6 +134,20 @@ describe('HandRailComponent', () => {
     controls.confirmHandPublic();
     expect(PeerCursor.myCursor.handPublic).toBe(true);
     controls.toggleHandPublic();
+    expect(PeerCursor.myCursor.handPublic).toBe(false);
+  });
+
+  it('locks the public status while the room fixes hand visibility', async () => {
+    Config.instance.handVisibilityMode = 'public';
+    TestBed.inject(HandRailService).open();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const status = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      '[data-testid="hand-public-status"]'
+    )!;
+    expect(status.disabled).toBe(true);
+    expect(status.getAttribute('aria-pressed')).toBe('true');
     expect(PeerCursor.myCursor.handPublic).toBe(false);
   });
 

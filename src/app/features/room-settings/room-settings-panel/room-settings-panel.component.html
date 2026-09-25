@@ -166,6 +166,20 @@
           <p class="text-ui-muted m-0 text-[11px] leading-relaxed">
             {{ 'feature.roomSettings.handCardsHint' | transloco }}
           </p>
+          <label class="text-ui-text flex flex-col gap-1 text-[13px]">
+            {{ 'feature.roomSettings.handVisibility' | transloco }}
+            <select
+              class="border-ui-border-panel bg-ui-elevated text-ui-text rounded-ui border border-solid px-2 py-1"
+              [(ngModel)]="handVisibilityMode"
+              name="handVisibilityMode"
+              data-testid="hand-visibility-mode"
+              [disabled]="isSharedReadOnly()"
+            >
+              <option value="choice">{{ 'feature.roomSettings.handVisibilityChoice' | transloco }}</option>
+              <option value="public">{{ 'feature.roomSettings.handVisibilityPublic' | transloco }}</option>
+              <option value="private">{{ 'feature.roomSettings.handVisibilityPrivate' | transloco }}</option>
+            </select>
+          </label>
         </div>
       </div>
     }

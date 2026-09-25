@@ -688,6 +688,14 @@ export class RoomSettingsPanelComponent {
     if (!this.isSharedReadOnly()) this.config.allowsHandGive = allowed;
   }
 
+  get handVisibilityMode(): 'choice' | 'public' | 'private' {
+    this.objectChange.versionOf('Config')();
+    return this.config.handVisibilityMode;
+  }
+  set handVisibilityMode(mode: 'choice' | 'public' | 'private') {
+    if (!this.isSharedReadOnly()) this.config.handVisibilityMode = mode;
+  }
+
   /**
    * Loads a dice bot as soon as it is picked, by fetching its help text in the background; the text
    * itself is not used here.

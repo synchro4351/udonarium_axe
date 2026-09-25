@@ -22,6 +22,7 @@ export class UiFabSubmenuButtonComponent {
   /** Whether something the button shows or hides is out; left unsaid when null. */
   readonly lit = input<boolean | null>(null);
   readonly disabled = input(false);
+  readonly badge = input(false);
   readonly testId = input<string | null>(null);
 
   readonly press = output<MouseEvent>();

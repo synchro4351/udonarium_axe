@@ -40,6 +40,7 @@ export class HandDrawPanelComponent {
   readonly targets = computed<HandDrawTarget[]>(() => {
     this.objectChange.collectionOf(Card.aliasName)();
     this.objectChange.collectionOf(PeerCursor.aliasName)();
+    this.objectChange.versionOf('Config')();
     const myUserId = this.cardGame.myUserId();
     const cursors = this.objectStore.getObjects<PeerCursor>(PeerCursor);
     for (const cursor of cursors) this.objectChange.versionOf(cursor.identifier)();
@@ -50,7 +51,7 @@ export class HandDrawPanelComponent {
         userId: cursor.userId,
         name: cursor.name,
         count: this.cardGame.handCardsOf(cursor.userId).length,
-        handPublic: PeerCursor.findByUserId(cursor.userId)?.handPublic ?? false,
+        handPublic: this.cardGame.handPublicOf(cursor.userId),
       }))
       .filter((target) => target.count > 0);
   });

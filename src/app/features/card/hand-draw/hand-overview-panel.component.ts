@@ -39,6 +39,7 @@ export class HandOverviewPanelComponent {
   readonly sections = computed<HandOverviewSection[]>(() => {
     this.objectChange.collectionOf(Card.aliasName)();
     this.objectChange.collectionOf(PeerCursor.aliasName)();
+    this.objectChange.versionOf('Config')();
     this.objectChange.trackMyCursor();
     for (const cursor of this.objectStore.getObjects<PeerCursor>(PeerCursor)) {
       this.objectChange.versionOf(cursor.identifier)();
@@ -50,7 +51,7 @@ export class HandOverviewPanelComponent {
       userId: seat.userId,
       name: seat.name,
       isSelf: seat.userId === myUserId,
-      handPublic: PeerCursor.findByUserId(seat.userId)?.handPublic ?? false,
+      handPublic: this.cardGame.handPublicOf(seat.userId),
       cards: this.cardGame.handCardsOf(seat.userId),
     }));
   });

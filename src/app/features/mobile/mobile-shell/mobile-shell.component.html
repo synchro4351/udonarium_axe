@@ -34,12 +34,15 @@
       {{ 'feature.mobile.characters' | transloco }}
     </button>
     <button
-      class="text-ui-muted active:bg-ui-accent-bg rounded-ui flex flex-1 flex-col items-center gap-0.5 border-none bg-transparent px-1 py-1.5 text-[0.65rem] leading-none shadow-none transition-colors"
+      class="text-ui-muted active:bg-ui-accent-bg rounded-ui relative flex flex-1 flex-col items-center gap-0.5 border-none bg-transparent px-1 py-1.5 text-[0.65rem] leading-none shadow-none transition-colors"
       [class.text-ui-accent]="isMenuOpen()"
       [attr.aria-expanded]="isMenuOpen()"
       (click)="toggleMenu()"
     >
       <i class="material-icons text-[22px]!">{{ isMenuOpen() ? 'close' : 'menu' }}</i>
+      @if (handRail.hasUpdate()) {
+        <span class="absolute top-1 right-1/3 size-2 rounded-full bg-red-500" aria-hidden="true"></span>
+      }
       {{ 'feature.mobile.menu' | transloco }}
     </button>
   </nav>
@@ -89,10 +92,13 @@
               </label>
             } @else {
               <button
-                class="text-ui-text active:bg-ui-accent-bg active:text-ui-accent rounded-ui flex min-h-15 w-full flex-col items-center justify-center gap-1 border-none bg-transparent px-1 py-1.5 text-[0.68rem] leading-tight shadow-none transition-colors"
+                class="text-ui-text active:bg-ui-accent-bg active:text-ui-accent rounded-ui relative flex min-h-15 w-full flex-col items-center justify-center gap-1 border-none bg-transparent px-1 py-1.5 text-[0.68rem] leading-tight shadow-none transition-colors"
                 (click)="runMenuAction(item.action)"
               >
                 <i class="material-icons text-ui-muted text-[22px]!">{{ item.icon }}</i>
+                @if (item.action === 'hand' && handRail.hasUpdate()) {
+                  <span class="absolute top-1 right-1/3 size-2 rounded-full bg-red-500" aria-hidden="true"></span>
+                }
                 <span class="text-center">{{ item.labelKey | transloco }}</span>
               </button>
             }

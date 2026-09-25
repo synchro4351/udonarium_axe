@@ -53,6 +53,7 @@ describe('HandOverviewPanelComponent', () => {
     fixture?.destroy();
     TestBed.inject(HandDragService).end();
     Config.instance.allowsHandGive = true;
+    Config.instance.handVisibilityMode = 'choice';
     for (const object of created.splice(0)) object.destroy();
     for (const cursor of ObjectStore.instance.getObjects<PeerCursor>(PeerCursor)) {
       if (cursor !== PeerCursor.myCursor) ObjectStore.instance.delete(cursor, false);
@@ -104,6 +105,17 @@ describe('HandOverviewPanelComponent', () => {
     TestBed.inject(ObjectChangeService).notifyChanged(other.identifier);
     fixture.detectChanges();
     expect(sectionOf('other').querySelector('card-face-preview')).toBeNull();
+  });
+
+  it('shows only backs when the room forces private hands, even if a cursor is public', () => {
+    const other = peer('other', 'あいて');
+    card('s01', 'other');
+    other.handPublic = true;
+    Config.instance.handVisibilityMode = 'private';
+    fixture.detectChanges();
+
+    expect(sectionOf('other').querySelector('card-face-preview')).toBeNull();
+    expect(sectionOf('other').querySelector('[title]')).toBeNull();
   });
 
   it('only views: clicking a card leaves it in its hand', () => {

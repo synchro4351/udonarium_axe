@@ -38,6 +38,7 @@ export class Config extends ObjectNode implements InnerXml {
   // Blank allows, so a room saved before these existed keeps letting hands trade cards.
   @SyncVar('_handDrawForbidden') private _handDrawForbidden: string = '';
   @SyncVar('_handGiveForbidden') private _handGiveForbidden: string = '';
+  @SyncVar('_handVisibilityMode') private _handVisibilityMode: string = '';
 
   // How the round is taken, which is the room's own decision rather than a table's.
   @SyncVar('_turnOrderMode') private _turnOrderMode: string = '';
@@ -105,6 +106,16 @@ export class Config extends ObjectNode implements InnerXml {
   }
   set allowsHandGive(allowed: boolean) {
     this._handGiveForbidden = allowed ? '' : '1';
+  }
+
+  /** How this room shows hands; missing values keep the participant's choice. */
+  get handVisibilityMode(): 'choice' | 'public' | 'private' {
+    return this._handVisibilityMode === 'public' || this._handVisibilityMode === 'private'
+      ? this._handVisibilityMode
+      : 'choice';
+  }
+  set handVisibilityMode(mode: 'choice' | 'public' | 'private') {
+    this._handVisibilityMode = mode === 'choice' ? '' : mode;
   }
 
   /** The room's master volume, shared by every peer; a change applied to the config updates the jukebox at once. */
