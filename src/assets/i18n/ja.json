@@ -525,7 +525,19 @@
         "sceneTemplatePick": "見本から作成",
         "sceneTemplate_battle": "戦闘開始",
         "sceneTemplate_success": "成功！",
-        "sceneTemplate_transition": "場面転換"
+        "sceneTemplate_transition": "場面転換",
+        "sceneTemplate_like": "いいね！",
+        "sceneTemplate_bouquet": "💐",
+        "sceneTemplate_heart": "❤",
+        "sceneTemplate_shock": "ガーン",
+        "sceneTemplate_critical": "Critical!",
+        "sceneTemplate_fumble": "Fumble!",
+        "sceneTemplate_victory": "勝利！",
+        "sceneTemplate_sanCheck": "SANチェック",
+        "sceneTemplate_levelUp": "Level UP",
+        "sceneTemplate_questClear": "Quest Clear",
+        "sceneTemplate_rebuttal": "論破",
+        "sceneTemplate_ending": "おしまい"
       },
       "cutInEditor": {
         "tabBasic": "基本設定",

@@ -525,7 +525,19 @@
         "sceneTemplatePick": "Create from example",
         "sceneTemplate_battle": "Battle begins",
         "sceneTemplate_success": "Success!",
-        "sceneTemplate_transition": "Scene transition"
+        "sceneTemplate_transition": "Scene transition",
+        "sceneTemplate_like": "Like!",
+        "sceneTemplate_bouquet": "💐",
+        "sceneTemplate_heart": "❤",
+        "sceneTemplate_shock": "Oh no!",
+        "sceneTemplate_critical": "Critical!",
+        "sceneTemplate_fumble": "Fumble!",
+        "sceneTemplate_victory": "Victory!",
+        "sceneTemplate_sanCheck": "SAN check",
+        "sceneTemplate_levelUp": "Level UP",
+        "sceneTemplate_questClear": "Quest Clear",
+        "sceneTemplate_rebuttal": "Objection!",
+        "sceneTemplate_ending": "The end"
       },
       "cutInEditor": {
         "tabBasic": "Settings",

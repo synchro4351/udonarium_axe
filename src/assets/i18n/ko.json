@@ -525,7 +525,19 @@
         "sceneTemplatePick": "예제로 만들기",
         "sceneTemplate_battle": "전투 시작",
         "sceneTemplate_success": "성공!",
-        "sceneTemplate_transition": "장면 전환"
+        "sceneTemplate_transition": "장면 전환",
+        "sceneTemplate_like": "좋아요!",
+        "sceneTemplate_bouquet": "💐",
+        "sceneTemplate_heart": "❤",
+        "sceneTemplate_shock": "충격!",
+        "sceneTemplate_critical": "Critical!",
+        "sceneTemplate_fumble": "Fumble!",
+        "sceneTemplate_victory": "승리!",
+        "sceneTemplate_sanCheck": "SAN 체크",
+        "sceneTemplate_levelUp": "Level UP",
+        "sceneTemplate_questClear": "Quest Clear",
+        "sceneTemplate_rebuttal": "반론!",
+        "sceneTemplate_ending": "끝"
       },
       "cutInEditor": {
         "tabBasic": "기본 설정",
