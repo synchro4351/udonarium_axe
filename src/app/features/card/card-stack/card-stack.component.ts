@@ -137,6 +137,7 @@ export class CardStackComponent {
    */
   get cards(): readonly Card[] {
     this.cardsVersion();
+    this.objectChange.versionOf(this.cardStack().identifier)();
     return this.cardStack().cards;
   }
   /** Whether the stack has no cards left, which shrinks its frame to a fixed size. */
@@ -185,6 +186,7 @@ export class CardStackComponent {
 
   protected readonly stackThicknessPx = computed<number>(() => {
     this.cardsVersion();
+    this.objectChange.versionOf(this.cardStack().identifier)();
     if (this.tabletopService.mode2d() || this.isPoster()) return 0;
     const count = this.cardStack().cards.length;
     if (count <= 1) return 0;
@@ -193,6 +195,7 @@ export class CardStackComponent {
 
   protected readonly stackLayers = computed<readonly { z: number; bg: string }[]>(() => {
     this.cardsVersion();
+    this.objectChange.versionOf(this.cardStack().identifier)();
     if (this.tabletopService.mode2d() || this.isPoster()) return [];
     const count = this.cardStack().cards.length;
     if (count <= 1) return [];

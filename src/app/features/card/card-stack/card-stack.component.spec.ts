@@ -218,6 +218,22 @@ describe('CardStackComponent', () => {
       }
     });
 
+    it('updates the count and thickness when another card joins the stack', async () => {
+      const stack = makeStackWithCards(1);
+      fixture.componentRef.setInput('cardStack', stack);
+      try {
+        expect(component.cards).toHaveLength(1);
+        expect(readThickness()).toBe(0);
+
+        stack.putOnBottom(Card.create('added', '', '', 2));
+        await fixture.whenStable();
+        expect(component.cards).toHaveLength(2);
+        expect(readThickness()).toBe(2);
+      } finally {
+        stack.destroy();
+      }
+    });
+
     it('puts a layer between each pair of cards, up to a limit', () => {
       const stack5 = makeStackWithCards(5);
       fixture.componentRef.setInput('cardStack', stack5);
