@@ -126,6 +126,7 @@ export class CutInListComponent {
     if (!this.canEditCutIns) return;
     const cutIn = new CutIn();
     cutIn.name = this.t('feature.media.cutIn.defaultName');
+    cutIn.frameless = true;
     cutIn.imageIdentifier = 'testTableBackgroundImage_image';
     cutIn.initialize();
     this.selectCutIn(cutIn.identifier);

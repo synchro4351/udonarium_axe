@@ -34,6 +34,13 @@ describe('CutInListComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('creates new cut-ins without a frame', () => {
+    component.createCutIn();
+
+    expect(component.selectedCutIn?.frameless).toBe(true);
+    component.selectedCutIn?.destroy();
+  });
+
   it('creates a new editable scene from an example', async () => {
     fixture.detectChanges();
     await fixture.whenStable();
