@@ -7,6 +7,8 @@ export class HandDragService {
   readonly x = signal(0);
   readonly y = signal(0);
   readonly tableCard = signal<Card | null>(null);
+  /** The participant whose hand overview section the carried card is over, empty when none. */
+  readonly dropUserId = signal('');
 
   /**
    * Starts carrying a card out of the hand rail, with the drag ghost drawn at the given viewport
@@ -27,6 +29,7 @@ export class HandDragService {
   /** Stops carrying a hand card, which takes the drag ghost away. */
   end(): void {
     this.card.set(null);
+    this.dropUserId.set('');
   }
 
   /**

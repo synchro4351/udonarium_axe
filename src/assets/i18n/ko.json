@@ -717,8 +717,8 @@
         "title": "패 {{count}}장",
         "unnamed": "(이름 없음)",
         "empty": "패가 없습니다",
-        "playFaceUp": "앞면으로 내려놓기",
-        "playFaceDown": "뒷면으로 내려놓기",
+        "playFaceUp": "앞면으로 놓기",
+        "playFaceDown": "엎어 놓기",
         "drawFromOther": "상대의 패에서 뽑기",
         "giveCard": "카드 건네기",
         "giveTo": "{{name}}에게 건네기",
@@ -727,7 +727,7 @@
         "privateStatus": "패 비공개",
         "publicStatus": "패 공개 중",
         "confirmPublic": "모두에게 공개",
-        "viewPublicHands": "공개된 패 보기",
+        "viewPublicHands": "모두의 패 보기",
         "chooseFaceAfterDrop": "이 위치에 카드 내기(취소하면 패에 유지)",
         "public": "공개된 패",
         "autoSort": "무늬와 숫자 / 이름순 정렬",
@@ -785,9 +785,16 @@
         "noPlayers": "패를 가진 참가자가 없습니다",
         "cardCount": "{{count}}장",
         "back": "상대 다시 고르기",
-        "pickCard": "뽑을 카드를 골라 주세요",
-        "pickPublicHand": "볼 공개 패를 골라 주세요",
-        "viewPublicHand": "공개된 패 보기(카드는 이동하지 않음)"
+        "pickCard": "뽑을 카드를 골라 주세요"
+      },
+      "handOverview": {
+        "hint": "공개된 패만 앞면이 보입니다. 내 패의 카드를 참가자 칸으로 끌어다 놓으면 그 카드를 건넬 수 있습니다.",
+        "you": "(나)",
+        "public": "공개 중",
+        "private": "비공개",
+        "empty": "패 없음",
+        "dropHere": "여기에 놓으면 {{name}}에게 건넵니다",
+        "noPlayers": "패를 가질 수 있는 참가자가 없습니다"
       },
       "deckDialog": {
         "hint": "같은 태그가 붙은 이미지 1장당 카드 1장을 만들어 하나의 덱으로 묶습니다.",

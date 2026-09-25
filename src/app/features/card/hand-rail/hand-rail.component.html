@@ -17,7 +17,8 @@
           type="button"
           [title]="'feature.card.hand.viewPublicHands' | transloco"
           [attr.aria-label]="'feature.card.hand.viewPublicHands' | transloco"
-          (click)="openPublicHands()"
+          data-testid="hand-overview-open"
+          (click)="openHandOverview()"
         >
           <i class="material-icons text-[14px]!">visibility</i>
         </button>
@@ -52,28 +53,24 @@
     </div>
 
     <div class="border-ui-border-panel flex items-center justify-center gap-2 border-b border-solid px-2 py-1">
-      <span
-        class="rounded-ui-sm px-2 py-0.5 text-[11px] font-bold"
-        [class.bg-red-700]="handPublic()"
-        [class.text-white]="handPublic()"
-        [class.bg-ui-elevated]="!handPublic()"
-        data-testid="hand-public-status"
-      >
-        {{ (handPublic() ? 'feature.card.hand.publicStatus' : 'feature.card.hand.privateStatus') | transloco }}
-      </span>
       <button
-        class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5.5 items-center justify-center border-none bg-transparent px-2"
-        [class.text-ui-accent]="handPublic()"
-        type="button"
-        data-testid="hand-public-toggle"
-        [attr.aria-pressed]="handPublic()"
-        [title]="(handPublic() ? 'feature.card.hand.makePrivate' : 'feature.card.hand.makePublic') | transloco"
-        [attr.aria-label]="
-          (handPublic() ? 'feature.card.hand.makePrivate' : 'feature.card.hand.makePublic') | transloco
+        class="rounded-ui-sm focus-visible:ring-ui-accent m-0 inline-flex h-5.5 cursor-pointer items-center gap-1 border border-solid px-2 text-[11px] font-bold transition-colors outline-none focus-visible:ring-2"
+        [ngClass]="
+          handPublic()
+            ? 'border-red-500 bg-red-700 text-white hover:bg-red-600'
+            : 'border-ui-border-panel bg-ui-elevated text-ui-text hover:bg-ui-hover'
         "
+        type="button"
+        data-testid="hand-public-status"
+        [attr.aria-pressed]="handPublic()"
+        [attr.aria-expanded]="handPublic() ? null : confirmPublic()"
+        [title]="(handPublic() ? 'feature.card.hand.makePrivate' : 'feature.card.hand.makePublic') | transloco"
         (click)="toggleHandPublic()"
       >
-        <i class="material-icons text-[14px]!">{{ handPublic() ? 'visibility' : 'visibility_off' }}</i>
+        <i class="material-icons text-[14px]!" aria-hidden="true">{{
+          handPublic() ? 'visibility' : 'visibility_off'
+        }}</i>
+        {{ (handPublic() ? 'feature.card.hand.publicStatus' : 'feature.card.hand.privateStatus') | transloco }}
       </button>
       @if (confirmPublic()) {
         <button

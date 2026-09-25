@@ -110,6 +110,32 @@ describe('HandRailComponent', () => {
     expect(PeerCursor.myCursor.handPublic).toBe(false);
   });
 
+  it('toggles hand visibility from the visible status itself', async () => {
+    TestBed.inject(HandRailService).open();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    const status = () => root.querySelector<HTMLButtonElement>('[data-testid="hand-public-status"]')!;
+
+    expect(status().tagName).toBe('BUTTON');
+    expect(status().getAttribute('aria-pressed')).toBe('false');
+    status().click();
+    fixture.detectChanges();
+    expect(PeerCursor.myCursor.handPublic).toBe(false);
+    expect(status().getAttribute('aria-expanded')).toBe('true');
+
+    root.querySelector<HTMLButtonElement>('[data-testid="hand-public-confirm"]')!.click();
+    fixture.detectChanges();
+    expect(PeerCursor.myCursor.handPublic).toBe(true);
+    expect(status().getAttribute('aria-pressed')).toBe('true');
+    expect(root.querySelector('[data-testid="hand-public-confirm"]')).toBeNull();
+
+    status().click();
+    fixture.detectChanges();
+    expect(PeerCursor.myCursor.handPublic).toBe(false);
+    expect(root.querySelector('[data-testid="hand-public-confirm"]')).toBeNull();
+  });
+
   it('keeps automatic sorting local and returns to manual order when rearranged', () => {
     const first = makeCard(handLocationOf('me'));
     const second = makeCard(handLocationOf('me'));
@@ -232,6 +258,96 @@ describe('HandRailComponent', () => {
       if (originalElementsFromPoint) Object.defineProperty(document, 'elementsFromPoint', originalElementsFromPoint);
       else Reflect.deleteProperty(document, 'elementsFromPoint');
     }
+  });
+
+  describe('dropping onto the hand overview', () => {
+    let other: PeerCursor;
+    let restoreElementsFromPoint: () => void;
+
+    function dropOver(card: Card, elements: HTMLElement[], dragging = true) {
+      const open = vi.spyOn(TestBed.inject(ContextMenuService), 'open').mockImplementation(() => undefined);
+      Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: () => elements });
+      const controls = component as unknown as {
+        activePointerId: number;
+        dragPending: { card: Card; startX: number; startY: number; dragging: boolean };
+        onCardPointerUp: (event: PointerEvent) => void;
+      };
+      controls.activePointerId = 1;
+      controls.dragPending = { card, startX: 0, startY: 0, dragging };
+      controls.onCardPointerUp({
+        pointerId: 1,
+        clientX: 10,
+        clientY: 10,
+        currentTarget: document.createElement('div'),
+      } as unknown as PointerEvent);
+      return open;
+    }
+
+    function overviewSection(userId: string): HTMLElement {
+      const host = document.createElement('hand-overview-panel');
+      const section = document.createElement('section');
+      section.setAttribute('data-hand-drop-user-id', userId);
+      host.appendChild(section);
+      return section;
+    }
+
+    beforeEach(() => {
+      const original = Object.getOwnPropertyDescriptor(document, 'elementsFromPoint');
+      restoreElementsFromPoint = () => {
+        if (original) Object.defineProperty(document, 'elementsFromPoint', original);
+        else Reflect.deleteProperty(document, 'elementsFromPoint');
+      };
+      other = new PeerCursor();
+      other.userId = 'other';
+      other.name = 'あいて';
+      other.role = PeerRole.Player;
+      other.initialize();
+      vi.spyOn(TestBed.inject(ChatMessageService), 'sendSystemMessage').mockImplementation(() => null!);
+    });
+
+    afterEach(() => {
+      restoreElementsFromPoint();
+      other.destroy();
+      vi.restoreAllMocks();
+    });
+
+    it('gives exactly the dragged card to the participant it was dropped on', () => {
+      const dragged = makeCard(handLocationOf('me'));
+      const kept = makeCard(handLocationOf('me'));
+      const surface = document.createElement('div');
+      surface.dataset['surface'] = 'table';
+
+      const open = dropOver(dragged, [overviewSection('other'), surface]);
+
+      expect(dragged.location.name).toBe(handLocationOf('other'));
+      expect(dragged.lastHandGiverUserId).toBe('me');
+      expect(kept.location.name).toBe(handLocationOf('me'));
+      expect(open).not.toHaveBeenCalled();
+      dragged.destroy();
+      kept.destroy();
+    });
+
+    it('keeps the card when dropped on your own section or on someone who has left', () => {
+      const card = makeCard(handLocationOf('me'));
+      const surface = document.createElement('div');
+      surface.dataset['surface'] = 'table';
+
+      const open = dropOver(card, [overviewSection('me'), surface]);
+      dropOver(card, [overviewSection('gone'), surface]);
+
+      expect(card.location.name).toBe(handLocationOf('me'));
+      expect(open).not.toHaveBeenCalled();
+      card.destroy();
+    });
+
+    it('does not give a card on a plain click over a section', () => {
+      const card = makeCard(handLocationOf('me'));
+
+      dropOver(card, [overviewSection('other')], false);
+
+      expect(card.location.name).toBe(handLocationOf('me'));
+      card.destroy();
+    });
   });
 
   it('moves the view to the card just played', () => {

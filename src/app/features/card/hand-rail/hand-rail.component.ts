@@ -28,9 +28,11 @@ import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
 import { HandDrawPanelComponent } from '@axe/features/card/hand-draw/hand-draw-panel.component';
+import { HandOverviewPanelComponent } from '@axe/features/card/hand-draw/hand-overview-panel.component';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
 import { autoSortHandCards, reorderHandCards, selectHandCards } from '@axe/features/card/hand-rail/hand-cards';
 import { HandDragService } from '@axe/features/card/hand-rail/hand-drag.service';
+import { handDropRecipientAt } from '@axe/features/card/hand-rail/hand-drop-target';
 import {
   fitHandFanOptions,
   HAND_CARD_HEIGHT_PX,
@@ -290,13 +292,12 @@ export class HandRailComponent {
     });
   }
 
-  protected openPublicHands(): void {
-    const panel = this.panelService.open(HandDrawPanelComponent, {
+  protected openHandOverview(): void {
+    this.panelService.open(HandOverviewPanelComponent, {
       title: this.t('feature.card.hand.viewPublicHands'),
-      width: 420,
-      height: 380,
+      width: 460,
+      height: 420,
     });
-    panel.viewOnly.set(true);
   }
 
   protected discardPairs(): void {
@@ -342,6 +343,12 @@ export class HandRailComponent {
       this.drag.move(event.clientX, event.clientY);
     }
     this.insertAt.set(this.insertIndexAt(event.clientX, event.clientY));
+    this.drag.dropUserId.set(this.recipientAt(elementsAt(event.clientX, event.clientY)));
+  }
+
+  private recipientAt(targets: readonly HTMLElement[]): string {
+    const participantIds = this.cardGame.participants().map((seat) => seat.userId);
+    return handDropRecipientAt(targets, this.cardGame.myUserId(), participantIds);
   }
 
   private insertIndexAt(clientX: number, clientY: number): number | null {
@@ -378,6 +385,14 @@ export class HandRailComponent {
       if (insertAt !== null) this.reorderTo(pending.card, insertAt);
       return;
     }
+
+    const recipient = this.recipientAt(targets);
+    if (recipient) {
+      this.cardGame.giveFromHand(pending.card, recipient);
+      return;
+    }
+    // Your own section, or one whose participant has left, is not a table under the overview.
+    if (targets.some((element) => element.closest('hand-overview-panel'))) return;
 
     const surface = targets.map((element) => element.closest<HTMLElement>('[data-surface]')).find(Boolean);
     if (!surface) return;

@@ -717,8 +717,8 @@
         "title": "Hand ({{count}})",
         "unnamed": "(unnamed)",
         "empty": "Your hand is empty",
-        "playFaceUp": "Play face up",
-        "playFaceDown": "Play face down",
+        "playFaceUp": "Face up",
+        "playFaceDown": "Face down",
         "drawFromOther": "Draw from a hand",
         "giveCard": "Give card",
         "giveTo": "Give to {{name}}",
@@ -727,7 +727,7 @@
         "privateStatus": "Hand private",
         "publicStatus": "Hand public",
         "confirmPublic": "Show to everyone",
-        "viewPublicHands": "View public hands",
+        "viewPublicHands": "View everyone's hands",
         "chooseFaceAfterDrop": "Play at this position (cancel to keep in hand)",
         "public": "Public hand",
         "autoSort": "Sort by suit and number / name",
@@ -785,9 +785,16 @@
         "noPlayers": "Nobody is holding cards",
         "cardCount": "{{count}} cards",
         "back": "Pick another player",
-        "pickCard": "Pick a card to draw",
-        "pickPublicHand": "Pick a public hand to view",
-        "viewPublicHand": "Viewing public hand (cards cannot be moved)"
+        "pickCard": "Pick a card to draw"
+      },
+      "handOverview": {
+        "hint": "Only public hands show their fronts. Drag a card from your hand onto a participant to give it to them.",
+        "you": "(you)",
+        "public": "Public",
+        "private": "Private",
+        "empty": "No cards",
+        "dropHere": "Release to give to {{name}}",
+        "noPlayers": "Nobody can hold cards"
       },
       "deckDialog": {
         "hint": "Makes one card per image carrying the tag, gathered into a single deck.",
