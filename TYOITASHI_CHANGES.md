@@ -32,9 +32,15 @@
 
 直前の渡し主（次版）：[da07bbd8](https://github.com/synchro4351/udonarium_axe/commit/da07bbd8)、[消去経路修正 15189c35](https://github.com/synchro4351/udonarium_axe/commit/15189c35)。Cardに渡し主ID・名前の保存・同期項目を追加。明示的な受け渡しで更新し、手札から出ると消します。旧セーブには項目がありません。これらは[同じ機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/card-hand-visibility-sort-provenance)の後続コミットで、929eec63以降の私家機能を含みます。
 
+短いカットイン見本（次版）：[f137d9d1](https://github.com/synchro4351/udonarium_axe/commit/f137d9d1)。15189c35起点。既存の見本3種を短縮し、透明背景の見本12種を追加。既存のシーン・レイヤーとアニメーションプリセットを使い、保存・同期形式は変えません。
+
+手札公開・場への配置の操作改善（次版）：[db74ee87](https://github.com/synchro4351/udonarium_axe/commit/db74ee87)。f137d9d1の後続。既存のPeerCursorの公開値とCard操作を使用。公開前の確認、閲覧専用画面、渡し主アイコンのカード外表示、ドロップ後の表裏選択を追加。新しい保存・同期項目はありません。
+
+山札の表示更新（次版）：[5e9f3ee2](https://github.com/synchro4351/udonarium_axe/commit/5e9f3ee2)。db74ee87の後続。CardStackの変更通知を枚数・厚さ表示へ接続。通信自体の遅延原因は未特定です。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-card-usability)には、この後にユーザー確認表の文書コミット6089e285も含みます。
+
 ## 検証と制限
 
-- 現在の次版候補は全体924ファイル／12,540件成功・1件skip、production build成功（機能ブランチの検証済みコミットと同一）。
+- 現在の次版候補は全体924ファイル／12,555件成功・1件skip、production build成功（機能ブランチの検証済みコミットと同一）。
 - カード追加機能の2クライアント実動作・画面目視・セーブ再読込は未確認。自動テストの成功と区別しています。
 - エフェクト選択欄とカットイン見本の実画面・演出は目視未確認。
 - フォント選択・YouTube表示・ポインター入力を組み合わせた92件は、r1で直接Vitest・Angular経由の両方に成功。自動再生追加は対象22件を両経路で確認。
