@@ -103,6 +103,13 @@ export class CardGameService {
     return this.objectStore.get<Config>('Config')?.allowsHandGive ?? true;
   }
 
+  /** Room rules override a participant's own public-hand choice without changing their cursor. */
+  handPublicOf(userId: string): boolean {
+    const mode = this.objectStore.get<Config>('Config')?.handVisibilityMode ?? 'choice';
+    if (mode !== 'choice') return mode === 'public';
+    return PeerCursor.findByUserId(userId)?.handPublic ?? false;
+  }
+
   /**
    * Takes a card from someone else's hand into your own and says so in chat.
    *

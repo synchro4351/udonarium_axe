@@ -274,6 +274,15 @@ describe('Config', () => {
     });
   });
 
+  it('keeps old rooms on participant choice and reads a forced visibility from saved attributes', () => {
+    Config.instance.handVisibilityMode = 'public';
+    Config.instance.setAttribute('_handVisibilityMode', `${Config.instance.getAttribute('_handVisibilityMode')}`);
+    expect(Config.instance.handVisibilityMode).toBe('public');
+
+    Config.instance.removeAttribute('_handVisibilityMode');
+    expect(Config.instance.handVisibilityMode).toBe('choice');
+  });
+
   describe('system avatar', () => {
     it('starts with no picture of its own', () => {
       expect(Config.instance.systemAvatarIdentifier).toBe('');

@@ -64,9 +64,17 @@
         "
         type="button"
         data-testid="hand-public-status"
+        [disabled]="!handVisibilityChoice()"
         [attr.aria-pressed]="handPublic()"
         [attr.aria-expanded]="handPublic() ? null : confirmPublic()"
-        [title]="(handPublic() ? 'feature.card.hand.makePrivate' : 'feature.card.hand.makePublic') | transloco"
+        [title]="
+          (handVisibilityChoice()
+            ? handPublic()
+              ? 'feature.card.hand.makePrivate'
+              : 'feature.card.hand.makePublic'
+            : 'feature.card.hand.visibilityRoomControlled'
+          ) | transloco
+        "
         (click)="toggleHandPublic()"
       >
         <i class="material-icons text-[14px]!" aria-hidden="true">{{
@@ -74,7 +82,7 @@
         }}</i>
         {{ (handPublic() ? 'feature.card.hand.publicStatus' : 'feature.card.hand.privateStatus') | transloco }}
       </button>
-      @if (confirmPublic()) {
+      @if (confirmPublic() && handVisibilityChoice()) {
         <button
           class="rounded-ui-sm m-0 border border-solid border-red-500 bg-red-700 px-2 py-0.5 text-[11px] font-bold text-white"
           type="button"

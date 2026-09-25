@@ -66,6 +66,9 @@
               (click)="chooseFab(entry, $event)"
             >
               <i class="material-icons">{{ entry.icon }}</i>
+              @if (entry.key === 'gameResources' && handRail.hasUpdate()) {
+                <span class="absolute top-1 right-1 size-2 rounded-full bg-red-500" aria-hidden="true"></span>
+              }
             </li>
           }
         </ul>
@@ -147,6 +150,7 @@
                     [icon]="entry.icon"
                     [label]="entry.labelKey | transloco"
                     [lit]="fabEntryLit(entry)"
+                    [badge]="entry.key === 'hand' && handRail.hasUpdate()"
                     [testId]="'fab-entry-' + entry.key"
                     (press)="chooseFromFabSubmenu(entry)"
                   />
@@ -165,6 +169,12 @@
         [attr.aria-expanded]="fabOpen()"
       >
         <i class="material-icons">{{ fabOpen() ? 'close' : 'menu' }}</i>
+        @if (handRail.hasUpdate()) {
+          <span
+            class="ring-ui-panel absolute top-0 right-0 size-2.5 rounded-full bg-red-500 ring-2"
+            aria-hidden="true"
+          ></span>
+        }
       </button>
     </div>
   }

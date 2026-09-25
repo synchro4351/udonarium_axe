@@ -25,6 +25,7 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { findTrumpPairs } from '@axe/domain/card/trump-card';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
+import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
 import { HandDrawPanelComponent } from '@axe/features/card/hand-draw/hand-draw-panel.component';
@@ -95,6 +96,21 @@ export class HandRailComponent {
   private savedTop: string | null = null;
 
   constructor() {
+    let previousCardIds: Set<string> | null = null;
+    effect(() => {
+      const currentCardIds = new Set(this.cards().map((card) => card.identifier));
+      if (previousCardIds !== null) {
+        const changed =
+          currentCardIds.size !== previousCardIds.size ||
+          [...currentCardIds].some((identifier) => !previousCardIds!.has(identifier));
+        if (changed && !this.rail.isOpen()) {
+          if (previousCardIds.size === 0 && currentCardIds.size > 0) this.rail.open();
+          else this.rail.markUpdated();
+        }
+      }
+      previousCardIds = currentCardIds;
+    });
+
     effect((onCleanup) => {
       const el = this.railRef()?.nativeElement;
       if (!el) return;
@@ -146,7 +162,13 @@ export class HandRailComponent {
 
   protected readonly handPublic = computed(() => {
     this.objectChange.trackMyCursor();
-    return PeerCursor.myCursor?.handPublic ?? false;
+    this.objectChange.versionOf('Config')();
+    return this.cardGame.handPublicOf(this.cardGame.myUserId());
+  });
+
+  protected readonly handVisibilityChoice = computed(() => {
+    this.objectChange.versionOf('Config')();
+    return (this.objectStore.get<Config>('Config')?.handVisibilityMode ?? 'choice') === 'choice';
   });
 
   /** Whether the room lets you take cards from other hands, which the draw button follows. */
@@ -165,7 +187,7 @@ export class HandRailComponent {
 
   protected toggleHandPublic(): void {
     const cursor = PeerCursor.myCursor;
-    if (!cursor || !this.canHoldCards()) return;
+    if (!cursor || !this.canHoldCards() || !this.handVisibilityChoice()) return;
     if (!cursor.handPublic) {
       this.confirmPublic.set(!this.confirmPublic());
       return;
@@ -177,7 +199,7 @@ export class HandRailComponent {
 
   protected confirmHandPublic(): void {
     const cursor = PeerCursor.myCursor;
-    if (!cursor || !this.canHoldCards() || !this.confirmPublic()) return;
+    if (!cursor || !this.canHoldCards() || !this.handVisibilityChoice() || !this.confirmPublic()) return;
     cursor.handPublic = true;
     this.confirmPublic.set(false);
     this.objectChange.notifyChanged(cursor.identifier);

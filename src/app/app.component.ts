@@ -172,7 +172,7 @@ export class AppComponent {
   private readonly renderLite = inject(RenderLiteService);
   private readonly language = inject(LanguageService);
   readonly visualNovel = inject(VisualNovelModeService);
-  private readonly handRail = inject(HandRailService);
+  protected readonly handRail = inject(HandRailService);
   readonly widgets = inject(WidgetVisibilityService);
   readonly viewport = inject(ViewportService);
   readonly mobile = inject(MobileLayoutService);

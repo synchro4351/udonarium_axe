@@ -55,6 +55,7 @@ describe('CardGameService', () => {
   afterEach(() => {
     Config.instance.allowsHandDraw = true;
     Config.instance.allowsHandGive = true;
+    Config.instance.handVisibilityMode = 'choice';
     vi.restoreAllMocks();
     for (const object of created.splice(0)) object.destroy();
     for (const cursor of ObjectStore.instance.getObjects<PeerCursor>(PeerCursor)) {
@@ -99,6 +100,19 @@ describe('CardGameService', () => {
       expect(result.participants).toBe(1);
       expect(service.handCardsOf('guest')).toHaveLength(0);
     });
+  });
+
+  it('uses the room visibility rule ahead of each participant choice', () => {
+    const other = peer('other', 'あいて');
+    other.handPublic = true;
+    expect(service.handPublicOf('other')).toBe(true);
+
+    Config.instance.handVisibilityMode = 'private';
+    expect(service.handPublicOf('other')).toBe(false);
+
+    other.handPublic = false;
+    Config.instance.handVisibilityMode = 'public';
+    expect(service.handPublicOf('other')).toBe(true);
   });
 
   describe('drawFromHand()', () => {

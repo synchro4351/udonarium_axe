@@ -49,7 +49,7 @@ export class MobileShellComponent {
   private readonly saveDataService = inject(SaveDataService);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly visualNovel = inject(VisualNovelModeService);
-  private readonly handRail = inject(HandRailService);
+  protected readonly handRail = inject(HandRailService);
   private readonly turnOrder = inject(TurnOrderService);
   private readonly tabletopService = inject(TabletopService);
   private readonly activeCharacter = inject(ActiveCharacterService);
