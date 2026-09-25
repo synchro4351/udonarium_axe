@@ -20,6 +20,13 @@ describe('handDropRecipientAt', () => {
     expect(handDropRecipientAt([document.createElement('div')], 'me', ['me', 'other'])).toBe('');
   });
 
+  it('does not pass a drop through a panel covering a hand section', () => {
+    const { child } = sectionFor('other');
+    const coveringPanel = document.createElement('div');
+
+    expect(handDropRecipientAt([coveringPanel, child], 'me', ['me', 'other'])).toBe('');
+  });
+
   it('never sends a card to yourself', () => {
     const { section } = sectionFor('me');
 

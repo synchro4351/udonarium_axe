@@ -10,7 +10,7 @@ export function handDropRecipientAt(
   myUserId: string,
   participantUserIds: readonly string[]
 ): string {
-  const section = elements.map((element) => element.closest(`[${HAND_DROP_USER_ATTRIBUTE}]`)).find(Boolean);
+  const section = elements[0]?.closest(`[${HAND_DROP_USER_ATTRIBUTE}]`);
   const userId = section?.getAttribute(HAND_DROP_USER_ATTRIBUTE) ?? '';
   if (userId.length < 1 || userId === myUserId || !participantUserIds.includes(userId)) return '';
   return userId;
