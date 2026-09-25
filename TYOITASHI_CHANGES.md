@@ -38,6 +38,8 @@
 
 山札の表示更新（次版）：[5e9f3ee2](https://github.com/synchro4351/udonarium_axe/commit/5e9f3ee2)。db74ee87の後続。CardStackの変更通知を枚数・厚さ表示へ接続。通信自体の遅延原因は未特定です。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-card-usability)には、この後にユーザー確認表の文書コミット6089e285も含みます。
 
+録画テストの負荷耐性（次版）：[7b9c7da7](https://github.com/synchro4351/udonarium_axe/commit/7b9c7da7)。実装が許容するフレーム飛びをテストでも扱い、描かれたフレームの音声待機時間を確認します。製品の録画処理そのものは変更していません。
+
 ## 検証と制限
 
 - 現在の次版候補は全体924ファイル／12,555件成功・1件skip、production build成功（機能ブランチの検証済みコミットと同一）。
