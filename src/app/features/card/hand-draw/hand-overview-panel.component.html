@@ -1,15 +1,25 @@
 <p class="text-ui-dim m-0 mb-2 text-xs" data-testid="hand-overview-hint">
-  {{ (allowsGive() ? 'feature.card.handOverview.hint' : 'feature.card.handOverview.hintGiveForbidden') | transloco }}
+  <span class="block">{{ 'feature.card.handOverview.hint' | transloco }}</span>
+  <span class="block">{{
+    (allowsGive() ? 'feature.card.handOverview.giveHint' : 'feature.card.handOverview.giveForbidden') | transloco
+  }}</span>
+  <span class="block" data-testid="hand-overview-draw-hint">{{
+    (allowsDraw() ? 'feature.card.handOverview.drawHint' : 'feature.card.handOverview.drawForbidden') | transloco
+  }}</span>
 </p>
 @for (section of sections(); track section.userId) {
+  @let target = (dropping() && !section.isSelf) || (drawing() && section.isSelf);
+  @let active = dropping() ? drag.dropUserId() === section.userId : drawing() && section.isSelf && overOwnSection();
+  @let drawable = !section.isSelf && canDraw();
   <section
     class="rounded-ui mb-2 border-2 border-solid p-2 transition-colors"
     data-testid="hand-overview-section"
     [attr.data-hand-drop-user-id]="section.isSelf || !allowsGive() ? null : section.userId"
-    [class.border-ui-border-panel]="!dropping() || section.isSelf"
-    [class.border-dashed]="dropping() && !section.isSelf && drag.dropUserId() !== section.userId"
-    [class.border-ui-accent]="dropping() && !section.isSelf"
-    [class.bg-ui-hover]="dropping() && drag.dropUserId() === section.userId"
+    [attr.data-hand-draw-target]="section.isSelf && canDraw() ? section.userId : null"
+    [class.border-ui-border-panel]="!target"
+    [class.border-dashed]="target && !active"
+    [class.border-ui-accent]="target"
+    [class.bg-ui-hover]="active"
     [class.opacity-50]="dropping() && section.isSelf"
     [attr.aria-label]="section.name"
   >
@@ -34,7 +44,7 @@
         }}
       </span>
       <span class="text-ui-dim ml-auto shrink-0 text-xs">
-        {{ 'feature.card.drawPanel.cardCount' | transloco: { count: section.cards.length } }}
+        {{ 'feature.card.handOverview.cardCount' | transloco: { count: section.cards.length } }}
       </span>
     </header>
     @if (dropping() && !section.isSelf) {
@@ -42,12 +52,24 @@
         {{ 'feature.card.handOverview.dropHere' | transloco: { name: section.name } }}
       </p>
     }
+    @if (drawing() && section.isSelf) {
+      <p class="text-ui-accent m-0 mb-1 text-[11px] font-bold" data-testid="hand-overview-draw-drop-hint">
+        {{ 'feature.card.handOverview.drawHere' | transloco }}
+      </p>
+    }
     <div class="flex min-h-14 flex-wrap gap-1">
       @for (card of section.cards; track card.identifier) {
         <div
           class="rounded-ui-sm border-ui-border-panel h-14 w-10 shrink-0 overflow-hidden border border-solid"
           data-testid="hand-overview-card"
+          [class]="drawable ? 'hover:border-ui-accent cursor-grab touch-none' : ''"
+          [class.opacity-40]="drag.drawCard() === card"
+          [attr.data-hand-draw-card]="drawable ? '' : null"
           [attr.title]="section.handPublic ? card.name : null"
+          (pointerdown)="onCardPointerDown($event, section, card)"
+          (pointermove)="onCardPointerMove($event)"
+          (pointerup)="onCardPointerUp($event)"
+          (pointercancel)="onCardPointerCancel($event)"
         >
           @if (section.handPublic) {
             <card-face-preview [card]="card" [imageUrl]="frontImageUrl(card)" [frameWidth]="40" [frameHeight]="56" />

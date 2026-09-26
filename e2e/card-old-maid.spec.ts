@@ -55,12 +55,14 @@ test.describe('ババ抜き向けのカード操作', () => {
     await expect(page.locator('card-stack')).toHaveCount(2, { timeout: 5000 });
   });
 
-  test('相手がいなければ引く相手の候補が空になること', async ({ page }) => {
+  test('引く操作は全員の手札の一覧で案内され、専用の窓がないこと', async ({ page }) => {
     const hand = page.locator('app-hand-rail');
-    await hand.locator('button[title="相手の手札から引く"]').click();
+    await expect(hand.locator('[data-testid="hand-draw-open"]')).toHaveCount(0);
+    await hand.locator('[data-testid="hand-overview-open"]').click();
 
-    const panel = page.locator('hand-draw-panel');
+    const panel = page.locator('hand-overview-panel');
     await expect(panel).toBeVisible({ timeout: 5000 });
-    await expect(panel).toContainText('手札を持っている参加者がいません');
+    await expect(panel.locator('[data-testid="hand-overview-draw-hint"]')).toContainText('自分の欄へドラッグ');
+    await expect(panel.locator('[data-hand-draw-card]')).toHaveCount(0);
   });
 });

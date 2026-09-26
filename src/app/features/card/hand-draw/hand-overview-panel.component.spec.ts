@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
@@ -162,5 +163,200 @@ describe('HandOverviewPanelComponent', () => {
     fixture.detectChanges();
     expect(sectionOf('other').getAttribute('data-hand-drop-user-id')).toBe('other');
     expect(sectionOf('other').querySelector('[data-testid="hand-overview-drop-hint"]')).toBeTruthy();
+  });
+
+  describe('drawing by dragging onto your own section', () => {
+    let restoreElementsFromPoint: () => void;
+    let under: Element[];
+
+    function cardElementOf(userId: string, index = 0): HTMLElement {
+      return sectionOf(userId).querySelectorAll<HTMLElement>('[data-testid="hand-overview-card"]')[index];
+    }
+
+    function pointer(target: HTMLElement, type: string, x: number, y: number): void {
+      target.dispatchEvent(
+        new PointerEvent(type, { bubbles: true, pointerId: 1, pointerType: 'mouse', button: 0, clientX: x, clientY: y })
+      );
+      fixture.detectChanges();
+    }
+
+    /** Presses a card and carries it far enough to count as a drag, leaving it held. */
+    function pickUp(element: HTMLElement): void {
+      pointer(element, 'pointerdown', 0, 0);
+      pointer(element, 'pointermove', 40, 40);
+    }
+
+    beforeEach(() => {
+      vi.spyOn(TestBed.inject(ChatMessageService), 'sendSystemMessage').mockReturnValue(null!);
+      vi.spyOn(component, 'frontImageUrl').mockReturnValue('front.png');
+      vi.spyOn(component, 'backImageUrl').mockReturnValue('back.png');
+      const original = Object.getOwnPropertyDescriptor(document, 'elementsFromPoint');
+      restoreElementsFromPoint = () => {
+        if (original) Object.defineProperty(document, 'elementsFromPoint', original);
+        else Reflect.deleteProperty(document, 'elementsFromPoint');
+      };
+      under = [];
+      Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: () => under });
+    });
+
+    afterEach(() => {
+      restoreElementsFromPoint();
+      Config.instance.allowsHandDraw = true;
+      PeerCursor.myCursor.role = PeerRole.Player;
+      TestBed.inject(HandDragService).endDraw();
+    });
+
+    it('takes a face-down card from another hand into yours, showing only its back while carried', () => {
+      peer('other', 'あいて');
+      const held = card('s01', 'other');
+      fixture.detectChanges();
+      const drag = TestBed.inject(HandDragService);
+      const element = cardElementOf('other');
+
+      pickUp(element);
+      expect(drag.drawCard()).toBe(held);
+      expect(drag.drawImageUrl()).toBe('back.png');
+      expect(sectionOf('me').querySelector('[data-testid="hand-overview-draw-drop-hint"]')).toBeTruthy();
+      expect(sectionOf('other').querySelector('card-face-preview')).toBeNull();
+
+      under = [sectionOf('me')];
+      pointer(element, 'pointerup', 40, 40);
+
+      expect(held.location.name).toBe(handLocationOf('me'));
+      expect(TestBed.inject(ChatMessageService).sendSystemMessage).toHaveBeenCalledWith(
+        expect.stringContaining('あいて')
+      );
+      expect(drag.drawCard()).toBeNull();
+      expect(drag.drawImageUrl()).toBe('');
+    });
+
+    it('does not draw when released outside your section or over a window covering it', () => {
+      peer('other', 'あいて');
+      const held = card('s01', 'other');
+      fixture.detectChanges();
+
+      pickUp(cardElementOf('other'));
+      under = [sectionOf('other')];
+      pointer(cardElementOf('other'), 'pointerup', 40, 40);
+      expect(held.location.name).toBe(handLocationOf('other'));
+
+      pickUp(cardElementOf('other'));
+      under = [document.createElement('div'), sectionOf('me')];
+      pointer(cardElementOf('other'), 'pointerup', 40, 40);
+      expect(held.location.name).toBe(handLocationOf('other'));
+      expect(TestBed.inject(HandDragService).drawCard()).toBeNull();
+    });
+
+    it('does not draw on a click without dragging', () => {
+      peer('other', 'あいて');
+      const held = card('s01', 'other');
+      fixture.detectChanges();
+      under = [sectionOf('me')];
+
+      pointer(cardElementOf('other'), 'pointerdown', 0, 0);
+      pointer(cardElementOf('other'), 'pointerup', 2, 2);
+
+      expect(held.location.name).toBe(handLocationOf('other'));
+    });
+
+    it('never lets you pick up a card from your own hand to draw it', () => {
+      peer('other', 'あいて');
+      const mine = card('h01', 'me');
+      fixture.detectChanges();
+
+      expect(cardElementOf('me').hasAttribute('data-hand-draw-card')).toBe(false);
+      expect(cardElementOf('me').classList.contains('touch-none')).toBe(false);
+      pickUp(cardElementOf('me'));
+      expect(TestBed.inject(HandDragService).drawCard()).toBeNull();
+      expect(mine.location.name).toBe(handLocationOf('me'));
+    });
+
+    it('offers no drawing while the room forbids it, and follows the setting as it changes', () => {
+      peer('other', 'あいて');
+      const held = card('s01', 'other');
+      Config.instance.allowsHandDraw = false;
+      fixture.detectChanges();
+      const hint = () =>
+        (fixture.nativeElement as HTMLElement).querySelector('[data-testid="hand-overview-draw-hint"]')?.textContent;
+
+      expect(hint()).toContain('この部屋では他の人の手札から引けません');
+      expect(sectionOf('me').hasAttribute('data-hand-draw-target')).toBe(false);
+      expect(cardElementOf('other').hasAttribute('data-hand-draw-card')).toBe(false);
+      pickUp(cardElementOf('other'));
+      expect(TestBed.inject(HandDragService).drawCard()).toBeNull();
+      under = [sectionOf('me')];
+      pointer(cardElementOf('other'), 'pointerup', 40, 40);
+      expect(held.location.name).toBe(handLocationOf('other'));
+
+      Config.instance.allowsHandDraw = true;
+      TestBed.inject(ObjectChangeService).notifyChanged('Config');
+      fixture.detectChanges();
+      expect(hint()).toContain('自分の欄へドラッグ');
+      expect(sectionOf('me').getAttribute('data-hand-draw-target')).toBe('me');
+      expect(cardElementOf('other').hasAttribute('data-hand-draw-card')).toBe(true);
+    });
+
+    it('drops a drag in progress when the room forbids drawing before it is released', () => {
+      peer('other', 'あいて');
+      const held = card('s01', 'other');
+      fixture.detectChanges();
+
+      pickUp(cardElementOf('other'));
+      Config.instance.allowsHandDraw = false;
+      TestBed.inject(ObjectChangeService).notifyChanged('Config');
+      fixture.detectChanges();
+      expect(TestBed.inject(HandDragService).drawCard()).toBeNull();
+
+      under = [sectionOf('me')];
+      pointer(cardElementOf('other'), 'pointerup', 40, 40);
+      expect(held.location.name).toBe(handLocationOf('other'));
+    });
+
+    it('offers no drawing to a guest, who holds no hand', () => {
+      peer('other', 'あいて');
+      card('s01', 'other');
+      PeerCursor.myCursor.role = PeerRole.Guest;
+      TestBed.inject(ObjectChangeService).notifyChanged(PeerCursor.myCursor.identifier);
+      fixture.detectChanges();
+
+      expect(cardElementOf('other').hasAttribute('data-hand-draw-card')).toBe(false);
+      pickUp(cardElementOf('other'));
+      expect(TestBed.inject(HandDragService).drawCard()).toBeNull();
+    });
+
+    it('lets go of the card when it leaves that hand while carried', () => {
+      peer('other', 'あいて');
+      peer('third', 'さんにんめ');
+      const held = card('s01', 'other');
+      fixture.detectChanges();
+      const element = cardElementOf('other');
+
+      pickUp(element);
+      held.toHand('third');
+      TestBed.inject(ObjectChangeService).notifyChanged(held.identifier);
+      fixture.detectChanges();
+      expect(TestBed.inject(HandDragService).drawCard()).toBeNull();
+
+      under = [sectionOf('me')];
+      pointer(element, 'pointerup', 40, 40);
+      expect(held.location.name).toBe(handLocationOf('third'));
+    });
+
+    it('shows the front while carried only as long as the hand stays public', () => {
+      const other = peer('other', 'あいて');
+      const held = card('s01', 'other');
+      other.handPublic = true;
+      fixture.detectChanges();
+      const drag = TestBed.inject(HandDragService);
+
+      pickUp(cardElementOf('other'));
+      expect(drag.drawCard()).toBe(held);
+      expect(drag.drawImageUrl()).toBe('front.png');
+
+      other.handPublic = false;
+      TestBed.inject(ObjectChangeService).notifyChanged(other.identifier);
+      fixture.detectChanges();
+      expect(drag.drawImageUrl()).toBe('back.png');
+    });
   });
 });

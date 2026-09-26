@@ -721,7 +721,6 @@
         "empty": "手札がありません",
         "playFaceUp": "表にする",
         "playFaceDown": "伏せる",
-        "drawFromOther": "相手の手札から引く",
         "giveCard": "カードを渡す",
         "giveTo": "{{name}} に渡す",
         "makePublic": "自分の手札を公開する",
@@ -730,7 +729,7 @@
         "privateStatus": "手札は非公開",
         "publicStatus": "手札を公開中",
         "confirmPublic": "全員に公開する",
-        "viewPublicHands": "全員の手札を見る",
+        "viewPublicHands": "全員の手札（見る・引く・渡す）",
         "chooseFaceAfterDrop": "この位置にカードを出す（取消は手札に戻す）",
         "public": "公開中の手札",
         "autoSort": "スート・数字／名前順に自動整列",
@@ -785,22 +784,19 @@
         "gaveCard": "{{from}} が {{to}} にカードを 1 枚渡しました",
         "discardedPairs": "{{name}} が {{ranks}} のペアを捨てました"
       },
-      "drawPanel": {
-        "title": "相手の手札から引く",
-        "pickPlayer": "引く相手を選んでください",
-        "noPlayers": "手札を持っている参加者がいません",
-        "cardCount": "{{count}} 枚",
-        "back": "相手を選び直す",
-        "pickCard": "引くカードを選んでください"
-      },
       "handOverview": {
-        "hint": "表が見えるのは公開中の手札だけです。自分の手札からカードを参加者の欄へドラッグすると、そのカードを渡せます。",
-        "hintGiveForbidden": "表が見えるのは公開中の手札だけです。この部屋ではカードを渡せません。",
+        "hint": "表が見えるのは公開中の手札だけです。",
+        "giveHint": "手札のカードを参加者の欄へドラッグすると、その人に渡せます。",
+        "giveForbidden": "この部屋ではカードを渡せません。",
+        "drawHint": "ほかの人の欄からカードを自分の欄へドラッグすると、1 枚引けます。",
+        "drawForbidden": "この部屋では他の人の手札から引けません。",
         "you": "（自分）",
         "public": "公開中",
         "private": "非公開",
         "empty": "手札なし",
+        "cardCount": "{{count}} 枚",
         "dropHere": "ここで離すと {{name}} に渡します",
+        "drawHere": "ここで離すと自分の手札に加えます",
         "noPlayers": "手札を持てる参加者がいません"
       },
       "deckDialog": {

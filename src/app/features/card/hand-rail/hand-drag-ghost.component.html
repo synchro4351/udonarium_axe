@@ -1,5 +1,6 @@
-@if (drag.card()) {
+@if (carrying()) {
   <div
+    data-testid="hand-drag-ghost"
     class="border-ui-accent bg-ui-panel shadow-ui-md pointer-events-none fixed z-10000 flex h-28.5 w-19 items-center justify-center overflow-hidden rounded-md border-2 border-solid p-0.5 opacity-90"
     [style.left.px]="drag.x() + 12"
     [style.top.px]="drag.y() + 12"

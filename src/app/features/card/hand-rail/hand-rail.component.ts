@@ -29,7 +29,6 @@ import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
-import { HandDrawPanelComponent } from '@axe/features/card/hand-draw/hand-draw-panel.component';
 import { HandOverviewPanelComponent } from '@axe/features/card/hand-draw/hand-overview-panel.component';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
 import { buildHandCardContextMenu } from '@axe/features/card/hand-rail/hand-card-context-menu';
@@ -175,12 +174,6 @@ export class HandRailComponent {
     return (this.objectStore.get<Config>('Config')?.handVisibilityMode ?? 'choice') === 'choice';
   });
 
-  /** Whether the room lets you take cards from other hands, which the draw button follows. */
-  protected readonly allowsDraw = computed(() => {
-    this.objectChange.versionOf('Config')();
-    return this.cardGame.allowsHandDraw();
-  });
-
   /** Whether the room lets you give cards away, by the menu or by dragging onto someone's hand. */
   protected readonly allowsGive = computed(() => {
     this.objectChange.versionOf('Config')();
@@ -321,15 +314,6 @@ export class HandRailComponent {
   }
 
   protected readonly pairCount = computed(() => findTrumpPairs(this.cards()).length);
-
-  protected openDrawPanel(): void {
-    if (!this.allowsDraw()) return;
-    this.panelService.open(HandDrawPanelComponent, {
-      title: this.t('feature.card.drawPanel.title'),
-      width: 420,
-      height: 380,
-    });
-  }
 
   protected openHandOverview(): void {
     this.panelService.open(HandOverviewPanelComponent, {
