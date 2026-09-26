@@ -147,7 +147,9 @@
       [canSpeak]="canSpeakCurrentTab()"
       [(gameType)]="gameType"
       [(sendFrom)]="sendFrom"
+      [offersStamps]="true"
       (chat)="sendChat($event)"
+      (stamp)="sendStamp($event)"
     ></chat-input>
   </div>
 </div>

@@ -1,5 +1,6 @@
 import { NgClass, NgStyle } from '@angular/common';
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -7,6 +8,7 @@ import {
   effect,
   ElementRef,
   inject,
+  Injector,
   input,
   linkedSignal,
   output,
@@ -37,15 +39,28 @@ import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatBubbleColors, chatBubbleOf, chatColorOf, DEFAULT_CHAT_COLOR } from '@axe/domain/chat/chat-color';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { composeChatOutgoing } from '@axe/domain/chat/chat-outgoing';
-import { ChatOutgoing } from '@axe/domain/chat/chat-outgoing';
+import { ChatOutgoing, ChatStampOutgoing } from '@axe/domain/chat/chat-outgoing';
+import { previewTextOf } from '@axe/domain/chat/chat-stamp-text';
 import { DataElement } from '@axe/domain/data/data-element';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
+import { StampItem, StampPack } from '@axe/domain/media/stamp-pack';
+import {
+  removeStampQuery,
+  StampQuery,
+  stampQueryAt,
+  StampSuggestion,
+  suggestStamps,
+} from '@axe/domain/media/stamp-suggestion';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { ChatColorSettingComponent } from '@axe/features/chat/chat-color-setting/chat-color-setting.component';
 import { ChatInputDiceBotHelper } from '@axe/features/chat/chat-input/chat-input-dicebot';
 import { allowsChat } from '@axe/features/chat/chat-input/chat-input-helpers';
 import { ChatInputHistory } from '@axe/features/chat/chat-input/chat-input-history';
+import {
+  ChatStampPickerComponent,
+  PickedStamp,
+} from '@axe/features/chat/chat-stamp-picker/chat-stamp-picker.component';
 import { PortraitChoice, PortraitPickerComponent } from '@axe/ui/components/portrait-picker/portrait-picker.component';
 import { PortraitSliderComponent } from '@axe/ui/components/portrait-slider/portrait-slider.component';
 import { NgSelectWindowDirective } from '@axe/ui/directives/ng-select-window.directive';
@@ -54,6 +69,13 @@ import { TranslocoModule } from '@jsverse/transloco';
 import { NgOptionComponent, NgSelectComponent } from '@ng-select/ng-select';
 
 const COLOR_SETTING_PANEL = 'chat-color-setting';
+
+/** Tells each input's suggestion list apart, for the text box to point at the one highlighted. */
+let nextSuggestionListId = 0;
+
+function stampQueryKey(query: StampQuery): string {
+  return `${query.start}:${query.word}`;
+}
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -67,6 +89,7 @@ const COLOR_SETTING_PANEL = 'chat-color-setting';
     NgOptionComponent,
     NgSelectWindowDirective,
     NgStyle,
+    ChatStampPickerComponent,
     PortraitPickerComponent,
     PortraitSliderComponent,
     SafePipe,
@@ -208,7 +231,7 @@ export class ChatInputComponent {
   readonly replyToText = computed(() => {
     const target = this.replyTarget();
     if (!target) return '';
-    const text = (target.text ?? '').replace(/\s+/g, ' ').trim();
+    const text = previewTextOf(target).replace(/\s+/g, ' ').trim();
     return text.length > 80 ? text.slice(0, 80) + '…' : text;
   });
 
@@ -223,7 +246,7 @@ export class ChatInputComponent {
   readonly quoteToText = computed(() => {
     const target = this.quoteTarget();
     if (!target) return '';
-    const text = (target.text ?? '').replace(/\s+/g, ' ').trim();
+    const text = previewTextOf(target).replace(/\s+/g, ' ').trim();
     return text.length > 80 ? text.slice(0, 80) + '…' : text;
   });
 
@@ -236,6 +259,184 @@ export class ChatInputComponent {
   readonly autoCompleteSwitch = output<number>();
 
   readonly autoCompleteDo = output<number>();
+
+  /**
+   * Whether the stamp button and the stamps found by `:word` are offered. A host that turns them
+   * on sends what `stamp` reports.
+   */
+  readonly offersStamps = input(false);
+  readonly stamp = output<ChatStampOutgoing>();
+
+  private readonly injector = inject(Injector);
+  private readonly stampButtonRef = viewChild<ElementRef<HTMLButtonElement>>('stampButton');
+
+  readonly isStampPickerOpen = signal(false);
+  /** Where the caret stood in the text box when it last moved. */
+  private readonly caret = signal(0);
+  /** The `:word` Escape put away, not offered again until it changes. */
+  private readonly dismissedStampQuery = signal('');
+  protected readonly suggestionListId = `chat-stamp-suggestions-${nextSuggestionListId++}`;
+
+  /** The room's packs, while stamps are offered. */
+  private readonly stampPacks = computed<StampPack[]>(() => {
+    if (!this.offersStamps()) return [];
+    this.objectChange.collectionOf(StampPack.aliasName)();
+    const packs = this.objectStore.getObjects(StampPack);
+    for (const pack of packs) this.objectChange.versionOf(pack.identifier)();
+    return packs;
+  });
+
+  /** The `:word` the caret stands at the end of, while stamps are offered and this seat may speak. */
+  private readonly stampQuery = computed<StampQuery | null>(() => {
+    if (!this.offersStamps() || !this.canSpeak()) return null;
+    const query = stampQueryAt(this._text(), this.caret());
+    if (!query || stampQueryKey(query) === this.dismissedStampQuery()) return null;
+    return query;
+  });
+
+  /** The stamps offered for the `:word` being typed. */
+  readonly stampSuggestions = computed<StampSuggestion[]>(() => {
+    const query = this.stampQuery();
+    return query ? suggestStamps(this.stampPacks(), query.word) : [];
+  });
+
+  /**
+   * Which suggestion the arrow keys have picked out, or -1 for none. None is until an arrow is
+   * pressed, so Enter sends the line as written unless a stamp was deliberately chosen.
+   */
+  readonly activeSuggestion = linkedSignal<StampSuggestion[], number>({
+    source: this.stampSuggestions,
+    computation: () => -1,
+  });
+
+  /** Notes where the caret is, so the `:word` it stands at can be looked up. */
+  trackCaret(): void {
+    const textArea = this.textAreaElementRef()?.nativeElement;
+    if (textArea) this.caret.set(textArea.selectionStart ?? 0);
+  }
+
+  /** The picture of a stamp offered, the thumbnail where there is one, or nothing until it arrives. */
+  protected stampImageUrl(imageIdentifier: string): string {
+    this.objectChange.fileVersion();
+    const image = this.imageStorage.get(imageIdentifier);
+    return image?.thumbnail.url || image?.url || '';
+  }
+
+  /** Opens the stamp picker, or closes it and hands focus back to the text box. */
+  toggleStampPicker(): void {
+    if (this.isStampPickerOpen()) {
+      this.isStampPickerOpen.set(false);
+      this.focusTextArea();
+      return;
+    }
+    this.isStampPickerOpen.set(true);
+  }
+
+  /** Closes the stamp picker without picking anything, handing focus back to the stamp button. */
+  closeStampPicker(): void {
+    this.isStampPickerOpen.set(false);
+    afterNextRender({ write: () => this.stampButtonRef()?.nativeElement.focus() }, { injector: this.injector });
+  }
+
+  /**
+   * Puts an emoji into the line where the caret is, over any words picked out, and leaves the caret
+   * after it. Nothing is sent.
+   */
+  insertEmoji(emoji: string): void {
+    const textArea = this.textAreaElementRef()?.nativeElement;
+    const text = this.text;
+    const start = Math.min(textArea?.selectionStart ?? text.length, text.length);
+    const end = Math.min(Math.max(textArea?.selectionEnd ?? start, start), text.length);
+    this.text = text.slice(0, start) + emoji + text.slice(end);
+    this.isStampPickerOpen.set(false);
+    this.focusTextArea(start + emoji.length);
+    this.kickCalcFitHeight();
+  }
+
+  /** Sends the stamp picked in the picker at once, leaving the words in the box as they are. */
+  sendPickedStamp(picked: PickedStamp): void {
+    this.isStampPickerOpen.set(false);
+    this.emitStamp(picked.item, picked.pack.name);
+    this.focusTextArea();
+  }
+
+  /** Sends the stamp chosen from the suggestions and takes the `:word` that found it out of the line. */
+  sendSuggestion(suggestion: StampSuggestion): void {
+    const query = this.stampQuery();
+    if (!query || !this.emitStamp(suggestion.item, suggestion.packName)) return;
+    const removed = removeStampQuery(this.text, query);
+    this.text = removed.text;
+    this.previousWritingLength = this.text.length;
+    this.focusTextArea(removed.caret);
+    this.kickCalcFitHeight();
+  }
+
+  /**
+   * Escape puts the suggestions away for the `:word` they were offered for, or closes the picker.
+   * With neither open it is left to whatever else listens for it.
+   */
+  onEscape(event: Event): void {
+    const query = this.stampQuery();
+    if (query && this.stampSuggestions().length > 0) {
+      this.dismissedStampQuery.set(stampQueryKey(query));
+    } else if (this.isStampPickerOpen()) {
+      this.isStampPickerOpen.set(false);
+    } else {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  /** The element id of the suggestion picked out, for the text box to point assistive technology at. */
+  protected activeSuggestionId(): string | null {
+    const index = this.activeSuggestion();
+    return index >= 0 ? `${this.suggestionListId}-${index}` : null;
+  }
+
+  /**
+   * Reports a stamp to send, spoken by and to whoever a line would be, in the same colour and
+   * answering the same reply or quotation, which it then clears. Answers whether it was reported:
+   * not for a seat that may not speak.
+   */
+  private emitStamp(item: StampItem, packName: string): boolean {
+    if (!this.canSpeak() || !this.offersStamps()) return false;
+    if (!this.sendFrom.length) this.sendFrom = this.myPeer.identifier;
+    const bubbles = this.chatBubbles(this.colorSelectNo());
+    this.stamp.emit({
+      stampName: item.name || packName || this.t('feature.chat.stamp.unnamed'),
+      imageIdentifier: item.imageIdentifier,
+      sendFrom: this.sendFrom,
+      sendTo: this.sendTo,
+      portraitIndex: this.portraitIndex,
+      messColor: this.selectChatColor,
+      messBubbleLight: bubbles.light,
+      messBubbleDark: bubbles.dark,
+      replyTo: this.replyTarget()?.identifier ?? '',
+      quoteOf: this.quoteTarget()?.identifier ?? '',
+    });
+    this.cancelReply();
+    this.cancelQuote();
+    return true;
+  }
+
+  /** Focuses the text box once drawn, with the caret where given. */
+  private focusTextArea(caret?: number): void {
+    if (caret !== undefined) this.caret.set(caret);
+    afterNextRender(
+      {
+        write: () => {
+          const textArea = this.textAreaElementRef()?.nativeElement;
+          if (!textArea) return;
+          // The box may not have been handed its new words yet, and the caret has to fall in them.
+          if (textArea.value !== this.text) textArea.value = this.text;
+          textArea.focus();
+          if (caret !== undefined) textArea.setSelectionRange(caret, caret);
+        },
+      },
+      { injector: this.injector }
+    );
+  }
 
   constructor() {
     this.objectChange.onObjectChangedForAlias(
@@ -533,8 +734,17 @@ export class ChatInputComponent {
    * Asks the parent to move the auto-complete highlight, on the arrow keys.
    *
    * The caret keeps moving as usual unless there is more than one suggestion to step through.
+   * While stamps are offered for a `:word`, the arrows step through those instead.
    */
   selectAutoComplete(event: Event, direction: number) {
+    const stampCount = this.stampSuggestions().length;
+    if (stampCount > 0) {
+      if (event) event.preventDefault();
+      this.activeSuggestion.update((index) =>
+        index < 0 ? (direction > 0 ? 0 : stampCount - 1) : (index + direction + stampCount) % stampCount
+      );
+      return;
+    }
     if (this.autoCompleteListLen() > 1) {
       if (event) event.preventDefault();
     }
@@ -545,7 +755,8 @@ export class ChatInputComponent {
    * Sends the draft, from the Enter key or the send button.
    *
    * It does nothing for a seat that may not speak, for an empty draft, or while an IME is
-   * composing. While a suggestion is highlighted it asks the parent to apply that instead. The
+   * composing. Enter on a stamp picked out with the arrows sends that stamp in place of the line.
+   * While a suggestion is highlighted it asks the parent to apply that instead. The
    * message is emitted under the game system the dice bot hands over for the line, which does not
    * wait for the system's code when the line cannot be a secret roll; the draft, reply and quote are
    * cleared at once.
@@ -557,6 +768,12 @@ export class ChatInputComponent {
     if (!this.text.length) return;
     if (event && (event as KeyboardEvent).key !== 'Enter') return;
     if (event && (event as KeyboardEvent).isComposing) return;
+
+    const picked = event ? this.stampSuggestions()[this.activeSuggestion()] : undefined;
+    if (picked) {
+      this.sendSuggestion(picked);
+      return;
+    }
 
     if (this.autoCompleteIndex() >= 0) {
       this.autoCompleteDo.emit(this.autoCompleteIndex());

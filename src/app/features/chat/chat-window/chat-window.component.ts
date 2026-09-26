@@ -28,7 +28,7 @@ import { sheetPanelBox } from '@axe/application/ui/sheet-panel';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage, ChatMessageTargetContext } from '@axe/domain/chat/chat-message';
-import { ChatOutgoing } from '@axe/domain/chat/chat-outgoing';
+import { ChatOutgoing, ChatStampOutgoing } from '@axe/domain/chat/chat-outgoing';
 import { evaluateCharacterReferences, textTargetsCharacter } from '@axe/domain/chat/chat-palette';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
@@ -579,5 +579,12 @@ export class ChatWindowComponent {
       );
       if (value.toTicker) this.chatTickerSelection.showMessage(sent.identifier);
     }
+  }
+
+  /** Sends a stamp from the chat input to the current tab, where the reader may speak there. */
+  sendStamp(value: ChatStampOutgoing) {
+    const tab = this.chatTab();
+    if (!tab || !canRoleSpeakTab(tab, PeerCursor.myRole)) return;
+    this.chatMessageService.sendStamp(tab, value);
   }
 }

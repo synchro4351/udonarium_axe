@@ -1,0 +1,84 @@
+<div
+  role="dialog"
+  data-testid="chat-stamp-picker"
+  class="border-ui-border-panel bg-ui-panel rounded-ui-sm shadow-ui-md box-border flex max-h-72 w-full flex-col gap-1 border border-solid p-1"
+  [attr.aria-label]="'feature.chat.stamp.open' | transloco"
+>
+  <div
+    role="tablist"
+    class="border-ui-border-panel flex shrink-0 gap-0.5 overflow-x-auto border-0 border-b border-solid pb-1"
+    (keydown)="onTabKeydown($event)"
+  >
+    <button
+      type="button"
+      role="tab"
+      data-testid="chat-stamp-tab"
+      class="rounded-ui-sm hover:bg-ui-hover min-h-8 shrink-0 cursor-pointer border-0 bg-transparent px-2 text-[12px] whitespace-nowrap transition-colors"
+      [class.bg-ui-accent-bg]="activeTab() === emojiTab"
+      [class.text-ui-accent]="activeTab() === emojiTab"
+      [attr.aria-selected]="activeTab() === emojiTab"
+      [attr.tabindex]="activeTab() === emojiTab ? 0 : -1"
+      (click)="selectTab(emojiTab)"
+    >
+      {{ 'feature.chat.stamp.emojiTab' | transloco }}
+    </button>
+    @for (pack of packs(); track pack.identifier) {
+      <button
+        type="button"
+        role="tab"
+        data-testid="chat-stamp-tab"
+        class="rounded-ui-sm hover:bg-ui-hover min-h-8 max-w-40 shrink-0 cursor-pointer truncate border-0 bg-transparent px-2 text-[12px] whitespace-nowrap transition-colors"
+        [class.bg-ui-accent-bg]="activeTab() === pack.identifier"
+        [class.text-ui-accent]="activeTab() === pack.identifier"
+        [attr.aria-selected]="activeTab() === pack.identifier"
+        [attr.tabindex]="activeTab() === pack.identifier ? 0 : -1"
+        [title]="pack.name"
+        (click)="selectTab(pack.identifier)"
+      >
+        {{ pack.name || ('feature.chat.stamp.unnamed' | transloco) }}
+      </button>
+    }
+  </div>
+  <div role="tabpanel" class="min-h-0 overflow-y-auto">
+    @if (activePack(); as pack) {
+      @if (pack.items.length === 0) {
+        <p class="text-ui-dim m-0 p-2 text-[12px]" data-testid="chat-stamp-empty">
+          {{ 'feature.chat.stamp.emptyPack' | transloco }}
+        </p>
+      } @else {
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(60px,1fr))] gap-1">
+          @for (item of pack.items; track item.id) {
+            <button
+              type="button"
+              data-testid="chat-stamp-choice"
+              class="rounded-ui-sm hover:bg-ui-hover focus-visible:bg-ui-hover flex aspect-square min-w-0 cursor-pointer items-center justify-center overflow-hidden border-0 bg-transparent p-1 transition-colors"
+              [attr.aria-label]="'feature.chat.stamp.send' | transloco: { name: item.name || pack.name }"
+              [title]="item.name"
+              (click)="pickStamp(pack, item)"
+            >
+              @if (imageUrlOf(item); as url) {
+                <img class="size-full object-contain" alt="" [src]="url | safe: 'resourceUrl'" />
+              } @else {
+                <span class="text-ui-dim truncate text-[11px]">{{ item.name }}</span>
+              }
+            </button>
+          }
+        </div>
+      }
+    } @else {
+      <div class="flex flex-wrap gap-0.5">
+        @for (emoji of emojis; track emoji) {
+          <button
+            type="button"
+            data-testid="chat-emoji-choice"
+            class="rounded-ui-sm hover:bg-ui-hover focus-visible:bg-ui-hover inline-flex size-9 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-[20px] leading-none transition-colors"
+            [attr.aria-label]="emoji"
+            (click)="pickEmoji(emoji)"
+          >
+            {{ emoji }}
+          </button>
+        }
+      </div>
+    }
+  </div>
+</div>

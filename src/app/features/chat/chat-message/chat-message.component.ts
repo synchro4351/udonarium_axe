@@ -36,6 +36,7 @@ import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
+import { previewTextOf } from '@axe/domain/chat/chat-stamp-text';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { canRoleSpeakTab } from '@axe/domain/chat/chat-tab-permission';
@@ -430,6 +431,16 @@ export class ChatMessageComponent {
       .map((identifier) => this.imageStorage.get(identifier))
       .filter((image): image is ImageFile => image != null);
   });
+  /**
+   * The name of the stamp the line was sent as, or empty for a line of words. Its picture is then
+   * drawn at a stamp's size and named by it, rather than as a small attachment.
+   */
+  readonly stampName = computed(() => {
+    const chatMessage = this.chatMessageInput();
+    if (!chatMessage) return '';
+    this.objectChange.versionOf(chatMessage.identifier)();
+    return chatMessage.isStamp ? chatMessage.stampName : '';
+  });
   readonly animeState = signal<string>('inactive');
 
   constructor() {
@@ -550,9 +561,7 @@ export class ChatMessageComponent {
     this.objectChange.versionOf(msg.replyTo)();
     const target = msg.replyToMessage;
     if (!target) return null;
-    const text = vnBodyOf(target.vnEmote, target.text ?? '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const text = vnBodyOf(target.vnEmote, previewTextOf(target)).replace(/\s+/g, ' ').trim();
     return {
       name: target.name ?? '',
       text: text.length > 120 ? text.slice(0, 120) + '…' : text,
@@ -566,7 +575,7 @@ export class ChatMessageComponent {
     this.objectChange.versionOf(msg.quoteOf)();
     const target = this.objectStore.get<ChatMessage>(msg.quoteOf);
     if (!(target instanceof ChatMessage)) return null;
-    const text = vnBodyOf(target.vnEmote, target.text ?? '').trim();
+    const text = vnBodyOf(target.vnEmote, previewTextOf(target)).trim();
     return {
       name: target.name ?? '',
       text: text.length > 280 ? text.slice(0, 280) + '…' : text,

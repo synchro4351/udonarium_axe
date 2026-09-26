@@ -5,8 +5,10 @@ import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { ViewModePreferenceService } from '@axe/application/ui/view-mode-preference.service';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
+import { ChatStampOutgoing } from '@axe/domain/chat/chat-outgoing';
 import { DataElement } from '@axe/domain/data/data-element';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
+import { StampItem, StampPack } from '@axe/domain/media/stamp-pack';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { ChatInputComponent } from '@axe/features/chat/chat-input/chat-input.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -338,6 +340,268 @@ describe('ChatInputComponent', () => {
       expect(completed).toHaveBeenCalledWith(3);
       expect(emitted).not.toHaveBeenCalled();
       expect(component.text).toBe('hel');
+    });
+  });
+
+  describe('stamps and emoji', () => {
+    const packs: StampPack[] = [];
+    let stamps: ChatStampOutgoing[];
+    let lines: Outgoing[];
+
+    function makePack(name: string, items: StampItem[]): StampPack {
+      const pack = new StampPack();
+      pack.name = name;
+      pack.setItems(items);
+      pack.initialize();
+      packs.push(pack);
+      return pack;
+    }
+
+    function stampItem(id: string, name: string, words: string[]): StampItem {
+      return { id, name, imageIdentifier: `image-${id}`, words };
+    }
+
+    function find<T extends Element = HTMLElement>(selector: string): T | null {
+      return (fixture.nativeElement as HTMLElement).querySelector<T>(selector);
+    }
+
+    function findAll(selector: string): HTMLElement[] {
+      return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(selector));
+    }
+
+    function textBox(): HTMLTextAreaElement {
+      return find<HTMLTextAreaElement>('textarea[name="chat-input-text"]')!;
+    }
+
+    async function settle(): Promise<void> {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    async function type(text: string, caret = text.length): Promise<void> {
+      const box = textBox();
+      box.value = text;
+      box.setSelectionRange(caret, caret);
+      box.dispatchEvent(new Event('input'));
+      await settle();
+    }
+
+    async function press(key: string, options: KeyboardEventInit = {}): Promise<KeyboardEvent> {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...options });
+      textBox().dispatchEvent(event);
+      await settle();
+      return event;
+    }
+
+    const suggestionNames = () =>
+      findAll('[data-testid="chat-stamp-suggestion"]').map((row) => row.textContent!.replace(/\s+/g, ' ').trim());
+
+    beforeEach(async () => {
+      stamps = [];
+      lines = [];
+      component.stamp.subscribe((stamp) => stamps.push(stamp));
+      component.chat.subscribe((line) => lines.push(line));
+      makePack('Faces', [stampItem('smile', 'Smile', ['smile', 'happy']), stampItem('smirk', 'Smirk', ['smirk'])]);
+      makePack('Animals', [stampItem('cat', 'Cat smile', ['smile'])]);
+      fixture.componentRef.setInput('offersStamps', true);
+      await settle();
+    });
+
+    afterEach(() => {
+      for (const pack of packs.splice(0)) pack.destroy();
+    });
+
+    it('offers no stamp button to a host that has not asked for stamps, such as the palette', async () => {
+      fixture.componentRef.setInput('offersStamps', false);
+      await settle();
+
+      expect(find('[data-testid="chat-stamp-button"]')).toBeNull();
+      await type(':smi');
+      expect(find('[data-testid="chat-stamp-suggestions"]')).toBeNull();
+    });
+
+    it('offers neither the button nor suggestions to a seat that may not speak', async () => {
+      await type(':smi');
+      fixture.componentRef.setInput('canSpeak', false);
+      await settle();
+
+      expect(find('[data-testid="chat-stamp-button"]')).toBeNull();
+      expect(component.stampSuggestions()).toEqual([]);
+    });
+
+    describe('the picker', () => {
+      async function openPicker(): Promise<void> {
+        find<HTMLButtonElement>('[data-testid="chat-stamp-button"]')!.click();
+        await settle();
+      }
+
+      it('opens on the emoji, with a tab after it for each of the room’s packs', async () => {
+        await openPicker();
+
+        const tabs = findAll('[data-testid="chat-stamp-tab"]');
+        expect(tabs.map((tab) => tab.textContent!.trim())).toEqual(['絵文字', 'Faces', 'Animals']);
+        expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+        expect(findAll('[data-testid="chat-emoji-choice"]').length).toBeGreaterThan(20);
+        expect(find('[data-testid="chat-stamp-button"]')!.getAttribute('aria-expanded')).toBe('true');
+      });
+
+      it('shows a pack’s stamps when its tab is chosen, and moves between tabs with the arrows', async () => {
+        await openPicker();
+        findAll('[data-testid="chat-stamp-tab"]')[1].click();
+        await settle();
+
+        expect(findAll('[data-testid="chat-stamp-choice"]').map((one) => one.getAttribute('title'))).toEqual([
+          'Smile',
+          'Smirk',
+        ]);
+
+        find('[role="tablist"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+        await settle();
+        expect(findAll('[data-testid="chat-stamp-choice"]').map((one) => one.getAttribute('title'))).toEqual([
+          'Cat smile',
+        ]);
+      });
+
+      it('puts an emoji into the line where the caret stood, and sends nothing', async () => {
+        await type('ab', 1);
+        await openPicker();
+        find<HTMLButtonElement>('[data-testid="chat-emoji-choice"][aria-label="🎲"]')!.click();
+        await settle();
+
+        expect(component.text).toBe('a🎲b');
+        expect(stamps).toEqual([]);
+        expect(lines).toEqual([]);
+        expect(component.isStampPickerOpen()).toBe(false);
+      });
+
+      it('sends a picture stamp at once, once, and leaves the words being written alone', async () => {
+        const target = speaker('勇者');
+        component.sendFrom = target.identifier;
+        component.sendTo = PeerCursor.myCursor.identifier;
+        await type('まだ途中');
+        await openPicker();
+        findAll('[data-testid="chat-stamp-tab"]')[1].click();
+        await settle();
+        findAll('[data-testid="chat-stamp-choice"]')[0].click();
+        await settle();
+
+        expect(stamps).toEqual([
+          expect.objectContaining({
+            stampName: 'Smile',
+            imageIdentifier: 'image-smile',
+            sendFrom: target.identifier,
+            sendTo: PeerCursor.myCursor.identifier,
+            messColor: '#111111',
+            messBubbleLight: '#aaaaaa',
+          }),
+        ]);
+        expect(lines).toEqual([]);
+        expect(component.text).toBe('まだ途中');
+        expect(component.isStampPickerOpen()).toBe(false);
+        target.destroy();
+      });
+
+      it('answers the reply being written, and lets it go once sent', async () => {
+        const replied = new ChatMessage();
+        replied.initialize();
+        component.replyTarget.set(replied);
+        await openPicker();
+        findAll('[data-testid="chat-stamp-tab"]')[2].click();
+        await settle();
+        findAll('[data-testid="chat-stamp-choice"]')[0].click();
+        await settle();
+
+        expect(stamps[0].replyTo).toBe(replied.identifier);
+        expect(component.replyTarget()).toBeNull();
+        replied.destroy();
+      });
+
+      it('closes on Escape without sending, handing focus back to its button', async () => {
+        await openPicker();
+        find('chat-stamp-picker')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await settle();
+
+        expect(component.isStampPickerOpen()).toBe(false);
+        expect(document.activeElement).toBe(find('[data-testid="chat-stamp-button"]'));
+        expect(stamps).toEqual([]);
+      });
+    });
+
+    describe('suggestions for a :word', () => {
+      it('offers the stamps saved under words that start with it, naming the pack where two collide', async () => {
+        await type('いいね :smi');
+
+        expect(suggestionNames()).toEqual(['Smile :smile · Faces', 'Smirk :smirk', 'Cat smile :smile · Animals']);
+      });
+
+      it('offers nothing where the colon does not stand at a clear boundary', async () => {
+        await type('note:smi');
+        expect(find('[data-testid="chat-stamp-suggestions"]')).toBeNull();
+
+        await type(':smi more', 2);
+        expect(find('[data-testid="chat-stamp-suggestions"]')).toBeNull();
+      });
+
+      it('sends the line as written on Enter when no stamp was picked out', async () => {
+        await type('hi :smile');
+        const line = sent();
+        await press('Enter');
+
+        expect((await line).text).toBe('hi :smile');
+        expect(stamps).toEqual([]);
+      });
+
+      it('sends the stamp picked out with the arrows on Enter, once, in place of the :word', async () => {
+        await type('hi :smirk');
+        const down = await press('ArrowDown');
+        await press('Enter');
+        await Promise.resolve();
+
+        expect(down.defaultPrevented).toBe(true);
+        expect(stamps).toHaveLength(1);
+        expect(stamps[0].stampName).toBe('Smirk');
+        expect(lines).toEqual([]);
+        expect(component.text).toBe('hi');
+      });
+
+      it('sends the stamp tapped in the list', async () => {
+        await type(':happy');
+        find<HTMLButtonElement>('[data-testid="chat-stamp-suggestion"]')!.click();
+        await settle();
+
+        expect(stamps.map((stamp) => stamp.stampName)).toEqual(['Smile']);
+        expect(component.text).toBe('');
+      });
+
+      it('leaves an Enter composing text in an IME to the IME', async () => {
+        await type(':smirk');
+        await press('ArrowDown');
+        await press('Enter', { isComposing: true });
+
+        expect(stamps).toEqual([]);
+        expect(component.text).toBe(':smirk');
+      });
+
+      it('puts the list away on Escape until the word changes', async () => {
+        await type(':smi');
+        const escape = await press('Escape');
+
+        expect(escape.defaultPrevented).toBe(true);
+        expect(find('[data-testid="chat-stamp-suggestions"]')).toBeNull();
+
+        await type(':smir');
+        expect(suggestionNames()).toEqual(['Smirk :smirk']);
+      });
+
+      it('lets the arrows reach the palette’s own completion when no stamp is offered', async () => {
+        const switched = vi.fn();
+        component.autoCompleteSwitch.subscribe(switched);
+        await type('plain words');
+        await press('ArrowDown');
+
+        expect(switched).toHaveBeenCalledWith(1);
+      });
     });
   });
 });

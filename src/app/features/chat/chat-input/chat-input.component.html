@@ -196,7 +196,57 @@
     }
 
     @if (canSpeak()) {
-      <form name="chat-input" class="m-0 flex min-w-0 items-center gap-2">
+      <form name="chat-input" class="relative m-0 flex min-w-0 items-center gap-2">
+        @if (isStampPickerOpen()) {
+          <chat-stamp-picker
+            class="absolute inset-x-0 bottom-full z-20 mb-1"
+            (emojiPicked)="insertEmoji($event)"
+            (stampPicked)="sendPickedStamp($event)"
+            (closed)="closeStampPicker()"
+          />
+        } @else if (stampSuggestions().length > 0) {
+          <div
+            role="listbox"
+            data-testid="chat-stamp-suggestions"
+            class="border-ui-border-panel bg-ui-panel rounded-ui-sm shadow-ui-md absolute bottom-full left-0 z-20 mb-1 box-border flex max-h-64 w-72 max-w-full flex-col overflow-y-auto border border-solid p-1"
+            [id]="suggestionListId"
+            [attr.aria-label]="'feature.chat.stamp.suggestions' | transloco"
+          >
+            @for (
+              suggestion of stampSuggestions();
+              track suggestion.packIdentifier + suggestion.item.id;
+              let i = $index
+            ) {
+              <button
+                type="button"
+                role="option"
+                tabindex="-1"
+                data-testid="chat-stamp-suggestion"
+                class="rounded-ui-sm hover:bg-ui-hover flex min-h-11 w-full min-w-0 cursor-pointer items-center gap-2 border-0 bg-transparent px-1.5 py-1 text-left text-[12px] transition-colors"
+                [class.bg-ui-accent-bg]="activeSuggestion() === i"
+                [id]="suggestionListId + '-' + i"
+                [attr.aria-selected]="activeSuggestion() === i"
+                (mousedown)="$event.preventDefault()"
+                (click)="sendSuggestion(suggestion)"
+              >
+                @if (stampImageUrl(suggestion.item.imageIdentifier); as url) {
+                  <img class="size-9 shrink-0 object-contain" alt="" [src]="url | safe: 'resourceUrl'" />
+                } @else {
+                  <span class="size-9 shrink-0"></span>
+                }
+                <span class="flex min-w-0 flex-col">
+                  <span class="text-ui-text truncate">{{ suggestion.item.name || suggestion.packName }}</span>
+                  <span class="text-ui-dim truncate text-[11px]">
+                    :{{ suggestion.word }}
+                    @if (suggestion.showsPack) {
+                      · {{ suggestion.packName }}
+                    }
+                  </span>
+                </span>
+              </button>
+            }
+          </div>
+        }
         <textarea
           name="chat-input-text"
           [attr.rows]="dense() ? 1 : null"
@@ -208,15 +258,39 @@
           "
           [(ngModel)]="text"
           [ngModelOptions]="{ standalone: true }"
-          (input)="onInput()"
+          (input)="onInput(); trackCaret()"
+          (click)="trackCaret()"
+          (keyup)="trackCaret()"
+          (focus)="trackCaret()"
           (pointerdown)="onTextAreaPointerDown($event)"
           (keydown.enter)="sendChat($event)"
+          (keydown.escape)="onEscape($event)"
           (keydown.control.arrowup)="moveHistory($event, -1)"
           (keydown.control.arrowdown)="moveHistory($event, 1)"
           (keydown.arrowup)="selectAutoComplete($event, -1)"
           (keydown.arrowdown)="selectAutoComplete($event, 1)"
+          [attr.aria-autocomplete]="offersStamps() ? 'list' : null"
+          [attr.aria-controls]="stampSuggestions().length > 0 ? suggestionListId : null"
+          [attr.aria-activedescendant]="activeSuggestionId()"
           #textArea
         ></textarea>
+        @if (offersStamps()) {
+          <button
+            #stampButton
+            type="button"
+            data-testid="chat-stamp-button"
+            class="border-ui-border-panel text-ui-muted hover:border-ui-accent hover:bg-ui-hover hover:text-ui-accent m-0 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-solid bg-transparent p-0 transition-colors hover:shadow-none [&_i]:text-[20px] [&_i]:leading-none"
+            [class.text-ui-accent]="isStampPickerOpen()"
+            [class.border-ui-accent]="isStampPickerOpen()"
+            [attr.aria-expanded]="isStampPickerOpen()"
+            aria-haspopup="dialog"
+            [attr.aria-label]="'feature.chat.stamp.open' | transloco"
+            [title]="'feature.chat.stamp.open' | transloco"
+            (click)="toggleStampPicker()"
+          >
+            <i aria-hidden="true" class="material-icons">emoji_emotions</i>
+          </button>
+        }
         <button
           type="submit"
           class="border-ui-accent bg-ui-accent hover:border-ui-accent hover:bg-ui-accent m-0 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-solid p-0 text-[12px] font-semibold text-white transition-[background,border-color,filter] hover:text-white hover:shadow-none hover:brightness-110 [&_i]:text-[18px] [&_i]:leading-none"

@@ -1,4 +1,4 @@
-import { isReactionEmoji } from '@axe/domain/chat/chat-reaction';
+import { DEFAULT_REACTION_EMOJIS, isReactionEmoji } from '@axe/domain/chat/chat-reaction';
 
 /** An emoji the picker can find by name, with the words it answers to in each language offered. */
 interface NamedEmoji {
@@ -80,6 +80,14 @@ const NAMED_EMOJIS: readonly NamedEmoji[] = [
   { emoji: '💔', names: ['broken heart', 'heartbreak', 'しつれん', '失恋', '상심'] },
   { emoji: '🆗', names: ['ok', 'okay', 'オーケー', '오케이'] },
   { emoji: '🆖', names: ['ng', 'no good', 'だめ', '안돼'] },
+];
+
+/**
+ * Every emoji the catalogue names, quick reactions first and each once, for a picker that shows
+ * them all, as the chat input's does.
+ */
+export const CATALOG_EMOJIS: readonly string[] = [
+  ...new Set([...DEFAULT_REACTION_EMOJIS, ...NAMED_EMOJIS.map(({ emoji }) => emoji)]),
 ];
 
 /** How many emoji a search offers at most, to keep the picker small. */

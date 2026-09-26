@@ -195,7 +195,23 @@
                   >{{ badge }}</span
                 >
               }
-              @if (attachmentImageFiles().length > 0) {
+              @if (stampName(); as stamp) {
+                @if (attachmentImageFiles().length > 0) {
+                  <div class="mt-0.5 flex flex-wrap gap-1.5 whitespace-normal">
+                    @for (image of attachmentImageFiles(); track image.identifier) {
+                      <img
+                        data-testid="chat-message-stamp"
+                        class="message-attachment-image block size-auto max-h-40 max-w-[min(160px,100%)] object-contain"
+                        [src]="image.url | safe: 'resourceUrl'"
+                        [alt]="stamp"
+                        [title]="stamp"
+                      />
+                    }
+                  </div>
+                } @else {
+                  <span data-testid="chat-message-stamp-pending" class="text-ui-dim">[{{ stamp }}]</span>
+                }
+              } @else if (attachmentImageFiles().length > 0) {
                 <div class="mt-1.5 flex flex-wrap gap-1.5 whitespace-normal">
                   @for (image of attachmentImageFiles(); track image.identifier) {
                     <img
@@ -318,7 +334,23 @@
                     >{{ badge }}</span
                   >
                 }
-                @if (attachmentImageFiles().length > 0) {
+                @if (stampName(); as stamp) {
+                  @if (attachmentImageFiles().length > 0) {
+                    <span class="ml-1.5 inline-flex align-middle">
+                      @for (image of attachmentImageFiles(); track image.identifier) {
+                        <img
+                          data-testid="chat-message-stamp"
+                          class="message-attachment-image block size-auto max-h-20 max-w-20 object-contain"
+                          [src]="image.url | safe: 'resourceUrl'"
+                          [alt]="stamp"
+                          [title]="stamp"
+                        />
+                      }
+                    </span>
+                  } @else {
+                    <span data-testid="chat-message-stamp-pending" class="text-ui-dim">[{{ stamp }}]</span>
+                  }
+                } @else if (attachmentImageFiles().length > 0) {
                   <span class="ml-1.5 inline-flex align-middle">
                     @for (image of attachmentImageFiles(); track image.identifier) {
                       <img

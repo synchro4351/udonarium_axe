@@ -76,6 +76,54 @@ describe('ChatMessageComponent', () => {
     }
   });
 
+  describe('a stamp', () => {
+    function stampMessage(imageIdentifier: string): ChatMessage {
+      const message = new ChatMessage();
+      message.initialize();
+      message.from = 'test-user';
+      message.name = 'テスト';
+      message.messColor = '#000000';
+      message.text = '';
+      message.stampName = 'やったね';
+      message.attachmentImageIdentifiers = JSON.stringify([imageIdentifier]);
+      return message;
+    }
+
+    it('shows its picture at a stamp’s size, named by the stamp, with no words beside it', () => {
+      const image = ImageStorage.instance.add('stamp-picture.png');
+      try {
+        fixture.componentRef.setInput('chatMessage', stampMessage(image.identifier));
+        fixture.detectChanges();
+
+        const stamps = fixture.nativeElement.querySelectorAll('[data-testid="chat-message-stamp"]');
+        expect(stamps).toHaveLength(1);
+        expect(stamps[0].getAttribute('alt')).toBe('やったね');
+        expect(stamps[0].getAttribute('src')).toBe('stamp-picture.png');
+        expect(stamps[0].className).toContain('max-h-40');
+        expect(fixture.nativeElement.querySelector('.msg-text').textContent.trim()).toBe('');
+      } finally {
+        ImageStorage.instance.delete(image.identifier);
+      }
+    });
+
+    it('shows its name until its picture arrives', () => {
+      fixture.componentRef.setInput('chatMessage', stampMessage('not-yet-here'));
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="chat-message-stamp-pending"]').textContent).toBe(
+        '[やったね]'
+      );
+    });
+
+    it('offers its sender no pencil, having no words to edit', () => {
+      beMyself('test-user');
+      fixture.componentRef.setInput('chatMessage', stampMessage('any'));
+      fixture.detectChanges();
+
+      expect(component.canChange).toBe(false);
+    });
+  });
+
   it('drops the cover on a secret roll as soon as the tag loses it', () => {
     // The reveal changes only the tag. Nothing else drawn while the line is hidden depends on
     // that message, so without a version to watch the cover would stay on until something
