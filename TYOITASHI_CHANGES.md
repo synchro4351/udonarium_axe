@@ -42,9 +42,20 @@
 
 録画テストの負荷耐性（次版）：[7b9c7da7](https://github.com/synchro4351/udonarium_axe/commit/7b9c7da7)。実装が許容するフレーム飛びをテストでも扱い、描かれたフレームの音声待機時間を確認します。製品の録画処理そのものは変更していません。
 
+### 2026-09-26 の追加分（次版）
+
+| 変更 | 本流コミット | 元の機能コミット・依存関係 |
+| --- | --- | --- |
+| カットイン見本の動き・文字表現 | [01bc84ea](https://github.com/synchro4351/udonarium_axe/commit/01bc84ea) | [32be84e0](https://github.com/synchro4351/udonarium_axe/commit/32be84e0)を1c228425起点へ取り込み。既存のシーン・レイヤー・アニメーション表現を使う |
+| 新規カットインの枠なし既定値 | [619902cf](https://github.com/synchro4351/udonarium_axe/commit/619902cf) | [310fba81](https://github.com/synchro4351/udonarium_axe/commit/310fba81)を取り込み。新規作成時だけ変更し、保存済みカットインには影響しない |
+| 手札の初回表示・更新通知・公開方式 | [6c465fbe](https://github.com/synchro4351/udonarium_axe/commit/6c465fbe) | [af1bcd8d](https://github.com/synchro4351/udonarium_axe/commit/af1bcd8d)。1c228425起点。新しい部屋設定は旧セーブでは「参加者が選択」 |
+| カード編集権限・場と山札から渡す操作 | [bf14331d](https://github.com/synchro4351/udonarium_axe/commit/bf14331d)、[権限テスト 4e1e2715](https://github.com/synchro4351/udonarium_axe/commit/4e1e2715) | [8a3fcd1f](https://github.com/synchro4351/udonarium_axe/commit/8a3fcd1f)、[8b8e51f3](https://github.com/synchro4351/udonarium_axe/commit/8b8e51f3)。前行の手札変更が基点。部屋のカード編集許可は既定オフ、既存の受け渡し許可も適用 |
+
+本流への取り込みでコミットIDが変わった行は、両方を記しました。これらは公式v1.57.1から直接cherry-pickできる独立パッチではなく、上記の私家版コミットを基点とします。公開手札の表示内容、山札内のカード一覧、権限の扱いを公式へ移す場合は、対象版で秘匿と同期を再検証してください。
+
 ## 検証と制限
 
-- 統合後の次版候補`f6e09ebb`は、通常pre-pushで全体924ファイル／12,556件成功・1件skip、production build成功。図形差分の元コミットでも同件数とbuild成功を確認済み。
+- 統合後の次版候補`4e1e2715`は、全体927ファイル／12,646件成功・1件skip、production build成功。図形差分の元コミットでも924ファイル／12,556件成功・1件skipとbuild成功を確認済み。
 - カード追加機能の2クライアント実動作・画面目視・セーブ再読込は未確認。自動テストの成功と区別しています。
 - エフェクト選択欄とカットイン見本の実画面・演出は目視未確認。
 - フォント選択・YouTube表示・ポインター入力を組み合わせた92件は、r1で直接Vitest・Angular経由の両方に成功。自動再生追加は対象22件を両経路で確認。
