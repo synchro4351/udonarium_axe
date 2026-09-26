@@ -721,7 +721,6 @@
         "empty": "Your hand is empty",
         "playFaceUp": "Face up",
         "playFaceDown": "Face down",
-        "drawFromOther": "Draw from a hand",
         "giveCard": "Give card",
         "giveTo": "Give to {{name}}",
         "makePublic": "Show your hand to everyone",
@@ -730,7 +729,7 @@
         "privateStatus": "Hand private",
         "publicStatus": "Hand public",
         "confirmPublic": "Show to everyone",
-        "viewPublicHands": "View everyone's hands",
+        "viewPublicHands": "Everyone's hands (view, draw, give)",
         "chooseFaceAfterDrop": "Play at this position (cancel to keep in hand)",
         "public": "Public hand",
         "autoSort": "Sort by suit and number / name",
@@ -785,22 +784,19 @@
         "gaveCard": "{{from}} gave a card to {{to}}",
         "discardedPairs": "{{name}} discarded pairs of {{ranks}}"
       },
-      "drawPanel": {
-        "title": "Draw from a hand",
-        "pickPlayer": "Pick whose hand to draw from",
-        "noPlayers": "Nobody is holding cards",
-        "cardCount": "{{count}} cards",
-        "back": "Pick another player",
-        "pickCard": "Pick a card to draw"
-      },
       "handOverview": {
-        "hint": "Only public hands show their fronts. Drag a card from your hand onto a participant to give it to them.",
-        "hintGiveForbidden": "Only public hands show their fronts. This room does not allow giving cards.",
+        "hint": "Only public hands show their fronts.",
+        "giveHint": "Drag a card from your hand onto a participant to give it to them.",
+        "giveForbidden": "This room does not allow giving cards.",
+        "drawHint": "Drag a card from someone else's hand onto your own to draw it.",
+        "drawForbidden": "This room does not allow drawing from other hands.",
         "you": "(you)",
         "public": "Public",
         "private": "Private",
         "empty": "No cards",
+        "cardCount": "{{count}} cards",
         "dropHere": "Release to give to {{name}}",
+        "drawHere": "Release to take it into your hand",
         "noPlayers": "Nobody can hold cards"
       },
       "deckDialog": {

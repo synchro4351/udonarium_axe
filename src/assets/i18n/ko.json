@@ -721,7 +721,6 @@
         "empty": "패가 없습니다",
         "playFaceUp": "앞면으로 놓기",
         "playFaceDown": "엎어 놓기",
-        "drawFromOther": "상대의 패에서 뽑기",
         "giveCard": "카드 건네기",
         "giveTo": "{{name}}에게 건네기",
         "makePublic": "내 패 공개하기",
@@ -730,7 +729,7 @@
         "privateStatus": "패 비공개",
         "publicStatus": "패 공개 중",
         "confirmPublic": "모두에게 공개",
-        "viewPublicHands": "모두의 패 보기",
+        "viewPublicHands": "모두의 패(보기·뽑기·건네기)",
         "chooseFaceAfterDrop": "이 위치에 카드 내기(취소하면 패에 유지)",
         "public": "공개된 패",
         "autoSort": "무늬와 숫자 / 이름순 정렬",
@@ -785,22 +784,19 @@
         "gaveCard": "{{from}}이(가) {{to}}에게 카드 1장을 건넸습니다",
         "discardedPairs": "{{name}}이(가) {{ranks}} 페어를 버렸습니다"
       },
-      "drawPanel": {
-        "title": "상대의 패에서 뽑기",
-        "pickPlayer": "뽑을 상대를 골라 주세요",
-        "noPlayers": "패를 가진 참가자가 없습니다",
-        "cardCount": "{{count}}장",
-        "back": "상대 다시 고르기",
-        "pickCard": "뽑을 카드를 골라 주세요"
-      },
       "handOverview": {
-        "hint": "공개된 패만 앞면이 보입니다. 내 패의 카드를 참가자 칸으로 끌어다 놓으면 그 카드를 건넬 수 있습니다.",
-        "hintGiveForbidden": "공개된 패만 앞면이 보입니다. 이 방에서는 카드를 건넬 수 없습니다.",
+        "hint": "공개된 패만 앞면이 보입니다.",
+        "giveHint": "내 패의 카드를 참가자 칸으로 끌어다 놓으면 그 사람에게 건넬 수 있습니다.",
+        "giveForbidden": "이 방에서는 카드를 건넬 수 없습니다.",
+        "drawHint": "다른 사람의 칸에서 카드를 내 칸으로 끌어다 놓으면 1장 뽑을 수 있습니다.",
+        "drawForbidden": "이 방에서는 다른 사람의 패에서 뽑을 수 없습니다.",
         "you": "(나)",
         "public": "공개 중",
         "private": "비공개",
         "empty": "패 없음",
+        "cardCount": "{{count}}장",
         "dropHere": "여기에 놓으면 {{name}}에게 건넵니다",
+        "drawHere": "여기에 놓으면 내 패에 넣습니다",
         "noPlayers": "패를 가질 수 있는 참가자가 없습니다"
       },
       "deckDialog": {

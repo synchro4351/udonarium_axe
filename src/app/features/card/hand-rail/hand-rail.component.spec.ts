@@ -312,10 +312,9 @@ describe('HandRailComponent', () => {
     });
   });
 
-  it('opens no give menu and disables the give and draw buttons while the room forbids them', async () => {
+  it('opens no give menu and disables the give button while the room forbids giving', async () => {
     const card = makeCard(handLocationOf('me'));
     const open = vi.spyOn(TestBed.inject(ContextMenuService), 'open').mockImplementation(() => undefined);
-    Config.instance.allowsHandDraw = false;
     Config.instance.allowsHandGive = false;
     TestBed.inject(HandRailService).open();
     fixture.detectChanges();
@@ -332,7 +331,8 @@ describe('HandRailComponent', () => {
 
       expect(open).not.toHaveBeenCalled();
       expect(root.querySelector<HTMLButtonElement>('[data-testid="hand-card-give"]')!.disabled).toBe(true);
-      expect(root.querySelector<HTMLButtonElement>('[data-testid="hand-draw-open"]')!.disabled).toBe(true);
+      // Drawing happens by dragging in the hand overview, so the rail has no separate draw window.
+      expect(root.querySelector('[data-testid="hand-draw-open"]')).toBeNull();
     } finally {
       card.destroy();
     }
