@@ -28,7 +28,7 @@
                 "glob": "**/*",
                 "input": "src/assets",
                 "output": "assets",
-                "ignore": ["config.json.example"]
+                "ignore": ["config.json.example", "images/stamps/*.svg"]
               }
             ],
             "styles": ["src/styles.css"],
@@ -51,7 +51,7 @@
                   "glob": "**/*",
                   "input": "src/assets",
                   "output": "assets",
-                  "ignore": ["config.json", "config.json.example"]
+                  "ignore": ["config.json", "config.json.example", "images/stamps/*.svg"]
                 }
               ],
               "optimization": true,

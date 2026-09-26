@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <title>いいね！</title>
+  <path d="M190 40c-8-14-30-10-30 6 0 14 18 22 30 34 12-12 30-20 30-34 0-16-22-20-30-6z" fill="#ff5c8a" stroke="#fff" stroke-width="7" stroke-linejoin="round"/>
+  <g transform="rotate(-6 120 140)" font-family="'Hiragino Maru Gothic ProN','Hiragino Sans','BIZ UDPGothic','Yu Gothic UI','Yu Gothic','Meiryo','Noto Sans JP','Noto Sans CJK JP',sans-serif" font-weight="900" font-size="72" text-anchor="middle" stroke-linejoin="round">
+    <text x="120" y="164" textLength="214" lengthAdjust="spacingAndGlyphs" fill="#fff" stroke="#fff" stroke-width="20">いいね！</text>
+    <text x="120" y="164" textLength="214" lengthAdjust="spacingAndGlyphs" fill="#ff3d77" stroke="#8a1038" stroke-width="3" paint-order="stroke">いいね！</text>
+  </g>
+</svg>

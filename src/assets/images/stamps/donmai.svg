@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <title>ドンマイ</title>
+  <g stroke-linecap="round">
+    <path d="M10 92h34M4 122h30M14 152h28" stroke="#fff" stroke-width="14"/>
+    <path d="M10 92h34M4 122h30M14 152h28" stroke="#60a5fa" stroke-width="6"/>
+  </g>
+  <g transform="translate(22 0) skewX(-12)" font-family="'Hiragino Sans','BIZ UDPGothic','Yu Gothic UI','Yu Gothic','Meiryo','Noto Sans JP','Noto Sans CJK JP',sans-serif" font-weight="900" font-size="72" text-anchor="middle" stroke-linejoin="round">
+    <text x="134" y="148" textLength="184" lengthAdjust="spacingAndGlyphs" fill="#fff" stroke="#fff" stroke-width="20">ドンマイ</text>
+    <text x="134" y="148" textLength="184" lengthAdjust="spacingAndGlyphs" fill="#2563eb" stroke="#0b2a6b" stroke-width="3" paint-order="stroke">ドンマイ</text>
+  </g>
+  <path d="M206 170l5 12 12 5-12 5-5 12-5-12-12-5 12-5z" fill="#fde047" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+</svg>

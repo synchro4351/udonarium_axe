@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <title>尊い</title>
+  <defs>
+    <linearGradient id="noble" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e11d8f"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <g stroke="#fbcfe8" stroke-width="9" stroke-linecap="round" transform="translate(120 120)">
+    <path d="M0-78V-112M0 78V112M-78 0H-112M78 0H112M55-55 79-79M-55-55-79-79M55 55 79 79M-55 55-79 79"/>
+  </g>
+  <g fill="#ff6fb5" stroke="#fff" stroke-width="5" stroke-linejoin="round">
+    <path d="M200 26c-5-9-19-6-19 4 0 9 11 14 19 21 8-7 19-12 19-21 0-10-14-13-19-4z"/>
+    <path d="M36 196c-4-7-15-5-15 3 0 7 9 11 15 17 6-6 15-10 15-17 0-8-11-10-15-3z"/>
+  </g>
+  <g font-family="'Hiragino Mincho ProN','Yu Mincho','BIZ UDPMincho','Noto Serif JP','Noto Serif CJK JP','Hiragino Sans','Yu Gothic UI','Meiryo',serif" font-weight="900" font-size="112" text-anchor="middle" stroke-linejoin="round">
+    <text x="120" y="160" textLength="196" lengthAdjust="spacingAndGlyphs" fill="#fff" stroke="#fff" stroke-width="22">尊い</text>
+    <text x="120" y="160" textLength="196" lengthAdjust="spacingAndGlyphs" fill="url(#noble)" stroke="#4a0a3c" stroke-width="3" paint-order="stroke">尊い</text>
+  </g>
+</svg>

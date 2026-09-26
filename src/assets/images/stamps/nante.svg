@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <title>なんて？</title>
+  <g font-family="'Hiragino Maru Gothic ProN','Hiragino Sans','BIZ UDPGothic','Yu Gothic UI','Yu Gothic','Meiryo','Noto Sans JP','Noto Sans CJK JP',sans-serif" font-weight="900" text-anchor="middle" stroke-linejoin="round">
+    <text x="158" y="206" font-size="180" transform="rotate(12 158 140)" fill="#e9d5ff" stroke="#fff" stroke-width="8" paint-order="stroke">？</text>
+    <text x="120" y="146" font-size="66" textLength="212" lengthAdjust="spacingAndGlyphs" fill="#fff" stroke="#fff" stroke-width="20">なんて？</text>
+    <text x="120" y="146" font-size="66" textLength="212" lengthAdjust="spacingAndGlyphs" fill="#7c3aed" stroke="#3b0a86" stroke-width="3" paint-order="stroke">なんて？</text>
+  </g>
+</svg>

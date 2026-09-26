@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <title>すごい！</title>
+  <path d="M232 120 201.3 153.7 199.2 199.2 153.7 201.3 120 232 86.3 201.3 40.8 199.2 38.7 153.7 8 120 38.7 86.3 40.8 40.8 86.3 38.7 120 8 153.7 38.7 199.2 40.8 201.3 86.3z" fill="#ffe066" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
+  <g font-family="'Hiragino Maru Gothic ProN','Hiragino Sans','BIZ UDPGothic','Yu Gothic UI','Yu Gothic','Meiryo','Noto Sans JP','Noto Sans CJK JP',sans-serif" font-weight="900" font-size="60" text-anchor="middle" stroke-linejoin="round">
+    <text x="120" y="142" textLength="176" lengthAdjust="spacingAndGlyphs" fill="#fff" stroke="#fff" stroke-width="16">すごい！</text>
+    <text x="120" y="142" textLength="176" lengthAdjust="spacingAndGlyphs" fill="#dc2626" stroke="#6b0d0d" stroke-width="3" paint-order="stroke">すごい！</text>
+  </g>
+</svg>

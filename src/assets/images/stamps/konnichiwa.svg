@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <title>こんにちは</title>
+  <g fill="#ff9a1f" stroke="#fff" stroke-width="12" stroke-linejoin="round">
+    <rect x="12" y="60" width="216" height="104" rx="50"/>
+    <path d="M58 150 44 206 104 158z"/>
+  </g>
+  <g fill="#ff9a1f">
+    <rect x="12" y="60" width="216" height="104" rx="50"/>
+    <path d="M58 150 44 206 104 158z"/>
+  </g>
+  <text x="120" y="130" font-family="'Hiragino Maru Gothic ProN','Hiragino Sans','BIZ UDPGothic','Yu Gothic UI','Yu Gothic','Meiryo','Noto Sans JP','Noto Sans CJK JP',sans-serif" font-weight="900" font-size="48" text-anchor="middle" textLength="184" lengthAdjust="spacingAndGlyphs" fill="#fff" stroke="#a64b00" stroke-width="2" stroke-linejoin="round" paint-order="stroke">こんにちは</text>
+</svg>

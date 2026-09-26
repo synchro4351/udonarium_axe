@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <title>またね</title>
+  <g fill="none" stroke-linecap="round">
+    <path d="M190 34q16 12 12 32M208 22q24 18 16 48" stroke="#fff" stroke-width="16"/>
+    <path d="M190 34q16 12 12 32M208 22q24 18 16 48" stroke="#14b8a6" stroke-width="7"/>
+    <path d="M30 192q22-16 45 0t45 0 45 0 45 0" stroke="#fff" stroke-width="18"/>
+    <path d="M30 192q22-16 45 0t45 0 45 0 45 0" stroke="#5eead4" stroke-width="9"/>
+  </g>
+  <g font-family="'Hiragino Maru Gothic ProN','Hiragino Sans','BIZ UDPGothic','Yu Gothic UI','Yu Gothic','Meiryo','Noto Sans JP','Noto Sans CJK JP',sans-serif" font-weight="900" font-size="84" text-anchor="middle" stroke-linejoin="round">
+    <text x="116" y="152" textLength="196" lengthAdjust="spacingAndGlyphs" fill="#fff" stroke="#fff" stroke-width="20">またね</text>
+    <text x="116" y="152" textLength="196" lengthAdjust="spacingAndGlyphs" fill="#0f9e8e" stroke="#064e46" stroke-width="3" paint-order="stroke">またね</text>
+  </g>
+</svg>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <title>生きててよかった</title>
+  <defs>
+    <linearGradient id="warm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff8a00"/>
+      <stop offset="1" stop-color="#ff2d7a"/>
+    </linearGradient>
+  </defs>
+  <g fill="#ffe36e" stroke="#fff" stroke-width="4" stroke-linejoin="round">
+    <path d="M30 22l5 13 13 5-13 5-5 13-5-13-13-5 13-5z"/>
+    <path d="M212 190l4 10 10 4-10 4-4 10-4-10-10-4 10-4z"/>
+  </g>
+  <g font-family="'Hiragino Maru Gothic ProN','Hiragino Sans','BIZ UDPGothic','Yu Gothic UI','Yu Gothic','Meiryo','Noto Sans JP','Noto Sans CJK JP',sans-serif" font-weight="900" font-size="54" text-anchor="middle" stroke-linejoin="round">
+    <text x="120" y="106" textLength="192" lengthAdjust="spacingAndGlyphs" fill="#fff" stroke="#fff" stroke-width="18">生きてて</text>
+    <text x="120" y="176" textLength="192" lengthAdjust="spacingAndGlyphs" fill="#fff" stroke="#fff" stroke-width="18">よかった</text>
+    <text x="120" y="106" textLength="192" lengthAdjust="spacingAndGlyphs" fill="url(#warm)" stroke="#7a1030" stroke-width="3" paint-order="stroke">生きてて</text>
+    <text x="120" y="176" textLength="192" lengthAdjust="spacingAndGlyphs" fill="url(#warm)" stroke="#7a1030" stroke-width="3" paint-order="stroke">よかった</text>
+  </g>
+</svg>
