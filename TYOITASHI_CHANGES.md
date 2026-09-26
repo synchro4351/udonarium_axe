@@ -78,6 +78,8 @@
 
 スタンプの使い勝手と絵文字表示：[66250c25](https://github.com/synchro4351/udonarium_axe/commit/66250c25)（独自の標準10個セット）、[33d91f3b](https://github.com/synchro4351/udonarium_axe/commit/33d91f3b)（画像一覧との共有・検索語の保存修正）、[34d6e3aa](https://github.com/synchro4351/udonarium_axe/commit/34d6e3aa)（スタンプ縮小・絵文字だけの発言を拡大）。`9a54146d`を基点に同じ機能ブランチで追加。標準素材は透過PNGとして同梱し、部屋ZIPへ重複保存しません。画面での修正後確認と弱回線試験は未実施です。
 
+標準セットの初期表示：[359c8941](https://github.com/synchro4351/udonarium_axe/commit/359c8941)。空の部屋ではスタンプ管理画面を開いた時に標準セットを表示。ChromiumのE2Eで標準セット、送信画像の大きさ、絵文字だけの拡大、追加直後の一覧、検索語保持を確認。保存ZIP再読込、実2端末、弱回線は未確認です。
+
 ## 検証と制限
 
 - r3の固定ソース`cf5edecf`は、全体929ファイル／12,712件成功・1件skip、production build成功。r2の固定ソース`6e5668dd`は全体927ファイル／12,680件成功・1件skip、production build成功。
