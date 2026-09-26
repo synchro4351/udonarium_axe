@@ -76,6 +76,8 @@
 
 画像スタンプ：[04978b94](https://github.com/synchro4351/udonarium_axe/commit/04978b94)（部屋保存）、[100e611e](https://github.com/synchro4351/udonarium_axe/commit/100e611e)（セットZIP入出力）、[fe4b5dba](https://github.com/synchro4351/udonarium_axe/commit/fe4b5dba)（メディア管理）、[acd82b59](https://github.com/synchro4351/udonarium_axe/commit/acd82b59)（送信とログ）、[9a54146d](https://github.com/synchro4351/udonarium_axe/commit/9a54146d)（選択画面と候補入力）。`.txt`ログ入り本流`21cb573e`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-stamps)。静止画像セットは部屋ZIPと参加者へ同期し、スタンプ発言は添付画像として旧版でも表示できます。画像データは部屋内へ共有されるため、秘密発言でも画像バイト自体は秘匿されません。実2端末と弱回線での確認は未実施です。
 
+スタンプの使い勝手と絵文字表示：[66250c25](https://github.com/synchro4351/udonarium_axe/commit/66250c25)（独自の標準10個セット）、[33d91f3b](https://github.com/synchro4351/udonarium_axe/commit/33d91f3b)（画像一覧との共有・検索語の保存修正）、[34d6e3aa](https://github.com/synchro4351/udonarium_axe/commit/34d6e3aa)（スタンプ縮小・絵文字だけの発言を拡大）。`9a54146d`を基点に同じ機能ブランチで追加。標準素材は透過PNGとして同梱し、部屋ZIPへ重複保存しません。画面での修正後確認と弱回線試験は未実施です。
+
 ## 検証と制限
 
 - r3の固定ソース`cf5edecf`は、全体929ファイル／12,712件成功・1件skip、production build成功。r2の固定ソース`6e5668dd`は全体927ファイル／12,680件成功・1件skip、production build成功。

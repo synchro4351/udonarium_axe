@@ -30,7 +30,7 @@
 
 ## tyoitashi r1／Axe v1.57.1 — 2026-09-24
 
-既存の利用版に初めて識別名を付けたものです。この命名のための再配備は行っていません。
+既存の固定ソースに初めて識別名を付けたものです。
 
 - 固定ソース：[be1fdb8a](https://github.com/synchro4351/udonarium_axe/tree/be1fdb8a81037efab6300ad49260023552e87739)
 - 公式基準：[Axe v1.57.1 / 85c89f98](https://github.com/Xelltis/udonarium_axe/commit/85c89f98ec11f2a82cb0b7bcbcf54351496d4457)
