@@ -249,6 +249,28 @@ describe('CutInStageComponent', () => {
     expect(words.style.letterSpacing).toBe('-10px');
   });
 
+  it('writes the words exactly, with no spaces the template would add around them', () => {
+    const scene = makeScene();
+    addLayer(scene, { kind: 'text', text: '成' });
+
+    show(scene, false, 0);
+
+    // The words keep their own line breaks, so a space around them would be a line of its own
+    // in a box no wider than one letter, and drop the letter half a line.
+    const words = fixture.nativeElement.querySelector('.whitespace-pre-wrap') as HTMLElement;
+    expect(words.textContent).toBe('成');
+  });
+
+  it('keeps the line breaks written into the words', () => {
+    const scene = makeScene();
+    addLayer(scene, { kind: 'text', text: '一行目\n  二行目' });
+
+    show(scene, false, 0);
+
+    const words = fixture.nativeElement.querySelector('.whitespace-pre-wrap') as HTMLElement;
+    expect(words.textContent).toBe('一行目\n  二行目');
+  });
+
   it('refuses to let the browser drag a layer picture away', () => {
     const scene = makeScene();
     addLayer(scene, { imageIdentifier: 'nothing' });
