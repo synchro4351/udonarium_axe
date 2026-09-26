@@ -74,6 +74,8 @@
 
 プレーンテキストのログ：[66490d3d](https://github.com/synchro4351/udonarium_axe/commit/66490d3d)（文字列生成）、[d1d26ea5](https://github.com/synchro4351/udonarium_axe/commit/d1d26ea5)（保存画面）、[21cb573e](https://github.com/synchro4351/udonarium_axe/commit/21cb573e)（HTML引用の秘匿修正）。リアクション入り本流`c5d53252`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-text-log)。HTMLの既存出力を残して`.txt`を追加し、読めない引用・返信先を両形式から除外。保存・同期形式は変えず、通常VPSへ未配備です。
 
+画像スタンプ：[04978b94](https://github.com/synchro4351/udonarium_axe/commit/04978b94)（部屋保存）、[100e611e](https://github.com/synchro4351/udonarium_axe/commit/100e611e)（セットZIP入出力）、[fe4b5dba](https://github.com/synchro4351/udonarium_axe/commit/fe4b5dba)（メディア管理）、[acd82b59](https://github.com/synchro4351/udonarium_axe/commit/acd82b59)（送信とログ）、[9a54146d](https://github.com/synchro4351/udonarium_axe/commit/9a54146d)（選択画面と候補入力）。`.txt`ログ入り本流`21cb573e`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-stamps)。静止画像セットは部屋ZIPと参加者へ同期し、スタンプ発言は添付画像として旧版でも表示できます。画像データは部屋内へ共有されるため、秘密発言でも画像バイト自体は秘匿されません。実2端末と弱回線での確認は未実施、通常VPSへ未配備です。
+
 ## 検証と制限
 
 - r3の固定ソース`cf5edecf`は、全体929ファイル／12,712件成功・1件skip、production build成功。r2の固定ソース`6e5668dd`は全体927ファイル／12,680件成功・1件skip、production build成功。
