@@ -39,6 +39,7 @@ export class Config extends ObjectNode implements InnerXml {
   @SyncVar('_handDrawForbidden') private _handDrawForbidden: string = '';
   @SyncVar('_handGiveForbidden') private _handGiveForbidden: string = '';
   @SyncVar('_handVisibilityMode') private _handVisibilityMode: string = '';
+  @SyncVar('_allowPlayerCardEdit') private _allowPlayerCardEdit: string = '';
 
   // How the round is taken, which is the room's own decision rather than a table's.
   @SyncVar('_turnOrderMode') private _turnOrderMode: string = '';
@@ -116,6 +117,14 @@ export class Config extends ObjectNode implements InnerXml {
   }
   set handVisibilityMode(mode: 'choice' | 'public' | 'private') {
     this._handVisibilityMode = mode === 'choice' ? '' : mode;
+  }
+
+  /** Players cannot edit card properties unless the GM opts in. */
+  get allowPlayerCardEdit(): boolean {
+    return this._allowPlayerCardEdit === '1';
+  }
+  set allowPlayerCardEdit(allowed: boolean) {
+    this._allowPlayerCardEdit = allowed ? '1' : '';
   }
 
   /** The room's master volume, shared by every peer; a change applied to the config updates the jukebox at once. */

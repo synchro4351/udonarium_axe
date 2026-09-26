@@ -16,10 +16,11 @@ import { CoordinateService } from '@axe/application/input/coordinate.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
-import { ContextMenuService } from '@axe/application/ui/context-menu.service';
+import { ContextMenuAction, ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { MobileLayoutService } from '@axe/application/ui/mobile-layout.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
+import { sheetPanelTitle } from '@axe/application/ui/sheet-panel';
 import { ViewportService } from '@axe/application/ui/viewport.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
@@ -31,6 +32,7 @@ import { canRoleEdit } from '@axe/domain/peer/peer-role';
 import { HandDrawPanelComponent } from '@axe/features/card/hand-draw/hand-draw-panel.component';
 import { HandOverviewPanelComponent } from '@axe/features/card/hand-draw/hand-overview-panel.component';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
+import { buildHandCardContextMenu } from '@axe/features/card/hand-rail/hand-card-context-menu';
 import { autoSortHandCards, reorderHandCards, selectHandCards } from '@axe/features/card/hand-rail/hand-cards';
 import { HandDragService } from '@axe/features/card/hand-rail/hand-drag.service';
 import { handDropRecipientAt } from '@axe/features/card/hand-rail/hand-drop-target';
@@ -47,6 +49,7 @@ import {
 } from '@axe/features/card/hand-rail/hand-fan';
 import { HandRailService } from '@axe/features/card/hand-rail/hand-rail.service';
 import { handTransferActions } from '@axe/features/card/hand-rail/hand-transfer-context-menu';
+import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { CardFacePreviewComponent } from '@axe/ui/components/card-face-preview/card-face-preview.component';
 import { DraggableDirective } from '@axe/ui/directives/draggable.directive';
 import { TranslocoModule } from '@jsverse/transloco';
@@ -85,6 +88,7 @@ export class HandRailComponent {
   private readonly panelService = inject(PanelService);
   private readonly cardGame = inject(CardGameService);
   private readonly contextMenu = inject(ContextMenuService);
+  private readonly objectPanels = inject(ObjectPanelService);
   protected readonly autoSort = signal(storedAutoSort());
 
   private dragPending: { card: Card; startX: number; startY: number; dragging: boolean } | null = null;
@@ -342,14 +346,43 @@ export class HandRailComponent {
   protected openGiveMenu(card: Card, event: MouseEvent): void {
     event.preventDefault();
     event.stopPropagation();
-    if (!this.allowsGive() || !this.cards().includes(card)) return;
-    const recipients = this.cardGame.participants().filter((seat) => seat.userId !== this.cardGame.myUserId());
-    if (recipients.length < 1) return;
-    this.contextMenu.open(
-      { x: event.clientX, y: event.clientY },
-      handTransferActions(recipients, (userId) => this.cardGame.giveFromHand(card, userId), this.t),
-      this.t('feature.card.hand.giveCard')
+    if (!this.cards().includes(card)) return;
+    const actions = this.giveActionsFor(card);
+    if (actions.length < 1) return;
+    this.contextMenu.open({ x: event.clientX, y: event.clientY }, actions, this.t('feature.card.hand.giveCard'));
+  }
+
+  /** Right-clicking a hand card offers giving it away and, when the room permits, editing it. */
+  protected openCardMenu(card: Card, event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.cards().includes(card)) return;
+    const actions = buildHandCardContextMenu(
+      {
+        giveActions: this.giveActionsFor(card),
+        canEdit: this.cardGame.canEditCard(card),
+        onEdit: () => this.openCardSheet(card),
+      },
+      this.t
     );
+    if (actions.length < 1) return;
+    this.contextMenu.open({ x: event.clientX, y: event.clientY }, actions, this.displayName(card));
+  }
+
+  private giveActionsFor(card: Card): ContextMenuAction[] {
+    if (!this.cardGame.canGiveCards()) return [];
+    return handTransferActions(
+      this.cardGame.giveRecipients(),
+      (userId) => this.cardGame.giveFromHand(card, userId),
+      this.t
+    );
+  }
+
+  /** Opens the card's editor, checking again in case the permission or the card moved since the menu opened. */
+  private openCardSheet(card: Card): void {
+    if (!this.cards().includes(card) || !this.cardGame.canEditCard(card)) return;
+    const title = sheetPanelTitle(this.t('feature.card.settingTitle'), card.name);
+    this.objectPanels.openSheet(card, title, { width: 600, height: 600 });
   }
 
   protected close(): void {

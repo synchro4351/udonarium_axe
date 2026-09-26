@@ -696,6 +696,14 @@ export class RoomSettingsPanelComponent {
     if (!this.isSharedReadOnly()) this.config.handVisibilityMode = mode;
   }
 
+  get allowPlayerCardEdit(): boolean {
+    this.objectChange.versionOf('Config')();
+    return this.config.allowPlayerCardEdit;
+  }
+  set allowPlayerCardEdit(allowed: boolean) {
+    if (!this.isSharedReadOnly()) this.config.allowPlayerCardEdit = allowed;
+  }
+
   /**
    * Loads a dice bot as soon as it is picked, by fetching its help text in the background; the text
    * itself is not used here.

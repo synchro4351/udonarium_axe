@@ -283,6 +283,16 @@ describe('Config', () => {
     expect(Config.instance.handVisibilityMode).toBe('choice');
   });
 
+  it('keeps player card editing disabled in old rooms until the GM enables it', () => {
+    Config.instance.removeAttribute('_allowPlayerCardEdit');
+    expect(Config.instance.allowPlayerCardEdit).toBe(false);
+
+    Config.instance.allowPlayerCardEdit = true;
+    Config.instance.setAttribute('_allowPlayerCardEdit', `${Config.instance.getAttribute('_allowPlayerCardEdit')}`);
+    expect(Config.instance.allowPlayerCardEdit).toBe(true);
+    Config.instance.allowPlayerCardEdit = false;
+  });
+
   describe('system avatar', () => {
     it('starts with no picture of its own', () => {
       expect(Config.instance.systemAvatarIdentifier).toBe('');

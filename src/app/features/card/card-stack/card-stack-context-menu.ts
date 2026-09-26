@@ -13,7 +13,8 @@ import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
  * copying, deleting) act on it directly and play their sound, and shuffling also raises the event
  * that plays the shuffle animation. Drawing, splitting, dealing, copying the detail schema and
  * opening the detail sheet go through the callbacks. A draw callback that returns null means no
- * card came off, so no draw sound plays.
+ * card came off, so no draw sound plays. Recipients for giving the top card away are grouped in
+ * a submenu that only appears when there are any.
  */
 export function buildCardStackContextMenu(
   cardStack: CardStack,
@@ -26,7 +27,8 @@ export function buildCardStackContextMenu(
   onDealAll: () => void,
   onCopySchema: () => void,
   onShowDetail: (cs: CardStack) => void,
-  t: TranslateFn
+  t: TranslateFn,
+  giveActions: readonly ContextMenuAction[] = []
 ): ContextMenuAction[] {
   return [
     buildLockToggleAction(cardStack.isLock, (next) => (cardStack.isLock = next), t),
@@ -47,6 +49,9 @@ export function buildCardStackContextMenu(
         }
       },
     },
+    ...(giveActions.length > 0
+      ? [{ name: t('feature.cardStack.contextMenu.giveTopCard'), subActions: [...giveActions] }]
+      : []),
     {
       name: t('feature.cardStack.contextMenu.drawMany'),
       action: () => {

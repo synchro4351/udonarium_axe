@@ -8,6 +8,7 @@ import {
   input,
   untracked,
 } from '@angular/core';
+import { CardGameService } from '@axe/application/card/card-game.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ModalService } from '@axe/application/ui/modal.service';
@@ -45,8 +46,16 @@ export class CardStackCardListComponent {
   private readonly objectChange = inject(ObjectChangeService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly t = inject(TRANSLATE_FN);
+  private readonly cardGame = inject(CardGameService);
 
   readonly cardStack = input.required<CardStack>();
+
+  /** Whether the room lets this user change the cards' names and images; drawing and ordering stay open to all. */
+  readonly canEditCards = computed(() => {
+    this.objectChange.versionOf('Config')();
+    this.objectChange.trackMyCursor();
+    return this.cardGame.canEditCards();
+  });
 
   private readonly owner = Network.peerContext.userId;
   private currentlyOwned: CardStack | null = null;
@@ -124,6 +133,7 @@ export class CardStackCardListComponent {
 
   /** Opens the card's own settings sheet, placed just off the corner of this panel. */
   showDetail(card: Card): void {
+    if (!this.cardGame.canEditCards()) return;
     const title = sheetPanelTitle(this.t('feature.card.settingTitle'), card.name);
     this.objectPanels.openSheet(
       card,
@@ -256,17 +266,20 @@ export class CardStackCardListComponent {
 
   /** Renames the card from its row's name field; the name is shared with the room. */
   setCardName(card: Card, event: Event): void {
+    if (!this.cardGame.canEditCards()) return;
     card.name = (event.target as HTMLInputElement).value;
   }
 
   /**
    * Opens the image picker and sets the chosen picture as the card's front or back.
    *
-   * Closing the picker without a choice, or a card without that image slot, changes nothing.
+   * Closing the picker without a choice, or a card without that image slot, changes nothing, and
+   * neither does a choice made after the room stopped letting this user edit cards.
    */
   setImage(card: Card, slot: 'front' | 'back'): void {
+    if (!this.cardGame.canEditCards()) return;
     this.modalService.open<string>(FileSelecterComponent).then((value) => {
-      if (value == null) return;
+      if (value == null || !this.cardGame.canEditCards()) return;
       const el = card.imageDataElement?.getFirstElementByName(slot);
       if (!el) return;
       el.value = value;

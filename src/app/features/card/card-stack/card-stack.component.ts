@@ -35,6 +35,7 @@ import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { surfaceOf } from '@axe/domain/tabletop/tabletop-object';
 import { CardDrawCountDialogComponent } from '@axe/features/card/card-draw-count-dialog/card-draw-count-dialog.component';
 import { buildCardStackContextMenu } from '@axe/features/card/card-stack/card-stack-context-menu';
+import { handTransferActions } from '@axe/features/card/hand-rail/hand-transfer-context-menu';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { CardFaceTextComponent } from '@axe/ui/components/card-face-text/card-face-text.component';
 import { MovableOption } from '@axe/ui/directives/movable.directive';
@@ -411,7 +412,14 @@ export class CardStackComponent {
       () => this.dealAll(),
       () => this.copySchemaToAll(),
       (cs) => this.showDetail(cs),
-      this.translateFn
+      this.translateFn,
+      this.cardGameService.canGiveCards() && this.cardStack().topCard
+        ? handTransferActions(
+            this.cardGameService.giveRecipients(),
+            (userId) => this.cardGameService.giveFromStackTop(this.cardStack(), userId),
+            this.translateFn
+          )
+        : []
     );
     const surfaceEntries = buildSurfaceSwitchContextMenu(
       this.cardStack(),

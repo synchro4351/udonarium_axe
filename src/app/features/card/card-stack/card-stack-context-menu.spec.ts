@@ -41,6 +41,37 @@ describe('buildCardStackContextMenu', () => {
     }
   });
 
+  it('offers giving the top card to a participant right after drawing it into the hand', () => {
+    const cardStack = CardStack.create('test stack');
+    const give = { name: 'あいて に渡す', action: vi.fn() };
+    try {
+      const build = (giveActions: { name: string; action: () => void }[]) =>
+        buildCardStackContextMenu(
+          cardStack,
+          50,
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+          t,
+          giveActions
+        );
+
+      const actions = build([give]);
+      const toHandIndex = actions.findIndex((action) => action.name === '１枚引いて手札に加える');
+      expect(actions[toHandIndex + 1].name).toBe('一番上のカードを渡す');
+      expect(actions[toHandIndex + 1].subActions).toEqual([give]);
+
+      expect(build([]).map((action) => action.name)).not.toContain('一番上のカードを渡す');
+    } finally {
+      cardStack.destroy();
+    }
+  });
+
   it('offers dealing the deck out before splitting it', () => {
     const cardStack = CardStack.create('test stack');
     try {

@@ -11,6 +11,7 @@ import {
   signal,
 } from '@angular/core';
 import { CardFlipCutInService } from '@axe/application/card/card-flip-cut-in.service';
+import { CardGameService } from '@axe/application/card/card-game.service';
 import { CardTargetService } from '@axe/application/card/card-target.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
@@ -33,6 +34,7 @@ import { buildCardContextMenu } from '@axe/features/card/card/card-context-menu'
 import { selectOverlappingCards } from '@axe/features/card/card/overlapping-cards';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
 import { HandDragService } from '@axe/features/card/hand-rail/hand-drag.service';
+import { handTransferActions } from '@axe/features/card/hand-rail/hand-transfer-context-menu';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { CardFaceTextComponent } from '@axe/ui/components/card-face-text/card-face-text.component';
 import { MovableOption } from '@axe/ui/directives/movable.directive';
@@ -65,6 +67,7 @@ export class CardComponent {
   private readonly contextMenuService = inject(ContextMenuService);
   private readonly pieceContextMenu = inject(PieceContextMenuService);
   private readonly rolePermission = inject(RolePermissionService);
+  private readonly cardGame = inject(CardGameService);
   private readonly disclosureService = inject(DisclosureService);
   private readonly objectPanels = inject(ObjectPanelService);
   private readonly elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -464,7 +467,17 @@ export class CardComponent {
         onClearTarget: () => this.cardTarget.clearTarget(this.card()),
       },
       this.flipCutIn.cutIns(),
-      this.translateFn
+      this.translateFn,
+      {
+        canEditCard: this.cardGame.canEditCard(this.card()),
+        giveActions: this.cardGame.canGiveCards()
+          ? handTransferActions(
+              this.cardGame.giveRecipients(),
+              (userId) => this.cardGame.giveFromTable(this.card(), userId),
+              this.translateFn
+            )
+          : [],
+      }
     );
     this.contextMenuService.open(
       position,
@@ -553,6 +566,7 @@ export class CardComponent {
   }
 
   private showDetail(gameObject: Card) {
+    if (!this.cardGame.canEditCard(gameObject)) return;
     if (!this.disclosureService.canView(gameObject)) return;
     const title = sheetPanelTitle(this.translateFn('feature.card.settingTitle'), gameObject.name);
     this.objectPanels.openSheet(gameObject, title, { width: 600, height: 600 });

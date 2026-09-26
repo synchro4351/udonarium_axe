@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { CardGameService } from '@axe/application/card/card-game.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
+import { IPeerContext } from '@axe/core/network/peer-context';
+import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card, CardState } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
@@ -56,6 +58,7 @@ describe('CardGameService', () => {
     Config.instance.allowsHandDraw = true;
     Config.instance.allowsHandGive = true;
     Config.instance.handVisibilityMode = 'choice';
+    Config.instance.allowPlayerCardEdit = false;
     vi.restoreAllMocks();
     for (const object of created.splice(0)) object.destroy();
     for (const cursor of ObjectStore.instance.getObjects<PeerCursor>(PeerCursor)) {
@@ -113,6 +116,175 @@ describe('CardGameService', () => {
     other.handPublic = false;
     Config.instance.handVisibilityMode = 'public';
     expect(service.handPublicOf('other')).toBe(true);
+  });
+
+  it('lets the GM edit cards but requires a room opt-in for players', () => {
+    expect(service.canEditCards()).toBe(false);
+    Config.instance.allowPlayerCardEdit = true;
+    expect(service.canEditCards()).toBe(true);
+    PeerCursor.myCursor.role = PeerRole.GameMaster;
+    Config.instance.allowPlayerCardEdit = false;
+    expect(service.canEditCards()).toBe(true);
+    PeerCursor.myCursor.role = PeerRole.Guest;
+    expect(service.canEditCards()).toBe(false);
+  });
+
+  describe('canEditCard()', () => {
+    beforeEach(() => {
+      setPeerContextProvider({
+        peerContext: { userId: 'me', peerId: 'me/peer' } as IPeerContext,
+        peerContexts: [],
+        peerIds: [],
+        peerId: 'me/peer',
+      });
+    });
+    afterEach(() => resetPeerContextProvider());
+
+    it('lets a permitted player edit only cards whose front they can already see', () => {
+      Config.instance.allowPlayerCardEdit = true;
+      const faceUp = trumpCard('s01');
+      faceUp.faceUp();
+      const faceDown = trumpCard('s02');
+      faceDown.faceDown();
+      const inMyHand = trumpCard('s03');
+      inMyHand.toHand('me');
+      const inOtherHand = trumpCard('s04');
+      inOtherHand.toHand('other');
+      const peekedByOther = trumpCard('s05');
+      peekedByOther.faceDown();
+      peekedByOther.owner = 'other';
+
+      expect(service.canEditCard(faceUp)).toBe(true);
+      expect(service.canEditCard(inMyHand)).toBe(true);
+      expect(service.canEditCard(faceDown)).toBe(false);
+      expect(service.canEditCard(inOtherHand)).toBe(false);
+      expect(service.canEditCard(peekedByOther)).toBe(false);
+    });
+
+    it('lets nobody but the GM edit while the room keeps its default', () => {
+      const inMyHand = trumpCard('s03');
+      inMyHand.toHand('me');
+      const faceDown = trumpCard('s02');
+      faceDown.faceDown();
+
+      expect(service.canEditCard(inMyHand)).toBe(false);
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      expect(service.canEditCard(inMyHand)).toBe(true);
+      expect(service.canEditCard(faceDown)).toBe(true);
+    });
+  });
+
+  describe('giveRecipients()', () => {
+    it('lists every card holder except yourself and onlookers', () => {
+      peer('other', 'あいて');
+      peer('guest', 'けんがく', PeerRole.Guest);
+
+      expect(service.giveRecipients()).toEqual([{ userId: 'other', name: 'あいて' }]);
+    });
+  });
+
+  describe('giveFromTable()', () => {
+    it('sends a face-up table card to another hand face down and announces it without naming the card', () => {
+      peer('other', 'あいて');
+      const card = trumpCard('s07');
+      card.faceUp();
+
+      expect(service.giveFromTable(card, 'other')).toBe(true);
+
+      expect(card.location.name).toBe(handLocationOf('other'));
+      expect(card.state).toBe(CardState.BACK);
+      expect(card.owner).toBe('');
+      expect(card.lastHandGiverUserId).toBe('me');
+      expect(sendSystemMessage).toHaveBeenCalledOnce();
+      expect(sendSystemMessage.mock.calls[0][0]).toBe('わたし が あいて にカードを 1 枚渡しました');
+    });
+
+    it('drops a peek on the card as it leaves the table', () => {
+      peer('other', 'あいて');
+      const card = trumpCard('s07');
+      card.faceDown();
+      card.owner = 'me';
+
+      expect(service.giveFromTable(card, 'other')).toBe(true);
+      expect(card.owner).toBe('');
+      expect(card.state).toBe(CardState.BACK);
+    });
+
+    it('refuses cards in a hand or a stack, yourself, guests and rooms that forbid giving', () => {
+      peer('other', 'あいて');
+      peer('guest', 'けんがく', PeerRole.Guest);
+      const inHand = trumpCard('s01');
+      inHand.toHand('third');
+      const stack = CardStack.create('山札');
+      created.push(stack);
+      const inStack = trumpCard('s02');
+      stack.putOnTop(inStack);
+      const loose = trumpCard('s03');
+
+      expect(service.giveFromTable(inHand, 'other')).toBe(false);
+      expect(service.giveFromTable(inStack, 'other')).toBe(false);
+      expect(service.giveFromTable(loose, 'me')).toBe(false);
+      expect(service.giveFromTable(loose, 'guest')).toBe(false);
+      expect(service.giveFromTable(loose, 'nobody')).toBe(false);
+      Config.instance.allowsHandGive = false;
+      expect(service.giveFromTable(loose, 'other')).toBe(false);
+
+      expect(inHand.location.name).toBe(handLocationOf('third'));
+      expect(stack.cards).toEqual([inStack]);
+      expect(loose.location.name).toBe('table');
+      expect(sendSystemMessage).not.toHaveBeenCalled();
+    });
+
+    it('refuses to give for an onlooker', () => {
+      peer('other', 'あいて');
+      const card = trumpCard('s07');
+      PeerCursor.myCursor.role = PeerRole.Guest;
+
+      expect(service.canGiveCards()).toBe(false);
+      expect(service.giveFromTable(card, 'other')).toBe(false);
+      expect(card.location.name).toBe('table');
+    });
+  });
+
+  describe('giveFromStackTop()', () => {
+    it('sends only the top card, face down, even when the stack shows it face up', () => {
+      peer('other', 'あいて');
+      const stack = CardStack.create('山札');
+      created.push(stack);
+      const top = trumpCard('s01');
+      const below = trumpCard('s02');
+      stack.putOnBottom(top);
+      stack.putOnBottom(below);
+      stack.faceUp();
+
+      expect(service.giveFromStackTop(stack, 'other')).toBe(true);
+
+      expect(top.location.name).toBe(handLocationOf('other'));
+      expect(top.state).toBe(CardState.BACK);
+      expect(top.owner).toBe('');
+      expect(top.lastHandGiverUserId).toBe('me');
+      expect(stack.cards).toEqual([below]);
+      expect(sendSystemMessage).toHaveBeenCalledOnce();
+    });
+
+    it('leaves the stack untouched for an empty stack, a refused recipient or a forbidding room', () => {
+      peer('other', 'あいて');
+      const empty = CardStack.create('空');
+      created.push(empty);
+      const stack = CardStack.create('山札');
+      created.push(stack);
+      const top = trumpCard('s01');
+      stack.putOnTop(top);
+
+      expect(service.giveFromStackTop(empty, 'other')).toBe(false);
+      expect(service.giveFromStackTop(stack, 'me')).toBe(false);
+      Config.instance.allowsHandGive = false;
+      expect(service.giveFromStackTop(stack, 'other')).toBe(false);
+
+      expect(stack.cards).toEqual([top]);
+      expect(top.location.name).not.toBe(handLocationOf('other'));
+      expect(sendSystemMessage).not.toHaveBeenCalled();
+    });
   });
 
   describe('drawFromHand()', () => {
