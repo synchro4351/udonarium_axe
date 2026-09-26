@@ -8,6 +8,8 @@
 
 ## tyoitashi r3／Axe v1.57.1 — 2026-09-26
 
+次版の開発ソースは[発言ごとの絵文字リアクション](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-reactions)を追加しています。r3の通常VPSには含みません。
+
 - 固定ソース：[cf5edecf](https://github.com/synchro4351/udonarium_axe/tree/cf5edecf309aa245d974737fc8b5486e6131faac)
 - r2を基点に、GMによる不在手札の引継ぎと自分の手札カードのホバー詳細を追加しました。新しい保存・同期項目はありません。
 - 全体929ファイル／12,712件成功・1件skip、production build成功。通常版VPSのWebを更新し、配信・コンテナ状態を確認済みです。手札ホバー詳細の目視は未確認です。最新の保存・再読込ではカード複製は見られませんでしたが、以前に報告された既存卓へZIPを重ねて読み込む条件は再確認が必要です。弱回線試験も後日実施します。

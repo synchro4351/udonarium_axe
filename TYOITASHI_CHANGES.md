@@ -68,6 +68,10 @@
 | --- | --- | --- |
 | 不在参加者の手札をGMが引き継がせる | [bf66c752](https://github.com/synchro4351/udonarium_axe/commit/bf66c752) | r2固定ソース`6e5668dd`起点。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/orphan-hand-recovery)。既存の手札位置とCard.toHandを使用。カードは伏せて移り、保存・同期形式を追加しない。最新の保存・再読込では複製なし。既存卓へのZIP重ね読み込みは再確認待ち |
 | 自分の手札カードのホバー詳細 | [be02ffce](https://github.com/synchro4351/udonarium_axe/commit/be02ffce) | bf66c752起点。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hand-hover-preview)。場のカードと共通のツールチップを自分の手札へ適用。タッチ・ドラッグ中は抑止。他人の秘匿手札には適用しない。保存・同期形式の変更なし |
+## 開発版の追加変更（未配備）
+
+発言別リアクション：[8cee77d4](https://github.com/synchro4351/udonarium_axe/commit/8cee77d4)（参加者別の保存・同期）、[45d1561b](https://github.com/synchro4351/udonarium_axe/commit/45d1561b)（HTMLログ）、[c5d53252](https://github.com/synchro4351/udonarium_axe/commit/c5d53252)（選択画面）。r3固定ソース`cf5edecf`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-reactions)。発言ごと・参加者ごとに別の同期オブジェクトを使い、複数人の同時操作で票を上書きしない。従来の保存ZIPは反応なしとして読込。実2端末と弱回線での確認は未実施、通常VPSへ未配備です。
+
 ## 検証と制限
 
 - r3の固定ソース`cf5edecf`は、全体929ファイル／12,712件成功・1件skip、production build成功。r2の固定ソース`6e5668dd`は全体927ファイル／12,680件成功・1件skip、production build成功。
