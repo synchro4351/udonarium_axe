@@ -4,6 +4,8 @@ import { ContextMenuAction, ContextMenuSeparator } from '@axe/application/ui/con
 /** What the reader may do with one line, as the line works it out. */
 export interface ChatMessageMenuState {
   canInteract: boolean;
+  /** Whether the reader may leave an emoji on the line. */
+  canReact?: boolean;
   canShareAsMemo: boolean;
   canChange: boolean;
   canShowInTicker: boolean;
@@ -20,6 +22,8 @@ export interface ChatMessageMenuState {
 }
 
 export interface ChatMessageMenuCallbacks {
+  /** Opens the emoji picker under the line. */
+  react?: () => void;
   reply: () => void;
   quote: () => void;
   copyToTab: (tabIdentifier: string) => void;
@@ -46,6 +50,10 @@ export function buildChatMessageContextMenu(
   t: TranslateFn
 ): ContextMenuAction[] {
   const actions: ContextMenuAction[] = [];
+  if (state.canReact && callbacks.react) {
+    const react = callbacks.react;
+    actions.push({ name: t('feature.chat.message.addReaction'), action: () => react() });
+  }
   if (state.canInteract) {
     actions.push({ name: t('feature.chat.message.reply'), action: () => callbacks.reply() });
     actions.push({ name: t('feature.chat.message.quote'), action: () => callbacks.quote() });

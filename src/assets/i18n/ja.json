@@ -2866,7 +2866,12 @@
         "ticker": "ティッカー",
         "copyToTab": "別のタブにコピー",
         "copyText": "本文をコピー",
-        "selectText": "文字を選ぶ"
+        "selectText": "文字を選ぶ",
+        "addReaction": "リアクションを追加",
+        "reactionChip": "{{emoji}} {{count}}人",
+        "reactionChipMine": "{{emoji}} {{count}}人（自分を含む）。押すと外します",
+        "reactionSearch": "名前で探すか、絵文字を貼り付け",
+        "reactionSearchNoMatch": "見つかりません"
       },
       "speech": {
         "read": "この発言を読み上げる",

@@ -1334,4 +1334,45 @@ describe('ChatMessageComponent', () => {
       expect(message.vnEmote).toBe('');
     });
   });
+
+  describe('reactions', () => {
+    let tab: ChatTab;
+
+    beforeEach(() => {
+      beMyself('alice');
+      vi.spyOn(TestBed.inject(RolePermissionService), 'myRole', 'get').mockReturnValue(PeerRole.Player);
+      tab = new ChatTab();
+      tab.initialize();
+    });
+
+    afterEach(() => {
+      tab.destroy();
+    });
+
+    const said = (extra: Partial<Record<'to' | 'tag', string>> = {}) =>
+      tab.addMessage({ from: 'bob', name: 'ボブ', text: 'やあ', timestamp: 1000, messColor: '#000000', ...extra });
+
+    it('opens the picker under the line from the button over it', () => {
+      fixture.componentRef.setInput('chatMessage', said());
+      fixture.detectChanges();
+
+      (fixture.nativeElement.querySelector('[data-testid="chat-message-react"]') as HTMLElement).click();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="chat-reaction-picker"]')).toBeTruthy();
+    });
+
+    it('offers no button on a whisper between others, nor in a window that only reads', () => {
+      fixture.componentRef.setInput('chatMessage', said({ to: 'carol' }));
+      fixture.detectChanges();
+      expect(component.canReact()).toBe(false);
+      expect(fixture.nativeElement.querySelector('[data-testid="chat-message-react"]')).toBeNull();
+
+      fixture.componentRef.setInput('chatMessage', said());
+      fixture.componentRef.setInput('readOnly', true);
+      fixture.detectChanges();
+      expect(component.canReact()).toBe(false);
+      expect(fixture.nativeElement.querySelector('[data-testid="chat-message-react"]')).toBeNull();
+    });
+  });
 });

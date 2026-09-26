@@ -16,6 +16,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { ChatPreferencesService } from '@axe/application/chat/chat-preferences.service';
+import { ChatReactionService } from '@axe/application/chat/chat-reaction.service';
 import { ChatTickerSelectionService } from '@axe/application/chat/chat-ticker-selection.service';
 import { SystemAvatarKind, SystemAvatarService } from '@axe/application/chat/system-avatar.service';
 import { decodeI18nMessage } from '@axe/application/i18n/i18n-message';
@@ -43,6 +44,7 @@ import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { TextNote } from '@axe/domain/tabletop/text-note';
 import { encodeVnEmote, vnBodyOf, vnEmoteOf } from '@axe/domain/visual-novel/vn-emote';
 import { buildChatMessageContextMenu } from '@axe/features/chat/chat-message/chat-message-context-menu';
+import { ChatMessageReactionsComponent } from '@axe/features/chat/chat-message-reactions/chat-message-reactions.component';
 import { ChatSpeechControlsComponent } from '@axe/features/chat/chat-speech-controls/chat-speech-controls.component';
 import { formatChatTickerMessage } from '@axe/features/chat/chat-ticker/chat-ticker-layout';
 import { SystemAvatarMenuService } from '@axe/features/chat/system-avatar-menu.service';
@@ -72,6 +74,7 @@ import { TranslocoModule } from '@jsverse/transloco';
     SafePipe,
     TranslocoModule,
     ChatSpeechControlsComponent,
+    ChatMessageReactionsComponent,
   ],
 })
 export class ChatMessageComponent {
@@ -96,6 +99,26 @@ export class ChatMessageComponent {
   private readonly contextMenuService = inject(ContextMenuService);
   private readonly pointerDeviceService = inject(PointerDeviceService);
   private readonly viewport = inject(ViewportService);
+  private readonly chatReactions = inject(ChatReactionService);
+
+  private readonly reactionsView = viewChild(ChatMessageReactionsComponent);
+
+  /** Whether this reader may leave an emoji on the line; it follows who may read the line and speak in its tab. */
+  readonly canReact = computed(() => {
+    if (this.readOnly()) return false;
+    const message = this.chatMessageInput();
+    if (!message) return false;
+    this.objectChange.versionOf(message.identifier)();
+    this.objectChange.versionOf(message.tabIdentifier)();
+    this.objectChange.trackMyCursor();
+    return this.chatReactions.canReact(message);
+  });
+
+  /** Opens the emoji picker under the line, from its button or its menu. */
+  openReactionPicker(): void {
+    if (!this.canReact()) return;
+    this.reactionsView()?.openPicker();
+  }
 
   protected get canRevealSecret(): boolean {
     return this.rolePermission.canSeeHidden;
@@ -247,6 +270,7 @@ export class ChatMessageComponent {
     const actions = buildChatMessageContextMenu(
       {
         canInteract: this.canInteract,
+        canReact: this.canReact(),
         canShareAsMemo: this.canShareAsMemo,
         canChange: this.canChange,
         canShowInTicker: this.canShowInTicker(),
@@ -257,6 +281,7 @@ export class ChatMessageComponent {
         isTouch: this.viewport.isTouch(),
       },
       {
+        react: () => this.openReactionPicker(),
         reply: () => this.clickReply(),
         quote: () => this.clickQuote(),
         copyToTab: (identifier) => {

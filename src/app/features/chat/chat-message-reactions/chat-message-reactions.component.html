@@ -1,0 +1,99 @@
+@if (reactions().length > 0 || isPickerOpen()) {
+  <div class="flex flex-wrap items-center gap-1 px-2.5 pt-1" data-testid="chat-reactions">
+    @for (reaction of reactions(); track reaction.emoji) {
+      @if (canReact()) {
+        <button
+          type="button"
+          data-testid="chat-reaction-chip"
+          class="rounded-ui inline-flex min-h-7 cursor-pointer items-center gap-1 border border-solid px-1.5 text-[13px] leading-none transition-colors"
+          [class]="
+            reaction.mine
+              ? 'border-ui-accent bg-ui-accent-bg text-ui-accent hover:bg-ui-accent-glow'
+              : 'border-ui-border-panel bg-ui-elevated text-ui-text hover:bg-ui-hover'
+          "
+          [attr.aria-pressed]="reaction.mine"
+          [attr.aria-label]="
+            (reaction.mine ? 'feature.chat.message.reactionChipMine' : 'feature.chat.message.reactionChip')
+              | transloco: { emoji: reaction.emoji, count: reaction.count }
+          "
+          [title]="
+            (reaction.mine ? 'feature.chat.message.reactionChipMine' : 'feature.chat.message.reactionChip')
+              | transloco: { emoji: reaction.emoji, count: reaction.count }
+          "
+          (click)="toggle(reaction.emoji)"
+        >
+          <span class="text-[15px]">{{ reaction.emoji }}</span>
+          <span class="font-medium tabular-nums">{{ reaction.count }}</span>
+        </button>
+      } @else {
+        <span
+          data-testid="chat-reaction-chip"
+          class="rounded-ui border-ui-border-panel bg-ui-elevated text-ui-text inline-flex min-h-7 items-center gap-1 border border-solid px-1.5 text-[13px] leading-none"
+          [title]="'feature.chat.message.reactionChip' | transloco: { emoji: reaction.emoji, count: reaction.count }"
+        >
+          <span class="text-[15px]">{{ reaction.emoji }}</span>
+          <span class="font-medium tabular-nums">{{ reaction.count }}</span>
+        </span>
+      }
+    }
+    @if (canReact()) {
+      <button
+        type="button"
+        data-testid="chat-reaction-add"
+        class="rounded-ui border-ui-border-panel text-ui-dim hover:text-ui-accent hover:bg-ui-hover inline-flex min-h-7 min-w-7 cursor-pointer items-center justify-center border border-dashed bg-transparent p-0 transition-colors"
+        [class.text-ui-accent]="isPickerOpen()"
+        [attr.aria-expanded]="isPickerOpen()"
+        [attr.aria-label]="'feature.chat.message.addReaction' | transloco"
+        [title]="'feature.chat.message.addReaction' | transloco"
+        (click)="togglePicker()"
+      >
+        <i aria-hidden="true" class="material-icons text-[16px]!">add_reaction</i>
+      </button>
+    }
+  </div>
+  @if (isPickerOpen() && canReact()) {
+    <div
+      role="group"
+      data-testid="chat-reaction-picker"
+      class="border-ui-border-panel bg-ui-panel rounded-ui-sm shadow-ui-md mx-2.5 mt-1 flex max-w-full flex-col gap-1 border border-solid p-1"
+      [attr.aria-label]="'feature.chat.message.addReaction' | transloco"
+      (keydown)="onPickerKeydown($event)"
+    >
+      <div class="relative flex items-center">
+        <i aria-hidden="true" class="material-icons text-ui-dim pointer-events-none absolute left-2 text-[16px]!">
+          search
+        </i>
+        <input
+          type="search"
+          data-testid="chat-reaction-search"
+          class="border-ui-border-input bg-ui-input text-ui-text rounded-ui-sm box-border min-h-9 w-full min-w-0 border border-solid py-1 pr-2 pl-7 text-[13px] outline-none"
+          autocomplete="off"
+          enterkeyhint="done"
+          [value]="query()"
+          [placeholder]="'feature.chat.message.reactionSearch' | transloco"
+          [attr.aria-label]="'feature.chat.message.reactionSearch' | transloco"
+          (input)="onQueryInput($event)"
+          (keydown)="onSearchKeydown($event)"
+        />
+      </div>
+      <div class="flex flex-wrap gap-0.5" data-testid="chat-reaction-choices">
+        @for (emoji of choices(); track emoji) {
+          <button
+            type="button"
+            data-testid="chat-reaction-choice"
+            class="rounded-ui-sm hover:bg-ui-hover focus-visible:bg-ui-hover inline-flex size-9 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-[20px] leading-none transition-colors"
+            [attr.aria-label]="emoji"
+            (click)="toggle(emoji)"
+          >
+            {{ emoji }}
+          </button>
+        }
+      </div>
+      <p class="text-ui-dim m-0 px-1 text-[12px]" aria-live="polite" data-testid="chat-reaction-search-status">
+        @if (choices().length === 0) {
+          {{ 'feature.chat.message.reactionSearchNoMatch' | transloco }}
+        }
+      </p>
+    </div>
+  }
+}

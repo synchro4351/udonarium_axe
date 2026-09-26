@@ -2866,7 +2866,12 @@
         "ticker": "Ticker",
         "copyToTab": "Copy to another tab",
         "copyText": "Copy text",
-        "selectText": "Select text"
+        "selectText": "Select text",
+        "addReaction": "Add reaction",
+        "reactionChip": "{{emoji}} from {{count}}",
+        "reactionChipMine": "{{emoji}} from {{count}}, including you. Press to remove yours",
+        "reactionSearch": "Search by name, or paste an emoji",
+        "reactionSearchNoMatch": "No matching emoji"
       },
       "speech": {
         "read": "Read this message aloud",

@@ -42,6 +42,17 @@
             <span class="tip msg-timestamp">{{ chatMessage.timestamp | date: 'y/M/d H:mm' }}</span>
             <chat-speech-controls [message]="chatMessage" />
             @if (!isEditing()) {
+              @if (canReact()) {
+                <button
+                  type="button"
+                  data-testid="chat-message-react"
+                  class="text-ui-dim hover:text-ui-accent ml-1 cursor-pointer border-0 bg-transparent p-0 align-middle opacity-0 transition-opacity duration-150 group-hover/body:opacity-100 focus:opacity-100"
+                  [attr.aria-label]="'feature.chat.message.addReaction' | transloco"
+                  (click)="openReactionPicker()"
+                >
+                  <i aria-hidden="true" class="material-icons text-[14px]!">add_reaction</i>
+                </button>
+              }
               @if (canInteract) {
                 <i
                   class="material-icons text-ui-dim hover:text-ui-accent ml-1 cursor-pointer align-middle text-[14px]! opacity-0 transition-opacity duration-150 group-hover/body:opacity-100"
@@ -205,6 +216,7 @@
               &nbsp;{{ 'feature.chat.message.edited' | transloco }}
             }
           </div>
+          <chat-message-reactions [message]="chatMessage" [readOnly]="readOnly()" />
         </div>
       </div>
     }
@@ -327,6 +339,17 @@
                 {{ 'feature.chat.message.editedSimple' | transloco }}
               }
               @if (!isEditing()) {
+                @if (canReact()) {
+                  <button
+                    type="button"
+                    data-testid="chat-message-react"
+                    class="text-ui-dim hover:text-ui-accent ml-1 cursor-pointer border-0 bg-transparent p-0 align-middle opacity-0 transition-opacity duration-150 group-hover/body:opacity-100 focus:opacity-100"
+                    [attr.aria-label]="'feature.chat.message.addReaction' | transloco"
+                    (click)="openReactionPicker()"
+                  >
+                    <i aria-hidden="true" class="material-icons text-[14px]!">add_reaction</i>
+                  </button>
+                }
                 @if (canInteract) {
                   <i
                     class="material-icons text-ui-dim hover:text-ui-accent ml-1 cursor-pointer align-middle text-[14px]! opacity-0 transition-opacity duration-150 group-hover/body:opacity-100"
@@ -400,6 +423,7 @@
               }
             </font>
           </span>
+          <chat-message-reactions [message]="chatMessage" [readOnly]="readOnly()" />
         </div>
       </div>
     }

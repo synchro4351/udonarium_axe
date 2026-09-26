@@ -143,4 +143,20 @@ describe('buildChatMessageContextMenu()', () => {
     expect(calls.copyText).toHaveBeenCalledTimes(1);
     expect(calls.selectText).toHaveBeenCalledTimes(1);
   });
+
+  it('offers reacting first where the reader may, which is how a touch screen opens the picker', () => {
+    const calls = { ...callbacks(), react: vi.fn() };
+    const menu = buildChatMessageContextMenu(state({ canReact: true, isTouch: true }), calls, translate);
+
+    expect(menu[0].name).toBe('feature.chat.message.addReaction');
+    menu[0].action?.();
+    expect(calls.react).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers no reacting where the reader may not, as on a line kept from them', () => {
+    const calls = { ...callbacks(), react: vi.fn() };
+    const menu = buildChatMessageContextMenu(state({ canReact: false }), calls, translate);
+
+    expect(menu.map((action) => action.name)).not.toContain('feature.chat.message.addReaction');
+  });
 });

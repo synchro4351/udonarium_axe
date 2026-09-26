@@ -2866,7 +2866,12 @@
         "ticker": "티커",
         "copyToTab": "다른 탭으로 복사",
         "copyText": "본문 복사",
-        "selectText": "텍스트 선택"
+        "selectText": "텍스트 선택",
+        "addReaction": "반응 추가",
+        "reactionChip": "{{emoji}} {{count}}명",
+        "reactionChipMine": "{{emoji}} {{count}}명 (나 포함). 누르면 취소합니다",
+        "reactionSearch": "이름으로 찾거나 이모지 붙여넣기",
+        "reactionSearchNoMatch": "일치하는 이모지가 없습니다"
       },
       "speech": {
         "read": "이 메시지를 소리 내어 읽기",
