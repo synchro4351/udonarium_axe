@@ -65,7 +65,8 @@ const SHAPES: Record<Exclude<CutInClip, 'none' | 'circle'>, readonly ClipPoint[]
 /** The corners of a shape, or none where the layer keeps its own box. */
 export function clipPoints(clip: CutInClip): readonly ClipPoint[] {
   if (clip === 'none' || clip === 'circle') return [];
-  return SHAPES[clip];
+  // A shape named by a newer copy of the app is drawn whole rather than not at all.
+  return SHAPES[clip] ?? [];
 }
 
 /** What the browser is told, or nothing at all where the layer keeps its own box. */
@@ -74,7 +75,7 @@ export function clipCss(clip: CutInClip): string {
   if (clip === 'circle') return 'ellipse(50% 50% at 50% 50%)';
 
   const corners = clipPoints(clip).map(([x, y]) => `${round(x * 100)}% ${round(y * 100)}%`);
-  return `polygon(${corners.join(', ')})`;
+  return corners.length > 0 ? `polygon(${corners.join(', ')})` : '';
 }
 
 /**
