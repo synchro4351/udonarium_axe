@@ -27,6 +27,7 @@ import { DataSummarySetting } from '@axe/domain/data/data-summary-setting';
 import { AudioTagList } from '@axe/domain/media/audio-tag-list';
 import { carriedImagesOf } from '@axe/domain/media/carried-images';
 import { ImageTagList } from '@axe/domain/media/image-tag-list';
+import { StampPack } from '@axe/domain/media/stamp-pack';
 import { Config } from '@axe/domain/peer/config';
 import { Room } from '@axe/domain/peer/room';
 import { WhiteBoard } from '@axe/domain/tabletop/white-board';
@@ -141,7 +142,7 @@ export class SaveDataService {
 
     const images: ImageFile[] = this.withCarried(
       [...this.searchImageFiles(roomXml), ...this.searchImageFiles(chatXml)],
-      ObjectStore.instance.getObjects(WhiteBoard)
+      [...ObjectStore.instance.getObjects(WhiteBoard), ...ObjectStore.instance.getObjects(StampPack)]
     );
     for (const image of images) {
       const file = this.createImageArchiveFile(image);

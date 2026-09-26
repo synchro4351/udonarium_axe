@@ -15,6 +15,7 @@ import { EffectField } from '@axe/domain/effect/effect-field';
 import { EffectPreset } from '@axe/domain/effect/effect-preset';
 import { createDefaultCutIns } from '@axe/domain/media/builtin-cut-ins';
 import { CutIn } from '@axe/domain/media/cut-in';
+import { StampPack } from '@axe/domain/media/stamp-pack';
 import { Party } from '@axe/domain/party/party';
 import { ReloadCheck } from '@axe/domain/peer/reload-check';
 import { GameTable } from '@axe/domain/tabletop/game-table';
@@ -43,7 +44,7 @@ export class Room extends GameObject implements InnerXml {
 
   /**
    * Writes everything on the table into the save file: tables, parties, characters, ranges, lights, notes,
-   * card stacks, loose cards, dice, coins, cut-ins, dice tables, effect presets and effect fields.
+   * card stacks, loose cards, dice, coins, cut-ins, dice tables, effect presets, effect fields and stamp packs.
    *
    * Cards inside a stack are written with their stack.
    */
@@ -66,6 +67,7 @@ export class Room extends GameObject implements InnerXml {
       ...ObjectStore.instance.getObjects(DiceTable),
       ...ObjectStore.instance.getObjects(EffectPreset),
       ...ObjectStore.instance.getObjects(EffectField),
+      ...ObjectStore.instance.getObjects(StampPack),
     ];
 
     for (const object of objects) {
@@ -77,8 +79,8 @@ export class Room extends GameObject implements InnerXml {
   /**
    * Replaces the room in play with a loaded one, once the user agrees to overwrite it.
    *
-   * Destroys the current tables and everything on them, then reads in the saved objects. Effect presets and
-   * cut-ins are kept when the save carries none, the default sets are made when neither side has any, and every
+   * Destroys the current tables and everything on them, then reads in the saved objects. Effect presets,
+   * cut-ins and stamp packs are kept when the save carries none, the default sets are made when neither side has any, and every
    * peek or hold on an object is cleared. Declining leaves the room untouched.
    */
   parseInnerXml(element: Element) {
@@ -91,6 +93,9 @@ export class Room extends GameObject implements InnerXml {
       Array.from(element.children).some((child) => child.nodeName === aliasName);
     const bringsPresets = brings(EffectPreset.aliasName);
     const bringsCutIns = brings(CutIn.aliasName);
+    // A room saved before there were stamps says nothing about them, which is no reason to take
+    // away the ones gathered here.
+    const bringsStampPacks = brings(StampPack.aliasName);
     const objects: GameObject[] = [
       ...ObjectStore.instance.getObjects(GameTable),
       ...ObjectStore.instance.getObjects(GameTableMask),
@@ -110,6 +115,7 @@ export class Room extends GameObject implements InnerXml {
       ...ObjectStore.instance.getObjects(DiceTable),
       ...(bringsPresets ? ObjectStore.instance.getObjects(EffectPreset) : []),
       ...ObjectStore.instance.getObjects(EffectField),
+      ...(bringsStampPacks ? ObjectStore.instance.getObjects(StampPack) : []),
     ];
 
     const reLoadOk = this.reloadCheck.answerCheck();

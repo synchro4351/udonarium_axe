@@ -9,6 +9,7 @@ import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
+import { StampPack } from '@axe/domain/media/stamp-pack';
 import { GameTable } from '@axe/domain/tabletop/game-table';
 import { WhiteBoard } from '@axe/domain/tabletop/white-board';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -344,6 +345,38 @@ describe('SaveDataService', () => {
       board.scene = JSON.stringify({ layers: [{ kind: 'image', items: [{ imageIdentifier: 'never-seen' }] }] });
 
       expect(privateApi.withCarried([], [board])).toEqual([]);
+    });
+  });
+
+  describe('the pictures of the stamp packs', () => {
+    afterEach(() => ImageStorage.instance.delete('stamp-picture'));
+
+    it('go into a saved room along with the packs', async () => {
+      const service = TestBed.inject(SaveDataService);
+      const privateApi = service as unknown as SaveDataServicePrivateApi;
+      ImageStorage.instance.add(
+        ImageFile.create({
+          identifier: 'stamp-picture',
+          name: '',
+          type: 'image/png',
+          blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
+          url: '',
+          thumbnail: { type: '', blob: null, url: '' },
+        })
+      );
+      const pack = new StampPack();
+      pack.name = 'いつもの';
+      pack.setItems([{ id: 's1', name: 'ok', imageIdentifier: 'stamp-picture', words: ['ok'] }]);
+      pack.initialize();
+      const saveAsync = vi.spyOn(privateApi, 'saveAsync').mockResolvedValue(undefined);
+
+      await privateApi._saveRoomAsync('room');
+
+      const files = saveAsync.mock.calls[0][0] as File[];
+      expect(files.map((file) => file.name)).toContain(`stamp-picture.${MimeType.extension('image/png')}`);
+      const data = await files.find((file) => file.name === 'data.xml')!.text();
+      expect(data).toContain('<stamp-pack');
+      expect(data).toContain(pack.identifier);
     });
   });
 

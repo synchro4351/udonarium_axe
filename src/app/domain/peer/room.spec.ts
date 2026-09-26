@@ -10,6 +10,7 @@ import { createDefaultEffectPresets } from '@axe/domain/effect/builtin-effect-pr
 import { EffectPreset } from '@axe/domain/effect/effect-preset';
 import { createDefaultCutIns } from '@axe/domain/media/builtin-cut-ins';
 import { CutIn } from '@axe/domain/media/cut-in';
+import { StampPack } from '@axe/domain/media/stamp-pack';
 import { Party, PARTY_COLORS } from '@axe/domain/party/party';
 import { ReloadCheck } from '@axe/domain/peer/reload-check';
 import { Room } from '@axe/domain/peer/room';
@@ -191,6 +192,49 @@ describe('Room', () => {
       const after = store.getObjects(CutIn);
       expect(after).toHaveLength(1);
       expect(after[0].name).toBe('持ち込みの一枚');
+    });
+  });
+
+  describe('what happens to the stamp packs as it reads', () => {
+    function packNamed(name: string): StampPack {
+      const pack = new StampPack();
+      pack.name = name;
+      pack.setItems([{ id: 's1', name: 'ok', imageIdentifier: 'image-ok', words: ['ok'] }]);
+      pack.initialize();
+      return pack;
+    }
+
+    it('writes the packs into the room with their identifiers and stamps', () => {
+      const pack = packNamed('いつもの');
+
+      const xml = new Room().innerXml();
+
+      expect(xml).toContain(`<stamp-pack`);
+      expect(xml).toContain(`identifier="${pack.identifier}"`);
+      expect(xml).toContain('image-ok');
+    });
+
+    it('keeps the packs here when the room data was saved before there were any', () => {
+      const pack = packNamed('kept');
+
+      const deleted = deletionsAmong(new Set([pack.identifier]), () => loadRoom('<card></card>'));
+
+      expect(deleted).toEqual([]);
+      expect(store.getObjects(StampPack).map((one) => one.name)).toEqual(['kept']);
+    });
+
+    it('replaces them with what the room data brings, under the identifiers it brings', () => {
+      packNamed('here before');
+      const saved = packNamed('saved');
+      const xml = saved.toXml();
+      saved.destroy();
+
+      loadRoom(xml);
+
+      const after = store.getObjects(StampPack);
+      expect(after.map((one) => one.name)).toEqual(['saved']);
+      expect(after[0].identifier).toBe(saved.identifier);
+      expect(after[0].items.map((item) => item.imageIdentifier)).toEqual(['image-ok']);
     });
   });
 
