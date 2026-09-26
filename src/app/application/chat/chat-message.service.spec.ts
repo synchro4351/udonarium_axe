@@ -1,10 +1,12 @@
 import { inject, TestBed } from '@angular/core/testing';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
+import { diceTableMessage$, resourceEditMessage$, sendMessage$ } from '@axe/core/event/domain-events';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { setPortraitNameOf } from '@axe/domain/character/character-portrait';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
+import { ChatStampOutgoing } from '@axe/domain/chat/chat-outgoing';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { DataElement } from '@axe/domain/data/data-element';
@@ -307,5 +309,98 @@ describe('ChatMessageService', () => {
       expect(PeerCursor.myCursor.lastControlImageIdentifier).toBe('img-1');
       expect(PeerCursor.myCursor.lastControlImageIndex).toBe(1);
     });
+  });
+});
+
+describe('ChatMessageService sending a stamp', () => {
+  let service: ChatMessageService;
+  let chatTab: ChatTab;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [...TEST_PROVIDERS, ChatMessageService] });
+    service = TestBed.inject(ChatMessageService);
+    PeerCursor.createMyCursor();
+    chatTab = new ChatTab();
+    chatTab.initialize();
+    ObjectStore.instance.add(chatTab);
+  });
+
+  afterEach(() => {
+    chatTab.destroy();
+    vi.restoreAllMocks();
+  });
+
+  function stamp(overrides: Partial<ChatStampOutgoing> = {}): ChatStampOutgoing {
+    return {
+      stampName: 'やったね',
+      imageIdentifier: 'stamp-image',
+      sendFrom: PeerCursor.myCursor.identifier,
+      sendTo: '',
+      portraitIndex: 0,
+      messColor: '#123456',
+      replyTo: '',
+      quoteOf: '',
+      ...overrides,
+    };
+  }
+
+  it('sends the picture as the one attachment with the name beside it and no words', () => {
+    const message = service.sendStamp(chatTab, stamp())!;
+
+    expect(message.text).toBe('');
+    expect(message.attachmentImageIdentifierList).toEqual(['stamp-image']);
+    expect(message.stampName).toBe('やったね');
+    expect(message.isStamp).toBe(true);
+    expect(message.messColor).toBe('#123456');
+    expect(chatTab.chatMessages).toEqual([message]);
+  });
+
+  it('says nothing the dice bot, the dice table or resource edits would read', () => {
+    const heard: string[] = [];
+    const stops = [
+      sendMessage$.subscribe(() => heard.push('send')),
+      diceTableMessage$.subscribe(() => heard.push('diceTable')),
+      resourceEditMessage$.subscribe(() => heard.push('resourceEdit')),
+    ];
+    try {
+      service.sendStamp(chatTab, stamp({ stampName: '2d6' }));
+    } finally {
+      stops.forEach((stop) => stop());
+    }
+
+    expect(heard).toEqual([]);
+  });
+
+  it('stays a whisper when whispered, seen only by the two who share it', () => {
+    const other = new PeerCursor();
+    other.initialize();
+    other.userId = 'listener';
+    try {
+      const message = service.sendStamp(chatTab, stamp({ sendTo: other.identifier }))!;
+
+      expect(message.to).toBe('listener');
+      expect(message.isDisplayableTo('listener')).toBe(true);
+      expect(message.isDisplayableTo(PeerCursor.myCursor.userId)).toBe(true);
+      expect(message.isDisplayableTo('someone-else')).toBe(false);
+    } finally {
+      other.destroy();
+    }
+  });
+
+  it('answers the reply and quotation it was sent with', () => {
+    const message = service.sendStamp(chatTab, stamp({ replyTo: 'earlier', quoteOf: 'quoted' }))!;
+
+    expect(message.replyTo).toBe('earlier');
+    expect(message.quoteOf).toBe('quoted');
+  });
+
+  it('keeps a name on one line, and gives one to a stamp that had none', () => {
+    expect(service.sendStamp(chatTab, stamp({ stampName: ' 二行の\nなまえ ' }))!.stampName).toBe('二行の なまえ');
+    expect(service.sendStamp(chatTab, stamp({ stampName: '' }))!.isStamp).toBe(true);
+  });
+
+  it('sends nothing for a stamp with no picture', () => {
+    expect(service.sendStamp(chatTab, stamp({ imageIdentifier: ' ' }))).toBeNull();
+    expect(chatTab.chatMessages).toEqual([]);
   });
 });

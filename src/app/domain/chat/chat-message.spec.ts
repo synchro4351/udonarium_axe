@@ -32,6 +32,54 @@ describe('ChatMessage', () => {
     });
   });
 
+  describe('a stamp', () => {
+    const reload = (message: ChatMessage): ChatMessage => {
+      const xml = message.toXml();
+      store.delete(message, false);
+      store.clearDeleteHistory();
+      return ObjectSerializer.instance.parseXml(xml) as ChatMessage;
+    };
+
+    it('is told by the stamp name it carries, and cannot be edited even by its sender', () => {
+      const msg = new ChatMessage();
+      msg.initialize();
+      msg.from = 'test-user';
+      msg.stampName = 'やったね';
+
+      expect(msg.isStamp).toBe(true);
+      expect(msg.isChangeableBy('test-user')).toBe(false);
+    });
+
+    it('keeps its name and picture through a save and a load', () => {
+      const msg = new ChatMessage();
+      msg.initialize();
+      msg.text = '';
+      msg.stampName = 'やったね';
+      msg.attachmentImageIdentifiers = JSON.stringify(['stamp-image']);
+
+      const restored = reload(msg);
+
+      expect(restored.stampName).toBe('やったね');
+      expect(restored.attachmentImageIdentifierList).toEqual(['stamp-image']);
+    });
+
+    it('leaves a line saved before stamps a line of words, with no stamp name written', () => {
+      const old = ObjectSerializer.instance.parseXml(
+        '<chat identifier="old-1" from="test-user" name="アリア" attachmentImageIdentifiers="[&quot;map&quot;]">地図です</chat>'
+      ) as ChatMessage;
+
+      expect(old.isStamp).toBe(false);
+      expect(old.text).toBe('地図です');
+      expect(old.attachmentImageIdentifierList).toEqual(['map']);
+      expect(old.isChangeableBy('test-user')).toBe(true);
+
+      const plain = new ChatMessage();
+      plain.initialize();
+      plain.text = 'ふつうの発言';
+      expect(plain.toXml()).not.toContain('stampName');
+    });
+  });
+
   describe('text getter/setter', () => {
     it('holds its text', () => {
       const msg = new ChatMessage();

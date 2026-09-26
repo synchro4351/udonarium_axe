@@ -2876,6 +2876,14 @@
         "sendToTickerHint": "이 발언을 화면 외곽에도 흘려보냅니다",
         "tools": "입력 설정"
       },
+      "stamp": {
+        "open": "스탬프·이모지",
+        "emojiTab": "이모지",
+        "emptyPack": "이 팩에는 아직 스탬프가 없습니다",
+        "send": "스탬프 \"{{name}}\" 보내기",
+        "suggestions": "스탬프 후보",
+        "unnamed": "스탬프"
+      },
       "tab": {
         "unnamedCharacter": "이름 없는 캐릭터",
         "player": "플레이어"
@@ -3144,7 +3152,8 @@
           "messages": "발언 {{count}}건",
           "exportedWith": "Udonarium Axe에서 내보냄",
           "attachment": "이미지 첨부",
-          "reactions": "리액션"
+          "reactions": "리액션",
+          "stamp": "스탬프"
         },
         "sample": {
           "gm": "GM",

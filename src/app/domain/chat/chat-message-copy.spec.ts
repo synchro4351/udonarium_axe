@@ -52,7 +52,20 @@ describe('copiedMessageContext()', () => {
       messBubbleLight: '#fff',
       messBubbleDark: '#000',
       sendFrom: 'character-1',
+      stampName: '',
     });
+  });
+
+  it('keeps a stamp a stamp in the tab it is copied to', () => {
+    const message = line();
+    message.value = '';
+    message.stampName = 'やったね';
+    message.attachmentImageIdentifiers = JSON.stringify(['stamp-image']);
+
+    const copied = copiedMessageContext(message, 1);
+
+    expect(copied.stampName).toBe('やったね');
+    expect(copied.attachmentImageIdentifiers).toBe('["stamp-image"]');
   });
 
   it('leaves behind what points at the tab it came from', () => {

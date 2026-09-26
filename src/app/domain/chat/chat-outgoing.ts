@@ -15,6 +15,24 @@ export interface ChatOutgoing {
   toTicker: boolean;
 }
 
+/**
+ * A stamp as it goes out: its picture and name, spoken by and to whoever the input has chosen.
+ *
+ * It carries no words and no dice system, so nothing in it is read as a command.
+ */
+export interface ChatStampOutgoing {
+  stampName: string;
+  imageIdentifier: string;
+  sendFrom: string;
+  sendTo: string;
+  portraitIndex: number;
+  messColor: string;
+  messBubbleLight?: string;
+  messBubbleDark?: string;
+  replyTo: string;
+  quoteOf: string;
+}
+
 export interface ChatOutgoingDraft {
   text: string;
   gameSystem: GameSystemClass;

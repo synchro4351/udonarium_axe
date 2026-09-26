@@ -1,6 +1,7 @@
 import type { ImageFile } from '@axe/core/storage/image-file';
 import type { ChatMessage } from '@axe/domain/chat/chat-message';
 import { formatReactionSummary } from '@axe/domain/chat/chat-reaction';
+import { previewTextOf } from '@axe/domain/chat/chat-stamp-text';
 import { vnBodyOf } from '@axe/domain/visual-novel/vn-emote';
 
 export type ChatLogLine = Pick<
@@ -29,8 +30,8 @@ export type ChatLogLine = Pick<
   | 'rollDetail'
   | 'isOutOfStory'
 > &
-  // a line from before reactions, or one drawn for a sample, may have none to give
-  Partial<Pick<ChatMessage, 'reactions'>>;
+  // a line from before reactions or stamps, or one drawn for a sample, may have none to give
+  Partial<Pick<ChatMessage, 'reactions' | 'stampName'>>;
 
 export interface ChatLogTab {
   readonly name: string;
@@ -481,9 +482,8 @@ export class ChatLogExporter {
    * characters with an ellipsis, without the staging an older novel-mode line carries.
    */
   static referenceExcerpt(target: ChatLogLine, maxTextLength: number, textDecoder?: ChatLogTextDecoder): string {
-    const rawText = vnBodyOf(target.vnEmote, ChatLogExporter.decode(target.text, textDecoder))
-      .replace(/\s+/g, ' ')
-      .trim();
+    const text = previewTextOf({ text: ChatLogExporter.decode(target.text, textDecoder), stampName: target.stampName });
+    const rawText = vnBodyOf(target.vnEmote, text).replace(/\s+/g, ' ').trim();
     return rawText.length > maxTextLength ? rawText.slice(0, maxTextLength) + '…' : rawText;
   }
 
@@ -517,7 +517,7 @@ export class ChatLogExporter {
       .map((image) => {
         const key = imageSrcResolver?.(image) ?? image.url;
         if (!key) return '';
-        const alt = image.name || '添付画像';
+        const alt = message.stampName || image.name || '添付画像';
         return `<img data-img-key="${ChatLogExporter.escapeAttribute(key)}" alt="${ChatLogExporter.escapeAttribute(alt)}" class="ai" />`;
       })
       .filter((imageTag) => imageTag.length > 0)

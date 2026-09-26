@@ -15,6 +15,8 @@ export interface ChatLogTextLabels extends Pick<
 > {
   /** Stands in for a picture attached to a line, which a text file cannot hold. */
   attachment: string;
+  /** Stands in for a stamp, written with its name. */
+  stamp: string;
   /** Heads the counts of the reactions on a line. */
   reactions: string;
 }
@@ -22,6 +24,7 @@ export interface ChatLogTextLabels extends Pick<
 export const DEFAULT_CHAT_LOG_TEXT_LABELS: ChatLogTextLabels = {
   ...DEFAULT_CHAT_LOG_LABELS,
   attachment: '画像添付',
+  stamp: 'スタンプ',
   reactions: 'リアクション',
 };
 
@@ -109,9 +112,12 @@ function entryLines(
   }
 
   const contents = textLines(vnBodyOf(message.vnEmote, decode(message.text, options)));
-  const attachments = (message.attachmentImages ?? [])
-    .map((image) => `[${labels.attachment}${image.name ? `: ${singleLine(image.name)}` : ''}]`)
-    .join(' ');
+  // A stamp is written by its name, which says more than the name of its picture's file.
+  const attachments = message.stampName
+    ? `[${labels.stamp}: ${singleLine(message.stampName)}]`
+    : (message.attachmentImages ?? [])
+        .map((image) => `[${labels.attachment}${image.name ? `: ${singleLine(image.name)}` : ''}]`)
+        .join(' ');
   if (attachments) contents.push(attachments);
   if (contents.length < 1) contents.push('');
 

@@ -239,6 +239,20 @@ describe('renderRichChatLog', () => {
     expect(html).toContain('<div class="att"><img data-img-key="i1" alt="地図.png"></div>');
   });
 
+  it('names a stamp’s picture by the stamp, for a reader who cannot see it', () => {
+    const picture = { identifier: 'a1', url: 'blob:a1', name: '3fa9.png' } as unknown as ImageFile;
+    const stamp = line({ text: '', stampName: 'やったね', attachmentImages: [picture] });
+
+    const rich = renderRichChatLog('parchment', 'tab', [tab('メイン', [stamp])], {
+      imageSrcResolver: () => 'i1',
+    });
+    const standard = ChatLogExporter.exportTabHtml(tab('メイン', [stamp]), 'user-1', () => 'i1');
+
+    expect(rich).toContain('<img data-img-key="i1" alt="やったね">');
+    expect(standard).toContain('alt="やったね"');
+    expect(rich).not.toContain('3fa9.png');
+  });
+
   it('puts the line replied to in front of the reply', () => {
     const original = line({ name: 'GM', text: '扉の向こうから物音がする' });
     const html = renderRichChatLog('messenger', 'tab', [

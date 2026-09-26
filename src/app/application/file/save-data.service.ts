@@ -355,6 +355,7 @@ export class SaveDataService {
     return {
       ...this.chatLogLabels(),
       attachment: this.translate('feature.chat.log.labels.attachment'),
+      stamp: this.translate('feature.chat.log.labels.stamp'),
       reactions: this.translate('feature.chat.log.labels.reactions'),
     };
   }

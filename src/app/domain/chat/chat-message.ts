@@ -46,6 +46,7 @@ export interface ChatMessageContext {
   quoteOf?: string;
   vnEmote?: string;
   senderRole?: string;
+  stampName?: string;
 }
 
 @SyncObject('chat')
@@ -79,6 +80,13 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
    * nothing to say about its speaker, and reads back empty.
    */
   @SyncVar() senderRole: string;
+  /**
+   * The name of the stamp the line was sent as, which its one attached picture shows.
+   *
+   * Left without an initialiser, as `vnEmote` is, so only a stamp writes it. A seat from before
+   * stamps does not know it and shows the picture as an ordinary attachment, with no words.
+   */
+  @SyncVar() stampName: string;
   @SyncVar() messColor: string;
   /** The bubble the sender asked for on each theme. Empty is worked out from the colour. */
   @SyncVar() messBubbleLight: string = '';
@@ -413,6 +421,10 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   get isSystemMessage(): boolean {
     return this.from === 'System' || (this.tag ?? '').includes('system-message');
   }
+  /** Whether the line is a stamp, a picture sent in place of words. */
+  get isStamp(): boolean {
+    return typeof this.stampName === 'string' && this.stampName.length > 0;
+  }
   /** Whether novel mode should pass this line over rather than have it read out. */
   get isOutOfStory(): boolean {
     return this.tags.includes(OUT_OF_STORY_TAG);
@@ -426,10 +438,10 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   }
   /**
    * Whether the user may edit the line: they sent it, and it is not a notice from the tool. A dice
-   * result is sent by the dice bot, so nobody may.
+   * result is sent by the dice bot, so nobody may; nor a stamp, which has no words to edit.
    */
   isChangeableBy(userId: string): boolean {
-    if (this.isSystemMessage) return false;
+    if (this.isSystemMessage || this.isStamp) return false;
     return userId === this.from;
   }
 }

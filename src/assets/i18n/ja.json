@@ -2876,6 +2876,14 @@
         "sendToTickerHint": "この発言を画面の外周にも流します",
         "tools": "入力の設定"
       },
+      "stamp": {
+        "open": "スタンプ・絵文字",
+        "emojiTab": "絵文字",
+        "emptyPack": "このパックにはまだスタンプがありません",
+        "send": "スタンプ「{{name}}」を送る",
+        "suggestions": "スタンプの候補",
+        "unnamed": "スタンプ"
+      },
       "tab": {
         "unnamedCharacter": "無名のキャラクター",
         "player": "プレイヤー"
@@ -3144,7 +3152,8 @@
           "messages": "{{count}} 件の発言",
           "exportedWith": "Udonarium Axe で書き出し",
           "attachment": "画像添付",
-          "reactions": "リアクション"
+          "reactions": "リアクション",
+          "stamp": "スタンプ"
         },
         "sample": {
           "gm": "GM",

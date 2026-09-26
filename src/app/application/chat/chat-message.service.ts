@@ -24,16 +24,21 @@ import { portraitNameOf } from '@axe/domain/character/character-portrait';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage, ChatMessageContext, ChatMessageTargetContext } from '@axe/domain/chat/chat-message';
 import { copiedMessageContext } from '@axe/domain/chat/chat-message-copy';
+import { ChatStampOutgoing } from '@axe/domain/chat/chat-outgoing';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { OUT_OF_STORY_TAG } from '@axe/domain/chat/constants';
 import { dieRollTag } from '@axe/domain/chat/die-roll-tag';
 import { DataElement, DataElementFieldType } from '@axe/domain/data/data-element';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
+import { normalizeStampName } from '@axe/domain/media/stamp-pack';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import GameSystemClass from 'bcdice/lib/game_system';
 
 const HOURS = 60 * 60 * 1000;
+
+/** What a stamp sent without a name is called, since a stamp is known by its name. */
+const STAMP_FALLBACK_NAME = '🖼️';
 
 @Injectable()
 export class ChatMessageService {
@@ -312,6 +317,43 @@ export class ChatMessageService {
     });
 
     return chat;
+  }
+
+  /**
+   * Sends a stamp into a tab: its picture as the line's one attachment and its name alongside,
+   * with no words.
+   *
+   * It goes to whoever a line would, under the same name, portrait and colour, and a whisper
+   * stays one. Nothing in it reaches the dice bot, the dice table or resource edits, since a stamp
+   * says nothing to roll or change. A seat from before stamps sees the picture as an attachment.
+   * Answers null, sending nothing, for a stamp with no picture.
+   */
+  sendStamp(chatTab: ChatTab, stamp: ChatStampOutgoing): ChatMessage | null {
+    const imageIdentifier = stamp.imageIdentifier.trim();
+    if (imageIdentifier.length === 0) return null;
+    const { sendFrom, sendTo } = stamp;
+    const imgIndex = resolvePortraitIndex(stamp.portraitIndex);
+    const chatMessage: ChatMessageContext = {
+      from: Network.peerContext.userId,
+      to: sendTo ? this.findId(sendTo) : undefined,
+      name: this.makeMessageName(sendFrom, sendTo),
+      imageIdentifier: this.findImageIdentifier(sendFrom, imgIndex),
+      timestamp: this.calcTimeStamp(chatTab),
+      tag: '',
+      text: '',
+      imagePos: this.findImagePos(sendFrom),
+      messColor: resolveMessageColor(stamp.messColor, '#000000'),
+      sendFrom,
+      senderRole: PeerCursor.myRole,
+      attachmentImageIdentifiers: JSON.stringify([imageIdentifier]),
+      stampName: normalizeStampName(stamp.stampName) || STAMP_FALLBACK_NAME,
+    };
+    if (stamp.replyTo) chatMessage.replyTo = stamp.replyTo;
+    if (stamp.quoteOf) chatMessage.quoteOf = stamp.quoteOf;
+    if (stamp.messBubbleLight) chatMessage.messBubbleLight = stamp.messBubbleLight;
+    if (stamp.messBubbleDark) chatMessage.messBubbleDark = stamp.messBubbleDark;
+    this.setLastControlInfoToPeer(sendFrom, chatMessage.imageIdentifier ?? '', imgIndex, sendTo);
+    return chatTab.addMessage(chatMessage);
   }
 
   private resolveAttachmentImageReferences(

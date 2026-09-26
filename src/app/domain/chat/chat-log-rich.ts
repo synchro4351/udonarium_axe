@@ -371,7 +371,7 @@ function renderAttachments(message: ChatLogLine, context: RenderContext): string
   const tags = (message.attachmentImages ?? [])
     .map((image) => {
       const key = context.options.imageSrcResolver?.(image) ?? image.url;
-      return key ? `<img data-img-key="${attr(key)}" alt="${attr(image.name || '')}">` : '';
+      return key ? `<img data-img-key="${attr(key)}" alt="${attr(message.stampName || image.name || '')}">` : '';
     })
     .filter((tag) => tag.length > 0)
     .join('');

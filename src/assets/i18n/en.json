@@ -2876,6 +2876,14 @@
         "sendToTickerHint": "Also run this line around the edge of the screen",
         "tools": "Input settings"
       },
+      "stamp": {
+        "open": "Stamps and emoji",
+        "emojiTab": "Emoji",
+        "emptyPack": "This pack has no stamps yet",
+        "send": "Send the stamp \"{{name}}\"",
+        "suggestions": "Stamp suggestions",
+        "unnamed": "Stamp"
+      },
       "tab": {
         "unnamedCharacter": "Unnamed character",
         "player": "Player"
@@ -3144,7 +3152,8 @@
           "messages": "{{count}} lines",
           "exportedWith": "Exported from Udonarium Axe",
           "attachment": "Image attached",
-          "reactions": "Reactions"
+          "reactions": "Reactions",
+          "stamp": "Stamp"
         },
         "sample": {
           "gm": "GM",

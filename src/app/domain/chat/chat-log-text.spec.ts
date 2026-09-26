@@ -131,6 +131,50 @@ describe('renderChatLogText', () => {
     expect(text).toContain('[20:00] アリア：[画像添付: map.png]\n');
   });
 
+  it('writes a stamp by its name rather than by its picture file', () => {
+    const stamp = line({ text: '', stampName: 'やったね', attachmentImages: [image('3fa9.png')] });
+    const text = renderChatLogText('tab', [tab('メイン', [stamp])], { userId: 'reader' });
+
+    expect(text).toContain('[20:00] アリア：[スタンプ: やったね]\n');
+    expect(text).not.toContain('3fa9.png');
+    expect(text).not.toContain('画像添付');
+  });
+
+  it('writes a stamp whose picture has not arrived by its name all the same', () => {
+    const stamp = line({ text: '', stampName: 'やったね', attachmentImages: [] });
+
+    expect(renderChatLogText('tab', [tab('メイン', [stamp])], { userId: 'reader' })).toContain(
+      'アリア：[スタンプ: やったね]'
+    );
+  });
+
+  it('leaves a stamp whispered between others out of the reader’s log, name and all', () => {
+    const whispered = line({
+      name: 'GM > ボブ',
+      text: '',
+      from: 'gm',
+      to: 'bob',
+      isDisplayable: false,
+      stampName: '秘密の合図',
+      attachmentImages: [image('signal.png')],
+    });
+    const text = renderChatLogText('tab', [tab('メイン', [line(), whispered])], { userId: 'reader' });
+
+    expect(text).not.toContain('秘密の合図');
+    expect(text).not.toContain('ボブ');
+    expect(renderChatLogText('tab', [tab('メイン', [whispered])], { userId: 'bob' })).toContain(
+      '[スタンプ: 秘密の合図]'
+    );
+  });
+
+  it('names a stamp quoted or replied to, rather than quoting nothing', () => {
+    const stamp = line({ name: 'ボブ', text: '', stampName: 'ありがとう' });
+    const reply = line({ text: 'どういたしまして', replyTo: 'x', replyToMessage: asMessage(stamp) });
+    const text = renderChatLogText('tab', [tab('メイン', [reply])], { userId: 'reader' });
+
+    expect(text).toContain('↩ 返信先 ボブ：[ありがとう]');
+  });
+
   it('writes a roll with its result and outcome, and marks an edited line', () => {
     const roll = line({
       name: '<BCDice：アリア>',
