@@ -3,9 +3,11 @@ import {
   ComponentRef,
   DestroyRef,
   Directive,
+  effect,
   inject,
   input,
   Type,
+  untracked,
   ViewContainerRef,
 } from '@angular/core';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
@@ -69,6 +71,8 @@ export class TooltipDirective {
   private static activeOwner: TooltipDirective | null = null;
 
   readonly tabletopObject = input.required<TabletopObject>({ alias: 'appTooltip' });
+  /** While set, the piece raises no detail, and the one it is showing goes. */
+  readonly disabled = input(false, { alias: 'appTooltipDisabled' });
 
   private callbackOnMouseEnter = (e: Event) => this.onMouseEnter(e as MouseEvent);
   private callbackOnMouseLeave = (e: Event) => this.onMouseLeave(e as MouseEvent);
@@ -90,6 +94,13 @@ export class TooltipDirective {
       this.addEventListeners(element);
       this.tapGesture = observeTap(element, () => this.onTap());
     });
+    effect(() => {
+      if (!this.disabled()) return;
+      untracked(() => {
+        this.clearTimer();
+        this.close();
+      });
+    });
     this.destroyRef.onDestroy(() => {
       this.removeEventListeners(this.viewContainerRef.element.nativeElement);
       this.tapGesture?.destroy();
@@ -100,7 +111,7 @@ export class TooltipDirective {
   }
 
   private onTap() {
-    if (!this.viewport.isTouch()) return;
+    if (!this.viewport.isTouch() || this.disabled()) return;
     this.clearTimer();
     if (this.hasTooltip()) {
       this.closeAll();
@@ -111,6 +122,7 @@ export class TooltipDirective {
 
   private onMouseEnter(e: MouseEvent) {
     this.clearTimer();
+    if (this.disabled()) return;
     this.tooltipRotationDegrees = this.rotationDegreesAt(e.clientX, e.clientY);
     if (!this.hasTooltip()) this.startOpenTimer();
   }
@@ -237,7 +249,7 @@ export class TooltipDirective {
 
   private open() {
     this.closeAll();
-    if (this.pointerDeviceService.isDragging) return;
+    if (this.pointerDeviceService.isDragging || this.disabled()) return;
     const panelClass = TooltipDirective.TooltipPanelComponentClass;
     if (!panelClass) {
       this.fetchPanelThenOpen();

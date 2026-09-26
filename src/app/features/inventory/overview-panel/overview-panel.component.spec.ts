@@ -1,4 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { IPeerContext } from '@axe/core/network/peer-context';
+import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
+import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { Card } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
@@ -206,6 +209,50 @@ describe('OverviewPanelComponent', () => {
       card.destroy();
       ImageStorage.instance.delete(image.identifier);
     }
+  });
+
+  describe('a card held in a hand', () => {
+    let front: ImageFile;
+    let back: ImageFile;
+    let card: Card;
+    const read = () => (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+    beforeEach(() => {
+      setPeerContextProvider({
+        peerContext: { userId: 'me', peerId: 'me/peer' } as IPeerContext,
+        peerContexts: [],
+        peerIds: [],
+        peerId: 'me/peer',
+      });
+      front = ImageStorage.instance.add('hand-detail-front.png');
+      back = ImageStorage.instance.add('hand-detail-back.png');
+      card = Card.create('切り札', front.identifier, back.identifier);
+    });
+
+    afterEach(() => {
+      card.destroy();
+      ImageStorage.instance.delete(front.identifier);
+      ImageStorage.instance.delete(back.identifier);
+      resetPeerContextProvider();
+    });
+
+    it('shows its front and name to the one holding it', () => {
+      card.toHand('me');
+      component.tabletopObject = card;
+      fixture.detectChanges();
+
+      expect(component.imageUrl()).toBe(front.url);
+      expect(read()).toContain('切り札');
+    });
+
+    it('keeps back the front and name of one held by somebody else', () => {
+      card.toHand('other');
+      component.tabletopObject = card;
+      fixture.detectChanges();
+
+      expect(component.imageUrl()).toBe(back.url);
+      expect(read()).not.toContain('切り札');
+    });
   });
 
   it('uses the top card text for a deck pop-up', () => {

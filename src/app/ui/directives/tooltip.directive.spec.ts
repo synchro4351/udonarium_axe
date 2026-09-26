@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, viewChild, ViewContainerRef } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  inject,
+  signal,
+  viewChild,
+  ViewContainerRef,
+} from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ObjectChangeService, ObjectDeleteEvent } from '@axe/application/sync/object-change.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
@@ -60,6 +68,7 @@ class StubTooltipPanelComponent implements TooltipPanelInstance {
   template: `
     <div data-testid="first-piece" [appTooltip]="first"><span data-testid="piece-body"></span></div>
     <div data-testid="second-piece" [appTooltip]="second"></div>
+    <div data-testid="guarded-piece" [appTooltip]="first" [appTooltipDisabled]="guarded()"></div>
     <ng-container #panelHost></ng-container>
   `,
   imports: [TooltipDirective],
@@ -68,6 +77,7 @@ class StubTooltipPanelComponent implements TooltipPanelInstance {
 class TooltipHostComponent {
   first!: TabletopObject;
   second!: TabletopObject;
+  readonly guarded = signal(false);
   readonly panelHost = viewChild.required('panelHost', { read: ViewContainerRef });
 }
 
@@ -262,6 +272,61 @@ describe('TooltipDirective', () => {
       await arrive(deliver);
 
       expect(bodyRemove.mock.calls.filter(([type]) => type === 'pointerdown')).toHaveLength(1);
+    });
+  });
+
+  describe('a piece whose detail is switched off', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('raises no detail on hover', async () => {
+      host.guarded.set(true);
+      fixture.detectChanges();
+
+      await hover('guarded-piece');
+
+      expect(panels()).toHaveLength(0);
+    });
+
+    it('raises no detail on a tap', async () => {
+      vi.spyOn(TestBed.inject(ViewportService), 'isTouch').mockReturnValue(true);
+      host.guarded.set(true);
+      fixture.detectChanges();
+      const piece = fixture.nativeElement.querySelector('[data-testid="guarded-piece"]') as HTMLElement;
+      const touch = (type: string, fingersDown: number) => {
+        const event = new Event(type, { bubbles: true });
+        Object.defineProperty(event, 'changedTouches', { value: [{ clientX: 5, clientY: 5 }] });
+        Object.defineProperty(event, 'touches', { value: fingersDown > 0 ? [{ clientX: 5, clientY: 5 }] : [] });
+        return event;
+      };
+
+      piece.dispatchEvent(touch('touchstart', 1));
+      piece.dispatchEvent(touch('touchend', 0));
+      await wait(OPEN_WAIT_MS);
+      fixture.detectChanges();
+
+      expect(panels()).toHaveLength(0);
+    });
+
+    it('takes a showing detail away the moment it is switched off', async () => {
+      await hover('guarded-piece');
+      expect(panels()).toHaveLength(4);
+
+      host.guarded.set(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(panels()).toHaveLength(0);
+    });
+
+    it('still leaves the other pieces their details', async () => {
+      host.guarded.set(true);
+      fixture.detectChanges();
+
+      await hover('second-piece');
+
+      expect(panels()).toHaveLength(4);
     });
   });
 

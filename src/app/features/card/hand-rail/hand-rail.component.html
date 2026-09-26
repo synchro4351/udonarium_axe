@@ -107,6 +107,8 @@
               [style.transform]="cardTransform(card)"
               [style.zIndex]="cardZIndex(card)"
               [class.opacity-40]="isDragging(card)"
+              [appTooltip]="card"
+              [appTooltipDisabled]="isTouch() || draggingId() !== null"
               (pointerenter)="setHovered(card)"
               (pointerleave)="setHovered(null)"
               (pointerdown)="onCardPointerDown($event, card)"

@@ -1,3 +1,4 @@
+import { Injector, Type, ViewContainerRef, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { CoordinateService } from '@axe/application/input/coordinate.service';
@@ -5,6 +6,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
+import { ViewportService } from '@axe/application/ui/viewport.service';
 import { IPeerContext } from '@axe/core/network/peer-context';
 import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
 import { Card, CardState } from '@axe/domain/card/card';
@@ -16,6 +18,7 @@ import { HandRailComponent } from '@axe/features/card/hand-rail/hand-rail.compon
 import { HandRailService } from '@axe/features/card/hand-rail/hand-rail.service';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
+import { TooltipDirective, TooltipPanelInstance } from '@axe/ui/directives/tooltip.directive';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('HandRailComponent', () => {
@@ -495,6 +498,89 @@ describe('HandRailComponent', () => {
       dropOver(card, [overviewSection('other')], false);
 
       expect(card.location.name).toBe(handLocationOf('me'));
+      card.destroy();
+    });
+  });
+
+  describe('the detail of a hand card under the pointer', () => {
+    /** Every detail the rail raised, standing in for the real panel so the test can read what it was given. */
+    const raised: { instance: Partial<TooltipPanelInstance>; destroyed: boolean }[] = [];
+    let previousLayer: ViewContainerRef;
+    const showing = () => raised.filter((entry) => !entry.destroyed);
+
+    beforeEach(() => {
+      previousLayer = ContextMenuService.defaultParentViewContainerRef;
+      ContextMenuService.defaultParentViewContainerRef = {
+        injector: TestBed.inject(Injector),
+        length: 0,
+        createComponent: () => {
+          const onDestroy: (() => void)[] = [];
+          const entry = { instance: {} as Partial<TooltipPanelInstance>, destroyed: false };
+          raised.push(entry);
+          return {
+            instance: entry.instance,
+            location: { nativeElement: document.createElement('div') },
+            onDestroy: (callback: () => void) => onDestroy.push(callback),
+            destroy: () => {
+              entry.destroyed = true;
+              for (const callback of onDestroy) callback();
+            },
+          };
+        },
+      } as unknown as ViewContainerRef;
+      TooltipDirective.TooltipPanelComponentClass = class {} as Type<TooltipPanelInstance>;
+    });
+
+    afterEach(() => {
+      fixture.destroy();
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+      raised.length = 0;
+      ContextMenuService.defaultParentViewContainerRef = previousLayer;
+      TooltipDirective.TooltipPanelComponentClass = null;
+    });
+
+    async function hoverFirstCard(): Promise<void> {
+      TestBed.inject(HandRailService).open();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const card = fixture.nativeElement.querySelector('.hand-card') as HTMLElement;
+      card.dispatchEvent(new MouseEvent('mouseenter'));
+      await vi.advanceTimersByTimeAsync(160);
+    }
+
+    it('shows the card itself, as a card on the table does', async () => {
+      const card = makeCard(handLocationOf('me'));
+
+      await hoverFirstCard();
+
+      expect(showing()).toHaveLength(1);
+      expect(showing()[0].instance.tabletopObject).toBe(card);
+      card.destroy();
+    });
+
+    it('takes the detail away once the card starts being dragged', async () => {
+      const card = makeCard(handLocationOf('me'));
+      await hoverFirstCard();
+      expect(showing()).toHaveLength(1);
+
+      (component as unknown as { draggingId: WritableSignal<string | null> }).draggingId.set(card.identifier);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(showing()).toHaveLength(0);
+      card.destroy();
+    });
+
+    it('raises none on a touch screen, where a tap picks the card instead', async () => {
+      vi.spyOn(TestBed.inject(ViewportService), 'isTouch').mockReturnValue(true);
+      fixture = TestBed.createComponent(HandRailComponent);
+      const card = makeCard(handLocationOf('me'));
+
+      await hoverFirstCard();
+
+      expect(raised).toHaveLength(0);
       card.destroy();
     });
   });

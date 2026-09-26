@@ -51,6 +51,7 @@ import { handTransferActions } from '@axe/features/card/hand-rail/hand-transfer-
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { CardFacePreviewComponent } from '@axe/ui/components/card-face-preview/card-face-preview.component';
 import { DraggableDirective } from '@axe/ui/directives/draggable.directive';
+import { TooltipDirective } from '@axe/ui/directives/tooltip.directive';
 import { TranslocoModule } from '@jsverse/transloco';
 
 const HAND_AUTO_SORT_KEY = 'ui-hand-auto-sort';
@@ -67,7 +68,7 @@ function storedAutoSort(): boolean {
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-hand-rail',
   templateUrl: './hand-rail.component.html',
-  imports: [DraggableDirective, NgClass, TranslocoModule, CardFacePreviewComponent],
+  imports: [DraggableDirective, TooltipDirective, NgClass, TranslocoModule, CardFacePreviewComponent],
 })
 export class HandRailComponent {
   private readonly destroyRef = inject(DestroyRef);
