@@ -4,6 +4,7 @@ import {
   MOBILE_MENU_ITEMS,
   sharedMobileMenuItems,
 } from '@axe/features/mobile/mobile-shell/mobile-menu-items';
+import { MobileShellComponent } from '@axe/features/mobile/mobile-shell/mobile-shell.component';
 
 describe('mobileMenuItems', () => {
   it('offers nothing twice', () => {
@@ -26,6 +27,15 @@ describe('mobileMenuItems', () => {
   it('puts the room settings straight after the table they belong with', () => {
     const actions = MOBILE_MENU_ITEMS.map((item) => item.action);
     expect(actions.indexOf('roomSettings')).toBe(actions.indexOf('tableSetting') + 1);
+  });
+
+  it('offers the stamp packs to everyone, next to the cut-ins as on the desktop', () => {
+    const actions = sharedMobileMenuItems().map((item) => item.action);
+    expect(actions.indexOf('stamp')).toBe(actions.indexOf('cutIn') + 1);
+    expect(MOBILE_MENU_ITEMS.find((item) => item.action === 'stamp')?.labelKey).toBe('app.fab.stamp');
+    const resolvePanel = (MobileShellComponent.prototype as unknown as { resolvePanel: (action: string) => string })
+      .resolvePanel;
+    expect(resolvePanel.call(null, 'stamp')).toBe('stampPacks');
   });
 
   it('shows the hand with the same drawn icon as the desktop menu', () => {

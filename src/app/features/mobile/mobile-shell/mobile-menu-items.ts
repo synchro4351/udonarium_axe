@@ -7,6 +7,7 @@ export type MobileMenuAction =
   | 'images'
   | 'jukebox'
   | 'cutIn'
+  | 'stamp'
   | 'effect'
   | 'inventory'
   | 'objectList'
@@ -40,6 +41,7 @@ export const MOBILE_MENU_ITEMS: readonly MobileMenuItem[] = [
   { action: 'images', icon: 'photo_library', labelKey: 'app.fab.images' },
   { action: 'jukebox', icon: 'queue_music', labelKey: 'app.fab.jukebox' },
   { action: 'cutIn', icon: 'slideshow', labelKey: 'app.fab.cutIn' },
+  { action: 'stamp', icon: 'emoji_emotions', labelKey: 'app.fab.stamp' },
   { action: 'effect', icon: 'auto_awesome', labelKey: 'feature.effect.title' },
   { action: 'inventory', icon: 'folder_shared', labelKey: 'app.fab.inventory' },
   { action: 'objectList', icon: 'list_alt', labelKey: 'feature.mobile.objectList', gameMasterOnly: true },

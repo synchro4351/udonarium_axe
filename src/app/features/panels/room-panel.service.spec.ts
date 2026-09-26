@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { PanelOption, PanelService } from '@axe/application/ui/panel.service';
 import { DiceTableSettingComponent } from '@axe/features/dice/dice-table-setting/dice-table-setting.component';
 import { MapEditorPanelComponent } from '@axe/features/map-editor/editor/map-editor-panel.component';
+import { StampPackListComponent } from '@axe/features/media/stamp-pack-list/stamp-pack-list.component';
 import { PanelWindowRequest, PanelWindowService } from '@axe/features/panels/panel-window.service';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
 import { DungeonGeneratorComponent } from '@axe/features/tabletop/dungeon-generator/dungeon-generator.component';
@@ -104,5 +105,12 @@ describe('RoomPanelService', () => {
 
     expect(option()).toEqual(expect.objectContaining({ width: 650, height: 400 }));
     await expect(openLazy.mock.calls[0][0]()).resolves.toBe(DiceTableSettingComponent);
+  });
+
+  it('loads the stamp packs, which the desktop and phone menus both open', async () => {
+    service.open('stampPacks');
+
+    expect(option()).toEqual(expect.objectContaining({ width: 560, height: 620 }));
+    await expect(openLazy.mock.calls[0][0]()).resolves.toBe(StampPackListComponent);
   });
 });

@@ -80,6 +80,7 @@ export const FAB_SUBMENUS: Readonly<Record<FabSubmenuName, readonly FabEntry[]>>
     panel('images', 'photo_library', 'fileStorage'),
     panel('jukebox', 'queue_music', 'jukebox'),
     panel('cutIn', 'slideshow', 'cutInList'),
+    panel('stamp', 'emoji_emotions', 'stampPacks'),
     { ...panel('effectLibrary', 'auto_awesome', 'effectLibrary', 'feature.effect.title'), audience: 'playing' },
   ],
 };

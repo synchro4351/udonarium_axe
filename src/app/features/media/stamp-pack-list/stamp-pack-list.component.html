@@ -1,0 +1,219 @@
+<div class="text-ui-text bg-ui-elevated flex h-full flex-col overflow-hidden text-[13px]" data-testid="stamp-pack-list">
+  <div class="border-ui-border-panel bg-ui-panel flex shrink-0 items-end gap-1 border-b border-solid px-2 pt-2">
+    <div class="flex min-w-0 flex-1 gap-1 overflow-x-auto" role="tablist">
+      @for (pack of packs(); track pack.identifier) {
+        <button
+          class="text-ui-muted hover:text-ui-text rounded-t-ui-sm max-w-40 shrink-0 cursor-pointer truncate border border-b-0 border-solid border-transparent bg-transparent px-3 py-1.5 text-[12px] font-semibold transition-colors"
+          type="button"
+          role="tab"
+          data-testid="stamp-pack-tab"
+          [attr.aria-selected]="selectedPack()?.identifier === pack.identifier"
+          [class.border-ui-border-panel!]="selectedPack()?.identifier === pack.identifier"
+          [class.bg-ui-elevated]="selectedPack()?.identifier === pack.identifier"
+          [class.text-ui-accent!]="selectedPack()?.identifier === pack.identifier"
+          [title]="pack.name"
+          (click)="selectPack(pack)"
+        >
+          {{ pack.name || ('feature.media.stamp.untitled' | transloco) }}
+        </button>
+      }
+    </div>
+    @if (canEdit()) {
+      <div class="flex shrink-0 gap-1 pb-1">
+        <button
+          class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-6.5 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 transition-[background,color] disabled:cursor-not-allowed disabled:opacity-50 [&_.material-icons]:text-base!"
+          type="button"
+          data-testid="stamp-pack-create"
+          [title]="'feature.media.stamp.createPack' | transloco"
+          [attr.aria-label]="'feature.media.stamp.createPack' | transloco"
+          [disabled]="busy() || packs().length >= limits.packsPerRoom"
+          (click)="createPack()"
+        >
+          <i class="material-icons">add</i>
+        </button>
+        <label
+          class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-6.5 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 transition-[background,color] [&_.material-icons]:text-base!"
+          [title]="'feature.media.stamp.import' | transloco"
+        >
+          <i class="material-icons">file_upload</i>
+          <input
+            class="hidden"
+            type="file"
+            accept=".zip,application/zip"
+            data-testid="stamp-pack-import"
+            [attr.aria-label]="'feature.media.stamp.import' | transloco"
+            [disabled]="busy()"
+            (change)="importPack($event)"
+          />
+        </label>
+      </div>
+    }
+  </div>
+
+  @if (selectedPack(); as pack) {
+    <div class="border-ui-border-panel flex shrink-0 flex-wrap items-center gap-2 border-b border-solid px-3 py-2">
+      <input
+        class="border-ui-border-panel bg-ui-input text-ui-text rounded-ui-sm min-w-0 flex-1 border border-solid px-2 py-1 text-[13px] disabled:opacity-70"
+        type="text"
+        data-testid="stamp-pack-name"
+        [attr.maxlength]="limits.nameLength"
+        [attr.aria-label]="'feature.media.stamp.packName' | transloco"
+        [value]="pack.name"
+        [disabled]="!canEdit()"
+        (change)="renamePack($event)"
+      />
+      <span class="text-ui-dim text-[11px]" data-testid="stamp-pack-count">{{
+        'feature.media.stamp.count' | transloco: { count: items().length, max: limits.stampsPerPack }
+      }}</span>
+      <button
+        class="border-ui-border-panel text-ui-text hover:bg-ui-hover rounded-ui-sm inline-flex cursor-pointer items-center gap-1 border border-solid bg-transparent px-2.5 py-1 text-[12px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 [&_.material-icons]:text-[15px]!"
+        type="button"
+        data-testid="stamp-pack-export"
+        [disabled]="busy()"
+        (click)="exportPack()"
+      >
+        <i class="material-icons">save</i>{{ 'feature.media.stamp.export' | transloco }}
+      </button>
+      @if (canEdit()) {
+        <button
+          class="text-ui-danger border-ui-danger hover:bg-ui-danger-bg rounded-ui-sm inline-flex cursor-pointer items-center gap-1 border border-solid bg-transparent px-2.5 py-1 text-[12px] font-semibold [&_.material-icons]:text-[15px]!"
+          type="button"
+          data-testid="stamp-pack-delete"
+          (click)="deletePack()"
+        >
+          <i class="material-icons">delete</i>{{ 'feature.media.stamp.deletePack' | transloco }}
+        </button>
+      }
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto p-3">
+      <ul class="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2 p-0" data-testid="stamp-grid">
+        @for (item of items(); track item.id) {
+          <li>
+            <button
+              class="border-ui-border-panel bg-ui-panel hover:bg-ui-hover rounded-ui-sm flex w-full cursor-pointer flex-col items-center gap-1 border border-solid p-1"
+              type="button"
+              data-testid="stamp-item"
+              [class.border-ui-accent!]="selectedStamp()?.id === item.id"
+              [attr.aria-pressed]="selectedStamp()?.id === item.id"
+              [title]="item.name"
+              (click)="selectStamp(item)"
+            >
+              @if (imageUrlOf(item); as url) {
+                <img class="size-16 object-contain" [src]="url" [alt]="item.name" draggable="false" />
+              } @else {
+                <span class="text-ui-dim flex size-16 items-center justify-center">
+                  <i class="material-icons">hourglass_empty</i>
+                </span>
+              }
+              <span class="w-full truncate text-center text-[11px]">{{ item.name }}</span>
+            </button>
+          </li>
+        }
+        @if (canEdit() && items().length < limits.stampsPerPack) {
+          <li>
+            <label
+              class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm flex size-full min-h-22 cursor-pointer flex-col items-center justify-center gap-1 border border-dashed p-1 text-[11px]"
+              [class.opacity-50]="busy()"
+            >
+              <i class="material-icons">add_photo_alternate</i>
+              <span>{{ 'feature.media.stamp.addStamps' | transloco }}</span>
+              <input
+                class="hidden"
+                type="file"
+                multiple
+                accept="image/png,image/jpeg,image/webp"
+                data-testid="stamp-add"
+                [attr.aria-label]="'feature.media.stamp.addStamps' | transloco"
+                [disabled]="busy()"
+                (change)="addStamps($event)"
+              />
+            </label>
+          </li>
+        }
+      </ul>
+      @if (items().length === 0 && !canEdit()) {
+        <p class="text-ui-dim m-0 p-6 text-center">{{ 'feature.media.stamp.emptyPack' | transloco }}</p>
+      }
+    </div>
+
+    @if (selectedStamp(); as stamp) {
+      <div
+        class="border-ui-border-panel bg-ui-panel grid shrink-0 grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1.5 border-t border-solid px-3 py-2"
+        data-testid="stamp-editor"
+      >
+        <label class="text-ui-muted text-[12px]" for="stamp-name">{{
+          'feature.media.stamp.stampName' | transloco
+        }}</label>
+        <input
+          id="stamp-name"
+          class="border-ui-border-panel bg-ui-input text-ui-text rounded-ui-sm min-w-0 border border-solid px-2 py-1 text-[13px] disabled:opacity-70"
+          type="text"
+          data-testid="stamp-name"
+          [attr.maxlength]="limits.nameLength"
+          [value]="stamp.name"
+          [disabled]="!canEdit()"
+          (change)="renameStamp(stamp, $event)"
+        />
+        <label class="text-ui-muted text-[12px]" for="stamp-words">{{ 'feature.media.stamp.words' | transloco }}</label>
+        <input
+          id="stamp-words"
+          class="border-ui-border-panel bg-ui-input text-ui-text rounded-ui-sm min-w-0 border border-solid px-2 py-1 text-[13px] disabled:opacity-70"
+          type="text"
+          data-testid="stamp-words"
+          [placeholder]="'feature.media.stamp.wordsHint' | transloco"
+          [value]="stamp.words.join(' ')"
+          [disabled]="!canEdit()"
+          (change)="changeWords(stamp, $event)"
+        />
+        @if (canEdit()) {
+          <div class="col-span-2 flex justify-end">
+            <button
+              class="text-ui-danger border-ui-danger hover:bg-ui-danger-bg rounded-ui-sm inline-flex cursor-pointer items-center gap-1 border border-solid bg-transparent px-2.5 py-1 text-[12px] font-semibold [&_.material-icons]:text-[15px]!"
+              type="button"
+              data-testid="stamp-remove"
+              (click)="removeStamp(stamp)"
+            >
+              <i class="material-icons">remove_circle_outline</i>{{ 'feature.media.stamp.removeStamp' | transloco }}
+            </button>
+          </div>
+        }
+      </div>
+    }
+  } @else {
+    <div
+      class="text-ui-dim flex flex-1 flex-col items-center justify-center gap-2.5 p-6 text-center [&_.material-icons]:text-[40px]! [&_.material-icons]:opacity-40"
+    >
+      <i class="material-icons">emoji_emotions</i>
+      <p class="m-0 text-[13px]">{{ 'feature.media.stamp.empty' | transloco }}</p>
+      @if (canEdit()) {
+        <button
+          class="bg-ui-accent rounded-ui-sm inline-flex cursor-pointer items-center gap-1 border-none px-3 py-1.25 text-[13px] font-semibold text-white transition-opacity hover:opacity-85"
+          type="button"
+          (click)="createPack()"
+        >
+          {{ 'feature.media.stamp.createPack' | transloco }}
+        </button>
+      }
+    </div>
+  }
+
+  <div class="border-ui-border-panel bg-ui-panel shrink-0 border-t border-solid px-3 py-1.5 text-[11px]">
+    @if (notice()) {
+      <p class="text-ui-text m-0" role="status" data-testid="stamp-notice">{{ notice() }}</p>
+    }
+    <p class="text-ui-dim m-0">
+      {{
+        'feature.media.stamp.limitsHint'
+          | transloco
+            : {
+                side: limits.imageSide,
+                kilobytes: limits.imageBytes / 1024,
+                stamps: limits.stampsPerPack,
+                packs: limits.packsPerRoom,
+              }
+      }}
+    </p>
+    <p class="text-ui-dim m-0">{{ 'feature.media.stamp.sharedHint' | transloco }}</p>
+  </div>
+</div>

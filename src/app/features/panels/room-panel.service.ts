@@ -148,6 +148,14 @@ export class RoomPanelService {
           load: () => import('@axe/features/media/cut-in-list/cut-in-list.component').then((m) => m.CutInListComponent),
           option: { width: 980, height: 760 },
         };
+      case 'stampPacks':
+        return {
+          load: () =>
+            import('@axe/features/media/stamp-pack-list/stamp-pack-list.component').then(
+              (m) => m.StampPackListComponent
+            ),
+          option: { width: 560, height: 620, minWidth: 320, minHeight: 360 },
+        };
       case 'characterGenerator':
         return {
           load: () =>

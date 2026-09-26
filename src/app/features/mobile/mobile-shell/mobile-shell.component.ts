@@ -257,6 +257,8 @@ export class MobileShellComponent {
         return 'jukebox';
       case 'cutIn':
         return 'cutInList';
+      case 'stamp':
+        return 'stampPacks';
       case 'effect':
         return 'effectLibrary';
       case 'inventory':
