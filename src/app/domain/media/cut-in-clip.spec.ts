@@ -108,6 +108,11 @@ describe('clipPoints()', () => {
     expect(clipPoints('star')).toHaveLength(10);
   });
 
+  it('draws a shape it does not know whole, rather than failing', () => {
+    expect(clipPoints('spiral' as never)).toEqual([]);
+    expect(clipCss('spiral' as never)).toBe('');
+  });
+
   it('keeps every shape inside the layer it belongs to', () => {
     for (const clip of CUT_IN_CLIPS) {
       for (const [x, y] of clipPoints(clip)) {
