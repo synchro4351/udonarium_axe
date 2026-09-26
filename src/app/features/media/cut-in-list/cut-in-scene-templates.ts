@@ -519,10 +519,12 @@ const PLANS: Record<CutInSceneTemplate, TemplatePlan> = {
     },
   },
   levelUp: {
-    stage: { width: 600, height: 340, durationMs: 1400 },
+    stage: { width: 600, height: 240, durationMs: 1400 },
     build(scene, stage, text) {
-      // An arrow of two layers: a head over a shaft wide enough to carry the words.
-      const head: Box = { x: 50, y: 14, width: 500, height: 170 };
+      // A squat arrow of two layers: a low, wide head over a short shaft, the words laid across
+      // the line where they meet.
+      const head: Box = { x: 50, y: 44, width: 500, height: 85 };
+      const join = head.y + head.height;
       // A paler head behind, which surges up and away once the arrow has landed.
       const spark = arrowHead(scene, stage, 'spark', head, { from: '#d8f59a', opacity: 0.6 });
       arrive(spark, 120, 300, { dy: 60, opacity: 0 });
@@ -531,9 +533,9 @@ const PLANS: Record<CutInSceneTemplate, TemplatePlan> = {
       // The shaft reaches a little way up under the head, so no seam shows between them.
       const shaft = band(scene, stage, 'band', {
         x: 100,
-        y: head.y + head.height - 2,
+        y: join - 2,
         width: 400,
-        height: 144,
+        height: 72,
         clip: 'none',
         shape: 'linear',
         from: '#85ac3f',
@@ -546,10 +548,10 @@ const PLANS: Record<CutInSceneTemplate, TemplatePlan> = {
         leave(part, stage.durationMs, 240, { dy: -160, opacity: 0 });
       }
 
-      // The words sit in the shaft, below the head.
+      // The words straddle the join, half on the base of the head and half on the shaft.
       lettering(scene, stage, text, {
-        box: { x: 110, y: 190, width: 380, height: 120 },
-        sizePx: 80,
+        box: { x: 110, y: join - 44, width: 380, height: 88 },
+        sizePx: 72,
         font: 'rounded',
         weight: 900,
         split: true,

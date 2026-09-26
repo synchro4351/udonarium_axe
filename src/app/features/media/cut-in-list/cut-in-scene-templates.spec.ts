@@ -242,12 +242,13 @@ describe('cut-in scene examples', () => {
     }
   });
 
-  it('points the level up arrow upward, with the words in its shaft', () => {
+  it('points the level up arrow upward, squat, with the words across the join of head and shaft', () => {
     withExample('levelUp', 'Level UP', (cutIn) => {
       const head = cutIn.scene!.layers.find((layer) => layer.name === 'head')!;
       const shaft = cutIn.scene!.layers.find((layer) => layer.name === 'band')!;
       const layers = cutIn.scene!.layers;
       expect(layers.indexOf(head)).toBeGreaterThan(layers.indexOf(shaft));
+      expect(cutIn.scene!.durationMs).toBe(1400);
 
       // The head is the pointed end of a chevron turned to face up, let in only to its shoulders.
       const shoulder = Math.max(...clipPoints('chevron').map(([x, y]) => (y === 0 ? x : 0)));
@@ -263,7 +264,9 @@ describe('cut-in scene examples', () => {
       const baseY = middleY - (shoulder - 0.5) * head.width;
       const baseHalf = head.height / 2;
       expect(tipY).toBeGreaterThanOrEqual(0);
-      expect(baseY - tipY).toBeGreaterThan(baseHalf * 0.5);
+      // Low and wide: far wider than it is tall, but still plainly a point.
+      expect(baseY - tipY).toBeGreaterThan(baseHalf * 0.25);
+      expect(baseY - tipY).toBeLessThanOrEqual(100);
       expect(Math.abs(middleX - cutIn.width / 2)).toBeLessThanOrEqual(1);
 
       // A plain shaft, narrower than the head, runs down from its base with no gap.
@@ -274,6 +277,7 @@ describe('cut-in scene examples', () => {
       expect(shaft.y).toBeLessThanOrEqual(baseY);
       expect(shaft.y).toBeGreaterThan(baseY - 6);
       expect(shaft.y + shaft.height).toBeLessThanOrEqual(cutIn.height);
+      expect(shaft.height).toBeLessThanOrEqual(80);
 
       const words = layersOf(cutIn, 'text');
       const first = words[0];
@@ -282,9 +286,12 @@ describe('cut-in scene examples', () => {
       const room = (first.width - first.fontSizePx * 0.5) / 2;
       expect(first.x + room).toBeGreaterThanOrEqual(shaft.x);
       expect(last.x + last.width - room).toBeLessThanOrEqual(shaft.x + shaft.width);
+      // Centred on the join, within the arrow from its point to the foot of the shaft.
       for (const word of words) {
-        expect(word.y).toBeGreaterThanOrEqual(baseY);
+        expect(Math.abs(word.y + word.height / 2 - baseY)).toBeLessThanOrEqual(3);
+        expect(word.y).toBeGreaterThanOrEqual(tipY);
         expect(word.y + word.height).toBeLessThanOrEqual(shaft.y + shaft.height);
+        expect(word.fontSizePx).toBeGreaterThanOrEqual(48);
       }
     });
   });
