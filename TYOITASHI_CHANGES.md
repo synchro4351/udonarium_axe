@@ -2,7 +2,7 @@
 
 [紹介ページ](README.md) · [版ごとの履歴](TYOITASHI_VERSIONS.md)
 
-比較対象は公式Axe v1.57.1（85c89f98）です。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1またはr2の固定ソースと併せて確認してください。
+比較対象は公式Axe v1.57.1（85c89f98）です。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1〜r3の固定ソースと併せて確認してください。
 
 ## 機能別の入口
 
@@ -62,14 +62,15 @@
 | 「Level UP」の低い矢印 | [93ce5369](https://github.com/synchro4351/udonarium_axe/commit/93ce5369) | 19a98d7e起点。頭と軸の高さを約半分にし、文字を境目へ置く。既存の作例レイヤー形状を使い、保存済みカットインには影響しない |
 | 手札メニューの独自アイコン | [c617725b](https://github.com/synchro4351/udonarium_axe/commit/c617725b) | 93ce5369起点。添付画像を参考に独自SVGを作成し、PC・モバイルのメニューで使用。保存・同期の変更なし |
 
-## 開発版の追加変更（未配備）
+## r3の追加変更
 
 | 変更 | 本流コミット | 基点と取り込み時の注意 |
 | --- | --- | --- |
-| 不在参加者の手札をGMが引き継がせる | [bf66c752](https://github.com/synchro4351/udonarium_axe/commit/bf66c752) | r2固定ソース`6e5668dd`起点。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/orphan-hand-recovery)。既存の手札位置とCard.toHandを使用。カードは伏せて移り、保存・同期形式を追加しない。ZIP再読込のカード複製は未解決 |
+| 不在参加者の手札をGMが引き継がせる | [bf66c752](https://github.com/synchro4351/udonarium_axe/commit/bf66c752) | r2固定ソース`6e5668dd`起点。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/orphan-hand-recovery)。既存の手札位置とCard.toHandを使用。カードは伏せて移り、保存・同期形式を追加しない。最新の保存・再読込では複製なし。既存卓へのZIP重ね読み込みは再確認待ち |
+| 自分の手札カードのホバー詳細 | [be02ffce](https://github.com/synchro4351/udonarium_axe/commit/be02ffce) | bf66c752起点。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hand-hover-preview)。場のカードと共通のツールチップを自分の手札へ適用。タッチ・ドラッグ中は抑止。他人の秘匿手札には適用しない。保存・同期形式の変更なし |
 ## 検証と制限
 
-- r2の固定ソース`6e5668dd`は、全体927ファイル／12,680件成功・1件skip、production build成功。図形差分の元コミットでも924ファイル／12,556件成功・1件skipとbuild成功を確認済み。
+- r3の固定ソース`cf5edecf`は、全体929ファイル／12,712件成功・1件skip、production build成功。r2の固定ソース`6e5668dd`は全体927ファイル／12,680件成功・1件skip、production build成功。
 - 2026-09-26に、ユーザーが前候補のカットイン見本とカード操作の確認表9項目を合格と報告。一覧から引く操作と演出調整もユーザーが合格を報告。低い「Level UP」と手札アイコンもユーザーが確認済み。手札の通常のセーブ・ロードと同じタブでの再接続は動作したが、既存卓へのZIP再読込でカード複製が報告されている。弱回線試験は未確認。
 - フォント選択・YouTube表示・ポインター入力を組み合わせた92件は、r1で直接Vitest・Angular経由の両方に成功。自動再生追加は対象22件を両経路で確認。
 - 初回ドラッグはChromium・Firefox・WebKitで、チャットフォーカスあり／なしの計6件を確認。
