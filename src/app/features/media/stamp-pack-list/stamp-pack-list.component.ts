@@ -67,7 +67,9 @@ export class StampPackListComponent {
   protected readonly builtinPack: StampPackView = builtinStampPack(this.t('feature.media.stamp.builtinPack'));
 
   /** Whether the tab open is the tool's own stamps. */
-  protected readonly showsBuiltin = computed(() => this.selectedPackId() === BUILTIN_STAMP_PACK_IDENTIFIER);
+  protected readonly showsBuiltin = computed(
+    () => this.selectedPackId() === BUILTIN_STAMP_PACK_IDENTIFIER || this.packs().length === 0
+  );
 
   /** The room pack whose tab is open: the one picked, or the first when that one is gone. */
   protected readonly selectedPack = computed<StampPack | null>(() => {
