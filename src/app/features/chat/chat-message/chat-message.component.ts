@@ -40,6 +40,7 @@ import { previewTextOf } from '@axe/domain/chat/chat-stamp-text';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { canRoleSpeakTab } from '@axe/domain/chat/chat-tab-permission';
+import { largeEmojiCountOf } from '@axe/domain/chat/emoji-only-text';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { TextNote } from '@axe/domain/tabletop/text-note';
@@ -440,6 +441,21 @@ export class ChatMessageComponent {
     if (!chatMessage) return '';
     this.objectChange.versionOf(chatMessage.identifier)();
     return chatMessage.isStamp ? chatMessage.stampName : '';
+  });
+  /**
+   * Whether the line is a few emoji and nothing else, drawn large as a chat app draws them. Only
+   * an ordinary line said openly is: a stamp, a line with a picture, a secret, a dice result or a
+   * notice from the tool is drawn as it always was.
+   */
+  readonly isLargeEmoji = computed(() => {
+    const chatMessage = this.chatMessageInput();
+    if (!chatMessage) return false;
+    this.objectChange.versionOf(chatMessage.identifier)();
+    if (chatMessage.isStamp || chatMessage.isSecret || chatMessage.isSystemMessage || chatMessage.isDicebot) {
+      return false;
+    }
+    if (chatMessage.attachmentImageIdentifierList.length > 0) return false;
+    return largeEmojiCountOf(vnBodyOf(chatMessage.vnEmote, chatMessage.text ?? '')) > 0;
   });
   readonly animeState = signal<string>('inactive');
 

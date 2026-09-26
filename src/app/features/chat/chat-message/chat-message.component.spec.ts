@@ -99,8 +99,22 @@ describe('ChatMessageComponent', () => {
         expect(stamps).toHaveLength(1);
         expect(stamps[0].getAttribute('alt')).toBe('やったね');
         expect(stamps[0].getAttribute('src')).toBe('stamp-picture.png');
-        expect(stamps[0].className).toContain('max-h-40');
+        expect(stamps[0].className).toContain('max-h-20');
         expect(fixture.nativeElement.querySelector('.msg-text').textContent.trim()).toBe('');
+      } finally {
+        ImageStorage.instance.delete(image.identifier);
+      }
+    });
+
+    it('is drawn smaller in the compact layout, still as a picture', () => {
+      const image = ImageStorage.instance.add('stamp-picture.png');
+      try {
+        fixture.componentRef.setInput('chatSimpleDispFlag', true);
+        fixture.componentRef.setInput('chatMessage', stampMessage(image.identifier));
+        fixture.detectChanges();
+
+        const stamp = fixture.nativeElement.querySelector('[data-testid="chat-message-stamp"]');
+        expect(stamp.className).toContain('max-h-14');
       } finally {
         ImageStorage.instance.delete(image.identifier);
       }
@@ -121,6 +135,53 @@ describe('ChatMessageComponent', () => {
       fixture.detectChanges();
 
       expect(component.canChange).toBe(false);
+    });
+  });
+
+  describe('a line of emoji only', () => {
+    function line(text: string, overrides: Partial<ChatMessage> = {}): ChatMessage {
+      const message = new ChatMessage();
+      message.initialize();
+      message.from = 'test-user';
+      message.name = 'テスト';
+      message.tag = '';
+      message.messColor = '#000000';
+      message.text = text;
+      Object.assign(message, overrides);
+      return message;
+    }
+
+    function largeBody(): HTMLElement | null {
+      return fixture.nativeElement.querySelector('[data-large-emoji]');
+    }
+
+    it('is drawn large', () => {
+      fixture.componentRef.setInput('chatMessage', line('🎉👍'));
+      fixture.detectChanges();
+
+      expect(largeBody()?.className).toContain('text-[3em]');
+    });
+
+    it('is drawn large in the compact layout too, a little less so', () => {
+      fixture.componentRef.setInput('chatSimpleDispFlag', true);
+      fixture.componentRef.setInput('chatMessage', line('😂'));
+      fixture.detectChanges();
+
+      expect(largeBody()?.className).toContain('text-[2em]');
+    });
+
+    it.each<[string, () => ChatMessage]>([
+      ['with words', () => line('やったね🎉')],
+      ['with a dice command', () => line('2d6 🎲')],
+      ['with a picture attached', () => line('👍', { attachmentImageIdentifiers: JSON.stringify(['some-image']) })],
+      ['kept secret', () => line('👍', { tag: 'secret' })],
+      ['from the dice bot', () => line('🎲', { tag: 'system', from: 'System-BCDice' })],
+    ])('is drawn as usual %s', (_label, make) => {
+      beMyself('test-user');
+      fixture.componentRef.setInput('chatMessage', make());
+      fixture.detectChanges();
+
+      expect(largeBody()).toBeNull();
     });
   });
 

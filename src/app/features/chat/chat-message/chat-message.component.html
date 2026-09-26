@@ -188,7 +188,12 @@
                 </div>
               </div>
             } @else if (!isSecret() || chatMessage.isSendFromSelf || canRevealSecret) {
-              <span #messageBody [innerHTML]="escapeHtmlAndRuby(chatMessage.text) | linkify | safe"></span>
+              <span
+                #messageBody
+                [ngClass]="isLargeEmoji() ? 'inline-block text-[3em] leading-[1.2]' : ''"
+                [attr.data-large-emoji]="isLargeEmoji() || null"
+                [innerHTML]="escapeHtmlAndRuby(chatMessage.text) | linkify | safe"
+              ></span>
               @for (badge of emoteBadges(); track $index) {
                 <span
                   class="rounded-ui bg-ui-accent-bg text-ui-accent ml-1 px-1 align-middle text-[10px] whitespace-nowrap"
@@ -201,7 +206,7 @@
                     @for (image of attachmentImageFiles(); track image.identifier) {
                       <img
                         data-testid="chat-message-stamp"
-                        class="message-attachment-image block size-auto max-h-40 max-w-[min(160px,100%)] object-contain"
+                        class="message-attachment-image block size-auto max-h-20 max-w-[min(120px,100%)] object-contain"
                         [src]="image.url | safe: 'resourceUrl'"
                         [alt]="stamp"
                         [title]="stamp"
@@ -327,7 +332,12 @@
                   </span>
                 </span>
               } @else if (!isSecret() || chatMessage.isSendFromSelf || canRevealSecret) {
-                <span #messageBody [innerHTML]="escapeHtmlAndRuby(chatMessage.text) | linkify | safe"></span>
+                <span
+                  #messageBody
+                  [ngClass]="isLargeEmoji() ? 'inline-block align-middle text-[2em] leading-[1.2]' : ''"
+                  [attr.data-large-emoji]="isLargeEmoji() || null"
+                  [innerHTML]="escapeHtmlAndRuby(chatMessage.text) | linkify | safe"
+                ></span>
                 @for (badge of emoteBadges(); track $index) {
                   <span
                     class="rounded-ui bg-ui-accent-bg text-ui-accent ml-1 px-1 align-middle text-[10px] whitespace-nowrap"
@@ -340,7 +350,7 @@
                       @for (image of attachmentImageFiles(); track image.identifier) {
                         <img
                           data-testid="chat-message-stamp"
-                          class="message-attachment-image block size-auto max-h-20 max-w-20 object-contain"
+                          class="message-attachment-image block size-auto max-h-14 max-w-20 object-contain"
                           [src]="image.url | safe: 'resourceUrl'"
                           [alt]="stamp"
                           [title]="stamp"
