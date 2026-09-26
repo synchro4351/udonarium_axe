@@ -6,11 +6,17 @@ import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
 import { ObjectNode } from '@axe/core/sync/object-node';
 import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { encodeEntityReference } from '@axe/core/util/xml-util';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { ChatReaction, type ChatReactionCount, isReactionEmoji, tallyReactions } from '@axe/domain/chat/chat-reaction';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { OUT_OF_STORY_TAG } from '@axe/domain/chat/constants';
 import { type DiceRollDetail, parseDiceRollDetail } from '@axe/domain/dice/dice-roll-detail';
 import { VN_PORTRAIT_POS_UNSET } from '@axe/domain/visual-novel/vn-portrait-position';
+
+// DOM node types, spelled out so the model does not reach for the DOM's globals
+const TEXT_NODE = 3;
+const CDATA_SECTION_NODE = 4;
 
 export interface ChatMessageTargetContext {
   text: string;
@@ -226,6 +232,107 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
       delete (this.attributes as Record<string, unknown>)['identifier'];
     }
   }
+  /**
+   * What goes into room data: the text, followed by each reader's reactions. A reader who took back
+   * everything they left has nothing to write.
+   */
+  override innerXml(): string {
+    let xml = encodeEntityReference(`${this.value}`);
+    for (const reaction of this.reactionNodes) {
+      if (reaction.emojis.length > 0) xml += ObjectSerializer.instance.toXml(reaction);
+    }
+    return xml;
+  }
+
+  /**
+   * Reads a saved line back. Its text is the element's own text; reactions saved beneath it come
+   * back as its children. A line saved before reactions existed holds only text, and reads as ever.
+   */
+  override parseInnerXml(element: Element): void {
+    if (element.children.length < 1) {
+      super.parseInnerXml(element);
+      return;
+    }
+    let text = '';
+    for (const node of Array.from(element.childNodes)) {
+      if (node.nodeType === TEXT_NODE || node.nodeType === CDATA_SECTION_NODE) text += node.nodeValue ?? '';
+    }
+    this.value = text;
+    for (const child of Array.from(element.children)) {
+      if (child.tagName !== ChatReaction.aliasName) continue;
+      const reaction = ObjectSerializer.instance.parseXml(child);
+      if (reaction instanceof ChatReaction) this.appendChild(reaction);
+    }
+  }
+
+  /** The reactions left on the line, one node for each reader. */
+  get reactionNodes(): ChatReaction[] {
+    return this.children.filter((child): child is ChatReaction => child instanceof ChatReaction);
+  }
+
+  /** The node holding the user's reactions to the line, or null when they left none. */
+  reactionOf(userId: string): ChatReaction | null {
+    if (!userId) return null;
+    return this.reactionNodes.find((reaction) => reaction.owner === userId) ?? null;
+  }
+
+  /** Whether the user left the emoji on the line. */
+  hasReactionBy(userId: string, emoji: string): boolean {
+    if (!userId) return false;
+    return this.reactionNodes.some((reaction) => reaction.owner === userId && reaction.has(emoji));
+  }
+
+  /**
+   * Leaves the emoji on the line for the user, or takes it back when they already left it.
+   * Answers whether it is now left.
+   *
+   * The user's reactions go into a node of their own beneath the line, made on their first, so no
+   * two readers write to the same object. Anything that is not an emoji changes nothing.
+   */
+  toggleReaction(userId: string, emoji: string): boolean {
+    if (!userId || !isReactionEmoji(emoji)) return false;
+    const own = this.reactionNodes.filter((reaction) => reaction.owner === userId);
+    if (own.some((reaction) => reaction.has(emoji))) {
+      // two windows of the same reader may each have made a node; take it back from all of them
+      for (const reaction of own) if (reaction.has(emoji)) reaction.toggle(emoji);
+      return false;
+    }
+    let reaction = own[0];
+    if (!reaction) {
+      reaction = new ChatReaction();
+      reaction.owner = userId;
+      reaction.initialize();
+      this.appendChild(reaction);
+    }
+    return reaction.toggle(emoji);
+  }
+
+  /**
+   * The emoji left on the line with how many readers left each, marking those the local user left.
+   * Empty for a line nobody reacted to, as every line from before reactions existed is.
+   */
+  get reactions(): readonly ChatReactionCount[] {
+    return this.reactionsFor(getPeerContext()?.userId);
+  }
+
+  /** The emoji left on the line with how many readers left each, marking those the user left. */
+  reactionsFor(userId?: string): readonly ChatReactionCount[] {
+    const nodes = this.reactionNodes;
+    if (nodes.length < 1) return [];
+    return tallyReactions(nodes, userId);
+  }
+
+  /**
+   * Whether the user may see the reactions on the line and leave their own.
+   *
+   * They follow the line: a direct line is theirs only when it concerns them, and a secret one only
+   * when they sent it or, with `canSeeHidden`, may see what is kept back from the table.
+   */
+  canReactBy(userId: string, canSeeHidden: boolean): boolean {
+    if (!userId || !this.isDisplayableTo(userId)) return false;
+    return !this.isSecret || this.isSentBy(userId) || canSeeHidden;
+  }
+
   /** Whether the line is addressed to particular users rather than said to everyone. */
   get isDirect(): boolean {
     return this.sendTo.length > 0;
