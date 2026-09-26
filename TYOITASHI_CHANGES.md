@@ -2,7 +2,7 @@
 
 [紹介ページ](README.md) · [版ごとの履歴](TYOITASHI_VERSIONS.md)
 
-比較対象は公式Axe v1.57.1（85c89f98）です。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1または次版の固定ソースと併せて確認してください。
+比較対象は公式Axe v1.57.1（85c89f98）です。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1またはr2の固定ソースと併せて確認してください。
 
 ## 機能別の入口
 
@@ -18,31 +18,31 @@
 | カットインのフォント選択 | [14101a33](https://github.com/synchro4351/udonarium_axe/commit/14101a33) | 6ba6751a起点。編集UI・翻訳・テスト。既存のfontFamily文字列を使用し、端末フォントへフォールバックする |
 | YouTube再生操作 | [f45a18c5](https://github.com/synchro4351/udonarium_axe/commit/f45a18c5) | 6ba6751a起点。プレイヤーのサムネイル待機を無効化、クリック遮断を除去、操作欄を表示 |
 | チャット入力後の初回ドラッグ | [0605e7ba](https://github.com/synchro4351/udonarium_axe/commit/0605e7ba) | 14101a33起点。入力要素のblurとwindowのblurを区別。保存・同期の変更なし |
-| YouTube自動再生（次版） | [42bdbd97](https://github.com/synchro4351/udonarium_axe/commit/42bdbd97) | be1fdb8a起点。f45a18c5の再生操作修正を前提とする。開始時にiframe生成・autoplay要求、既存の時刻合わせと操作欄を維持 |
-| ホットバーのエフェクトアイコン（次版） | [2a75e5c2](https://github.com/synchro4351/udonarium_axe/commit/2a75e5c2) | 42bdbd97起点。既存のeffect-shapesのSVGとng-selectを使用。保存値は従来のエフェクト名のまま |
-| 編集可能なカットイン見本3種（次版） | [13e18a3f](https://github.com/synchro4351/udonarium_axe/commit/13e18a3f) | 2a75e5c2の後続。既存のCutIn・シーン・レイヤー・アニメーションプリセットを使用。既存カットインに不干渉、保存・同期形式を追加しない |
+| YouTube自動再生（r2） | [42bdbd97](https://github.com/synchro4351/udonarium_axe/commit/42bdbd97) | be1fdb8a起点。f45a18c5の再生操作修正を前提とする。開始時にiframe生成・autoplay要求、既存の時刻合わせと操作欄を維持 |
+| ホットバーのエフェクトアイコン（r2） | [2a75e5c2](https://github.com/synchro4351/udonarium_axe/commit/2a75e5c2) | 42bdbd97起点。既存のeffect-shapesのSVGとng-selectを使用。保存値は従来のエフェクト名のまま |
+| 編集可能なカットイン見本3種（r2） | [13e18a3f](https://github.com/synchro4351/udonarium_axe/commit/13e18a3f) | 2a75e5c2の後続。既存のCutIn・シーン・レイヤー・アニメーションプリセットを使用。既存カットインに不干渉、保存・同期形式を追加しない |
 
 [小改善2件の機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hotbar-effect-icons-and-cutin-presets)は、公式v1.57.1に私家機能を加えた42bdbd97を基点としています。
 
-手札の受け渡し（次版）：[929eec63](https://github.com/synchro4351/udonarium_axe/commit/929eec63ca7c1f6424106b0c15a6256a12e95a99)、[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/card-player-transfer)。基点は上記2件を含む1c285e05。既存のCardGameServiceと手札UIへ追加し、既存のCard.toHandで移動するため保存・同期の新項目はありません。実行直前に手札の所在・操作側ロール・受取人を再確認します。公開手札・自動ソート・配布元表示は含みません。
+手札の受け渡し（r2）：[929eec63](https://github.com/synchro4351/udonarium_axe/commit/929eec63ca7c1f6424106b0c15a6256a12e95a99)、[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/card-player-transfer)。基点は上記2件を含む1c285e05。既存のCardGameServiceと手札UIへ追加し、既存のCard.toHandで移動するため保存・同期の新項目はありません。実行直前に手札の所在・操作側ロール・受取人を再確認します。公開手札・自動ソート・配布元表示は含みません。
 
-手札の公開・秘匿（次版）：[5a0cc8e4](https://github.com/synchro4351/udonarium_axe/commit/5a0cc8e4)。929eec63起点。公開設定はPeerCursorの同期値で、既定秘匿・再接続時も秘匿。ルームセーブ対象外です。
+手札の公開・秘匿（r2）：[5a0cc8e4](https://github.com/synchro4351/udonarium_axe/commit/5a0cc8e4)。929eec63起点。公開設定はPeerCursorの同期値で、既定秘匿・再接続時も秘匿。ルームセーブ対象外です。
 
-自動ソート（次版）：[d9a3280a](https://github.com/synchro4351/udonarium_axe/commit/d9a3280a)。表示順だけを端末ごとに切り替え、共有のhandOrderは変更しません。設定はブラウザ内に保存します。
+自動ソート（r2）：[d9a3280a](https://github.com/synchro4351/udonarium_axe/commit/d9a3280a)。表示順だけを端末ごとに切り替え、共有のhandOrderは変更しません。設定はブラウザ内に保存します。
 
-直前の渡し主（次版）：[da07bbd8](https://github.com/synchro4351/udonarium_axe/commit/da07bbd8)、[消去経路修正 15189c35](https://github.com/synchro4351/udonarium_axe/commit/15189c35)。Cardに渡し主ID・名前の保存・同期項目を追加。明示的な受け渡しで更新し、手札から出ると消します。旧セーブには項目がありません。これらは[同じ機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/card-hand-visibility-sort-provenance)の後続コミットで、929eec63以降の私家機能を含みます。
+直前の渡し主（r2）：[da07bbd8](https://github.com/synchro4351/udonarium_axe/commit/da07bbd8)、[消去経路修正 15189c35](https://github.com/synchro4351/udonarium_axe/commit/15189c35)。Cardに渡し主ID・名前の保存・同期項目を追加。明示的な受け渡しで更新し、手札から出ると消します。旧セーブには項目がありません。これらは[同じ機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/card-hand-visibility-sort-provenance)の後続コミットで、929eec63以降の私家機能を含みます。
 
-短いカットイン見本（次版）：[f137d9d1](https://github.com/synchro4351/udonarium_axe/commit/f137d9d1)。15189c35起点。既存の見本3種を短縮し、透明背景の見本12種を追加。既存のシーン・レイヤーとアニメーションプリセットを使い、保存・同期形式は変えません。
+短いカットイン見本（r2）：[f137d9d1](https://github.com/synchro4351/udonarium_axe/commit/f137d9d1)。15189c35起点。既存の見本3種を短縮し、透明背景の見本12種を追加。既存のシーン・レイヤーとアニメーションプリセットを使い、保存・同期形式は変えません。
 
-カットイン見本の図形差分（次版）：[元コミット f3f2b172](https://github.com/synchro4351/udonarium_axe/commit/f3f2b172)、[本流への取り込み f6e09ebb](https://github.com/synchro4351/udonarium_axe/commit/f6e09ebb)。既存のCutInClipとCutInFillShapeで、丸・星・裂けた帯・斜め帯などの形を見本ごとに変えます。録画テスト修正後の本流へcherry-pickしたためコミットIDは異なります。保存・同期形式や外部画像は増やしていません。
+カットイン見本の図形差分（r2）：[元コミット f3f2b172](https://github.com/synchro4351/udonarium_axe/commit/f3f2b172)、[本流への取り込み f6e09ebb](https://github.com/synchro4351/udonarium_axe/commit/f6e09ebb)。既存のCutInClipとCutInFillShapeで、丸・星・裂けた帯・斜め帯などの形を見本ごとに変えます。録画テスト修正後の本流へcherry-pickしたためコミットIDは異なります。保存・同期形式や外部画像は増やしていません。
 
-手札公開・場への配置の操作改善（次版）：[db74ee87](https://github.com/synchro4351/udonarium_axe/commit/db74ee87)。f137d9d1の後続。既存のPeerCursorの公開値とCard操作を使用。公開前の確認、閲覧専用画面、渡し主アイコンのカード外表示、ドロップ後の表裏選択を追加。新しい保存・同期項目はありません。
+手札公開・場への配置の操作改善（r2）：[db74ee87](https://github.com/synchro4351/udonarium_axe/commit/db74ee87)。f137d9d1の後続。既存のPeerCursorの公開値とCard操作を使用。公開前の確認、閲覧専用画面、渡し主アイコンのカード外表示、ドロップ後の表裏選択を追加。新しい保存・同期項目はありません。
 
-山札の表示更新（次版）：[5e9f3ee2](https://github.com/synchro4351/udonarium_axe/commit/5e9f3ee2)。db74ee87の後続。CardStackの変更通知を枚数・厚さ表示へ接続。通信自体の遅延原因は未特定です。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-card-usability)には、この後にユーザー確認表の文書コミット6089e285も含みます。
+山札の表示更新（r2）：[5e9f3ee2](https://github.com/synchro4351/udonarium_axe/commit/5e9f3ee2)。db74ee87の後続。CardStackの変更通知を枚数・厚さ表示へ接続。通信自体の遅延原因は未特定です。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-card-usability)には、この後にユーザー確認表の文書コミット6089e285も含みます。
 
-録画テストの負荷耐性（次版）：[7b9c7da7](https://github.com/synchro4351/udonarium_axe/commit/7b9c7da7)。実装が許容するフレーム飛びをテストでも扱い、描かれたフレームの音声待機時間を確認します。製品の録画処理そのものは変更していません。
+録画テストの負荷耐性（r2）：[7b9c7da7](https://github.com/synchro4351/udonarium_axe/commit/7b9c7da7)。実装が許容するフレーム飛びをテストでも扱い、描かれたフレームの音声待機時間を確認します。製品の録画処理そのものは変更していません。
 
-### 2026-09-26 の追加分（次版）
+### 2026-09-26 の追加分（r2）
 
 | 変更 | 本流コミット | 元の機能コミット・依存関係 |
 | --- | --- | --- |
@@ -59,11 +59,13 @@
 | カットイン文字の余分な空白 | [70fc8456](https://github.com/synchro4351/udonarium_axe/commit/70fc8456) | [44a0fdaf](https://github.com/synchro4351/udonarium_axe/commit/44a0fdaf)、基点4e1e2715。共通描画の空白をなくし、自作カットインの明示改行は保持 |
 | 未知の切り抜き名を安全に表示 | [557525ba](https://github.com/synchro4351/udonarium_axe/commit/557525ba) | [908b6a1c](https://github.com/synchro4351/udonarium_axe/commit/908b6a1c)。この版が将来の未知の形状名を受け取っても、切り抜かずに表示する |
 | カットイン見本の演出調整 | [fe0c0c7e](https://github.com/synchro4351/udonarium_axe/commit/fe0c0c7e) | [b2a32ec4](https://github.com/synchro4351/udonarium_axe/commit/b2a32ec4)。花束とハートを各1種に整理し、雨・星・上向き矢印・閃光・帯内の光を調整。矢印は既存形状だけで構成し、新しい保存値を増やさない |
+| 「Level UP」の低い矢印 | [93ce5369](https://github.com/synchro4351/udonarium_axe/commit/93ce5369) | 19a98d7e起点。頭と軸の高さを約半分にし、文字を境目へ置く。既存の作例レイヤー形状を使い、保存済みカットインには影響しない |
+| 手札メニューの独自アイコン | [c617725b](https://github.com/synchro4351/udonarium_axe/commit/c617725b) | 93ce5369起点。添付画像を参考に独自SVGを作成し、PC・モバイルのメニューで使用。保存・同期の変更なし |
 
 ## 検証と制限
 
-- 統合後の次版候補`19a98d7e`は、全体927ファイル／12,677件成功・1件skip、production build成功。図形差分の元コミットでも924ファイル／12,556件成功・1件skipとbuild成功を確認済み。
-- 2026-09-26に、ユーザーが前候補のカットイン見本とカード操作の確認表9項目を合格と報告。今回追加した一覧から引く操作と演出調整は目視未確認。追加設定のセーブ再読込と弱回線試験は未確認。
+- r2の固定ソース`6e5668dd`は、全体927ファイル／12,680件成功・1件skip、production build成功。図形差分の元コミットでも924ファイル／12,556件成功・1件skipとbuild成功を確認済み。
+- 2026-09-26に、ユーザーが前候補のカットイン見本とカード操作の確認表9項目を合格と報告。一覧から引く操作と演出調整もユーザーが合格を報告。新しい低い「Level UP」と手札アイコンは配備後の目視待ち。追加設定のセーブ再読込と弱回線試験は未確認。
 - フォント選択・YouTube表示・ポインター入力を組み合わせた92件は、r1で直接Vitest・Angular経由の両方に成功。自動再生追加は対象22件を両経路で確認。
 - 初回ドラッグはChromium・Firefox・WebKitで、チャットフォーカスあり／なしの計6件を確認。
 - 再読み込み後の同一ID再参加・双方向通信・再同期は確認済み。旧接続が残る場合は約1分待ち、他の参加者の強制退出やID変更はしない。
