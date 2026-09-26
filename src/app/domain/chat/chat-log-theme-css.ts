@@ -43,6 +43,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body)
 .rt{display:-webkit-box;min-width:0;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .att{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .att img{display:block;max-width:min(100%,320px);max-height:260px;border:1px solid var(--line);border-radius:var(--radius-sm)}
+.rx{margin-top:4px;color:var(--muted);font-size:12.5px;line-height:1.6}
 .ooc{opacity:.7}
 .ooc .tx{font-size:.92em}
 .seal{color:var(--muted);letter-spacing:.2em}

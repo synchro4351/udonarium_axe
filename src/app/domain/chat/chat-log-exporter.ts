@@ -1,5 +1,6 @@
 import type { ImageFile } from '@axe/core/storage/image-file';
 import type { ChatMessage } from '@axe/domain/chat/chat-message';
+import { formatReactionSummary } from '@axe/domain/chat/chat-reaction';
 import { vnBodyOf } from '@axe/domain/visual-novel/vn-emote';
 
 export type ChatLogLine = Pick<
@@ -27,7 +28,9 @@ export type ChatLogLine = Pick<
   | 'isDicebot'
   | 'rollDetail'
   | 'isOutOfStory'
->;
+> &
+  // a line from before reactions, or one drawn for a sample, may have none to give
+  Partial<Pick<ChatMessage, 'reactions'>>;
 
 export interface ChatLogTab {
   readonly name: string;
@@ -75,6 +78,7 @@ export class ChatLogExporter {
     '.bn{font-weight:bold;margin-right:4px}' +
     '.ai{max-width:180px;max-height:120px;width:auto;height:auto;object-fit:contain;border:1px solid #ccc;border-radius:4px;background:#fff;vertical-align:top;margin:2px 4px 2px 0}' +
     '.aw{display:block;margin-top:6px;white-space:normal}' +
+    '.rx{display:block;margin-top:2px;color:#666;font-size:.85em}' +
     '</style>\n';
   /**
    * Escapes a value for html and turns ruby markup, `|base《reading》`, into `<ruby>` tags.
@@ -153,6 +157,7 @@ export class ChatLogExporter {
     }
     if (message.fixd) str += ' (編集済)';
     str += '</font>';
+    str += ChatLogExporter.formatReactions(message, !message.isSecret || canSee);
     str += '</div></div>\n';
     return str;
   }
@@ -193,11 +198,25 @@ export class ChatLogExporter {
     }
     if (message.fixd) str += ' (編集済)';
     str += '\n';
+    const reactions = ChatLogExporter.formatReactions(message, !message.isSecret || canSee);
+    if (reactions) str += `        ${reactions}\n`;
 
     str += '      </div>\n';
     str += '    </div>\n';
     str += '    \n';
     return str;
+  }
+
+  /**
+   * The counts of the reactions on a line, such as `👍 2・❤️ 1`, as a small block to follow it.
+   *
+   * Who reacted is not written. Nothing comes out for a line nobody reacted to, nor for one whose
+   * words are kept from the reader (`visible` false), whose reactions are kept from them as well.
+   */
+  static formatReactions(message: ChatLogLine, visible: boolean): string {
+    if (!visible) return '';
+    const summary = formatReactionSummary(message.reactions);
+    return summary ? `<span class="rx">${ChatLogExporter.escapeHtml(summary)}</span>` : '';
   }
 
   /**

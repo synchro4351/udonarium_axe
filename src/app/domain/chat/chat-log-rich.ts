@@ -8,6 +8,7 @@ import {
 } from '@axe/domain/chat/chat-log-exporter';
 import type { RichChatLogStyle } from '@axe/domain/chat/chat-log-style';
 import { CHAT_LOG_BASE_CSS, CHAT_LOG_THEME_CSS } from '@axe/domain/chat/chat-log-theme-css';
+import { formatReactionSummary } from '@axe/domain/chat/chat-reaction';
 import type { DiceRollOutcome } from '@axe/domain/dice/dice-roll-detail';
 import { vnBodyOf } from '@axe/domain/visual-novel/vn-emote';
 
@@ -280,6 +281,7 @@ function renderSay(entry: ChatLogEntry, continuation: boolean, context: RenderCo
     `<div class="hd"><span class="nm">${esc(name)}</span>${tabBadge(entry, context)}${timeOf(message)}</div>` +
     renderReferences(message, context) +
     `<div class="tx">${body}${edited}</div>` +
+    renderReactions(message, visible) +
     '</div></article>\n'
   );
 }
@@ -307,6 +309,7 @@ function renderRoll(entry: ChatLogEntry, context: RenderContext): string {
     '<div class="bd">' +
     `<div class="hd"><span class="nm">${esc(roller)}</span>${badge}${tabBadge(entry, context)}${timeOf(message)}</div>` +
     `<div class="tx">${body}</div>` +
+    renderReactions(message, visible) +
     '</div></article>\n'
   );
 }
@@ -351,6 +354,12 @@ function renderReference(
   const name = decode(target.name, context) || label;
   const excerpt = ChatLogExporter.referenceExcerpt(target, maxTextLength, context.options.textDecoder);
   return `<div class="ref"><span class="rn">${icon} ${esc(name)}</span><span class="rt">${esc(excerpt)}</span></div>`;
+}
+
+/** The reaction counts under a line the reader may see, or nothing; see `ChatLogExporter.formatReactions`. */
+function renderReactions(message: ChatLogLine, visible: boolean): string {
+  const summary = visible ? formatReactionSummary(message.reactions) : '';
+  return summary ? `<div class="rx">${esc(summary)}</div>` : '';
 }
 
 function renderAttachments(message: ChatLogLine, context: RenderContext): string {
