@@ -54,7 +54,7 @@ test.describe('左メニューからパネルを開く', () => {
     await expect(page.locator('dice-table-setting')).toBeVisible({ timeout: 10000 });
   });
 
-  test('画像・ジュークボックス・カットイン・エフェクトは「メディア」の小窓にまとまり、選ぶと小窓が閉じること', async ({
+  test('画像・ジュークボックス・カットイン・エフェクト・スタンプは「メディア」の小窓にまとまり、選ぶと小窓が閉じること', async ({
     page,
   }) => {
     await openFabMenu(page);
@@ -62,7 +62,7 @@ test.describe('左メニューからパネルを開く', () => {
 
     await page.locator('[data-testid="fab-entry-media"]').click();
     const media = page.locator('[data-testid="fab-submenu-media"]');
-    await expect(media.locator('[data-label]')).toHaveCount(4);
+    await expect(media.locator('[data-label]')).toHaveCount(5);
     await expect(page.locator('[data-testid="fab-entry-media"]')).toHaveAttribute('aria-expanded', 'true');
 
     await media.getByTestId('fab-entry-jukebox').click();
