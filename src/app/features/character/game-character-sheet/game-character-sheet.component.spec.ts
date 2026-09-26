@@ -1,9 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
+import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { ModalService } from '@axe/application/ui/modal.service';
 import { Card, CardState } from '@axe/domain/card/card';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DataElement, DataElementAttribute, DataElementRole } from '@axe/domain/data/data-element';
 import { DiceSymbol } from '@axe/domain/dice/dice-symbol';
+import { Config } from '@axe/domain/peer/config';
 import { Terrain } from '@axe/domain/tabletop/terrain';
 import { GameCharacterSheetComponent } from '@axe/features/character/game-character-sheet/game-character-sheet.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -21,13 +24,161 @@ describe('GameCharacterSheetComponent', () => {
   });
 
   beforeEach(() => {
+    // Card cases below edit as a player, which the room has to allow first.
+    Config.instance.allowPlayerCardEdit = true;
     fixture = TestBed.createComponent(GameCharacterSheetComponent);
     component = fixture.componentInstance;
     pointerDeviceService = TestBed.inject(PointerDeviceService);
   });
 
+  afterEach(() => {
+    Config.instance.allowPlayerCardEdit = false;
+    vi.restoreAllMocks();
+  });
+
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  describe('card editing permission', () => {
+    it('shows a card read-only to a player and ignores its edits while the room keeps card edits to the GM', () => {
+      Config.instance.allowPlayerCardEdit = false;
+      const card = Card.create('閲覧のみ', 'front.png', 'back.png');
+      const open = vi.spyOn(TestBed.inject(ModalService), 'open');
+      component.tabletopObject = card;
+
+      try {
+        fixture.detectChanges();
+        const body = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="card-sheet-body"]')!;
+        expect(body.hasAttribute('inert')).toBe(true);
+
+        component.setCardOwnName(card, { target: { value: '改名' } } as unknown as Event);
+        component.setCardOwnSize(card, { target: { valueAsNumber: 9 } } as unknown as Event);
+        component.setCardOwnFaceText(card, { target: { value: '書き換え' } } as unknown as Event);
+        component.flushCardOwnFaceText();
+        component.toggleEditMode();
+        component.openModal('front');
+
+        expect(card.name).toBe('閲覧のみ');
+        expect(card.size).toBe(2);
+        expect(card.faceText).toBe('');
+        expect(component.isEdit()).toBe(false);
+        expect(open).not.toHaveBeenCalled();
+      } finally {
+        card.destroy();
+      }
+    });
+
+    it('opens the card up again as soon as the room allows player edits', () => {
+      Config.instance.allowPlayerCardEdit = false;
+      const card = Card.create('許可待ち', 'front.png', 'back.png');
+      component.tabletopObject = card;
+
+      try {
+        fixture.detectChanges();
+        Config.instance.allowPlayerCardEdit = true;
+        TestBed.inject(ObjectChangeService).notifyChanged('Config');
+        fixture.detectChanges();
+
+        const body = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="card-sheet-body"]')!;
+        expect(body.hasAttribute('inert')).toBe(false);
+        component.setCardOwnName(card, { target: { value: '改名' } } as unknown as Event);
+        expect(card.name).toBe('改名');
+      } finally {
+        card.destroy();
+      }
+    });
+
+    it('drops face text still waiting when the permission is withdrawn before it is written', () => {
+      vi.useFakeTimers();
+      const card = Card.create('取り消し', 'front.png', 'back.png');
+      component.tabletopObject = card;
+
+      try {
+        component.setCardOwnFaceText(card, { target: { value: '途中' } } as unknown as Event);
+        Config.instance.allowPlayerCardEdit = false;
+        vi.advanceTimersByTime(100);
+        expect(card.faceText).toBe('');
+      } finally {
+        vi.useRealTimers();
+        card.destroy();
+      }
+    });
+
+    it('never shows the front picture of a card whose face is hidden from this user', () => {
+      const card = Card.create('伏せ札', 'front.png', 'back.png');
+      vi.spyOn(card, 'frontImage', 'get').mockReturnValue({ url: 'secret-front.png' } as never);
+
+      try {
+        expect(component.cardOwnFrontImageUrl(card)).toBe('secret-front.png');
+        card.state = CardState.BACK;
+        card.owner = 'another-user';
+        expect(component.cardOwnFrontImageUrl(card)).toBe('');
+
+        component.tabletopObject = card;
+        fixture.detectChanges();
+        const front = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+          '[data-testid="card-sheet-front-image"]'
+        )!;
+        expect(front.getAttribute('style') ?? '').not.toContain('secret-front');
+      } finally {
+        card.destroy();
+      }
+    });
+
+    it('puts a picture chosen after the sheet moved on onto neither piece', async () => {
+      const first = Card.create('一枚目', 'front.png', 'back.png');
+      const second = Card.create('二枚目', 'front2.png', 'back2.png');
+      let choose!: (value: string) => void;
+      vi.spyOn(TestBed.inject(ModalService), 'open').mockReturnValue(new Promise<string>((r) => (choose = r)));
+      component.tabletopObject = first;
+
+      try {
+        component.openModal('front');
+        component.tabletopObject = second;
+        choose('picked.png');
+        await Promise.resolve();
+
+        expect(first.imageDataElement?.getFirstElementByName('front')?.value).toBe('front.png');
+        expect(second.imageDataElement?.getFirstElementByName('front')?.value).toBe('front2.png');
+      } finally {
+        first.destroy();
+        second.destroy();
+      }
+    });
+
+    it('puts a picture chosen after the permission was withdrawn nowhere', async () => {
+      const card = Card.create('撤回', 'front.png', 'back.png');
+      let choose!: (value: string) => void;
+      vi.spyOn(TestBed.inject(ModalService), 'open').mockReturnValue(new Promise<string>((r) => (choose = r)));
+      component.tabletopObject = card;
+
+      try {
+        component.openModal('back');
+        Config.instance.allowPlayerCardEdit = false;
+        choose('picked.png');
+        await Promise.resolve();
+
+        expect(card.imageDataElement?.getFirstElementByName('back')?.value).toBe('back.png');
+      } finally {
+        card.destroy();
+      }
+    });
+
+    it('leaves the card permission out of other pieces', async () => {
+      Config.instance.allowPlayerCardEdit = false;
+      const terrain = Terrain.create('地形', 2, 2, 2, 'wall.png', 'floor.png');
+      vi.spyOn(TestBed.inject(ModalService), 'open').mockResolvedValue('picked.png');
+      component.tabletopObject = terrain;
+
+      try {
+        component.openModal('floor');
+        await Promise.resolve();
+        expect(terrain.imageDataElement?.getFirstElementByName('floor')?.value).toBe('picked.png');
+      } finally {
+        terrain.destroy();
+      }
+    });
   });
 
   describe('the width a card is set to', () => {
