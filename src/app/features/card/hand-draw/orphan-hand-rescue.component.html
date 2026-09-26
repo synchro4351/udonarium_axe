@@ -1,0 +1,73 @@
+@if (isGameMaster() && hands().length > 0) {
+  <details class="rounded-ui border-ui-border-panel mt-3 border border-dashed p-2" data-testid="orphan-hands">
+    <summary class="text-ui-dim cursor-pointer text-xs font-bold">
+      {{ 'feature.card.orphanHand.title' | transloco: { count: hands().length } }}
+    </summary>
+    <p class="text-ui-dim m-0 my-1 text-[11px]">{{ 'feature.card.orphanHand.hint' | transloco }}</p>
+    @if (outcome(); as result) {
+      @if (result !== 'moved') {
+        <p class="m-0 mb-1 text-[11px] font-bold text-red-400" role="status" data-testid="orphan-hand-outcome">
+          {{ 'feature.card.orphanHand.result.' + result | transloco }}
+        </p>
+      }
+    }
+    @for (hand of hands(); track hand.userId) {
+      <section
+        class="rounded-ui-sm border-ui-border-panel mb-2 border border-solid p-2 last:mb-0"
+        data-testid="orphan-hand"
+        [attr.aria-label]="'feature.card.orphanHand.absent' | transloco: { id: shortId(hand.userId) }"
+      >
+        <header class="mb-1 flex items-center gap-2 text-sm">
+          <span class="truncate font-bold" data-testid="orphan-hand-label">
+            {{ 'feature.card.orphanHand.absent' | transloco: { id: shortId(hand.userId) } }}
+          </span>
+          <span class="text-ui-dim ml-auto shrink-0 text-xs">
+            {{ 'feature.card.handOverview.cardCount' | transloco: { count: hand.cards.length } }}
+          </span>
+        </header>
+        <div class="mb-1 flex flex-wrap gap-1">
+          @for (card of hand.cards; track card.identifier) {
+            <div
+              class="rounded-ui-sm border-ui-border-panel h-14 w-10 shrink-0 overflow-hidden border border-solid"
+              data-testid="orphan-hand-card"
+            >
+              <img class="size-full object-cover" [src]="backImageUrl(card) | safe: 'resourceUrl'" alt="" />
+            </div>
+          }
+        </div>
+        @if (recipients().length > 0) {
+          <div class="flex items-center gap-1">
+            <select
+              class="rounded-ui-sm border-ui-border-panel bg-ui-input text-ui-text box-border min-w-0 flex-1 cursor-pointer border border-solid px-2 py-1 text-[12px]"
+              data-testid="orphan-hand-recipient"
+              [attr.aria-label]="'feature.card.orphanHand.recipient' | transloco"
+              (change)="pick(hand.userId, $event)"
+            >
+              <option value="" [selected]="pickedFor(hand.userId) === ''">
+                {{ 'feature.card.orphanHand.chooseRecipient' | transloco }}
+              </option>
+              @for (seat of recipients(); track seat.userId) {
+                <option [value]="seat.userId" [selected]="pickedFor(hand.userId) === seat.userId">
+                  {{ seat.name || ('feature.card.hand.unnamed' | transloco) }}
+                </option>
+              }
+            </select>
+            <button
+              class="shrink-0 px-2.5 py-1 text-[12px]"
+              type="button"
+              data-testid="orphan-hand-move"
+              [disabled]="pickedFor(hand.userId) === ''"
+              (click)="rescue(hand)"
+            >
+              {{ 'feature.card.orphanHand.move' | transloco }}
+            </button>
+          </div>
+        } @else {
+          <p class="text-ui-dim m-0 text-[11px]" data-testid="orphan-hand-no-recipient">
+            {{ 'feature.card.orphanHand.noRecipients' | transloco }}
+          </p>
+        }
+      </section>
+    }
+  </details>
+}

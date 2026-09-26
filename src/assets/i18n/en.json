@@ -780,7 +780,26 @@
         "drewFromHand": "{{to}} drew a card from {{from}}",
         "gaveFromHand": "{{from}} gave a card from their hand to {{to}}",
         "gaveCard": "{{from}} gave a card to {{to}}",
-        "discardedPairs": "{{name}} discarded pairs of {{ranks}}"
+        "discardedPairs": "{{name}} discarded pairs of {{ranks}}",
+        "rescuedOrphanHand": "{{gm}} moved the {{count}} cards left by an absent participant ({{from}}) to {{to}}"
+      },
+      "orphanHand": {
+        "title": "Hands of absent participants ({{count}})",
+        "hint": "Hands held by participants who are not in the room. Only the GM sees this. Moved cards join the end of the recipient's hand, face down.",
+        "absent": "Absent participant ({{id}})",
+        "recipient": "Recipient",
+        "chooseRecipient": "Choose a recipient",
+        "move": "Move hand",
+        "noRecipients": "Nobody connected can take these cards right now",
+        "confirmTitle": "Move an absent participant's hand",
+        "confirmMessage": "Move all {{count}} cards in the hand of the absent participant ({{from}}) to {{to}}. Only {{to}} will see their fronts.",
+        "confirmPublicWarning": "{{to}}'s hand is public right now, so everyone will see the fronts of the moved cards.",
+        "result": {
+          "notGameMaster": "Not moved: you are not the GM.",
+          "sourcePresent": "Not moved: that participant is back in the room.",
+          "recipientUnavailable": "Not moved: the recipient has left or can no longer hold cards.",
+          "handChanged": "Not moved: the hand changed after you confirmed. Please check it again."
+        }
       },
       "handOverview": {
         "hint": "Only public hands show their fronts.",

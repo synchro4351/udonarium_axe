@@ -1,13 +1,14 @@
 import { inject, Injectable } from '@angular/core';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
-import { getPeerContext } from '@axe/core/network/peer-context-source';
+import { getPeerContext, getPeerIds } from '@axe/core/network/peer-context-source';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { planDeal } from '@axe/domain/card/card-deal';
 import { CardStack } from '@axe/domain/card/card-stack';
 import { selectHandCardsOf } from '@axe/domain/card/hand-cards';
 import { handHolderOf } from '@axe/domain/card/hand-location';
+import { appendHandOrderAfter, OrphanHand, selectOrphanHands, shortUserIdOf } from '@axe/domain/card/orphan-hands';
 import { findTrumpPairs, selectExtraJokers, trumpRankOf } from '@axe/domain/card/trump-card';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { Config } from '@axe/domain/peer/config';
@@ -20,6 +21,10 @@ export interface CardSeat {
   userId: string;
   name: string;
 }
+
+/** How a game master's attempt to hand over an orphaned hand ended; anything but `moved` left every card where it was. */
+export type OrphanHandRescueResult =
+  'moved' | 'notGameMaster' | 'sourcePresent' | 'recipientUnavailable' | 'handChanged';
 
 export interface DealResult {
   dealt: number;
@@ -145,13 +150,14 @@ export class CardGameService {
    * Takes a card from someone else's hand into your own and says so in chat.
    *
    * False, with nothing moved, while you have no user id or may not hold cards, when the card is in
-   * no other hand, or when the room forbids drawing from hands.
+   * no other hand, when the room forbids drawing from hands, or when the holder is no longer in the
+   * room: an orphaned hand is only for the game master to hand over.
    */
   drawFromHand(card: Card, fromName: string): boolean {
     const myUserId = this.myUserId();
     if (myUserId.length < 1 || !canRoleEdit(PeerCursor.myRole) || !this.allowsHandDraw()) return false;
     const holder = handHolderOf(card.location.name);
-    if (!holder || holder === myUserId) return false;
+    if (!holder || holder === myUserId || !PeerCursor.findByUserId(holder)) return false;
 
     card.toHand(myUserId);
     SoundEffect.play(PresetSound.cardDraw);
@@ -199,6 +205,80 @@ export class CardGameService {
     stack.update();
     this.finishGiving(card, recipient, false);
     return true;
+  }
+
+  /**
+   * The hands left behind by participants no longer in the room, as saved rooms can bring back.
+   *
+   * Only a user with no cursor at all counts as absent; one who has just dropped keeps their cursor
+   * for a while and may still come back to their hand.
+   */
+  orphanHands(): OrphanHand[] {
+    return selectOrphanHands(this.objectStore.getObjects<Card>(Card), this.presentUserIds());
+  }
+
+  /** Whether you may hand an orphaned hand over to someone: only the game master may. */
+  canRescueOrphanHands(): boolean {
+    return PeerCursor.myRole === PeerRole.GameMaster && this.myUserId().length > 0;
+  }
+
+  /** Who may take over an orphaned hand: participants who can hold cards and are connected right now, yourself included. */
+  orphanHandRecipients(): CardSeat[] {
+    const myUserId = this.myUserId();
+    const connected = new Set(getPeerIds());
+    return this.participants().filter((seat) => {
+      if (seat.userId === myUserId) return true;
+      const peerId = PeerCursor.findByUserId(seat.userId)?.peerId ?? '';
+      return peerId.length > 0 && connected.has(peerId);
+    });
+  }
+
+  /**
+   * Moves every card of an absent participant's hand into a connected participant's hand, face down
+   * and in the same order after the cards they already hold, and says so in chat without naming any
+   * card.
+   *
+   * Everything is checked again at the moment of moving, and nothing moves unless you are still the
+   * game master, the holder is still absent, the recipient may still take it, and the hand still
+   * holds exactly the cards that were confirmed. The room's give and draw rules do not apply: this is
+   * the game master recovering cards nobody could otherwise reach.
+   */
+  rescueOrphanHand(
+    fromUserId: string,
+    toUserId: string,
+    confirmedCardIdentifiers: readonly string[]
+  ): OrphanHandRescueResult {
+    if (!this.canRescueOrphanHands()) return 'notGameMaster';
+    if (this.presentUserIds().has(fromUserId)) return 'sourcePresent';
+    const recipient = this.orphanHandRecipients().find((seat) => seat.userId === toUserId);
+    if (!recipient) return 'recipientUnavailable';
+
+    const cards = this.handCardsOf(fromUserId);
+    const confirmed = new Set(confirmedCardIdentifiers);
+    if (cards.length < 1 || cards.length !== confirmed.size || cards.some((card) => !confirmed.has(card.identifier))) {
+      return 'handChanged';
+    }
+
+    const baseOrder = appendHandOrderAfter(this.handCardsOf(recipient.userId), Date.now());
+    cards.forEach((card, index) => card.toHand(recipient.userId, baseOrder + index));
+
+    SoundEffect.play(PresetSound.cardDraw);
+    this.chatMessageService.sendSystemMessage(
+      this.t('feature.card.message.rescuedOrphanHand', {
+        gm: PeerCursor.myCursor?.name ?? '',
+        from: shortUserIdOf(fromUserId),
+        count: cards.length,
+        to: recipient.name,
+      })
+    );
+    return 'moved';
+  }
+
+  private presentUserIds(): Set<string> {
+    const present = new Set(this.objectStore.getObjects<PeerCursor>(PeerCursor).map((cursor) => cursor.userId));
+    const myUserId = this.myUserId();
+    if (myUserId.length > 0) present.add(myUserId);
+    return present;
   }
 
   private recipientForGive(userId: string): CardSeat | null {

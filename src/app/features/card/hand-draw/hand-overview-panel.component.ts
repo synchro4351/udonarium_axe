@@ -6,6 +6,7 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
+import { OrphanHandRescueComponent } from '@axe/features/card/hand-draw/orphan-hand-rescue.component';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
 import { HandDragService } from '@axe/features/card/hand-rail/hand-drag.service';
 import { isOwnHandDrawTargetAt } from '@axe/features/card/hand-rail/hand-drop-target';
@@ -29,7 +30,7 @@ const DRAW_DRAG_THRESHOLD_PX = 6;
   selector: 'hand-overview-panel',
   templateUrl: './hand-overview-panel.component.html',
   host: { class: 'text-ui-text block h-full overflow-y-auto p-3' },
-  imports: [CardFacePreviewComponent, SafePipe, TranslocoModule],
+  imports: [CardFacePreviewComponent, OrphanHandRescueComponent, SafePipe, TranslocoModule],
 })
 export class HandOverviewPanelComponent {
   private readonly objectStore = inject(ObjectStore);

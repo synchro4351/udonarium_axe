@@ -780,7 +780,26 @@
         "drewFromHand": "{{to}} が {{from}} の手札から 1 枚引きました",
         "gaveFromHand": "{{from}} が {{to}} に手札から 1 枚渡しました",
         "gaveCard": "{{from}} が {{to}} にカードを 1 枚渡しました",
-        "discardedPairs": "{{name}} が {{ranks}} のペアを捨てました"
+        "discardedPairs": "{{name}} が {{ranks}} のペアを捨てました",
+        "rescuedOrphanHand": "{{gm}} が不在の参加者（{{from}}）の手札 {{count}} 枚を {{to}} に移しました"
+      },
+      "orphanHand": {
+        "title": "不在の参加者の手札（{{count}}）",
+        "hint": "部屋にいない参加者の手札です。GM だけに見えます。移すと受け取った人の手札の末尾に裏向きで加わります。",
+        "absent": "不在の参加者（{{id}}）",
+        "recipient": "受け取る人",
+        "chooseRecipient": "受け取る人を選ぶ",
+        "move": "手札を移す",
+        "noRecipients": "いま受け取れる参加者がいません",
+        "confirmTitle": "不在の参加者の手札を移す",
+        "confirmMessage": "不在の参加者（{{from}}）の手札 {{count}} 枚をまとめて {{to}} の手札に移します。カードの表は {{to}} にだけ見えます。",
+        "confirmPublicWarning": "{{to}} の手札はいま公開中なので、移したカードは全員に表が見えます。",
+        "result": {
+          "notGameMaster": "GM ではないため移せませんでした。",
+          "sourcePresent": "その参加者が部屋に戻ったため、移しませんでした。",
+          "recipientUnavailable": "受け取る人が部屋にいないか手札を持てないため、移しませんでした。",
+          "handChanged": "確認のあとで手札の中身が変わったため、移しませんでした。もう一度確かめてください。"
+        }
       },
       "handOverview": {
         "hint": "表が見えるのは公開中の手札だけです。",

@@ -289,6 +289,7 @@ describe('CardGameService', () => {
 
   describe('drawFromHand()', () => {
     it('moves a card from another hand into your own', () => {
+      peer('other', 'あいて');
       const card = trumpCard('s07');
       card.toHand('other');
 
@@ -319,6 +320,192 @@ describe('CardGameService', () => {
       expect(service.drawFromHand(card, 'あいて')).toBe(false);
       expect(card.location.name).toBe(handLocationOf('other'));
       expect(sendSystemMessage).not.toHaveBeenCalled();
+    });
+
+    it('does not let a player take a card from the hand of someone no longer in the room', () => {
+      const card = trumpCard('s07');
+      card.toHand('gone');
+
+      expect(service.drawFromHand(card, '')).toBe(false);
+      expect(card.location.name).toBe(handLocationOf('gone'));
+      expect(sendSystemMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('orphaned hands', () => {
+    function secretCard(name: string, userId: string, handOrder: number): Card {
+      const card = Card.create(name, './assets/images/trump/s01.webp', './assets/images/trump/z01.webp');
+      created.push(card);
+      card.toHand(userId, handOrder);
+      return card;
+    }
+
+    function identifiersOf(cards: Card[]): string[] {
+      return cards.map((card) => card.identifier);
+    }
+
+    beforeEach(() => {
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      PeerCursor.myCursor.peerId = 'peer-me';
+      setPeerContextProvider({
+        peerContext: { userId: 'me', peerId: 'peer-me' } as IPeerContext,
+        peerContexts: [],
+        peerIds: ['peer-other'],
+        peerId: 'peer-me',
+      });
+    });
+    afterEach(() => resetPeerContextProvider());
+
+    it('lists only hands whose holder has no cursor, in hand order, for several absent users', () => {
+      peer('other', 'あいて');
+      peer('dropping', 'きれかけ');
+      const second = secretCard('ひみつB', 'gone-1', 20);
+      const first = secretCard('ひみつA', 'gone-1', 10);
+      const lone = secretCard('ひみつC', 'gone-2', 5);
+      secretCard('ひみつD', 'other', 1);
+      secretCard('ひみつE', 'dropping', 1);
+      secretCard('ひみつF', 'me', 1);
+
+      const hands = service.orphanHands();
+
+      expect(hands.map((hand) => hand.userId)).toEqual(['gone-1', 'gone-2']);
+      expect(hands[0].cards).toEqual([first, second]);
+      expect(hands[1].cards).toEqual([lone]);
+    });
+
+    it('offers only connected participants who may hold cards, yourself included', () => {
+      peer('other', 'あいて');
+      peer('dropping', 'きれかけ');
+      peer('guest', 'けんがく', PeerRole.Guest);
+
+      expect(service.orphanHandRecipients().map((seat) => seat.userId)).toEqual(['me', 'other']);
+    });
+
+    it('moves the whole hand face down, in order, after the cards the recipient already holds', () => {
+      peer('other', 'あいて');
+      const held = secretCard('もちふだ', 'other', Date.now() + 1_000_000);
+      const second = secretCard('ひみつB', 'gone', 20);
+      const first = secretCard('ひみつA', 'gone', 10);
+      // Whatever state a saved room left them in, they arrive hidden from all but the recipient.
+      first.state = CardState.FRONT;
+      second.owner = 'someone';
+
+      const result = service.rescueOrphanHand('gone', 'other', identifiersOf([first, second]));
+
+      expect(result).toBe('moved');
+      expect(service.handCardsOf('other')).toEqual([held, first, second]);
+      expect(service.orphanHands()).toEqual([]);
+      for (const card of [first, second]) {
+        expect(card.state).toBe(CardState.BACK);
+        expect(card.owner).toBe('');
+        expect(card.lastHandGiverUserId).toBe('');
+      }
+      expect(sendSystemMessage).toHaveBeenCalledOnce();
+      const message = sendSystemMessage.mock.calls[0][0] as string;
+      expect(message).toContain('あいて');
+      expect(message).toContain('2');
+      expect(message).not.toContain('ひみつ');
+    });
+
+    it('ignores the room give and draw rules, which are for players', () => {
+      peer('other', 'あいて');
+      const card = secretCard('ひみつA', 'gone', 1);
+      Config.instance.allowsHandGive = false;
+      Config.instance.allowsHandDraw = false;
+
+      expect(service.rescueOrphanHand('gone', 'other', [card.identifier])).toBe('moved');
+      expect(card.location.name).toBe(handLocationOf('other'));
+    });
+
+    it('lets the game master take the hand into their own', () => {
+      const card = secretCard('ひみつA', 'gone', 1);
+
+      expect(service.rescueOrphanHand('gone', 'me', [card.identifier])).toBe('moved');
+      expect(card.location.name).toBe(handLocationOf('me'));
+    });
+
+    it('refuses a player or a guest, moving nothing', () => {
+      peer('other', 'あいて');
+      const card = secretCard('ひみつA', 'gone', 1);
+
+      for (const role of [PeerRole.Player, PeerRole.Guest]) {
+        PeerCursor.myCursor.role = role;
+        expect(service.canRescueOrphanHands()).toBe(false);
+        expect(service.rescueOrphanHand('gone', 'me', [card.identifier])).toBe('notGameMaster');
+        expect(service.rescueOrphanHand('gone', 'other', [card.identifier])).toBe('notGameMaster');
+      }
+      expect(card.location.name).toBe(handLocationOf('gone'));
+      expect(sendSystemMessage).not.toHaveBeenCalled();
+    });
+
+    it('refuses once the holder is back in the room', () => {
+      peer('other', 'あいて');
+      const card = secretCard('ひみつA', 'gone', 1);
+      peer('gone', 'もどった');
+
+      expect(service.rescueOrphanHand('gone', 'other', [card.identifier])).toBe('sourcePresent');
+      expect(card.location.name).toBe(handLocationOf('gone'));
+    });
+
+    it('refuses a recipient who is not connected, is a guest, or is unknown', () => {
+      peer('dropping', 'きれかけ');
+      peer('guest', 'けんがく', PeerRole.Guest);
+      const card = secretCard('ひみつA', 'gone', 1);
+
+      for (const userId of ['dropping', 'guest', 'nobody', 'gone']) {
+        expect(service.rescueOrphanHand('gone', userId, [card.identifier])).toBe('recipientUnavailable');
+      }
+      expect(card.location.name).toBe(handLocationOf('gone'));
+      expect(sendSystemMessage).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the hand is no longer what was confirmed', () => {
+      peer('other', 'あいて');
+      const first = secretCard('ひみつA', 'gone', 1);
+      const second = secretCard('ひみつB', 'gone', 2);
+      const confirmed = identifiersOf([first, second]);
+
+      const added = secretCard('ひみつC', 'gone', 3);
+      expect(service.rescueOrphanHand('gone', 'other', confirmed)).toBe('handChanged');
+      added.setLocation('table');
+
+      second.setLocation('table');
+      expect(service.rescueOrphanHand('gone', 'other', confirmed)).toBe('handChanged');
+
+      first.setLocation('table');
+      expect(service.rescueOrphanHand('gone', 'other', [])).toBe('handChanged');
+      expect(sendSystemMessage).not.toHaveBeenCalled();
+      expect(service.handCardsOf('other')).toEqual([]);
+    });
+
+    it('survives a save and reload, carrying no new attribute', () => {
+      peer('other', 'あいて');
+      const card = secretCard('ひみつA', 'gone', 1);
+      // happy-dom's XML parser rejects dotted attribute names such as location.name, so the saved
+      // attributes are read off the tag and replayed the way ObjectSerializer.parseXml applies them.
+      const attributesOf = (xml: string) =>
+        Array.from(/^<\w+([^>]*)>/.exec(xml)![1].matchAll(/([\w.]+)="([^"]*)"/g), ([, name, value]) => ({
+          name,
+          value,
+        }));
+      const reload = (xml: string): Card => {
+        const restored = new Card();
+        restored.parseAttributes(attributesOf(xml) as unknown as NamedNodeMap);
+        return restored;
+      };
+      const namesOf = (xml: string) => attributesOf(xml).map((attribute) => attribute.name);
+      const before = namesOf(card.toXml());
+
+      expect(reload(card.toXml()).location.name).toBe(handLocationOf('gone'));
+
+      service.rescueOrphanHand('gone', 'other', [card.identifier]);
+      const saved = card.toXml();
+      expect(namesOf(saved)).toEqual(before);
+
+      const reloaded = reload(saved);
+      expect(reloaded.location.name).toBe(handLocationOf('other'));
+      expect(reloaded.handOrder).toBe(card.handOrder);
+      expect(reloaded.state).toBe(CardState.BACK);
     });
   });
 
