@@ -20,6 +20,7 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { ReloadCheck } from '@axe/domain/peer/reload-check';
+import { HAND_CARDS_ICON } from '@axe/domain/ui/custom-icon';
 import { RoomPanelName } from '@axe/domain/ui/room-panel';
 import { nextViewMode, viewModeIcon, viewModeLabelKey } from '@axe/domain/ui/view-mode';
 import { HandRailService } from '@axe/features/card/hand-rail/hand-rail.service';
@@ -35,13 +36,14 @@ import { RoomPanelService } from '@axe/features/panels/room-panel.service';
 import { ActiveCharacterService } from '@axe/features/pl-tools/active-character.service';
 import { isOwnedByUser } from '@axe/features/pl-tools/owned-character-list/owned-characters';
 import { VisualNovelModeService } from '@axe/features/visual-novel/visual-novel-mode.service';
+import { UiHandCardsIconComponent } from '@axe/ui/components/hand-cards-icon/hand-cards-icon.component';
 import { TranslocoModule } from '@jsverse/transloco';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-mobile-shell',
   templateUrl: './mobile-shell.component.html',
-  imports: [MobileChatPaneComponent, TranslocoModule],
+  imports: [MobileChatPaneComponent, TranslocoModule, UiHandCardsIconComponent],
 })
 export class MobileShellComponent {
   private readonly panelService = inject(PanelService);
@@ -112,6 +114,7 @@ export class MobileShellComponent {
     return this.t('common.motion.auto');
   });
 
+  protected readonly handCardsIcon = HAND_CARDS_ICON;
   protected readonly sharedItems: MobileMenuItem[] = sharedMobileMenuItems();
   protected readonly gameMasterItems: MobileMenuItem[] = gameMasterMobileMenuItems();
   protected readonly showGameMasterItems = computed(() => this.isGameMaster());

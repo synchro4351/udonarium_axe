@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HAND_CARDS_ICON } from '@axe/domain/ui/custom-icon';
 import { UiFabSubmenuButtonComponent } from '@axe/ui/components/fab-submenu/fab-submenu-button.component';
 
 describe('UiFabSubmenuButtonComponent', () => {
@@ -32,6 +33,19 @@ describe('UiFabSubmenuButtonComponent', () => {
 
     expect(button().textContent!.trim()).toBe('JA');
     expect(button().querySelector('i')).toBeNull();
+  });
+
+  it('draws the hand icon itself instead of asking the icon font for it', () => {
+    set('icon', HAND_CARDS_ICON);
+    set('badge', true);
+
+    const svg = button().querySelector('ui-hand-cards-icon svg')!;
+    expect(button().querySelector('i')).toBeNull();
+    expect(svg.getAttribute('fill')).toBe('currentColor');
+    expect(svg.querySelector('[data-part="front-card"]')!.getAttribute('fill-rule')).toBe('evenodd');
+    expect(svg.querySelector('[data-part="back-card"]')).not.toBeNull();
+    expect(button().getAttribute('aria-label')).toBe('Clock');
+    expect(button().querySelector('.bg-red-500')).not.toBeNull();
   });
 
   it('says whether what it shows is out only when told', () => {

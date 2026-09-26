@@ -95,7 +95,11 @@
                 class="text-ui-text active:bg-ui-accent-bg active:text-ui-accent rounded-ui relative flex min-h-15 w-full flex-col items-center justify-center gap-1 border-none bg-transparent px-1 py-1.5 text-[0.68rem] leading-tight shadow-none transition-colors"
                 (click)="runMenuAction(item.action)"
               >
-                <i class="material-icons text-ui-muted text-[22px]!">{{ item.icon }}</i>
+                @if (item.icon === handCardsIcon) {
+                  <ui-hand-cards-icon class="text-ui-muted size-5.5" />
+                } @else {
+                  <i class="material-icons text-ui-muted text-[22px]!">{{ item.icon }}</i>
+                }
                 @if (item.action === 'hand' && handRail.hasUpdate()) {
                   <span class="absolute top-1 right-1/3 size-2 rounded-full bg-red-500" aria-hidden="true"></span>
                 }

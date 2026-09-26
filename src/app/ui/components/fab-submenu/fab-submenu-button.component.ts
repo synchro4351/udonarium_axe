@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { HAND_CARDS_ICON } from '@axe/domain/ui/custom-icon';
+import { UiHandCardsIconComponent } from '@axe/ui/components/hand-cards-icon/hand-cards-icon.component';
 
 /**
  * One button in a menu opened beside the drawer.
@@ -11,10 +13,16 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
   selector: 'ui-fab-submenu-button',
   templateUrl: './fab-submenu-button.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [UiHandCardsIconComponent],
   host: { class: 'contents' },
 })
 export class UiFabSubmenuButtonComponent {
-  /** The icon shown; left out when a short text is written instead. */
+  protected readonly handCardsIcon = HAND_CARDS_ICON;
+
+  /**
+   * The icon shown, a Material Icons name or one the app draws itself; left out when a short text is
+   * written instead.
+   */
   readonly icon = input<string | null>(null);
   /** A few letters written in place of an icon. */
   readonly text = input<string | null>(null);

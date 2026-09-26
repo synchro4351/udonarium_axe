@@ -1,3 +1,4 @@
+import { HAND_CARDS_ICON } from '@axe/domain/ui/custom-icon';
 import { RoomPanelName } from '@axe/domain/ui/room-panel';
 
 /** The small menus an entry of the drawer opens beside it, holding entries of their own. */
@@ -73,7 +74,7 @@ export const FAB_SUBMENUS: Readonly<Record<FabSubmenuName, readonly FabEntry[]>>
     { ...panel('buffManager', 'timeline', 'buffManager', 'feature.buffManager.title'), audience: 'playing' },
     panel('statusAilment', 'list_alt', 'statusAilment', 'feature.statusAilment.title'),
     panel('diceTableSetting', 'casino', 'diceTableSetting', 'feature.dice.tableSetting.title'),
-    { key: 'hand', icon: 'back_hand', labelKey: 'app.fab.hand', action: { kind: 'handRail' }, audience: 'playing' },
+    { key: 'hand', icon: HAND_CARDS_ICON, labelKey: 'app.fab.hand', action: { kind: 'handRail' }, audience: 'playing' },
   ],
   media: [
     panel('images', 'photo_library', 'fileStorage'),

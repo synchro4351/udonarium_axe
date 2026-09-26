@@ -1,3 +1,4 @@
+import { HAND_CARDS_ICON } from '@axe/domain/ui/custom-icon';
 import { FAB_ENTRIES, FAB_SUBMENUS } from '@axe/domain/ui/fab-menu';
 import { ROOM_PANELS } from '@axe/domain/ui/room-panel';
 
@@ -89,5 +90,9 @@ describe('the menu the room is reached through', () => {
   it('shows the table entry as a table, and the tabletop display as a screen laid on it', () => {
     expect(FAB_ENTRIES.find((entry) => entry.key === 'table')?.icon).toBe('table_restaurant');
     expect(FAB_SUBMENUS.table.find((entry) => entry.key === 'tabletopDisplay')?.icon).toBe('tablet');
+  });
+
+  it('shows the hand as fanned cards the app draws, not as a raised palm', () => {
+    expect(FAB_SUBMENUS.gameResources.find((entry) => entry.key === 'hand')?.icon).toBe(HAND_CARDS_ICON);
   });
 });
