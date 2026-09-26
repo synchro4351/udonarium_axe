@@ -59,8 +59,10 @@
           <div class="flex shrink-0 gap-0.5" [appTooltip]="card">
             <button
               type="button"
-              class="group/thumb bg-ui-input border-ui-border-panel hover:border-ui-accent rounded-ui-sm relative size-14 cursor-pointer overflow-hidden border border-solid bg-contain bg-center bg-no-repeat p-0 shadow-sm transition-[border-color,transform,box-shadow] hover:scale-[1.06] hover:shadow-md"
-              [attr.title]="'feature.inventory.sheet.changeFrontImage' | transloco"
+              class="group/thumb bg-ui-input border-ui-border-panel hover:border-ui-accent rounded-ui-sm relative size-14 cursor-pointer overflow-hidden border border-solid bg-contain bg-center bg-no-repeat p-0 shadow-sm transition-[border-color,transform,box-shadow] hover:scale-[1.06] hover:shadow-md disabled:cursor-default disabled:hover:scale-100"
+              [attr.title]="canEditCards() ? ('feature.inventory.sheet.changeFrontImage' | transloco) : null"
+              [disabled]="!canEditCards()"
+              data-testid="card-list-front-image"
               (click)="setImage(card, 'front')"
             >
               <card-face-preview
@@ -70,20 +72,21 @@
                 [frameHeight]="56"
               />
               <span
-                class="pointer-events-none absolute inset-0 z-3 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity group-hover/thumb:opacity-100 [&_.material-icons]:text-[18px]!"
+                class="pointer-events-none absolute inset-0 z-3 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity group-hover/thumb:opacity-100 group-disabled/thumb:hidden [&_.material-icons]:text-[18px]!"
               >
                 <i class="material-icons">edit</i>
               </span>
             </button>
             <button
               type="button"
-              class="group/thumb bg-ui-input border-ui-border-panel hover:border-ui-accent rounded-ui-sm relative size-14 cursor-pointer overflow-hidden border border-solid bg-contain bg-center bg-no-repeat p-0 shadow-sm transition-[border-color,transform,box-shadow] hover:scale-[1.06] hover:shadow-md"
+              class="group/thumb bg-ui-input border-ui-border-panel hover:border-ui-accent rounded-ui-sm relative size-14 cursor-pointer overflow-hidden border border-solid bg-contain bg-center bg-no-repeat p-0 shadow-sm transition-[border-color,transform,box-shadow] hover:scale-[1.06] hover:shadow-md disabled:cursor-default disabled:hover:scale-100"
               [style.background-image]="'url(' + $safeNavigationMigration(card.backImage?.url) + ')' | safe: 'style'"
-              [attr.title]="'feature.inventory.sheet.changeBackImage' | transloco"
+              [attr.title]="canEditCards() ? ('feature.inventory.sheet.changeBackImage' | transloco) : null"
+              [disabled]="!canEditCards()"
               (click)="setImage(card, 'back')"
             >
               <span
-                class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity group-hover/thumb:opacity-100 [&_.material-icons]:text-[18px]!"
+                class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity group-hover/thumb:opacity-100 group-disabled/thumb:hidden [&_.material-icons]:text-[18px]!"
               >
                 <i class="material-icons">edit</i>
               </span>
@@ -107,6 +110,8 @@
               class="border-ui-border-panel/60 bg-ui-input/60 text-ui-text focus:border-ui-accent focus:bg-ui-input rounded-ui-sm w-full max-w-xs border border-solid px-2 py-0.75 text-[0.78em] transition-colors outline-none placeholder:italic"
               [value]="cardName(card)"
               [placeholder]="'feature.cardStack.list.namePlaceholder' | transloco"
+              [readOnly]="!canEditCards()"
+              data-testid="card-list-name"
               (change)="setCardName(card, $event)"
             />
           </div>
@@ -120,14 +125,17 @@
               <i class="material-icons">arrow_outward</i>
               {{ 'feature.cardStack.list.drawFromStack' | transloco }}
             </button>
-            <button
-              type="button"
-              class="text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm flex size-7 cursor-pointer items-center justify-center border-none bg-transparent p-0 transition-[background,color] [&_.material-icons]:text-[16px]!"
-              [attr.title]="'feature.cardStack.list.edit' | transloco"
-              (click)="showDetail(card)"
-            >
-              <i class="material-icons">settings</i>
-            </button>
+            @if (canEditCards()) {
+              <button
+                type="button"
+                class="text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm flex size-7 cursor-pointer items-center justify-center border-none bg-transparent p-0 transition-[background,color] [&_.material-icons]:text-[16px]!"
+                [attr.title]="'feature.cardStack.list.edit' | transloco"
+                data-testid="card-list-edit"
+                (click)="showDetail(card)"
+              >
+                <i class="material-icons">settings</i>
+              </button>
+            }
           </div>
         </li>
       }

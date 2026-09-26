@@ -782,6 +782,7 @@
       "message": {
         "drewFromHand": "{{to}} が {{from}} の手札から 1 枚引きました",
         "gaveFromHand": "{{from}} が {{to}} に手札から 1 枚渡しました",
+        "gaveCard": "{{from}} が {{to}} にカードを 1 枚渡しました",
         "discardedPairs": "{{name}} が {{ranks}} のペアを捨てました"
       },
       "drawPanel": {
@@ -853,6 +854,7 @@
       "contextMenu": {
         "drawOne": "１枚引く",
         "drawToHand": "１枚引いて手札に加える",
+        "giveTopCard": "一番上のカードを渡す",
         "drawMany": "X枚を引く",
         "topFaceUp": "一番上を表にする",
         "topFaceDown": "一番上を裏にする",
@@ -2459,6 +2461,7 @@
       "handVisibilityChoice": "参加者が選ぶ",
       "handVisibilityPublic": "手札は常に公開",
       "handVisibilityPrivate": "手札は常に非公開",
+      "allowPlayerCardEdit": "PLにカードの編集を許可する（手札・場・山札）",
       "handCardsHint": "オフにすると、手札のメニューやドラッグ操作からもできなくなります。",
       "controllerResourcesShowAll": "すべて出す",
       "controllerResourcesHideAll": "すべて外す",

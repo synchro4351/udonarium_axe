@@ -2,7 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { Card } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
+import { Config } from '@axe/domain/peer/config';
 import { CardStackCardListComponent } from '@axe/features/card/card-stack-card-list/card-stack-card-list.component';
+import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
 describe('CardStackCardListComponent', () => {
@@ -18,6 +20,8 @@ describe('CardStackCardListComponent', () => {
   });
 
   beforeEach(() => {
+    // Most cases edit the cards, which a player may do only once the room allows it.
+    Config.instance.allowPlayerCardEdit = true;
     stack = CardStack.create('テスト山札');
     stack.putOnBottom(Card.create('A', './assets/images/trump/s01.webp', './assets/images/trump/z02.webp'));
     stack.putOnBottom(Card.create('B', './assets/images/trump/h13.webp', './assets/images/trump/z02.webp'));
@@ -25,6 +29,56 @@ describe('CardStackCardListComponent', () => {
     fixture = TestBed.createComponent(CardStackCardListComponent);
     fixture.componentRef.setInput('cardStack', stack);
     component = fixture.componentInstance;
+  });
+
+  afterEach(() => {
+    Config.instance.allowPlayerCardEdit = false;
+    vi.restoreAllMocks();
+  });
+
+  describe('while the room keeps card edits to the GM', () => {
+    beforeEach(() => {
+      Config.instance.allowPlayerCardEdit = false;
+    });
+
+    it('keeps names, pictures and the card editor out of reach but still lets the deck be drawn from', async () => {
+      const card = stack.cards[0];
+      const open = vi.spyOn(TestBed.inject(ModalService), 'open').mockResolvedValue('img-front-123');
+      const openSheet = vi.spyOn(TestBed.inject(ObjectPanelService), 'openSheet').mockImplementation(() => undefined);
+
+      component.setCardName(card, { target: { value: '書き換え' } } as unknown as Event);
+      component.setImage(card, 'front');
+      component.showDetail(card);
+      await Promise.resolve();
+
+      expect(card.name).toBe('A');
+      expect(open).not.toHaveBeenCalled();
+      expect(openSheet).not.toHaveBeenCalled();
+      expect(card.imageDataElement?.getFirstElementByName('front')?.value).toBe('./assets/images/trump/s01.webp');
+
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelector<HTMLInputElement>('[data-testid="card-list-name"]')!.readOnly).toBe(true);
+      expect(root.querySelector<HTMLButtonElement>('[data-testid="card-list-front-image"]')!.disabled).toBe(true);
+      expect(root.querySelector('[data-testid="card-list-edit"]')).toBeNull();
+
+      component.drawCard(card);
+      expect(stack.cards.includes(card)).toBe(false);
+    });
+
+    it('drops a picture chosen after the permission was withdrawn', async () => {
+      Config.instance.allowPlayerCardEdit = true;
+      let choose!: (value: string) => void;
+      vi.spyOn(TestBed.inject(ModalService), 'open').mockReturnValue(new Promise<string>((r) => (choose = r)));
+      const card = stack.cards[0];
+
+      component.setImage(card, 'front');
+      Config.instance.allowPlayerCardEdit = false;
+      choose('img-front-123');
+      await Promise.resolve();
+
+      expect(card.imageDataElement?.getFirstElementByName('front')?.value).toBe('./assets/images/trump/s01.webp');
+    });
   });
 
   it('should be created and render the card rows', () => {

@@ -171,6 +171,34 @@ describe('buildCardContextMenu()', () => {
     expect(card.destroy).toHaveBeenCalled();
   });
 
+  it('offers editing only when the card may be edited', () => {
+    const onShowDetail = vi.fn();
+    const build = (canEditCard: boolean) =>
+      buildCardContextMenu(makeCard() as unknown as Card, 50, { ...defaultCallbacks(), onShowDetail }, noCutIns, t, {
+        canEditCard,
+        giveActions: [],
+      });
+
+    expect(names(build(false))).not.toContain('カードを編集');
+    build(true).find((m) => m.name === 'カードを編集')!.action!();
+    expect(onShowDetail).toHaveBeenCalledOnce();
+  });
+
+  it('groups recipients under a give entry right after taking the card into the hand', () => {
+    const give = { name: 'あいて に渡す', action: vi.fn() };
+    const menu = buildCardContextMenu(makeCard() as unknown as Card, 50, defaultCallbacks(), noCutIns, t, {
+      canEditCard: true,
+      giveActions: [give],
+    });
+    const toHandIndex = names(menu).indexOf('手札に加える');
+
+    expect(menu[toHandIndex + 1].name).toBe('カードを渡す');
+    expect(menu[toHandIndex + 1].subActions).toEqual([give]);
+    expect(
+      names(buildCardContextMenu(makeCard() as unknown as Card, 50, defaultCallbacks(), noCutIns, t))
+    ).not.toContain('カードを渡す');
+  });
+
   it('offers taking that pile into the hand right after making a deck of it', () => {
     const card = makeCard({});
     const callbacks = defaultCallbacks();

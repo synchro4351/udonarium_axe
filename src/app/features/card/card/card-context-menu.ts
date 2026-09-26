@@ -26,7 +26,11 @@ export function buildCardContextMenu(
     onClearTarget: () => void;
   },
   cutIns: readonly { identifier: string; name: string }[],
-  t: TranslateFn
+  t: TranslateFn,
+  options: { canEditCard: boolean; giveActions: readonly ContextMenuAction[] } = {
+    canEditCard: true,
+    giveActions: [],
+  }
 ): ContextMenuAction[] {
   const menuArray: ContextMenuAction[] = [];
 
@@ -116,6 +120,9 @@ export function buildCardContextMenu(
       SoundEffect.play(PresetSound.cardDraw);
     },
   });
+  if (options.giveActions.length > 0) {
+    menuArray.push({ name: t('feature.card.hand.giveCard'), subActions: [...options.giveActions] });
+  }
 
   menuArray.push(ContextMenuSeparator);
 
@@ -164,12 +171,14 @@ export function buildCardContextMenu(
       },
     });
   }
-  menuArray.push({
-    name: t('feature.card.contextMenu.editCard'),
-    action: () => {
-      callbacks.onShowDetail();
-    },
-  });
+  if (options.canEditCard) {
+    menuArray.push({
+      name: t('feature.card.contextMenu.editCard'),
+      action: () => {
+        callbacks.onShowDetail();
+      },
+    });
+  }
   menuArray.push({
     name: t('feature.tabletop.contextMenu.copy'),
     action: () => {

@@ -782,6 +782,7 @@
       "message": {
         "drewFromHand": "{{to}} drew a card from {{from}}",
         "gaveFromHand": "{{from}} gave a card from their hand to {{to}}",
+        "gaveCard": "{{from}} gave a card to {{to}}",
         "discardedPairs": "{{name}} discarded pairs of {{ranks}}"
       },
       "drawPanel": {
@@ -853,6 +854,7 @@
       "contextMenu": {
         "drawOne": "Draw one",
         "drawToHand": "Draw one into hand",
+        "giveTopCard": "Give the top card",
         "drawMany": "Draw N cards",
         "topFaceUp": "Top card face up",
         "topFaceDown": "Top card face down",
@@ -2459,6 +2461,7 @@
       "handVisibilityChoice": "Each participant chooses",
       "handVisibilityPublic": "Hands are always public",
       "handVisibilityPrivate": "Hands are always private",
+      "allowPlayerCardEdit": "Allow players to edit cards (hands, table, and decks)",
       "handCardsHint": "Turning one off also blocks it from the hand menus and drag and drop.",
       "controllerResourcesShowAll": "Show all",
       "controllerResourcesHideAll": "Hide all",

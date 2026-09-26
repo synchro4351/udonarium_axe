@@ -782,6 +782,7 @@
       "message": {
         "drewFromHand": "{{to}}이(가) {{from}}의 패에서 1장 뽑았습니다",
         "gaveFromHand": "{{from}}이(가) {{to}}에게 패에서 1장을 건넸습니다",
+        "gaveCard": "{{from}}이(가) {{to}}에게 카드 1장을 건넸습니다",
         "discardedPairs": "{{name}}이(가) {{ranks}} 페어를 버렸습니다"
       },
       "drawPanel": {
@@ -853,6 +854,7 @@
       "contextMenu": {
         "drawOne": "1장 뽑기",
         "drawToHand": "1장 뽑아 패에 넣기",
+        "giveTopCard": "맨 위 카드 건네기",
         "drawMany": "X장 뽑기",
         "topFaceUp": "맨 위를 앞면으로",
         "topFaceDown": "맨 위를 뒷면으로",
@@ -2459,6 +2461,7 @@
       "handVisibilityChoice": "참가자가 선택",
       "handVisibilityPublic": "패 항상 공개",
       "handVisibilityPrivate": "패 항상 비공개",
+      "allowPlayerCardEdit": "플레이어의 카드 편집 허용 (패, 테이블, 덱)",
       "handCardsHint": "끄면 패 메뉴나 드래그 조작으로도 할 수 없게 됩니다.",
       "controllerResourcesShowAll": "모두 표시",
       "controllerResourcesHideAll": "모두 끄기",

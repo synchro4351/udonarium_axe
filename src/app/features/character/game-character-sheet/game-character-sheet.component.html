@@ -819,7 +819,12 @@
         }
       </div>
     } @else if (card; as c) {
-      <div class="flex w-full flex-col gap-3 p-2">
+      <div
+        class="flex w-full flex-col gap-3 p-2"
+        data-testid="card-sheet-body"
+        [attr.inert]="canEditCard() ? null : ''"
+        [class.opacity-70]="!canEditCard()"
+      >
         <section class="flex flex-wrap items-center justify-end gap-2">
           <button
             class="bg-ui-elevated border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex cursor-pointer items-center gap-0.75 border border-solid px-2 py-0.75 text-[0.78em] leading-[1.4] whitespace-nowrap transition-[background,color] [&_.material-icons]:text-[13px]!"
@@ -869,7 +874,8 @@
                 <button
                   type="button"
                   class="group bg-ui-input border-ui-border-panel hover:border-ui-accent rounded-ui-sm relative aspect-2/3 h-32 cursor-pointer overflow-hidden border border-solid bg-contain bg-center bg-no-repeat p-0 shadow-sm transition-[border-color,transform,box-shadow] hover:scale-[1.04] hover:shadow-md"
-                  [style.background-image]="'url(' + $safeNavigationMigration(c.frontImage?.url) + ')' | safe: 'style'"
+                  [style.background-image]="'url(' + cardOwnFrontImageUrl(c) + ')' | safe: 'style'"
+                  data-testid="card-sheet-front-image"
                   [attr.title]="'feature.inventory.sheet.changeFrontImage' | transloco"
                   (click)="openModal('front')"
                 >

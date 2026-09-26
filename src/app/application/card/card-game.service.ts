@@ -12,7 +12,7 @@ import { findTrumpPairs, selectExtraJokers, trumpRankOf } from '@axe/domain/card
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
-import { canRoleEdit } from '@axe/domain/peer/peer-role';
+import { canRoleEdit, canRoleSeeHidden, PeerRole } from '@axe/domain/peer/peer-role';
 
 const DISCARD_STACK_OFFSET = 150;
 
@@ -110,6 +110,37 @@ export class CardGameService {
     return PeerCursor.findByUserId(userId)?.handPublic ?? false;
   }
 
+  /** Card property edits are GM-only until the room explicitly permits players. Guests never edit. */
+  canEditCards(): boolean {
+    if (PeerCursor.myRole === PeerRole.GameMaster) return true;
+    return (
+      PeerCursor.myRole === PeerRole.Player && (this.objectStore.get<Config>('Config')?.allowPlayerCardEdit ?? false)
+    );
+  }
+
+  /**
+   * Whether this user may open the editor of this particular card.
+   *
+   * Besides the room permission, a player must be able to see the card's front, so the editor never
+   * shows the face of a card lying face down, sitting in another hand, or peeked at by someone else.
+   */
+  canEditCard(card: Card): boolean {
+    if (!this.canEditCards()) return false;
+    if (canRoleSeeHidden(PeerCursor.myRole)) return true;
+    return !(card.hasOwner && !card.isMine) && card.isVisible;
+  }
+
+  /** Whether this user may send cards to other hands at all: they can hold cards and the room allows giving. */
+  canGiveCards(): boolean {
+    return this.myUserId().length > 0 && canRoleEdit(PeerCursor.myRole) && this.allowsHandGive();
+  }
+
+  /** The participants a card can be given to, which is everyone who holds cards except yourself. */
+  giveRecipients(): CardSeat[] {
+    const myUserId = this.myUserId();
+    return this.participants().filter((seat) => seat.userId !== myUserId);
+  }
+
   /**
    * Takes a card from someone else's hand into your own and says so in chat.
    *
@@ -132,21 +163,60 @@ export class CardGameService {
 
   /** Gives one of your hand cards to another participant, keeping it hidden in their hand. False while the room forbids it. */
   giveFromHand(card: Card, recipientUserId: string): boolean {
-    const myUserId = this.myUserId();
-    if (!myUserId || !canRoleEdit(PeerCursor.myRole) || recipientUserId === myUserId) return false;
-    if (!this.allowsHandGive()) return false;
-    if (!this.handCardsOf(myUserId).includes(card)) return false;
-    const recipient = this.participants().find((seat) => seat.userId === recipientUserId);
-    if (!recipient) return false;
+    const recipient = this.recipientForGive(recipientUserId);
+    if (!recipient || !this.handCardsOf(this.myUserId()).includes(card)) return false;
 
+    this.finishGiving(card, recipient, true);
+    return true;
+  }
+
+  /**
+   * Sends one loose card from the table to another participant's hand, face down so only they see it.
+   *
+   * False, with nothing moved, for a card already in a hand or inside a stack, or whenever
+   * {@link giveFromHand} would refuse the recipient.
+   */
+  giveFromTable(card: Card, recipientUserId: string): boolean {
+    if (card.isInAnyHand || card.parent?.parent instanceof CardStack) return false;
+    const recipient = this.recipientForGive(recipientUserId);
+    if (!recipient) return false;
+    this.finishGiving(card, recipient, false);
+    return true;
+  }
+
+  /**
+   * Takes the top card off a stack and sends it straight to another participant's hand, face down,
+   * so its front is never shown to the giver or the table.
+   *
+   * False, with the stack untouched, when it is empty or the recipient is refused.
+   */
+  giveFromStackTop(stack: CardStack, recipientUserId: string): boolean {
+    if (!stack.topCard) return false;
+    const recipient = this.recipientForGive(recipientUserId);
+    if (!recipient) return false;
+    const card = stack.drawCard();
+    if (!card) return false;
+    stack.update();
+    this.finishGiving(card, recipient, false);
+    return true;
+  }
+
+  private recipientForGive(userId: string): CardSeat | null {
+    if (!this.canGiveCards()) return null;
+    return this.giveRecipients().find((seat) => seat.userId === userId) ?? null;
+  }
+
+  private finishGiving(card: Card, recipient: CardSeat, fromHand: boolean): void {
     card.toHand(recipient.userId);
-    card.lastHandGiverUserId = myUserId;
+    card.lastHandGiverUserId = this.myUserId();
     card.lastHandGiverName = PeerCursor.myCursor?.name ?? '';
     SoundEffect.play(PresetSound.cardDraw);
     this.chatMessageService.sendSystemMessage(
-      this.t('feature.card.message.gaveFromHand', { from: PeerCursor.myCursor?.name ?? '', to: recipient.name })
+      this.t(fromHand ? 'feature.card.message.gaveFromHand' : 'feature.card.message.gaveCard', {
+        from: PeerCursor.myCursor?.name ?? '',
+        to: recipient.name,
+      })
     );
-    return true;
   }
 
   /**

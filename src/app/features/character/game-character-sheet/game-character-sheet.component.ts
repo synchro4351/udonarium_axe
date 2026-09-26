@@ -9,6 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { CardGameService } from '@axe/application/card/card-game.service';
 import { SaveDataService } from '@axe/application/file/save-data.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
@@ -87,6 +88,18 @@ export class GameCharacterSheetComponent {
   private readonly dataElementDrag = inject(DataElementDragService);
   private readonly translateFn = inject(TRANSLATE_FN);
   private readonly rolePermission = inject(RolePermissionService);
+  private readonly cardGame = inject(CardGameService);
+
+  /**
+   * Whether this user may change the card's properties, which the room grants to the game master and,
+   * when it opts in, to players. The card sheet stays viewable either way.
+   */
+  canEditCard(): boolean {
+    this.objectChange.versionOf('Config')();
+    this.objectChange.trackMyCursor();
+    const card = this.card;
+    return !!card && this.cardGame.canEditCard(card);
+  }
 
   readonly isReadOnly = computed(() => {
     this.objectChange.trackMyCursor();
@@ -292,6 +305,7 @@ export class GameCharacterSheetComponent {
   }
   /** Renames the card from its name field. */
   setCardOwnName(c: Card, event: Event): void {
+    if (!this.canEditCard()) return;
     c.name = (event.target as HTMLInputElement).value;
   }
   /** The card's width in grid squares, for its size field. */
@@ -304,6 +318,7 @@ export class GameCharacterSheetComponent {
    * anything not a number is ignored.
    */
   setCardOwnSize(c: Card, event: Event): void {
+    if (!this.canEditCard()) return;
     const value = (event.target as HTMLInputElement).valueAsNumber;
     if (!Number.isFinite(value)) return;
     c.size = Math.max(1, Math.min(20, Math.round(value)));
@@ -324,6 +339,12 @@ export class GameCharacterSheetComponent {
     return this.rolePermission.canSeeHidden || (!isOwnedByAnotherUser && c.isVisible);
   }
 
+  /** The picture on the card's front, or none for a user who may not read the face, so a hidden card never shows it. */
+  cardOwnFrontImageUrl(c: Card): string {
+    this.objectChange.fileVersion();
+    return this.canReadCardFace(c) ? (c.frontImage?.url ?? '') : '';
+  }
+
   /** The text on the card's face, or an empty string for a user who may not read it. */
   cardOwnFaceText(c: Card): string {
     this.objectChange.versionOf(c.identifier)();
@@ -336,7 +357,7 @@ export class GameCharacterSheetComponent {
    * for a user who may not read the face.
    */
   setCardOwnFaceText(c: Card, event: Event): void {
-    if (!this.canReadCardFace(c)) return;
+    if (!this.canEditCard() || !this.canReadCardFace(c)) return;
     if (this.cardFaceTextUpdateTimer) clearTimeout(this.cardFaceTextUpdateTimer);
     this.pendingCardFaceText = { card: c, value: (event.target as HTMLTextAreaElement).value };
     this.cardFaceTextUpdateTimer = setTimeout(() => this.flushCardOwnFaceText(), 66);
@@ -350,7 +371,9 @@ export class GameCharacterSheetComponent {
     this.cardFaceTextUpdateTimer = null;
     const pending = this.pendingCardFaceText;
     this.pendingCardFaceText = null;
-    if (pending && this.canReadCardFace(pending.card)) pending.card.faceText = pending.value;
+    if (pending && this.cardGame.canEditCard(pending.card) && this.canReadCardFace(pending.card)) {
+      pending.card.faceText = pending.value;
+    }
   }
   /** The font size of the card's face text, or the default for a user who may not read it. */
   cardOwnFaceFontSize(c: Card): number {
@@ -362,7 +385,7 @@ export class GameCharacterSheetComponent {
    * the face or for anything not a number.
    */
   setCardOwnFaceFontSize(c: Card, event: Event): void {
-    if (!this.canReadCardFace(c)) return;
+    if (!this.canEditCard() || !this.canReadCardFace(c)) return;
     const value = (event.target as HTMLInputElement).valueAsNumber;
     if (Number.isFinite(value)) c.faceFontSize = value;
   }
@@ -377,7 +400,7 @@ export class GameCharacterSheetComponent {
    * read the face.
    */
   setCardOwnFaceFontColor(c: Card, event: Event): void {
-    if (!this.canReadCardFace(c)) return;
+    if (!this.canEditCard() || !this.canReadCardFace(c)) return;
     c.faceFontColor = (event.target as HTMLInputElement).value;
   }
   cardOwnFaceTextOutline(c: Card): boolean {
@@ -385,7 +408,7 @@ export class GameCharacterSheetComponent {
     return this.canReadCardFace(c) && c.faceTextOutline;
   }
   setCardOwnFaceTextOutline(c: Card, event: Event): void {
-    if (!this.canReadCardFace(c)) return;
+    if (!this.canEditCard() || !this.canReadCardFace(c)) return;
     c.faceTextOutline = (event.target as HTMLInputElement).checked;
   }
   cardOwnFaceOutlineColor(c: Card): string {
@@ -393,7 +416,7 @@ export class GameCharacterSheetComponent {
     return this.canReadCardFace(c) ? c.faceOutlineColor : Card.DEFAULT_FACE_OUTLINE_COLOR;
   }
   setCardOwnFaceOutlineColor(c: Card, event: Event): void {
-    if (!this.canReadCardFace(c)) return;
+    if (!this.canEditCard() || !this.canReadCardFace(c)) return;
     c.faceOutlineColor = (event.target as HTMLInputElement).value;
   }
 
@@ -642,6 +665,7 @@ export class GameCharacterSheetComponent {
 
   /** Switches the sheet between reading and editing, from its edit button. */
   toggleEditMode() {
+    if (this.card && !this.canEditCard()) return;
     this.isEdit.update((v) => !v);
   }
 
@@ -943,8 +967,13 @@ export class GameCharacterSheetComponent {
    * Closing the picker, an empty choice, or a piece without that slot changes nothing.
    */
   openModal(name: string = '', isAllowedEmpty: boolean = false) {
+    const obj = this.tabletopObject;
+    if (obj instanceof Card && !this.canEditCard()) return;
     this.modalService.open<string>(FileSelecterComponent, { isAllowedEmpty: isAllowedEmpty }).then((value) => {
-      const obj = this.tabletopObject;
+      // The picker is asynchronous: the sheet may show another piece, or the room may have
+      // withdrawn card editing, by the time a picture is chosen.
+      if (obj !== this.tabletopObject) return;
+      if (obj instanceof Card && !this.canEditCard()) return;
       if (!obj || !obj.imageDataElement || !value) return;
       const element = obj.imageDataElement.getFirstElementByName(name);
       if (!element) return;

@@ -180,6 +180,21 @@
               <option value="private">{{ 'feature.roomSettings.handVisibilityPrivate' | transloco }}</option>
             </select>
           </label>
+          <label
+            class="text-ui-text flex items-center gap-1.5 text-[13px] select-none"
+            [class.cursor-pointer]="!isSharedReadOnly()"
+            [class.opacity-50]="isSharedReadOnly()"
+          >
+            <input
+              type="checkbox"
+              class="size-3.5 [accent-color:var(--ui-accent)] disabled:cursor-not-allowed"
+              [(ngModel)]="allowPlayerCardEdit"
+              name="allowPlayerCardEdit"
+              data-testid="allow-player-card-edit"
+              [disabled]="isSharedReadOnly()"
+            />
+            {{ 'feature.roomSettings.allowPlayerCardEdit' | transloco }}
+          </label>
         </div>
       </div>
     }

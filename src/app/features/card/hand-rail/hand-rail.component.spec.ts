@@ -5,6 +5,8 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
+import { IPeerContext } from '@axe/core/network/peer-context';
+import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
 import { Card, CardState } from '@axe/domain/card/card';
 import { handLocationOf } from '@axe/domain/card/hand-location';
 import { Config } from '@axe/domain/peer/config';
@@ -12,6 +14,7 @@ import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { HandRailComponent } from '@axe/features/card/hand-rail/hand-rail.component';
 import { HandRailService } from '@axe/features/card/hand-rail/hand-rail.service';
+import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -242,6 +245,71 @@ describe('HandRailComponent', () => {
       other.destroy();
       card.destroy();
     }
+  });
+
+  describe('hand card right-click menu', () => {
+    type MenuControls = { openCardMenu: (c: Card, e: MouseEvent) => void };
+    const rightClick = () => new MouseEvent('contextmenu', { clientX: 5, clientY: 5, cancelable: true });
+
+    beforeEach(() => {
+      setPeerContextProvider({
+        peerContext: { userId: 'me', peerId: 'me/peer' } as IPeerContext,
+        peerContexts: [],
+        peerIds: [],
+        peerId: 'me/peer',
+      });
+    });
+    afterEach(() => {
+      resetPeerContextProvider();
+      Config.instance.allowPlayerCardEdit = false;
+      vi.restoreAllMocks();
+    });
+
+    it('offers no editing to a player until the room allows player card edits', () => {
+      const card = makeCard(handLocationOf('me'));
+      const open = vi.spyOn(TestBed.inject(ContextMenuService), 'open').mockImplementation(() => undefined);
+      const openSheet = vi.spyOn(TestBed.inject(ObjectPanelService), 'openSheet').mockImplementation(() => undefined);
+
+      try {
+        (component as unknown as MenuControls).openCardMenu(card, rightClick());
+        expect(open).not.toHaveBeenCalled();
+
+        Config.instance.allowPlayerCardEdit = true;
+        (component as unknown as MenuControls).openCardMenu(card, rightClick());
+        expect(open).toHaveBeenCalledOnce();
+        const edit = open.mock.calls[0][1].find((entry) => entry.name === 'カードを編集');
+        edit!.action!();
+        expect(openSheet).toHaveBeenCalledWith(card, expect.any(String), { width: 600, height: 600 });
+      } finally {
+        card.destroy();
+      }
+    });
+
+    it('shows give and edit together for the GM, and rechecks the permission before opening the editor', () => {
+      const other = new PeerCursor();
+      other.userId = 'other';
+      other.name = 'あいて';
+      other.role = PeerRole.Player;
+      other.initialize();
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      const card = makeCard(handLocationOf('me'));
+      const open = vi.spyOn(TestBed.inject(ContextMenuService), 'open').mockImplementation(() => undefined);
+      const openSheet = vi.spyOn(TestBed.inject(ObjectPanelService), 'openSheet').mockImplementation(() => undefined);
+
+      try {
+        (component as unknown as MenuControls).openCardMenu(card, rightClick());
+        const menu = open.mock.calls[0][1];
+        expect(menu.map((entry) => entry.name)).toEqual(['カードを渡す', 'カードを編集']);
+        expect(menu[0].subActions![0].name).toContain('あいて');
+
+        PeerCursor.myCursor.role = PeerRole.Player;
+        menu[1].action!();
+        expect(openSheet).not.toHaveBeenCalled();
+      } finally {
+        other.destroy();
+        card.destroy();
+      }
+    });
   });
 
   it('opens no give menu and disables the give and draw buttons while the room forbids them', async () => {
