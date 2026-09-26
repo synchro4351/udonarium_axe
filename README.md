@@ -7,7 +7,7 @@
 ## バージョンとソース
 
 - **現在の利用版：tyoitashi r3／Axe v1.57.1** — [固定ソース `cf5edecf`](https://github.com/synchro4351/udonarium_axe/tree/cf5edecf309aa245d974737fc8b5486e6131faac)
-- **開発ソース** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)。r3を基点に、発言ごとの絵文字リアクションを追加しています。通常VPSにはまだ反映していません。
+- **開発ソース** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)。r3を基点に、発言ごとの絵文字リアクションとチャットログの`.txt`保存を追加しています。通常VPSにはまだ反映していません。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
@@ -17,6 +17,7 @@
 **開発版で追加した変更：**
 
 - 各チャット発言へ絵文字リアクションを付け外しでき、参加者数を表示します。定番候補のほか、名前検索や絵文字の直接入力もできます。秘匿・個別宛発言の表示範囲に従い、HTMLログには人数だけを記録します。通常VPSでは未提供です。
+- チャットログを装飾付きHTMLのほか、文字だけの`.txt`形式でも保存できます。現在タブ／全タブを選び、画像は短い説明に置き換えます。読めない発言の引用元がHTMLログに出る問題も修正しました。通常VPSでは未提供です。
 
 | 追加・変更 | 内容 |
 | --- | --- |
