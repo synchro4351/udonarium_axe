@@ -1,6 +1,6 @@
 import type { CutInEasingName } from '@axe/domain/media/cubic-bezier';
 import { CutIn } from '@axe/domain/media/cut-in';
-import type { CutInClip } from '@axe/domain/media/cut-in-clip';
+import { clipPoints, type CutInClip } from '@axe/domain/media/cut-in-clip';
 import type { CutInFillShape } from '@axe/domain/media/cut-in-fill';
 import { type CutInTrackName, encodeCutInTracks, upsertKey } from '@axe/domain/media/cut-in-keyframe';
 import type { CutInLayer } from '@axe/domain/media/cut-in-layer';
@@ -14,9 +14,7 @@ export const CUT_IN_SCENE_TEMPLATES = [
   'transition',
   'like',
   'bouquet',
-  'bouquetCompact',
   'heart',
-  'heartCompact',
   'shock',
   'critical',
   'fumble',
@@ -96,8 +94,6 @@ type Key = readonly [ms: number, value: number, easing?: CutInEasingName];
 
 interface TemplatePlan {
   stage: Stage;
-  /** Words shown in place of the title, for an example whose title only tells it apart. */
-  text?: string;
   build(scene: CutInScene, stage: Stage, text: string): void;
 }
 
@@ -166,21 +162,26 @@ const PLANS: Record<CutInSceneTemplate, TemplatePlan> = {
       arrive(base, 0, 300, { scaleX: 0 });
       leave(base, stage.durationMs, 220, { dy: -20, opacity: 0 });
 
+      // The glint lies over the band on the same box and outline, so none of it shows past the
+      // band's edges; its leading edge is let in and its trailing edge taken away just behind.
       const glint = band(scene, stage, 'glint', {
-        x: -200,
-        y: 40,
-        width: 120,
-        height: 240,
-        rotation: 25,
+        x: 30,
+        y: 90,
+        width: 500,
+        height: 140,
         opacity: 0.4,
         blendMode: 'screen',
-        clip: 'none',
+        clip: 'slant',
         shape: 'stripes',
         from: '#ffffff',
         to: '#9ef0d0',
+        angleDeg: 117,
         scalePx: 16,
       });
-      tween(glint, 200, 1000, {}, { dx: 900 }, 'inOutQuad');
+      glint.wipeShape = 'right';
+      glint.crumbleShape = 'left';
+      tween(glint, 320, 1000, { wipe: 0 }, { wipe: 1 }, 'linear');
+      tween(glint, 460, 1140, { crumble: 1 }, { crumble: 0 }, 'linear');
 
       lettering(scene, stage, text, {
         box: { x: 40, y: 100, width: 480, height: 120 },
@@ -286,36 +287,39 @@ const PLANS: Record<CutInSceneTemplate, TemplatePlan> = {
     stage: { width: 400, height: 400, durationMs: 2400 },
     build: (scene, stage, text) => bloom(scene, stage, text, { circle: 220, glyph: 200 }),
   },
-  bouquetCompact: {
-    stage: { width: 280, height: 280, durationMs: 2000 },
-    text: '💐',
-    build: (scene, stage, text) => bloom(scene, stage, text, { circle: 130, glyph: 170 }),
-  },
   heart: {
-    stage: { width: 360, height: 360, durationMs: 1500 },
-    build: (scene, stage, text) => heartbeat(scene, stage, text, { circle: 200, glyph: 190 }),
-  },
-  heartCompact: {
     stage: { width: 260, height: 260, durationMs: 1200 },
-    text: '❤',
     build: (scene, stage, text) => heartbeat(scene, stage, text, { circle: 120, glyph: 150 }),
   },
   shock: {
     stage: { width: 440, height: 440, durationMs: 1000 },
     build(scene, stage, text) {
-      const rain = band(scene, stage, 'rain', {
-        x: 170,
-        y: 0,
-        width: 100,
-        height: 440,
-        opacity: 0.5,
-        clip: 'none',
-        shape: 'speedlines',
-        from: '#d8d0ff',
-        to: '#373a5e',
-        angleDeg: 0,
-      });
-      tween(rain, 0, stage.durationMs, { dy: -440 }, { dy: 440 }, 'linear');
+      // Streaks across the whole width, each falling from above the stage to below it in turn.
+      const streaks = [
+        { x: 24, height: 150, atMs: 0 },
+        { x: 78, height: 110, atMs: 240 },
+        { x: 131, height: 170, atMs: 90 },
+        { x: 183, height: 130, atMs: 380 },
+        { x: 247, height: 160, atMs: 160 },
+        { x: 300, height: 120, atMs: 300 },
+        { x: 356, height: 140, atMs: 40 },
+        { x: 410, height: 110, atMs: 450 },
+      ];
+      for (const streak of streaks) {
+        const rain = band(scene, stage, 'rain', {
+          x: streak.x,
+          y: 0,
+          width: 4,
+          height: streak.height,
+          opacity: 0.6,
+          clip: 'none',
+          shape: 'linear',
+          from: '#373a5e',
+          to: '#d8d0ff',
+          angleDeg: 180,
+        });
+        tween(rain, streak.atMs, streak.atMs + 520, { dy: -streak.height }, { dy: stage.height }, 'linear');
+      }
 
       const burst = band(scene, stage, 'band', {
         x: 50,
@@ -432,26 +436,11 @@ const PLANS: Record<CutInSceneTemplate, TemplatePlan> = {
     },
   },
   victory: {
-    stage: { width: 640, height: 400, durationMs: 1800 },
+    stage: { width: 640, height: 360, durationMs: 1800 },
     build(scene, stage, text) {
-      const star = band(scene, stage, 'star', {
-        x: 170,
-        y: 50,
-        width: 300,
-        height: 300,
-        opacity: 0.9,
-        clip: 'star',
-        shape: 'radial',
-        from: '#a26b16',
-        to: '#d9b553',
-      });
-      arrive(star, 0, 400, { scale: 0, turn: -120 }, 'outBack');
-      tween(star, 400, stage.durationMs - 250, {}, { turn: 30 }, 'linear');
-      leave(star, stage.durationMs, 250, { scale: 1.6, opacity: 0 });
-
       const ribbon = band(scene, stage, 'ribbon', {
         x: 40,
-        y: 150,
+        y: 140,
         width: 560,
         height: 100,
         clip: 'slant',
@@ -461,11 +450,30 @@ const PLANS: Record<CutInSceneTemplate, TemplatePlan> = {
         angleDeg: 0,
       });
       ribbon.wipeShape = 'right';
-      arrive(ribbon, 200, 300, { wipe: 0 });
+      arrive(ribbon, 0, 300, { wipe: 0 });
       leave(ribbon, stage.durationMs, 250, { dy: -40, opacity: 0 });
 
+      // Three stars across the ribbon, rolling in from the left one after another.
+      for (const [at, centerX] of [150, 320, 490].entries()) {
+        const star = band(scene, stage, 'star', {
+          x: centerX - 75,
+          y: 115,
+          width: 150,
+          height: 150,
+          opacity: 0.9,
+          clip: 'star',
+          shape: 'radial',
+          from: '#d9b553',
+          to: '#a26b16',
+        });
+        const landedMs = 100 + at * 120 + 420;
+        arrive(star, landedMs - 420, 420, { dx: -160, turn: -270, scale: 0.3, opacity: 0 }, 'outBack');
+        tween(star, landedMs, stage.durationMs - 280, {}, { turn: 20 }, 'linear');
+        leave(star, stage.durationMs, 280, { dy: -60, opacity: 0 });
+      }
+
       lettering(scene, stage, text, {
-        box: { x: 40, y: 140, width: 560, height: 120 },
+        box: { x: 40, y: 130, width: 560, height: 120 },
         sizePx: 96,
         font: 'mincho',
         weight: 900,
@@ -473,7 +481,7 @@ const PLANS: Record<CutInSceneTemplate, TemplatePlan> = {
         stroke: '#5a3a00',
         split: true,
       }).forEach((letter, at) => {
-        arrive(letter, 260 + at * 70, 320, { dy: 50, scale: 0.4, opacity: 0 }, 'outBack');
+        arrive(letter, 400 + at * 70, 320, { dy: 50, scale: 0.4, opacity: 0 }, 'outBack');
         leave(letter, stage.durationMs, 280, { dy: -80, scale: 1.2, opacity: 0 });
       });
     },
@@ -511,40 +519,36 @@ const PLANS: Record<CutInSceneTemplate, TemplatePlan> = {
     },
   },
   levelUp: {
-    stage: { width: 560, height: 300, durationMs: 1400 },
+    stage: { width: 600, height: 340, durationMs: 1400 },
     build(scene, stage, text) {
-      const chevron = band(scene, stage, 'band', {
-        x: 40,
-        y: 90,
-        width: 480,
-        height: 120,
-        opacity: 0.9,
-        clip: 'chevron',
-        shape: 'linear',
-        from: '#326b30',
-        to: '#85ac3f',
-        angleDeg: 0,
-      });
-      arrive(chevron, 0, 260, { dy: 120, opacity: 0 }, 'outBack');
-      leave(chevron, stage.durationMs, 240, { dy: -160, opacity: 0 });
+      // An arrow of two layers: a head over a shaft wide enough to carry the words.
+      const head: Box = { x: 50, y: 14, width: 500, height: 170 };
+      // A paler head behind, which surges up and away once the arrow has landed.
+      const spark = arrowHead(scene, stage, 'spark', head, { from: '#d8f59a', opacity: 0.6 });
+      arrive(spark, 120, 300, { dy: 60, opacity: 0 });
+      tween(spark, 500, 900, {}, { dy: -50, scale: 1.1, opacity: 0 }, 'outCubic');
 
-      const spark = band(scene, stage, 'spark', {
-        x: 40,
-        y: 215,
-        width: 480,
-        height: 14,
-        clip: 'chevron',
+      // The shaft reaches a little way up under the head, so no seam shows between them.
+      const shaft = band(scene, stage, 'band', {
+        x: 100,
+        y: head.y + head.height - 2,
+        width: 400,
+        height: 144,
+        clip: 'none',
         shape: 'linear',
-        from: '#d8f59a',
-        to: '#85ac3f',
-        angleDeg: 0,
+        from: '#85ac3f',
+        to: '#326b30',
+        angleDeg: 180,
       });
-      spark.wipeShape = 'right';
-      arrive(spark, 150, 300, { wipe: 0 });
-      leave(spark, stage.durationMs, 240, { dy: -200, opacity: 0 });
+      const tip = arrowHead(scene, stage, 'head', head, { from: '#85ac3f' });
+      for (const part of [shaft, tip]) {
+        arrive(part, 0, 260, { dy: 120, opacity: 0 }, 'outBack');
+        leave(part, stage.durationMs, 240, { dy: -160, opacity: 0 });
+      }
 
+      // The words sit in the shaft, below the head.
       lettering(scene, stage, text, {
-        box: { x: 60, y: 95, width: 440, height: 110 },
+        box: { x: 110, y: 190, width: 380, height: 120 },
         sizePx: 80,
         font: 'rounded',
         weight: 900,
@@ -634,6 +638,21 @@ const PLANS: Record<CutInSceneTemplate, TemplatePlan> = {
       arrive(flash, 40, 180, { dx: 700, dy: -100 });
       leave(flash, stage.durationMs, 140, { dx: -700, dy: 100 });
 
+      // A second flash under the band, crossing the other way.
+      const under = band(scene, stage, 'flash', {
+        x: -40,
+        y: 222,
+        width: 720,
+        height: 8,
+        rotation: -8,
+        opacity: 0.8,
+        clip: 'none',
+        shape: 'linear',
+        from: '#ffffff',
+      });
+      arrive(under, 40, 180, { dx: -700, dy: 100 });
+      leave(under, stage.durationMs, 140, { dx: 700, dy: -100 });
+
       lettering(scene, stage, text, {
         box: { x: 40, y: 90, width: 560, height: 120 },
         sizePx: 96,
@@ -709,7 +728,7 @@ export function createCutInSceneTemplate(kind: CutInSceneTemplate, title: string
   const scene = ensureScene(cutIn);
   scene.durationMs = plan.stage.durationMs;
   scene.backgroundColor = '';
-  plan.build(scene, plan.stage, plan.text ?? title);
+  plan.build(scene, plan.stage, title);
   return cutIn;
 }
 
@@ -733,6 +752,9 @@ function graphemes(text: string): string[] {
   if (typeof Intl === 'undefined' || typeof Intl.Segmenter !== 'function') return Array.from(text);
   return Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text), (part) => part.segment);
 }
+
+/** How much wider than its estimated width a piece's box is, as a share of the size of the letters. */
+const FRAGMENT_ROOM_EM = 0.5;
 
 /** A glyph's width as a share of the size of the letters, near enough to lay pieces side by side. */
 function emWidth(fragment: string): number {
@@ -764,6 +786,41 @@ function band(scene: CutInScene, stage: Stage, name: string, look: BandLook): Cu
   return layer;
 }
 
+/** How much of a chevron's length its pointed end takes up: a triangle of its own. */
+const CHEVRON_POINT = 1 - Math.max(...clipPoints('chevron').map(([x, y]) => (y === 0 ? x : 0)));
+
+/**
+ * A triangle pointing up, filling the box from its point at the top to its base across the bottom.
+ *
+ * It is the pointed end of a chevron, turned a quarter back so its point faces up and let in
+ * only as far as its shoulders, so a copy of the app that knows nothing newer draws it the same.
+ */
+function arrowHead(
+  scene: CutInScene,
+  stage: Stage,
+  name: string,
+  box: Box,
+  look: { from: string; opacity?: number }
+): CutInLayer {
+  // Turned, the chevron's length runs up the stage and its height across it, and it turns about
+  // its middle, which lies below the base of the triangle.
+  const length = Math.round(box.height / CHEVRON_POINT);
+  const middleY = box.y + box.height + (0.5 - CHEVRON_POINT) * length;
+  const layer = band(scene, stage, name, {
+    x: Math.round(box.x + (box.width - length) / 2),
+    y: Math.round(middleY - box.width / 2),
+    width: length,
+    height: box.width,
+    rotation: -90,
+    clip: 'chevron',
+    shape: 'linear',
+    ...look,
+  });
+  layer.wipeShape = 'left';
+  layer.wipe = CHEVRON_POINT;
+  return layer;
+}
+
 /** Lays the words into the box, as one layer or one per piece set side by side. */
 function lettering(scene: CutInScene, stage: Stage, text: string, look: LetterLook): CutInLayer[] {
   const fragments = look.split ? textFragments(text) : [text];
@@ -784,15 +841,18 @@ function lettering(scene: CutInScene, stage: Stage, text: string, look: LetterLo
 
   return fragments.map((fragment, at) => {
     const layer = addLayer(scene, 'text', fragment, stage);
-    const width = fragments.length > 1 ? widths[at] * sizePx : look.box.width;
-    const lift = (x + width / 2 - middle) * slope;
+    const slot = fragments.length > 1 ? widths[at] * sizePx : look.box.width;
+    // The widths above are only estimates, so a piece is given room to spare on both sides of
+    // its slot rather than a box it could overrun and break inside.
+    const width = fragments.length > 1 ? slot + FRAGMENT_ROOM_EM * sizePx : slot;
+    const lift = (x + slot / 2 - middle) * slope;
     place(layer, {
-      x: Math.round(x),
+      x: Math.round(x - (width - slot) / 2),
       y: Math.round(look.box.y + lift),
       width: Math.round(width),
       height: look.box.height,
     });
-    x += width + gapEm * sizePx;
+    x += slot + gapEm * sizePx;
 
     layer.text = fragment;
     layer.fontSizePx = sizePx;

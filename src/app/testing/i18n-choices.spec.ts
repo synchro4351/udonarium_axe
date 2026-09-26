@@ -28,6 +28,7 @@ import { FACTION_PHASE_MODES, TURN_ORDER_MODES } from '@axe/domain/tabletop/turn
 import { LightPreset } from '@axe/domain/tabletop/vision-types';
 import { FAB_ENTRIES } from '@axe/domain/ui/fab-menu';
 import { VIEW_MODES } from '@axe/domain/ui/view-mode';
+import { CUT_IN_SCENE_TEMPLATES } from '@axe/features/media/cut-in-list/cut-in-scene-templates';
 import { MAP_KINDS } from '@axe/features/tabletop/dungeon-generator/dungeon-generator.component';
 const HOTBAR_FAILURES = ['noCharacter', 'notFound', 'noTab', 'offTable', 'empty'] as const;
 
@@ -74,6 +75,7 @@ const CHOICES: Record<string, readonly string[]> = {
   'feature.media.cutInEditor.easing': CUT_IN_EASING_NAMES,
   'feature.media.cutInEditor.look': CUT_IN_LAYER_PRESETS.map((preset) => preset.id),
   'feature.media.cutInEditor.preset': [...CUT_IN_ENTRANCES, ...CUT_IN_EXITS],
+  'feature.media.cutIn.sceneTemplate_': CUT_IN_SCENE_TEMPLATES,
   'feature.tabletop.displaySetting.viewMode_': VIEW_MODES,
   'app.fab.': FAB_ENTRIES.map((entry) => entry.key),
 };
