@@ -249,6 +249,63 @@ describe('renderRichChatLog', () => {
     );
   });
 
+  describe('references kept from the reader', () => {
+    const hiddenWhisper = line({ from: 'other', to: 'third', name: '密談者', text: 'ないしょ話' });
+    const hiddenSecret = line({ from: 'other', isSecret: true, name: '秘密GM', text: '秘密の出目' });
+    const openTarget = line({ from: 'other', name: '公開者', text: '公開の発言' });
+
+    function answering(target: ChatLogLine, overrides: Partial<ChatLogLine> = {}): ChatLogLine {
+      return line({
+        from: 'reader',
+        text: '返事',
+        quoteOf: 'q',
+        quoteOfMessage: target as never,
+        replyTo: 'r',
+        replyToMessage: target as never,
+        ...overrides,
+      });
+    }
+
+    const scopes = ['tab', 'all'] as const;
+
+    it.each(scopes)('leaves out a whisper the reader may not see (%s)', (scope) => {
+      const html = renderRichChatLog('messenger', scope, [tab('メイン', [answering(hiddenWhisper)])], {
+        userId: 'reader',
+      });
+      expect(html).toContain('返事');
+      expect(html).not.toContain('class="ref"');
+      expect(html).not.toContain('密談者');
+      expect(html).not.toContain('ないしょ話');
+    });
+
+    it.each(scopes)('leaves out a secret roll kept from the reader (%s)', (scope) => {
+      const html = renderRichChatLog('messenger', scope, [tab('メイン', [answering(hiddenSecret)])], {
+        userId: 'reader',
+      });
+      expect(html).toContain('返事');
+      expect(html).not.toContain('class="ref"');
+      expect(html).not.toContain('秘密GM');
+      expect(html).not.toContain('秘密の出目');
+    });
+
+    it.each(scopes)('shows no references under a sealed secret line (%s)', (scope) => {
+      const sealed = answering(openTarget, { from: 'other', isSecret: true, text: '伏せた本文' });
+      const html = renderRichChatLog('messenger', scope, [tab('メイン', [sealed])], { userId: 'reader' });
+      expect(html).toContain('class="seal"');
+      expect(html).not.toContain('伏せた本文');
+      expect(html).not.toContain('class="ref"');
+      expect(html).not.toContain('公開の発言');
+    });
+
+    it.each(scopes)('keeps a reference the reader may read (%s)', (scope) => {
+      const html = renderRichChatLog('messenger', scope, [tab('メイン', [answering(openTarget)])], {
+        userId: 'reader',
+      });
+      expect(html).toContain('<span class="rn">❝ 公開者</span>');
+      expect(html).toContain('<span class="rn">↩ 公開者</span>');
+    });
+  });
+
   it('runs the name and the body through the decoder', () => {
     const html = renderRichChatLog('messenger', 'tab', [tab('メイン', [line({ name: '@n', text: '@t' })])], {
       textDecoder: (text) => (text === '@n' ? 'システム' : text === '@t' ? '訳文' : text),

@@ -461,6 +461,82 @@ describe('ChatLogExporter', () => {
     });
   });
 
+  describe('isReadable', () => {
+    it('is true for an open line said to everyone', () => {
+      expect(ChatLogExporter.isReadable(createMockMessage({ from: 'other' }), 'reader')).toBe(true);
+    });
+
+    it('is false for a whisper between others', () => {
+      const whisper = createMockMessage({ from: 'other', to: 'third' });
+      expect(ChatLogExporter.isReadable(whisper, 'reader')).toBe(false);
+    });
+
+    it('is false for a secret roll someone else made, and true for the one who made it', () => {
+      const secret = createMockMessage({ from: 'other', isSecret: true });
+      expect(ChatLogExporter.isReadable(secret, 'reader')).toBe(false);
+      expect(ChatLogExporter.isReadable(secret, 'other')).toBe(true);
+    });
+  });
+
+  describe('references kept from the reader', () => {
+    const hiddenWhisper = createMockMessage({ from: 'other', to: 'third', name: '密談者', text: 'ないしょ話' });
+    const hiddenSecret = createMockMessage({ from: 'other', isSecret: true, name: '秘密GM', text: '秘密の出目' });
+    const openTarget = createMockMessage({ from: 'other', name: '公開者', text: '公開の発言' });
+
+    function answering(target: ChatMessage, overrides: Partial<ChatMessage> = {}): ChatMessage {
+      return createMockMessage({
+        from: 'reader',
+        name: '自分',
+        text: '返事',
+        quoteOf: 'q',
+        quoteOfMessage: target,
+        replyTo: 'r',
+        replyToMessage: target,
+        timestamp: 100,
+        ...overrides,
+      } as Partial<ChatMessage>);
+    }
+
+    const exports: [string, (tab: ChatTab) => string][] = [
+      ['standard tab', (tab) => ChatLogExporter.exportTabHtml(tab, 'reader')],
+      ['standard all tabs', (tab) => ChatLogExporter.exportAllTabsHtml([tab], true, 'reader')],
+      ['CoC tab', (tab) => ChatLogExporter.exportTabHtmlCoc(tab, 'reader')],
+      ['CoC all tabs', (tab) => ChatLogExporter.exportAllTabsHtmlCoc([tab], 'reader')],
+    ];
+
+    it.each(exports)('leaves out a whisper the reader may not see in the %s export', (_, render) => {
+      const result = render(createMockTab('メイン', [answering(hiddenWhisper)]));
+      expect(result).toContain('返事');
+      expect(result).not.toContain('blockquote');
+      expect(result).not.toContain('密談者');
+      expect(result).not.toContain('ないしょ話');
+    });
+
+    it.each(exports)('leaves out a secret roll kept from the reader in the %s export', (_, render) => {
+      const result = render(createMockTab('メイン', [answering(hiddenSecret)]));
+      expect(result).toContain('返事');
+      expect(result).not.toContain('blockquote');
+      expect(result).not.toContain('秘密GM');
+      expect(result).not.toContain('秘密の出目');
+    });
+
+    it.each(exports)('shows no references under a sealed secret line in the %s export', (_, render) => {
+      const sealed = answering(openTarget, { from: 'other', isSecret: true, text: '伏せた本文' });
+      const result = render(createMockTab('メイン', [sealed]));
+      expect(result).toContain('（シークレットダイス）');
+      expect(result).not.toContain('伏せた本文');
+      expect(result).not.toContain('blockquote');
+      expect(result).not.toContain('公開の発言');
+    });
+
+    it.each(exports)('keeps a reference the reader may read in the %s export', (_, render) => {
+      const result = render(createMockTab('メイン', [answering(openTarget)]));
+      expect(result).toContain('❝ 公開者');
+      expect(result).toContain('↩ 公開者');
+      expect(result).toContain('公開の発言');
+    });
+  });
+
   describe('exportTabHtml', () => {
     it('writes the log out', () => {
       const msg = createMockMessage({ name: 'GM', text: '開始' });

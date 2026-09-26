@@ -86,13 +86,6 @@ function singleTabEntries(tab: ChatLogTab | undefined, options: ChatLogTextOptio
     .map((message) => ({ tab, tabIndex: 0, message }));
 }
 
-/** Whether the reader may see what a line holds: a line they may see at all, and not a secret kept from them. */
-function isReadable(message: ChatLogLine, userId?: string): boolean {
-  return (
-    ChatLogExporter.isVisibleMessage(message, userId) && (!message.isSecret || ChatLogExporter.canSee(message, userId))
-  );
-}
-
 function entryLines(
   entry: ChatLogEntry,
   showTab: boolean,
@@ -140,8 +133,10 @@ function referenceLines(message: ChatLogLine, options: ChatLogTextOptions, label
   const lines: string[] = [];
   const quote = message.quoteOf ? message.quoteOfMessage : null;
   const reply = message.replyTo ? message.replyToMessage : null;
-  if (quote && isReadable(quote, options.userId)) lines.push(referenceLine('❝', labels.quote, quote, 280, options));
-  if (reply && isReadable(reply, options.userId)) lines.push(referenceLine('↩', labels.reply, reply, 120, options));
+  if (quote && ChatLogExporter.isReadable(quote, options.userId))
+    lines.push(referenceLine('❝', labels.quote, quote, 280, options));
+  if (reply && ChatLogExporter.isReadable(reply, options.userId))
+    lines.push(referenceLine('↩', labels.reply, reply, 120, options));
   return lines;
 }
 

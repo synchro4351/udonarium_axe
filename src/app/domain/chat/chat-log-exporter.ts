@@ -136,7 +136,7 @@ export class ChatLogExporter {
     str += ChatLogExporter.formatPortraitImage(message, imageSrcResolver);
 
     str += '<div class="ct">';
-    str += ChatLogExporter.formatReferenceBlock(message, textDecoder);
+    str += ChatLogExporter.formatReferenceBlock(message, userId, textDecoder);
     str += "<font color='";
     if (message.messColor) str += message.messColor.toLowerCase();
     str += "'>";
@@ -183,7 +183,7 @@ export class ChatLogExporter {
     str += `      ${ChatLogExporter.formatPortraitImage(message, imageSrcResolver)}\n`;
     str += '      <div class="ct">\n';
     str += '        ';
-    const refBlock = ChatLogExporter.formatReferenceBlock(message, textDecoder);
+    const refBlock = ChatLogExporter.formatReferenceBlock(message, userId, textDecoder);
     if (refBlock) str += refBlock;
     const decodedName = ChatLogExporter.decode(message.name, textDecoder);
     str += `<span>${ChatLogExporter.escapeHtml(decodedName).replace('<', '').replace('>', '')}</span> `;
@@ -234,6 +234,17 @@ export class ChatLogExporter {
    */
   static canSee(message: ChatLogLine, userId?: string): boolean {
     return userId != null ? message.isSentBy(userId) : message.isSendFromSelf;
+  }
+
+  /**
+   * Whether the reader may see what a line holds: a line they may see at all, and not a secret
+   * kept from them. Without `userId` the reader is the local user.
+   */
+  static isReadable(message: ChatLogLine, userId?: string): boolean {
+    return (
+      ChatLogExporter.isVisibleMessage(message, userId) &&
+      (!message.isSecret || ChatLogExporter.canSee(message, userId))
+    );
   }
 
   /**
@@ -431,14 +442,16 @@ export class ChatLogExporter {
   }
 
   // The message quoted or replied to is put in front of the body as a small quotation,
-  // trimmed to about the length the chat itself previews.
-  private static formatReferenceBlock(message: ChatLogLine, textDecoder?: ChatLogTextDecoder): string {
+  // trimmed to about the length the chat itself previews. A line the reader may not read is
+  // left out altogether, name and all, and a sealed secret line shows no references.
+  private static formatReferenceBlock(message: ChatLogLine, userId?: string, textDecoder?: ChatLogTextDecoder): string {
+    if (message.isSecret && !ChatLogExporter.canSee(message, userId)) return '';
     const quote = message.quoteOf ? message.quoteOfMessage : null;
     const reply = message.replyTo ? message.replyToMessage : null;
     if (!quote && !reply) return '';
 
     const blocks: string[] = [];
-    if (quote) {
+    if (quote && ChatLogExporter.isReadable(quote, userId)) {
       blocks.push(
         ChatLogExporter.formatReferenceBlockBody({
           label: '引用',
@@ -449,7 +462,7 @@ export class ChatLogExporter {
         })
       );
     }
-    if (reply) {
+    if (reply && ChatLogExporter.isReadable(reply, userId)) {
       blocks.push(
         ChatLogExporter.formatReferenceBlockBody({
           label: '返信先',

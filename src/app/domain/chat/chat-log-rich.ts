@@ -279,7 +279,7 @@ function renderSay(entry: ChatLogEntry, continuation: boolean, context: RenderCo
     `<div class="pt">${renderPortrait(message, name, context)}</div>` +
     '<div class="bd">' +
     `<div class="hd"><span class="nm">${esc(name)}</span>${tabBadge(entry, context)}${timeOf(message)}</div>` +
-    renderReferences(message, context) +
+    (visible ? renderReferences(message, context) : '') +
     `<div class="tx">${body}${edited}</div>` +
     renderReactions(message, visible) +
     '</div></article>\n'
@@ -334,13 +334,18 @@ function renderPortrait(message: ChatLogLine, name: string, context: RenderConte
   return `<span class="ini">${esc(initial)}</span>`;
 }
 
+// A quoted or replied-to line the reader may not read is left out altogether, name and all,
+// so a whisper or a secret roll cannot come out through a line that answers it.
 function renderReferences(message: ChatLogLine, context: RenderContext): string {
   const { labels } = context;
+  const { userId } = context.options;
   const quote = message.quoteOf ? message.quoteOfMessage : null;
   const reply = message.replyTo ? message.replyToMessage : null;
   let html = '';
-  if (quote) html += renderReference('❝', quote, 280, labels.quote, context);
-  if (reply) html += renderReference('↩', reply, 120, labels.reply, context);
+  if (quote && ChatLogExporter.isReadable(quote, userId))
+    html += renderReference('❝', quote, 280, labels.quote, context);
+  if (reply && ChatLogExporter.isReadable(reply, userId))
+    html += renderReference('↩', reply, 120, labels.reply, context);
   return html;
 }
 
