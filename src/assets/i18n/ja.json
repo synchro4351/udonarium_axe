@@ -3020,6 +3020,10 @@
         "previewTitle": "ログのプレビュー",
         "previewSave": "この形式で保存",
         "previewFrameTitle": "書き出されるログの見本",
+        "previewSaveText": "テキストで保存",
+        "formatLabel": "書き出し形式",
+        "formatHtml": "HTML",
+        "formatText": "テキスト (.txt)",
         "previewLimited": "直近 {{count}} 件で表示しています。保存するとタブ全体が書き出されます。",
         "previewSample": "まだ発言がないため、見本の会話で表示しています。",
         "styles": {
@@ -3100,7 +3104,9 @@
           "allTabs": "全タブ",
           "everyTab": "すべて",
           "messages": "{{count}} 件の発言",
-          "exportedWith": "Udonarium Axe で書き出し"
+          "exportedWith": "Udonarium Axe で書き出し",
+          "attachment": "画像添付",
+          "reactions": "リアクション"
         },
         "sample": {
           "gm": "GM",

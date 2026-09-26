@@ -130,6 +130,76 @@ describe('ChatLogPreviewComponent', () => {
     expect(spy.mock.calls[0][2]).toEqual(TestBed.inject(ChatMessageService).chatTabs);
   });
 
+  it('shows the tab as plain text when text is picked', async () => {
+    component.tab.set(addTab('メイン', 2));
+    component.chooseFormat('text');
+    fixture.detectChanges();
+    await vi.waitFor(() => expect(component.text()).not.toBe(''));
+    fixture.detectChanges();
+
+    expect(component.text()).toContain('誰か：line-001');
+    expect(component.text()).not.toContain('<');
+    expect(component.html()).toBe('');
+    const pre = fixture.nativeElement.querySelector('[data-testid="chat-log-preview-text"]') as HTMLElement;
+    expect(pre.textContent).toContain('誰か：line-001');
+    expect(fixture.nativeElement.querySelector('[data-testid="chat-log-preview-frame"]')).toBeNull();
+  });
+
+  it('keeps the style picked while text is on show, and goes back to html on picking a style', async () => {
+    component.tab.set(addTab('メイン', 1));
+    component.choose('neon');
+    component.chooseFormat('text');
+
+    expect(component.style()).toBe('neon');
+
+    component.choose('washi');
+
+    expect(component.format()).toBe('html');
+    expect(await shown()).toContain('data-style="washi"');
+  });
+
+  it('saves the whole tab as text when text is on show, whatever the style', async () => {
+    const tab = addTab('メイン', CHAT_LOG_PREVIEW_LIMIT + 10);
+    component.tab.set(tab);
+    component.choose('eerie');
+    component.chooseFormat('text');
+    const html = vi.spyOn(saveData, 'saveChatLog').mockResolvedValue(undefined);
+    const text = vi.spyOn(saveData, 'saveChatLogText').mockReturnValue(undefined);
+
+    await component.save();
+
+    expect(text).toHaveBeenCalledWith('tab', [tab], 'メイン');
+    expect(html).not.toHaveBeenCalled();
+  });
+
+  it('saves every tab as text when they are all on show', async () => {
+    component.tab.set(addTab('メイン', 1));
+    component.chooseScope('all');
+    component.chooseFormat('text');
+    const spy = vi.spyOn(saveData, 'saveChatLogText').mockReturnValue(undefined);
+
+    await component.save();
+
+    expect(spy.mock.calls[0][0]).toBe('all');
+    expect(spy.mock.calls[0][1]).toEqual(TestBed.inject(ChatMessageService).chatTabs);
+  });
+
+  it('downloads the text as a utf-8 .txt file', async () => {
+    const tab = addTab('メイン', 1);
+    const created = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:log');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+    saveData.saveChatLogText('tab', [tab], 'メイン');
+
+    const blob = created.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe('text/plain;charset=utf-8');
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    expect(new TextDecoder('utf-8', { fatal: true }).decode(bytes)).toContain('誰か：line-000');
+    const anchor = click.mock.contexts[0] as HTMLAnchorElement;
+    expect(anchor.download).toMatch(/_log_メイン_\d{4}-\d{2}-\d{2}_\d{4}\.txt$/);
+  });
+
   it('keeps to the one tab while the system tab is on show', () => {
     const systemTab = ChatTabList.instance.ensureSystemTab();
     tabs.push(systemTab);

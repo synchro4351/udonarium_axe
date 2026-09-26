@@ -16,6 +16,9 @@ import { TranslocoModule } from '@jsverse/transloco';
 
 export const CHAT_LOG_PREVIEW_LIMIT = 60;
 
+/** Whether the log is saved as a styled html page or as plain text. */
+export type ChatLogFormat = 'html' | 'text';
+
 interface PreparedPreview {
   readonly tabs: readonly ChatLogTab[];
   readonly images: ChatLogImages;
@@ -43,6 +46,7 @@ export class ChatLogPreviewComponent {
   readonly style = this.preference.style;
   readonly tab = signal<ChatTab | null>(null);
   readonly scope = signal<ChatLogScope>('tab');
+  readonly format = signal<ChatLogFormat>('html');
   readonly isSaving = signal(false);
   private readonly prepared = signal<PreparedPreview | null>(null);
   private loadCount = 0;
@@ -55,13 +59,19 @@ export class ChatLogPreviewComponent {
 
   readonly html = computed(() => {
     const prepared = this.prepared();
-    if (!prepared) return '';
+    if (!prepared || this.format() !== 'html') return '';
     return this.saveDataService.renderChatLog(
       this.effectiveStyle(),
       this.effectiveScope(),
       prepared.tabs,
       prepared.images
     );
+  });
+
+  readonly text = computed(() => {
+    const prepared = this.prepared();
+    if (!prepared || this.format() !== 'text') return '';
+    return this.saveDataService.renderChatLogText(this.effectiveScope(), prepared.tabs);
   });
 
   readonly note = computed(() => {
@@ -80,9 +90,18 @@ export class ChatLogPreviewComponent {
     });
   }
 
-  /** Switches the log style shown in the preview, remembering it as this player's preference. */
+  /**
+   * Switches the log style shown in the preview, remembering it as this player's preference. A style
+   * belongs to the html log, so picking one goes back to it from plain text.
+   */
   choose(style: ChatLogStyle): void {
     this.preference.choose(style);
+    this.format.set('html');
+  }
+
+  /** Switches between the styled html log and plain text, leaving the style picked as it is. */
+  chooseFormat(format: ChatLogFormat): void {
+    this.format.set(format);
   }
 
   /** Switches between saving the one tab and saving every tab; a system tab always saves alone. */
@@ -91,7 +110,7 @@ export class ChatLogPreviewComponent {
   }
 
   /**
-   * Saves the log in the style and scope being previewed.
+   * Saves the log in the format, style and scope being previewed.
    *
    * The whole log is written, not the trimmed preview. Does nothing while a save is already under way
    * or when there is no tab to save.
@@ -103,7 +122,11 @@ export class ChatLogPreviewComponent {
     this.isSaving.set(true);
     try {
       const label = scope === 'all' ? this.t('feature.chat.tabSetting.allTabsLogName') : tabs[0].name;
-      await this.saveDataService.saveChatLog(this.effectiveStyle(), scope, tabs, label);
+      if (this.format() === 'text') {
+        this.saveDataService.saveChatLogText(scope, tabs, label);
+      } else {
+        await this.saveDataService.saveChatLog(this.effectiveStyle(), scope, tabs, label);
+      }
     } finally {
       this.isSaving.set(false);
     }

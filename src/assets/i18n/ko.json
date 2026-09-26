@@ -3020,6 +3020,10 @@
         "previewTitle": "로그 미리보기",
         "previewSave": "이 형식으로 저장",
         "previewFrameTitle": "내보낼 로그 견본",
+        "previewSaveText": "텍스트로 저장",
+        "formatLabel": "내보내기 형식",
+        "formatHtml": "HTML",
+        "formatText": "텍스트 (.txt)",
         "previewLimited": "최근 {{count}}건으로 표시하고 있습니다. 저장하면 탭 전체가 내보내집니다.",
         "previewSample": "아직 발언이 없어 견본 대화로 표시하고 있습니다.",
         "styles": {
@@ -3100,7 +3104,9 @@
           "allTabs": "전체 탭",
           "everyTab": "전체",
           "messages": "발언 {{count}}건",
-          "exportedWith": "Udonarium Axe에서 내보냄"
+          "exportedWith": "Udonarium Axe에서 내보냄",
+          "attachment": "이미지 첨부",
+          "reactions": "리액션"
         },
         "sample": {
           "gm": "GM",

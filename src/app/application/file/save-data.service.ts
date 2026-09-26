@@ -21,6 +21,7 @@ import { ChatLogImages, exportChatLog } from '@axe/domain/chat/chat-log-export';
 import { ChatLogImageSrcResolver, ChatLogTab, ChatLogTextDecoder } from '@axe/domain/chat/chat-log-exporter';
 import { ChatLogLabels, ChatLogScope } from '@axe/domain/chat/chat-log-rich';
 import { ChatLogStyle } from '@axe/domain/chat/chat-log-style';
+import { ChatLogTextLabels, renderChatLogText } from '@axe/domain/chat/chat-log-text';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { DataSummarySetting } from '@axe/domain/data/data-summary-setting';
 import { AudioTagList } from '@axe/domain/media/audio-tag-list';
@@ -309,6 +310,23 @@ export class SaveDataService {
     return SaveDataService.injectImageRegistry(body, images.registryScript);
   }
 
+  /** Downloads chat tabs as a plain UTF-8 text log named after the room, naming pictures rather than holding them. */
+  saveChatLogText(scope: ChatLogScope, tabs: readonly ChatLogTab[], label: string): void {
+    const text = this.renderChatLogText(scope, tabs);
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    downloadBlob(blob, this.appendTimestamp(`${this.chatLogRoomName()}_log_${label}`) + '.txt');
+  }
+
+  /** Renders chat tabs as a plain text log, without downloading anything. */
+  renderChatLogText(scope: ChatLogScope, tabs: readonly ChatLogTab[]): string {
+    return renderChatLogText(scope, tabs, {
+      textDecoder: this.chatLogTextDecoder,
+      roomName: Network.peerContext?.roomName || undefined,
+      labels: this.chatLogTextLabels(),
+      exportedAt: Date.now(),
+    });
+  }
+
   private chatLogRoomName(): string {
     return Network.peerContext?.roomName || this.translate('app.roomDataDefault');
   }
@@ -329,6 +347,14 @@ export class SaveDataService {
       everyTab: label('everyTab'),
       messages: (count) => label('messages', { count }),
       exportedWith: label('exportedWith'),
+    };
+  }
+
+  private chatLogTextLabels(): ChatLogTextLabels {
+    return {
+      ...this.chatLogLabels(),
+      attachment: this.translate('feature.chat.log.labels.attachment'),
+      reactions: this.translate('feature.chat.log.labels.reactions'),
     };
   }
 

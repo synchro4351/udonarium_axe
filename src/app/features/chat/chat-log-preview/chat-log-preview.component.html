@@ -10,9 +10,9 @@
       @for (option of styles; track option) {
         <li
           class="rounded-ui-sm hover:bg-ui-hover flex cursor-pointer items-center gap-2.5 px-2 py-1.5 transition-colors"
-          [class.bg-ui-accent-bg!]="option === style()"
+          [class.bg-ui-accent-bg!]="format() === 'html' && option === style()"
           role="option"
-          [attr.aria-selected]="option === style()"
+          [attr.aria-selected]="format() === 'html' && option === style()"
           [attr.data-testid]="'chat-log-style-' + option"
           (click)="choose(option)"
         >
@@ -34,7 +34,7 @@
             ></span>
           </span>
           <span class="flex min-w-0 flex-col leading-tight">
-            <span class="truncate text-[13px]" [class.text-ui-accent]="option === style()">{{
+            <span class="truncate text-[13px]" [class.text-ui-accent]="format() === 'html' && option === style()">{{
               'feature.chat.log.styles.' + option + '.name' | transloco
             }}</span>
             <span class="text-ui-dim truncate text-[11px]">{{
@@ -46,6 +46,34 @@
     </ul>
 
     <div class="border-ui-border-panel flex shrink-0 flex-col gap-2 border-t border-solid p-2">
+      <div
+        class="rounded-ui-sm border-ui-border-panel grid grid-cols-2 overflow-hidden border border-solid"
+        role="group"
+        [attr.aria-label]="'feature.chat.log.formatLabel' | transloco"
+      >
+        <button
+          type="button"
+          data-testid="chat-log-format-html"
+          class="text-ui-muted hover:bg-ui-hover m-0 cursor-pointer border-0 bg-transparent px-2 py-1 text-[12px] transition-colors hover:shadow-none"
+          [class.bg-ui-accent-bg!]="format() === 'html'"
+          [class.text-ui-accent!]="format() === 'html'"
+          [attr.aria-pressed]="format() === 'html'"
+          (click)="chooseFormat('html')"
+        >
+          {{ 'feature.chat.log.formatHtml' | transloco }}
+        </button>
+        <button
+          type="button"
+          data-testid="chat-log-format-text"
+          class="border-ui-border-panel text-ui-muted hover:bg-ui-hover m-0 cursor-pointer border-0 border-l border-solid bg-transparent px-2 py-1 text-[12px] transition-colors hover:shadow-none"
+          [class.bg-ui-accent-bg!]="format() === 'text'"
+          [class.text-ui-accent!]="format() === 'text'"
+          [attr.aria-pressed]="format() === 'text'"
+          (click)="chooseFormat('text')"
+        >
+          {{ 'feature.chat.log.formatText' | transloco }}
+        </button>
+      </div>
       @if (!isSystemTab()) {
         <div
           class="rounded-ui-sm border-ui-border-panel grid grid-cols-2 overflow-hidden border border-solid"
@@ -85,7 +113,7 @@
         } @else {
           <i class="material-icons">download</i>
         }
-        {{ 'feature.chat.log.previewSave' | transloco }}
+        {{ (format() === 'text' ? 'feature.chat.log.previewSaveText' : 'feature.chat.log.previewSave') | transloco }}
       </button>
     </div>
   </aside>
@@ -98,7 +126,12 @@
         <i class="material-icons">info_outline</i>{{ message }}
       </div>
     }
-    @if (html(); as doc) {
+    @if (text(); as plain) {
+      <pre
+        data-testid="chat-log-preview-text"
+        class="m-0 min-h-0 flex-1 overflow-auto bg-white p-3 font-mono text-xs/normal break-all whitespace-pre-wrap text-black"
+        >{{ plain }}</pre>
+    } @else if (html(); as doc) {
       <iframe
         data-testid="chat-log-preview-frame"
         class="block min-h-0 w-full flex-1 border-0 bg-white"

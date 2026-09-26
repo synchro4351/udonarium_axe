@@ -3020,6 +3020,10 @@
         "previewTitle": "Log preview",
         "previewSave": "Save in this style",
         "previewFrameTitle": "Sample of the exported log",
+        "previewSaveText": "Save as text",
+        "formatLabel": "File format",
+        "formatHtml": "HTML",
+        "formatText": "Text (.txt)",
         "previewLimited": "Showing the latest {{count}} lines. Saving writes out the whole tab.",
         "previewSample": "Nothing has been said yet, so a sample conversation is shown.",
         "styles": {
@@ -3100,7 +3104,9 @@
           "allTabs": "All tabs",
           "everyTab": "All",
           "messages": "{{count}} lines",
-          "exportedWith": "Exported from Udonarium Axe"
+          "exportedWith": "Exported from Udonarium Axe",
+          "attachment": "Image attached",
+          "reactions": "Reactions"
         },
         "sample": {
           "gm": "GM",
