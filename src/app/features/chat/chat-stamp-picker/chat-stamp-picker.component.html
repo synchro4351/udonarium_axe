@@ -52,14 +52,14 @@
               type="button"
               data-testid="chat-stamp-choice"
               class="rounded-ui-sm hover:bg-ui-hover focus-visible:bg-ui-hover flex aspect-square min-w-0 cursor-pointer items-center justify-center overflow-hidden border-0 bg-transparent p-1 transition-colors"
-              [attr.aria-label]="'feature.chat.stamp.send' | transloco: { name: item.name || pack.name }"
-              [title]="item.name"
+              [attr.aria-label]="'feature.chat.stamp.send' | transloco: { name: labelOf(item) || pack.name }"
+              [title]="labelOf(item)"
               (click)="pickStamp(pack, item)"
             >
               @if (imageUrlOf(item); as url) {
                 <img class="size-full object-contain" alt="" [src]="url | safe: 'resourceUrl'" />
               } @else {
-                <span class="text-ui-dim truncate text-[11px]">{{ item.name }}</span>
+                <span class="text-ui-dim truncate text-[11px]">{{ labelOf(item) }}</span>
               }
             </button>
           }

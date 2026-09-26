@@ -235,7 +235,7 @@
                   <span class="size-9 shrink-0"></span>
                 }
                 <span class="flex min-w-0 flex-col">
-                  <span class="text-ui-text truncate">{{ suggestion.item.name || suggestion.packName }}</span>
+                  <span class="text-ui-text truncate">{{ stampLabelOf(suggestion.item) || suggestion.packName }}</span>
                   <span class="text-ui-dim truncate text-[11px]">
                     :{{ suggestion.word }}
                     @if (suggestion.showsPack) {

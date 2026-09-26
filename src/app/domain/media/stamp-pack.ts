@@ -13,16 +13,38 @@ export interface StampItem {
   readonly words: readonly string[];
 }
 
-/** How far a room's stamps may grow, so that sharing them stays light on every seat. */
+/**
+ * How far a room's stamps may grow, so that sharing them stays light on every seat.
+ *
+ * `imageBytes` and `imageSide` are what a picture may be at most, in a pack file or picked from
+ * the room's own pictures. A picture made into a stamp here is shrunk further, to `preparedSide`:
+ * a stamp is drawn no larger than a portrait, so more would only be more to send.
+ */
 export const STAMP_LIMITS = {
   packsPerRoom: 20,
   stampsPerPack: 64,
   imageBytes: 256 * 1024,
   imageSide: 512,
+  preparedSide: 320,
   nameLength: 40,
   wordsPerStamp: 16,
   wordLength: 32,
 } as const;
+
+/**
+ * The tag a picture made into a stamp is filed under in the media library, so it can be found
+ * there and picked again. Stored and shared like every tag, so it is this word in any language.
+ */
+export const STAMP_IMAGE_TAG = 'スタンプ';
+
+/**
+ * What a stamp is called where it is shown and in the log: its first search word, or its name
+ * where it has none. A stamp is picked by the words it is found by, so the first of them is the
+ * one to read it by; the name is kept for packs and seats from before that.
+ */
+export function stampLabelOf(item: Pick<StampItem, 'name' | 'words'>): string {
+  return item.words[0] ?? item.name;
+}
 
 const IDENTIFIER_LENGTH = 128;
 
@@ -117,9 +139,9 @@ export function parseStampItems(text: string): StampItem[] {
 export type StampItemsProblem = 'malformed' | 'tooManyStamps';
 
 /**
- * The stamps written in a pack file, read strictly: anything that cannot be read, a stamp given
- * twice or more stamps than a pack may hold turns the whole list away, rather than bringing in
- * part of a pack as though it were all of it.
+ * The stamps written in a pack file, read strictly: anything that cannot be read, a stamp with
+ * neither a name nor a search word, a stamp given twice or more stamps than a pack may hold turns
+ * the whole list away, rather than bringing in part of a pack as though it were all of it.
  */
 export function parseStampItemsStrict(text: string): StampItem[] | StampItemsProblem {
   let parsed: unknown;
@@ -134,7 +156,7 @@ export function parseStampItemsStrict(text: string): StampItem[] | StampItemsPro
   const seen = new Set<string>();
   for (const raw of parsed) {
     const item = toStampItem(raw);
-    if (!item || item.name.length === 0 || seen.has(item.id)) return 'malformed';
+    if (!item || stampLabelOf(item).length === 0 || seen.has(item.id)) return 'malformed';
     seen.add(item.id);
     items.push(item);
   }

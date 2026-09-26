@@ -43,7 +43,8 @@ import { ChatOutgoing, ChatStampOutgoing } from '@axe/domain/chat/chat-outgoing'
 import { previewTextOf } from '@axe/domain/chat/chat-stamp-text';
 import { DataElement } from '@axe/domain/data/data-element';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
-import { StampItem, StampPack } from '@axe/domain/media/stamp-pack';
+import { builtinStampPack, StampPackView } from '@axe/domain/media/builtin-stamps';
+import { StampItem, stampLabelOf, StampPack } from '@axe/domain/media/stamp-pack';
 import {
   removeStampQuery,
   StampQuery,
@@ -277,13 +278,16 @@ export class ChatInputComponent {
   private readonly dismissedStampQuery = signal('');
   protected readonly suggestionListId = `chat-stamp-suggestions-${nextSuggestionListId++}`;
 
-  /** The room's packs, while stamps are offered. */
-  private readonly stampPacks = computed<StampPack[]>(() => {
+  /**
+   * The room's packs and then the tool's own, while stamps are offered, so a word a room gave its
+   * own stamp finds that one first.
+   */
+  private readonly stampPacks = computed<StampPackView[]>(() => {
     if (!this.offersStamps()) return [];
     this.objectChange.collectionOf(StampPack.aliasName)();
-    const packs = this.objectStore.getObjects(StampPack);
+    const packs: StampPackView[] = this.objectStore.getObjects(StampPack);
     for (const pack of packs) this.objectChange.versionOf(pack.identifier)();
-    return packs;
+    return [...packs, builtinStampPack(this.t('feature.media.stamp.builtinPack'))];
   });
 
   /** The `:word` the caret stands at the end of, while stamps are offered and this seat may speak. */
@@ -314,6 +318,8 @@ export class ChatInputComponent {
     const textArea = this.textAreaElementRef()?.nativeElement;
     if (textArea) this.caret.set(textArea.selectionStart ?? 0);
   }
+
+  protected readonly stampLabelOf = stampLabelOf;
 
   /** The picture of a stamp offered, the thumbnail where there is one, or nothing until it arrives. */
   protected stampImageUrl(imageIdentifier: string): string {
@@ -404,7 +410,7 @@ export class ChatInputComponent {
     if (!this.sendFrom.length) this.sendFrom = this.myPeer.identifier;
     const bubbles = this.chatBubbles(this.colorSelectNo());
     this.stamp.emit({
-      stampName: item.name || packName || this.t('feature.chat.stamp.unnamed'),
+      stampName: stampLabelOf(item) || packName || this.t('feature.chat.stamp.unnamed'),
       imageIdentifier: item.imageIdentifier,
       sendFrom: this.sendFrom,
       sendTo: this.sendTo,

@@ -1,4 +1,10 @@
-<div class="text-ui-text bg-ui-elevated flex h-full flex-col overflow-hidden text-[13px]" data-testid="stamp-pack-list">
+<div
+  class="text-ui-text bg-ui-elevated relative flex h-full flex-col overflow-hidden text-[13px]"
+  data-testid="stamp-pack-list"
+  (dragover)="onDragOver($event)"
+  (dragleave)="onDragLeave($event)"
+  (drop)="onDrop($event)"
+>
   <div class="border-ui-border-panel bg-ui-panel flex shrink-0 items-end gap-1 border-b border-solid px-2 pt-2">
     <div class="flex min-w-0 flex-1 gap-1 overflow-x-auto" role="tablist">
       @for (pack of packs(); track pack.identifier) {
@@ -17,6 +23,20 @@
           {{ pack.name || ('feature.media.stamp.untitled' | transloco) }}
         </button>
       }
+      <button
+        class="text-ui-muted hover:text-ui-text rounded-t-ui-sm inline-flex max-w-40 shrink-0 cursor-pointer items-center gap-1 truncate border border-b-0 border-solid border-transparent bg-transparent px-3 py-1.5 text-[12px] font-semibold transition-colors [&_.material-icons]:text-[14px]!"
+        type="button"
+        role="tab"
+        data-testid="stamp-builtin-tab"
+        [attr.aria-selected]="showsBuiltin()"
+        [class.border-ui-border-panel!]="showsBuiltin()"
+        [class.bg-ui-elevated]="showsBuiltin()"
+        [class.text-ui-accent!]="showsBuiltin()"
+        [title]="builtinPack.name"
+        (click)="selectPack(builtinPack)"
+      >
+        <i class="material-icons" aria-hidden="true">lock</i>{{ builtinPack.name }}
+      </button>
     </div>
     @if (canEdit()) {
       <div class="flex shrink-0 gap-1 pb-1">
@@ -50,7 +70,23 @@
     }
   </div>
 
-  @if (selectedPack(); as pack) {
+  @if (showsBuiltin()) {
+    <div class="min-h-0 flex-1 overflow-y-auto p-3" data-testid="stamp-builtin">
+      <p class="text-ui-dim m-0 mb-2 text-[12px]">{{ 'feature.media.stamp.builtinHint' | transloco }}</p>
+      <ul class="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2 p-0">
+        @for (item of builtinPack.items; track item.id) {
+          <li
+            class="border-ui-border-panel bg-ui-panel rounded-ui-sm flex flex-col items-center gap-1 border border-solid p-1"
+            data-testid="stamp-builtin-item"
+            [title]="item.words.join(' ')"
+          >
+            <img class="size-18 object-contain" [src]="item.imageIdentifier" [alt]="labelOf(item)" draggable="false" />
+            <span class="w-full truncate text-center text-[11px]">{{ labelOf(item) }}</span>
+          </li>
+        }
+      </ul>
+    </div>
+  } @else if (selectedPack(); as pack) {
     <div class="border-ui-border-panel flex shrink-0 flex-wrap items-center gap-2 border-b border-solid px-3 py-2">
       <input
         class="border-ui-border-panel bg-ui-input text-ui-text rounded-ui-sm min-w-0 flex-1 border border-solid px-2 py-1 text-[13px] disabled:opacity-70"
@@ -87,7 +123,7 @@
     </div>
 
     <div class="min-h-0 flex-1 overflow-y-auto p-3">
-      <ul class="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2 p-0" data-testid="stamp-grid">
+      <ul class="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2 p-0" data-testid="stamp-grid">
         @for (item of items(); track item.id) {
           <li>
             <button
@@ -96,24 +132,31 @@
               data-testid="stamp-item"
               [class.border-ui-accent!]="selectedStamp()?.id === item.id"
               [attr.aria-pressed]="selectedStamp()?.id === item.id"
-              [title]="item.name"
+              [title]="item.words.join(' ') || labelOf(item)"
               (click)="selectStamp(item)"
             >
               @if (imageUrlOf(item); as url) {
-                <img class="size-16 object-contain" [src]="url" [alt]="item.name" draggable="false" />
+                <img class="size-18 object-contain" [src]="url" [alt]="labelOf(item)" draggable="false" />
               } @else {
-                <span class="text-ui-dim flex size-16 items-center justify-center">
+                <span class="text-ui-dim flex size-18 items-center justify-center">
                   <i class="material-icons">hourglass_empty</i>
                 </span>
               }
-              <span class="w-full truncate text-center text-[11px]">{{ item.name }}</span>
+              <span class="w-full truncate text-center text-[11px]" data-testid="stamp-item-label">{{
+                labelOf(item)
+              }}</span>
+              @if (item.words.length === 0) {
+                <span class="text-ui-dim w-full truncate text-center text-[10px]" data-testid="stamp-item-no-words">{{
+                  'feature.media.stamp.noWords' | transloco
+                }}</span>
+              }
             </button>
           </li>
         }
         @if (canEdit() && items().length < limits.stampsPerPack) {
-          <li>
+          <li class="flex flex-col gap-1">
             <label
-              class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm flex size-full min-h-22 cursor-pointer flex-col items-center justify-center gap-1 border border-dashed p-1 text-[11px]"
+              class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm flex min-h-16 flex-1 cursor-pointer flex-col items-center justify-center gap-1 border border-dashed p-1 text-center text-[11px]"
               [class.opacity-50]="busy()"
             >
               <i class="material-icons">add_photo_alternate</i>
@@ -129,6 +172,15 @@
                 (change)="addStamps($event)"
               />
             </label>
+            <button
+              class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm flex cursor-pointer items-center justify-center gap-1 border border-dashed bg-transparent p-1 text-[11px] disabled:cursor-not-allowed disabled:opacity-50 [&_.material-icons]:text-[15px]!"
+              type="button"
+              data-testid="stamp-add-from-room"
+              [disabled]="busy()"
+              (click)="addFromRoomImages()"
+            >
+              <i class="material-icons">photo_library</i>{{ 'feature.media.stamp.addFromRoom' | transloco }}
+            </button>
           </li>
         }
       </ul>
@@ -137,37 +189,41 @@
       }
     </div>
 
-    @if (selectedStamp(); as stamp) {
+    @for (stamp of editedStamps(); track stamp.id) {
       <div
-        class="border-ui-border-panel bg-ui-panel grid shrink-0 grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1.5 border-t border-solid px-3 py-2"
+        class="border-ui-border-panel bg-ui-panel flex shrink-0 flex-col gap-1.5 border-t border-solid px-3 py-2"
         data-testid="stamp-editor"
       >
-        <label class="text-ui-muted text-[12px]" for="stamp-name">{{
-          'feature.media.stamp.stampName' | transloco
-        }}</label>
-        <input
-          id="stamp-name"
-          class="border-ui-border-panel bg-ui-input text-ui-text rounded-ui-sm min-w-0 border border-solid px-2 py-1 text-[13px] disabled:opacity-70"
-          type="text"
-          data-testid="stamp-name"
-          [attr.maxlength]="limits.nameLength"
-          [value]="stamp.name"
-          [disabled]="!canEdit()"
-          (change)="renameStamp(stamp, $event)"
-        />
-        <label class="text-ui-muted text-[12px]" for="stamp-words">{{ 'feature.media.stamp.words' | transloco }}</label>
+        <div class="flex items-center gap-2">
+          <label class="text-ui-muted text-[12px] font-semibold" for="stamp-words">{{
+            'feature.media.stamp.words' | transloco
+          }}</label>
+          <span class="text-ui-dim ml-auto text-[11px]" role="status" data-testid="stamp-words-state">
+            @switch (wordsState()) {
+              @case ('pending') {
+                {{ 'feature.media.stamp.wordsPending' | transloco }}
+              }
+              @case ('saved') {
+                {{ 'feature.media.stamp.wordsSaved' | transloco }}
+              }
+            }
+          </span>
+        </div>
         <input
           id="stamp-words"
           class="border-ui-border-panel bg-ui-input text-ui-text rounded-ui-sm min-w-0 border border-solid px-2 py-1 text-[13px] disabled:opacity-70"
           type="text"
           data-testid="stamp-words"
-          [placeholder]="'feature.media.stamp.wordsHint' | transloco"
-          [value]="stamp.words.join(' ')"
+          [placeholder]="'feature.media.stamp.wordsPlaceholder' | transloco"
+          [value]="wordsTextOf(stamp)"
           [disabled]="!canEdit()"
-          (change)="changeWords(stamp, $event)"
+          (input)="typeWords(stamp, $event)"
+          (change)="commitWords($event)"
+          (keydown.enter)="commitWords($event)"
         />
+        <p class="text-ui-dim m-0 text-[11px]">{{ 'feature.media.stamp.wordsHint' | transloco }}</p>
         @if (canEdit()) {
-          <div class="col-span-2 flex justify-end">
+          <div class="flex justify-end">
             <button
               class="text-ui-danger border-ui-danger hover:bg-ui-danger-bg rounded-ui-sm inline-flex cursor-pointer items-center gap-1 border border-solid bg-transparent px-2.5 py-1 text-[12px] font-semibold [&_.material-icons]:text-[15px]!"
               type="button"
@@ -207,7 +263,7 @@
         'feature.media.stamp.limitsHint'
           | transloco
             : {
-                side: limits.imageSide,
+                side: limits.preparedSide,
                 kilobytes: limits.imageBytes / 1024,
                 stamps: limits.stampsPerPack,
                 packs: limits.packsPerRoom,
@@ -216,4 +272,14 @@
     </p>
     <p class="text-ui-dim m-0">{{ 'feature.media.stamp.sharedHint' | transloco }}</p>
   </div>
+
+  @if (dragging()) {
+    <div
+      class="border-ui-accent bg-ui-accent-bg text-ui-accent rounded-ui pointer-events-none absolute inset-2 z-10 flex flex-col items-center justify-center gap-1 border-2 border-dashed text-[13px] font-semibold [&_.material-icons]:text-[32px]!"
+      data-testid="stamp-drop-overlay"
+    >
+      <i class="material-icons">file_download</i>
+      <span>{{ 'feature.media.stamp.dropHint' | transloco }}</span>
+    </div>
+  }
 </div>

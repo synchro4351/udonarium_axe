@@ -9,17 +9,19 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
-import { StampItem, StampPack } from '@axe/domain/media/stamp-pack';
+import { builtinStampPack, StampPackView } from '@axe/domain/media/builtin-stamps';
+import { StampItem, stampLabelOf, StampPack } from '@axe/domain/media/stamp-pack';
 import { CATALOG_EMOJIS } from '@axe/features/chat/chat-message-reactions/reaction-emoji-catalog';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
 /** A stamp picked to be sent, with the pack it came from. */
 export interface PickedStamp {
-  readonly pack: StampPack;
+  readonly pack: StampPackView;
   readonly item: StampItem;
 }
 
@@ -27,8 +29,8 @@ export interface PickedStamp {
 export const EMOJI_TAB = '';
 
 /**
- * What the chat input's stamp button opens: a tab of emoji, always there, and a tab for each of
- * the room's stamp packs.
+ * What the chat input's stamp button opens: a tab of emoji and one of the tool's own stamps, always
+ * there, and a tab for each of the room's stamp packs.
  *
  * Picking an emoji or a stamp reports it and leaves what happens next to the input. The tabs step
  * with the arrow keys, and Escape reports the picker closed. Focus goes to the first choice when it
@@ -47,6 +49,7 @@ export class ChatStampPickerComponent {
   private readonly imageStorage = inject(ImageStorage);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly t = inject(TRANSLATE_FN);
 
   readonly emojiPicked = output<string>();
   readonly stampPicked = output<PickedStamp>();
@@ -54,13 +57,19 @@ export class ChatStampPickerComponent {
 
   protected readonly emojiTab = EMOJI_TAB;
   protected readonly emojis = CATALOG_EMOJIS;
+  protected readonly labelOf = stampLabelOf;
 
-  /** The room's packs, followed through additions, removals and changes to their stamps. */
-  readonly packs = computed(() => {
+  private readonly builtinPack = builtinStampPack(this.t('feature.media.stamp.builtinPack'));
+
+  /**
+   * The tool's own stamps, then the room's packs, followed through additions, removals and
+   * changes to their stamps.
+   */
+  readonly packs = computed<StampPackView[]>(() => {
     this.objectChange.collectionOf(StampPack.aliasName)();
     const packs = this.objectStore.getObjects(StampPack);
     for (const pack of packs) this.objectChange.versionOf(pack.identifier)();
-    return packs;
+    return [this.builtinPack, ...packs];
   });
 
   private readonly selectedTab = signal(EMOJI_TAB);
@@ -92,7 +101,7 @@ export class ChatStampPickerComponent {
     this.emojiPicked.emit(emoji);
   }
 
-  protected pickStamp(pack: StampPack, item: StampItem): void {
+  protected pickStamp(pack: StampPackView, item: StampItem): void {
     this.stampPicked.emit({ pack, item });
   }
 

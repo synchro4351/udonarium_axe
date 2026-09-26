@@ -1,4 +1,4 @@
-import { STAMP_LIMITS, StampItem } from '@axe/domain/media/stamp-pack';
+import { STAMP_LIMITS, StampItem, stampLabelOf } from '@axe/domain/media/stamp-pack';
 
 /** A `:word` being typed in chat, and where it sits in the line. */
 export interface StampQuery {
@@ -76,7 +76,7 @@ export function suggestStamps(packs: readonly StampSuggestionPack[], word: strin
       (other) =>
         other.packIdentifier !== one.packIdentifier &&
         (other.word.toLocaleLowerCase() === one.word.toLocaleLowerCase() ||
-          (other.item.name.length > 0 && other.item.name === one.item.name))
+          (stampLabelOf(other.item).length > 0 && stampLabelOf(other.item) === stampLabelOf(one.item)))
     ),
   }));
 }

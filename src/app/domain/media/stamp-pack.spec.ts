@@ -10,6 +10,7 @@ import {
   serializeStampItems,
   STAMP_LIMITS,
   StampItem,
+  stampLabelOf,
   StampPack,
 } from '@axe/domain/media/stamp-pack';
 
@@ -55,6 +56,16 @@ describe('stamp pack', () => {
     });
   });
 
+  describe('stampLabelOf()', () => {
+    it('reads a stamp by its first search word', () => {
+      expect(stampLabelOf(stamp('a', { name: 'IMG_0001', words: ['いいね', 'good'] }))).toBe('いいね');
+    });
+
+    it('falls back to the name for a stamp with no words, as packs from before words had', () => {
+      expect(stampLabelOf(stamp('a', { name: 'やったね' }))).toBe('やったね');
+    });
+  });
+
   describe('parseStampItems()', () => {
     it('reads what it wrote', () => {
       const items = [stamp('a', { words: ['hi'] }), stamp('b')];
@@ -87,6 +98,11 @@ describe('stamp pack', () => {
       expect(parseStampItemsStrict(JSON.stringify([stamp('a'), stamp('a')]))).toBe('malformed');
       expect(parseStampItemsStrict(JSON.stringify([stamp('a', { name: '  ' })]))).toBe('malformed');
       expect(parseStampItemsStrict('nope')).toBe('malformed');
+    });
+
+    it('reads a stamp known only by its search words', () => {
+      const wordsOnly = stamp('a', { name: '', words: ['いいね'] });
+      expect(parseStampItemsStrict(JSON.stringify([wordsOnly]))).toEqual([wordsOnly]);
     });
 
     it('turns away more stamps than a pack may hold', () => {

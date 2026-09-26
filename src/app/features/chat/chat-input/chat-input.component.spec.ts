@@ -436,11 +436,11 @@ describe('ChatInputComponent', () => {
         await settle();
       }
 
-      it('opens on the emoji, with a tab after it for each of the room’s packs', async () => {
+      it('opens on the emoji, with the tool’s own stamps and then a tab for each of the room’s packs', async () => {
         await openPicker();
 
         const tabs = findAll('[data-testid="chat-stamp-tab"]');
-        expect(tabs.map((tab) => tab.textContent!.trim())).toEqual(['絵文字', 'Faces', 'Animals']);
+        expect(tabs.map((tab) => tab.textContent!.trim())).toEqual(['絵文字', '定番', 'Faces', 'Animals']);
         expect(tabs[0].getAttribute('aria-selected')).toBe('true');
         expect(findAll('[data-testid="chat-emoji-choice"]').length).toBeGreaterThan(20);
         expect(find('[data-testid="chat-stamp-button"]')!.getAttribute('aria-expanded')).toBe('true');
@@ -448,18 +448,31 @@ describe('ChatInputComponent', () => {
 
       it('shows a pack’s stamps when its tab is chosen, and moves between tabs with the arrows', async () => {
         await openPicker();
-        findAll('[data-testid="chat-stamp-tab"]')[1].click();
+        findAll('[data-testid="chat-stamp-tab"]')[2].click();
         await settle();
 
+        // A stamp is shown by its first search word.
         expect(findAll('[data-testid="chat-stamp-choice"]').map((one) => one.getAttribute('title'))).toEqual([
-          'Smile',
-          'Smirk',
+          'smile',
+          'smirk',
         ]);
 
         find('[role="tablist"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
         await settle();
-        expect(findAll('[data-testid="chat-stamp-choice"]').map((one) => one.getAttribute('title'))).toEqual([
-          'Cat smile',
+        expect(findAll('[data-testid="chat-stamp-choice"]').map((one) => one.getAttribute('title'))).toEqual(['smile']);
+      });
+
+      it('sends one of the tool’s own stamps by its phrase', async () => {
+        await openPicker();
+        findAll('[data-testid="chat-stamp-tab"]')[1].click();
+        await settle();
+
+        expect(findAll('[data-testid="chat-stamp-choice"]')).toHaveLength(10);
+        findAll('[data-testid="chat-stamp-choice"]')[0].click();
+        await settle();
+
+        expect(stamps).toEqual([
+          expect.objectContaining({ stampName: 'いいね！', imageIdentifier: 'assets/images/stamps/iine.png' }),
         ]);
       });
 
@@ -481,14 +494,14 @@ describe('ChatInputComponent', () => {
         component.sendTo = PeerCursor.myCursor.identifier;
         await type('まだ途中');
         await openPicker();
-        findAll('[data-testid="chat-stamp-tab"]')[1].click();
+        findAll('[data-testid="chat-stamp-tab"]')[2].click();
         await settle();
         findAll('[data-testid="chat-stamp-choice"]')[0].click();
         await settle();
 
         expect(stamps).toEqual([
           expect.objectContaining({
-            stampName: 'Smile',
+            stampName: 'smile',
             imageIdentifier: 'image-smile',
             sendFrom: target.identifier,
             sendTo: PeerCursor.myCursor.identifier,
@@ -507,7 +520,7 @@ describe('ChatInputComponent', () => {
         replied.initialize();
         component.replyTarget.set(replied);
         await openPicker();
-        findAll('[data-testid="chat-stamp-tab"]')[2].click();
+        findAll('[data-testid="chat-stamp-tab"]')[3].click();
         await settle();
         findAll('[data-testid="chat-stamp-choice"]')[0].click();
         await settle();
@@ -532,7 +545,13 @@ describe('ChatInputComponent', () => {
       it('offers the stamps saved under words that start with it, naming the pack where two collide', async () => {
         await type('いいね :smi');
 
-        expect(suggestionNames()).toEqual(['Smile :smile · Faces', 'Smirk :smirk', 'Cat smile :smile · Animals']);
+        expect(suggestionNames()).toEqual(['smile :smile · Faces', 'smirk :smirk', 'smile :smile · Animals']);
+      });
+
+      it('offers the tool’s own stamps after the room’s, by their phrase', async () => {
+        await type(':いいね');
+
+        expect(suggestionNames()).toEqual(['いいね！ :いいね']);
       });
 
       it('offers nothing where the colon does not stand at a clear boundary', async () => {
@@ -560,7 +579,7 @@ describe('ChatInputComponent', () => {
 
         expect(down.defaultPrevented).toBe(true);
         expect(stamps).toHaveLength(1);
-        expect(stamps[0].stampName).toBe('Smirk');
+        expect(stamps[0].stampName).toBe('smirk');
         expect(lines).toEqual([]);
         expect(component.text).toBe('hi');
       });
@@ -570,7 +589,7 @@ describe('ChatInputComponent', () => {
         find<HTMLButtonElement>('[data-testid="chat-stamp-suggestion"]')!.click();
         await settle();
 
-        expect(stamps.map((stamp) => stamp.stampName)).toEqual(['Smile']);
+        expect(stamps.map((stamp) => stamp.stampName)).toEqual(['smile']);
         expect(component.text).toBe('');
       });
 
@@ -591,7 +610,7 @@ describe('ChatInputComponent', () => {
         expect(find('[data-testid="chat-stamp-suggestions"]')).toBeNull();
 
         await type(':smir');
-        expect(suggestionNames()).toEqual(['Smirk :smirk']);
+        expect(suggestionNames()).toEqual(['smirk :smirk']);
       });
 
       it('lets the arrows reach the palette’s own completion when no stamp is offered', async () => {

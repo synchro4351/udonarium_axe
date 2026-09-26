@@ -13,10 +13,12 @@ import type { ZipEntry } from '@axe/core/storage/zip-archive-message';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { generateUuid } from '@axe/core/util/uuid';
 import { xml2element } from '@axe/core/util/xml-util';
+import { ImageTag } from '@axe/domain/media/image-tag';
 import {
   normalizeStampName,
   normalizeStampWords,
   parseStampItemsStrict,
+  STAMP_IMAGE_TAG,
   STAMP_LIMITS,
   StampItem,
   StampPack,
@@ -50,6 +52,12 @@ const SOURCE_IMAGE_BYTES = 8 * 1024 * 1024;
 const ARCHIVE_BYTES = STAMP_LIMITS.stampsPerPack * STAMP_LIMITS.imageBytes + 1024 * 1024;
 
 const SAVED_IMAGE_NAME = /^([0-9a-f]{64})\.[a-z0-9]+$/;
+
+/** A picture named after its own bytes, as the image store names what it is given. */
+const HASHED_IDENTIFIER = /^[0-9a-f]{64}$/;
+
+/** The kinds of picture a pack file carries and reads back; anything else is copied into one of them. */
+const PACKABLE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
 /** Whether a problem is one of those a change can meet, for telling results apart from packs. */
 export function isStampProblem<T>(result: T | string): result is string {
@@ -108,10 +116,11 @@ export class StampPackService {
   }
 
   /**
-   * Adds a picture to a pack as a new stamp, named after its file.
+   * Adds a picture to a pack as a new stamp, named after its file until it is given words.
    *
-   * Only still pictures are taken. They are shrunk to fit the largest side a stamp may have, and
-   * turned away if even then they are larger than a stamp may be.
+   * Only still pictures are taken. They are shrunk to the side a stamp is made at, and turned away
+   * if even then they are larger than a stamp may be. The picture goes into the media library
+   * like any other, filed under the stamp tag unless it is already filed somewhere.
    */
   async addStamp(pack: StampPack, file: File): Promise<StampItem | StampEditProblem> {
     if (!this.canEdit) return 'forbidden';
@@ -119,21 +128,46 @@ export class StampPackService {
     const prepared = await this.prepareImage(file);
     if (isStampProblem(prepared)) return prepared;
     const image = await this.imageStorage.addAsync(prepared);
-    // Read again after the wait, since someone else may have filled the pack meanwhile.
-    if (pack.items.length >= STAMP_LIMITS.stampsPerPack) return 'stampLimit';
-    const name = normalizeStampName(file.name.replace(/\.[^.]*$/, '')) || normalizeStampName(file.name);
-    const item: StampItem = { id: generateUuid(), name, imageIdentifier: image.identifier, words: [] };
-    pack.setItems([...pack.items, item]);
-    return item;
+    this.fileAsStamp(image.identifier);
+    return this.appendStamp(pack, image.identifier, file.name);
   }
 
-  /** Changes a stamp's name and search words. A blank name keeps the old one. */
+  /**
+   * Adds a picture the room already holds to a pack as a new stamp.
+   *
+   * A picture a pack file could carry as it is, being small enough, still and of a kind a pack
+   * reads back, is used as it is, so nothing new is stored or sent. Any other is shrunk into a
+   * copy, which goes into the media library under the stamp tag, and the original is left alone.
+   */
+  async addStampFromImage(pack: StampPack, imageIdentifier: string): Promise<StampItem | StampEditProblem> {
+    if (!this.canEdit) return 'forbidden';
+    if (pack.items.length >= STAMP_LIMITS.stampsPerPack) return 'stampLimit';
+    const image = this.imageStorage.get(imageIdentifier);
+    const blob = image?.state === ImageState.COMPLETE ? image.blob : null;
+    if (!image || !blob) return 'notImage';
+    const fileName = image.name || STAMP_IMAGE_TAG;
+    if (await this.packableAsIs(imageIdentifier, blob)) return this.appendStamp(pack, imageIdentifier, fileName);
+
+    const prepared = await this.prepareImage(new File([blob], fileName, { type: blob.type }));
+    if (isStampProblem(prepared)) return prepared;
+    const copy = await this.imageStorage.addAsync(prepared);
+    this.fileAsStamp(copy.identifier);
+    return this.appendStamp(pack, copy.identifier, fileName);
+  }
+
+  /**
+   * Changes a stamp's search words, and its name. A blank name keeps the old one.
+   *
+   * The first word is what the stamp is shown and logged by, so when words are given the name
+   * follows it, and a seat or pack file that still reads the name reads the same.
+   */
   updateStamp(pack: StampPack, id: string, change: { name?: string; words?: string }): StampEditProblem | null {
     if (!this.canEdit) return 'forbidden';
     const items = pack.items.map((item) => {
       if (item.id !== id) return item;
-      const name = change.name === undefined ? item.name : normalizeStampName(change.name) || item.name;
       const words = change.words === undefined ? item.words : normalizeStampWords(change.words);
+      const named = change.name === undefined ? '' : normalizeStampName(change.name);
+      const name = named || (change.words !== undefined ? normalizeStampName(words[0]) : '') || item.name;
       return { ...item, name, words };
     });
     pack.setItems(items);
@@ -214,7 +248,9 @@ export class StampPackService {
     if (!existing && this.packs().length >= STAMP_LIMITS.packsPerRoom) return 'packLimit';
 
     for (const [identifier, image] of archive.images) {
-      if (!this.holds(identifier)) await this.imageStorage.addAsync(image);
+      if (this.holds(identifier)) continue;
+      await this.imageStorage.addAsync(image);
+      this.fileAsStamp(identifier);
     }
 
     // Looked up again after the wait, in case the pack arrived or went meanwhile.
@@ -231,6 +267,46 @@ export class StampPackService {
     pack.setItems(archive.items);
     pack.initialize();
     return pack;
+  }
+
+  /**
+   * Puts a stamp showing the picture at the end of the pack, named after the file it came from.
+   * A name is always given, since a seat from before search words reads a stamp by it.
+   */
+  private appendStamp(pack: StampPack, imageIdentifier: string, fileName: string): StampItem | StampEditProblem {
+    // Read again after the wait, since someone else may have filled the pack meanwhile.
+    if (pack.items.length >= STAMP_LIMITS.stampsPerPack) return 'stampLimit';
+    const name =
+      normalizeStampName(fileName.replace(/\.[^.]*$/, '')) || normalizeStampName(fileName) || STAMP_IMAGE_TAG;
+    const item: StampItem = { id: generateUuid(), name, imageIdentifier, words: [] };
+    pack.setItems([...pack.items, item]);
+    return item;
+  }
+
+  /**
+   * Files a picture made or brought in for a stamp under the stamp tag in the media library. One
+   * already filed under a tag of its own, or whose tag somebody deleted, is left as it is.
+   */
+  private fileAsStamp(imageIdentifier: string): void {
+    const existing = ImageTag.get(imageIdentifier);
+    if (existing) {
+      if (!existing.tag) existing.tag = STAMP_IMAGE_TAG;
+      return;
+    }
+    const created = ImageTag.create(imageIdentifier);
+    if (ImageTag.get(imageIdentifier) === created) created.tag = STAMP_IMAGE_TAG;
+  }
+
+  /**
+   * Whether a picture the room holds could go into a pack file and be read back as it is: named
+   * after its own bytes, of a kind a pack carries, still, and within a stamp's size.
+   */
+  private async packableAsIs(identifier: string, blob: Blob): Promise<boolean> {
+    if (!HASHED_IDENTIFIER.test(identifier) || !PACKABLE_TYPES.has(blob.type)) return false;
+    if (blob.size > STAMP_LIMITS.imageBytes) return false;
+    const buffer = await FileReaderUtil.readAsArrayBufferAsync(blob);
+    if (isAnimatedImageBytes(buffer) || (await FileReaderUtil.calcSHA256Async(buffer)) !== identifier) return false;
+    return (await this.measure(blob)) === 'fits';
   }
 
   private holds(imageIdentifier: string): boolean {
@@ -262,9 +338,9 @@ export class StampPackService {
     return shrunk;
   }
 
-  /** The picture resampled to the largest side a stamp may have, or as it was where that cannot be done. */
+  /** The picture resampled to the side a stamp is made at, or as it was where that cannot be done. */
   private async shrink(file: File): Promise<Blob> {
-    return (await downscaleImageBlob(file, STAMP_LIMITS.imageSide)) ?? file;
+    return (await downscaleImageBlob(file, STAMP_LIMITS.preparedSide)) ?? file;
   }
 
   /**

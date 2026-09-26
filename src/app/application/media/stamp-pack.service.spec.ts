@@ -6,7 +6,8 @@ import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { createZipBlob } from '@axe/core/storage/zip-archive';
 import { ObjectStore } from '@axe/core/sync/object-store';
-import { STAMP_LIMITS, StampItem, StampPack } from '@axe/domain/media/stamp-pack';
+import { ImageTag } from '@axe/domain/media/image-tag';
+import { STAMP_IMAGE_TAG, STAMP_LIMITS, StampItem, StampPack } from '@axe/domain/media/stamp-pack';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -102,6 +103,8 @@ describe('StampPackService', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     for (const image of ImageStorage.instance.images) ImageStorage.instance.delete(image.identifier);
+    for (const tag of ObjectStore.instance.getObjects<ImageTag>(ImageTag)) tag.destroy();
+    ObjectStore.instance.clearDeleteHistory();
   });
 
   describe('making and changing packs', () => {
@@ -144,6 +147,33 @@ describe('StampPackService', () => {
       expect(ImageStorage.instance.get(item.imageIdentifier)).not.toBeNull();
     });
 
+    it('names a stamp after its first search word once it has words', async () => {
+      const pack = newPack();
+      const item = await addedStamp(pack, pngFile('IMG_0001.png', 1));
+
+      service.updateStamp(pack, item.id, { words: 'よろしく yoroshiku' });
+      expect(pack.itemOf(item.id)).toMatchObject({ name: 'よろしく', words: ['よろしく', 'yoroshiku'] });
+
+      service.updateStamp(pack, item.id, { words: '' });
+      expect(pack.itemOf(item.id)).toMatchObject({ name: 'よろしく', words: [] });
+    });
+
+    it('files a picture made into a stamp in the media library under the stamp tag', async () => {
+      const item = await addedStamp(newPack(), pngFile('a.png', 1));
+      expect(ImageTag.get(item.imageIdentifier)?.tag).toBe(STAMP_IMAGE_TAG);
+    });
+
+    it('leaves a picture already filed under a tag of its own where it is', async () => {
+      const file = pngFile('a.png', 1);
+      const stored = await store(file);
+      ImageTag.create(stored.identifier).tag = 'キャラ';
+
+      const item = await addedStamp(newPack(), file);
+
+      expect(item.imageIdentifier).toBe(stored.identifier);
+      expect(ImageTag.get(stored.identifier).tag).toBe('キャラ');
+    });
+
     it('adds no more stamps than a pack may hold', async () => {
       const pack = newPack();
       pack.setItems(
@@ -156,6 +186,60 @@ describe('StampPackService', () => {
       );
       expect(await service.addStamp(pack, pngFile('a.png', 1))).toBe('stampLimit');
       expect(addAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a picture the room already holds', () => {
+    it('is used as it is when a pack file could carry it, storing nothing new', async () => {
+      const held = await store(pngFile('face.png', 1));
+      addAsync.mockClear();
+      const pack = newPack();
+
+      const item = await service.addStampFromImage(pack, held.identifier);
+
+      expect(item).toMatchObject({ imageIdentifier: held.identifier, words: [] });
+      expect(addAsync).not.toHaveBeenCalled();
+      expect(ImageTag.get(held.identifier)).toBeFalsy();
+    });
+
+    it('is copied at a stamp’s size when it is too large to carry as it is, leaving it alone', async () => {
+      const held = await store(pngFile('big.png', 1, STAMP_LIMITS.imageBytes));
+      const shrunk = new Blob([pngBytes(7)], { type: 'image/png' });
+      const shrink = vi.spyOn(service as unknown as { shrink: (file: File) => Promise<Blob> }, 'shrink');
+      shrink.mockResolvedValueOnce(shrunk);
+      addAsync.mockClear();
+
+      const item = await service.addStampFromImage(newPack(), held.identifier);
+
+      expect(typeof item).toBe('object');
+      const copy = (item as StampItem).imageIdentifier;
+      expect(copy).not.toBe(held.identifier);
+      expect(addAsync).toHaveBeenCalledTimes(1);
+      expect(ImageTag.get(copy)?.tag).toBe(STAMP_IMAGE_TAG);
+      expect(ImageStorage.instance.get(held.identifier)).not.toBeNull();
+    });
+
+    it('is copied when it is not named after its own bytes, as a pack file would need', async () => {
+      const bytes = pngBytes(3);
+      ImageStorage.instance.add(
+        ImageFile.create({
+          identifier: 'legacy-image',
+          name: 'old.png',
+          type: 'image/png',
+          blob: new Blob([bytes], { type: 'image/png' }),
+          url: '',
+          thumbnail: { type: '', blob: null, url: '' },
+        })
+      );
+
+      const item = await service.addStampFromImage(newPack(), 'legacy-image');
+
+      expect((item as StampItem).imageIdentifier).toBe(await calcSHA256Async(bytes.slice().buffer));
+      expect((item as StampItem).name).toBe('old');
+    });
+
+    it('is turned away when this seat does not hold it', async () => {
+      expect(await service.addStampFromImage(newPack(), 'nowhere')).toBe('notImage');
     });
   });
 
@@ -242,7 +326,23 @@ describe('StampPackService', () => {
       expect((restored as StampPack).name).toBe('いつもの');
       expect((restored as StampPack).items).toEqual(items);
       expect(addAsync).toHaveBeenCalledTimes(2);
-      for (const item of items) expect(ImageStorage.instance.get(item.imageIdentifier)).not.toBeNull();
+      for (const item of items) {
+        expect(ImageStorage.instance.get(item.imageIdentifier)).not.toBeNull();
+        expect(ImageTag.get(item.imageIdentifier)?.tag).toBe(STAMP_IMAGE_TAG);
+      }
+    });
+
+    it('reads a pack whose stamps are known only by their words', async () => {
+      const bytes = pngBytes(5);
+      const identifier = await calcSHA256Async(bytes.slice().buffer);
+      const stamps = JSON.stringify([{ id: 's1', name: '', imageIdentifier: identifier, words: ['たぬき'] }]);
+
+      const archive = await readArchive([
+        packXml({ identifier: 'p', name: 'x', stamps }),
+        new File([bytes], `${identifier}.png`),
+      ]);
+
+      expect(archive.items[0].words).toEqual(['たぬき']);
     });
 
     it('brings a pack the room already has up to date in place, without storing its pictures again', async () => {
