@@ -1,7 +1,7 @@
 {
-  "name": "Udonarium Axe",
-  "short_name": "Axe",
-  "description": "ブラウザで動く TRPG オンラインセッション支援ツール",
+  "name": "Udonarium Axe tyoitashi",
+  "short_name": "Axe tyoitashi",
+  "description": "Udonarium Axe を元にした私家版（tyoitashi）。ブラウザで動く TRPG オンラインセッション支援ツール",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

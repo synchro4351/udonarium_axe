@@ -11,6 +11,7 @@ import {
   ViewContainerRef,
 } from '@angular/core';
 import { Title } from '@angular/platform-browser';
+import { appTitle } from '@axe/app-title';
 import { SaveDataService } from '@axe/application/file/save-data.service';
 import { LanguageService } from '@axe/application/i18n/language.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
@@ -344,7 +345,7 @@ export class AppComponent {
   isSaving = signal(false);
   progressPercent = signal(0);
   constructor() {
-    inject(Title).setTitle(`Udonarium Axe ${APP_VERSION}`);
+    inject(Title).setTitle(appTitle(APP_VERSION));
 
     if (new URLSearchParams(window.location.search).get('stats') === '1') this.widgets.renderStats.set(true);
 
