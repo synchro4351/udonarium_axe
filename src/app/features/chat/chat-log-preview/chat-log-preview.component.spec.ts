@@ -145,6 +145,22 @@ describe('ChatLogPreviewComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="chat-log-preview-frame"]')).toBeNull();
   });
 
+  it('offers text first in the list of styles, marked picked alone while it is on show', () => {
+    component.tab.set(addTab('メイン', 1));
+    fixture.detectChanges();
+    const list = fixture.nativeElement.querySelector('[role="listbox"]') as HTMLElement;
+    const options = Array.from(list.querySelectorAll<HTMLElement>('[role="option"]'));
+
+    expect(options[0].dataset['testid']).toBe('chat-log-format-text');
+    expect(options[1].dataset['testid']).toBe('chat-log-style-standard');
+
+    options[0].click();
+    fixture.detectChanges();
+
+    expect(component.format()).toBe('text');
+    expect(options.filter((option) => option.getAttribute('aria-selected') === 'true')).toEqual([options[0]]);
+  });
+
   it('keeps the style picked while text is on show, and goes back to html on picking a style', async () => {
     component.tab.set(addTab('メイン', 1));
     component.choose('neon');

@@ -470,7 +470,7 @@
         "removeStamp": "このスタンプを外す",
         "empty": "スタンプセットはまだありません",
         "emptyPack": "このセットにスタンプはありません",
-        "builtinPack": "定番",
+        "builtinPack": "プリセット",
         "builtinHint": "最初から入っている文字スタンプです。どの部屋でも使えます（編集はできません）。",
         "dropHint": "画像はスタンプとして、ZIPはスタンプセットとして読み込みます",
         "limitsHint": "静止画（PNG・JPEG・WebP）のみ。長辺{{side}}pxに縮小し、{{kilobytes}}KBまで。追加した画像は画像一覧に「スタンプ」タグで入ります。1セット{{stamps}}個、部屋に{{packs}}セットまで。",
@@ -2888,8 +2888,57 @@
         "emojiTab": "絵文字",
         "emptyPack": "このパックにはまだスタンプがありません",
         "send": "スタンプ「{{name}}」を送る",
-        "suggestions": "スタンプの候補",
+        "suggestions": "入力候補",
+        "paletteLine": "チャットパレットの行を入力欄に入れる",
         "unnamed": "スタンプ"
+      },
+      "syntax": {
+        "tab": "特殊記法",
+        "placeholder": {
+          "rubyBase": "漢字",
+          "rubyReading": "かんじ",
+          "resource": "HP",
+          "buffName": "バフ名",
+          "effectName": "演出名"
+        },
+        "items": {
+          "ruby": {
+            "name": "ルビ",
+            "hint": "選んだ語にふりがなを振ります"
+          },
+          "secretDice": {
+            "name": "シークレットダイス",
+            "hint": "行頭に S を付け、結果を伏せて振ります"
+          },
+          "quote": {
+            "name": "引用",
+            "hint": "行頭に > を付けて引用として表示します"
+          },
+          "resource": {
+            "name": "リソース操作",
+            "hint": "発言キャラクターの項目を増減します"
+          },
+          "targetResource": {
+            "name": "ターゲットへ操作",
+            "hint": "ターゲット中のコマの項目を増減します"
+          },
+          "buff": {
+            "name": "バフ付与",
+            "hint": "名前とラウンド数でバフを付けます"
+          },
+          "reference": {
+            "name": "項目の参照",
+            "hint": "送信時にシートの値へ置き換えます"
+          },
+          "portrait": {
+            "name": "立ち絵の切り替え",
+            "hint": "文末で立ち絵を番号か名前で切り替えます"
+          },
+          "effect": {
+            "name": "演出の起動",
+            "hint": "登録したマップ演出を出します"
+          }
+        }
       },
       "tab": {
         "unnamedCharacter": "無名のキャラクター",
@@ -3074,9 +3123,8 @@
         "previewSave": "この形式で保存",
         "previewFrameTitle": "書き出されるログの見本",
         "previewSaveText": "テキストで保存",
-        "formatLabel": "書き出し形式",
-        "formatHtml": "HTML",
         "formatText": "テキスト (.txt)",
+        "formatTextDescription": "文字だけのログ",
         "previewLimited": "直近 {{count}} 件で表示しています。保存するとタブ全体が書き出されます。",
         "previewSample": "まだ発言がないため、見本の会話で表示しています。",
         "styles": {

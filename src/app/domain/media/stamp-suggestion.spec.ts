@@ -4,6 +4,7 @@ import {
   removeStampQuery,
   stampQueryAt,
   StampSuggestionPack,
+  stampWordAt,
   suggestStamps,
 } from '@axe/domain/media/stamp-suggestion';
 
@@ -48,6 +49,29 @@ describe('stampQueryAt', () => {
   });
 });
 
+describe('stampWordAt', () => {
+  const at = (text: string, caret = text.length) => stampWordAt(text, caret);
+
+  it('finds the plain word since the last space, marked as typed without a colon', () => {
+    expect(at('ドンマイ')).toEqual({ word: 'ドンマイ', start: 0, end: 4, bare: true });
+    expect(at('ok ドンマイ')).toEqual({ word: 'ドンマイ', start: 3, end: 7, bare: true });
+    expect(at('line\nsugoi')?.word).toBe('sugoi');
+  });
+
+  it('wants two characters at least, and leaves a colon word to stampQueryAt', () => {
+    expect(at('a')).toBeNull();
+    expect(at('ok a')).toBeNull();
+    expect(at(':ok')).toBeNull();
+    expect(at('：ok')).toBeNull();
+  });
+
+  it('counts only while the caret stands at the end of the word', () => {
+    expect(at('good', 2)).toBeNull();
+    expect(at('good more', 4)?.word).toBe('good');
+    expect(at('good ')).toBeNull();
+  });
+});
+
 describe('suggestStamps', () => {
   const smile = item('s1', 'Smile', ['smile', 'happy']);
   const smirk = item('s2', 'Smirk', ['smirk']);
@@ -69,6 +93,14 @@ describe('suggestStamps', () => {
     const found = suggestStamps([pack('p', 'Faces', [okay, nod])], 'ok');
 
     expect(found.map((one) => one.item.id)).toEqual(['s3', 'a']);
+  });
+
+  it('offers only stamps saved under the whole word when asked for whole words', () => {
+    const okay = item('a', 'Okay', ['okay']);
+    const packs = [pack('p', 'Faces', [okay, nod])];
+
+    expect(suggestStamps(packs, 'OK', true).map((one) => one.item.id)).toEqual(['s3']);
+    expect(suggestStamps(packs, 'oka', true)).toEqual([]);
   });
 
   it('offers a stamp once, under the word that fits best', () => {

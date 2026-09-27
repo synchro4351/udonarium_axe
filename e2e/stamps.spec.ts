@@ -8,14 +8,34 @@ test('stamp panel and chat behave in a real browser', async ({ page }) => {
   await page.getByTestId('chat-stamp-button').click();
   const picker = page.locator('chat-stamp-picker');
   await expect(picker).toBeVisible();
-  await picker.getByRole('tab', { name: /定番/ }).click();
+  await picker.getByRole('tab', { name: /プリセット/ }).click();
   await expect(picker.getByTestId('chat-stamp-choice')).toHaveCount(10);
   await picker.getByTestId('chat-stamp-choice').first().click();
   const sentStamp = page.locator('chat-message [data-testid="chat-message-stamp"]').last();
   await expect(sentStamp).toBeVisible();
   expect((await sentStamp.boundingBox())?.height).toBeLessThanOrEqual(80);
 
+  // A press anywhere else puts the picker away.
+  await page.getByTestId('chat-stamp-button').click();
+  await expect(picker).toBeVisible();
+  await page.locator('textarea.chat-input').click();
+  await expect(picker).toBeHidden();
+
+  // The syntax tab writes into the box and sends nothing.
+  await page.getByTestId('chat-stamp-button').click();
+  await picker.getByRole('tab', { name: /特殊記法/ }).click();
+  await picker.locator('[data-syntax="ruby"]').click();
   const textarea = page.locator('textarea.chat-input');
+  await expect(textarea).toHaveValue('|漢字《かんじ》');
+
+  // A saved word typed without a colon is offered, and only sent when chosen.
+  await textarea.fill('ドンマイ');
+  await expect(page.getByTestId('chat-stamp-suggestion')).toHaveCount(1);
+  await textarea.press('ArrowDown');
+  await textarea.press('Enter');
+  await expect(textarea).toHaveValue('');
+  await expect(page.locator('chat-message [data-testid="chat-message-stamp"]')).toHaveCount(2);
+
   await textarea.fill('👍🎉');
   await textarea.press('Enter');
   await expect(page.locator('chat-message [data-large-emoji="true"]').last()).toBeVisible();

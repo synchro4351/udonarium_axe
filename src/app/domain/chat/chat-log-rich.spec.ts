@@ -253,6 +253,24 @@ describe('renderRichChatLog', () => {
     expect(rich).not.toContain('3fa9.png');
   });
 
+  it('draws a stamp at half an attachment’s size, in the themed and the standard log alike', () => {
+    const picture = { identifier: 'a1', url: 'blob:a1', name: '3fa9.png' } as unknown as ImageFile;
+    const stamp = line({ text: '', stampName: 'やったね', attachmentImages: [picture] });
+    const attached = line({ text: '', attachmentImages: [picture] });
+
+    const rich = renderRichChatLog('parchment', 'tab', [tab('メイン', [stamp, attached])], {
+      imageSrcResolver: () => 'i1',
+    });
+    const standard = ChatLogExporter.exportTabHtml(tab('メイン', [stamp, attached]), 'user-1', () => 'i1');
+
+    expect(rich).toContain('<div class="att st"><img data-img-key="i1" alt="やったね"></div>');
+    expect(rich).toContain('<div class="att"><img data-img-key="i1" alt="3fa9.png"></div>');
+    expect(rich).toContain('.att.st img{max-width:min(100%,160px);max-height:130px}');
+    expect(standard).toContain('alt="やったね" class="ai st"');
+    expect(standard).toContain('alt="3fa9.png" class="ai"');
+    expect(standard).toContain('.ai.st{max-width:90px;max-height:60px}');
+  });
+
   it('puts the line replied to in front of the reply', () => {
     const original = line({ name: 'GM', text: '扉の向こうから物音がする' });
     const html = renderRichChatLog('messenger', 'tab', [

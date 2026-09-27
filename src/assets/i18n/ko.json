@@ -470,7 +470,7 @@
         "removeStamp": "이 스탬프 빼기",
         "empty": "아직 스탬프 세트가 없습니다",
         "emptyPack": "이 세트에는 스탬프가 없습니다",
-        "builtinPack": "기본",
+        "builtinPack": "프리셋",
         "builtinHint": "처음부터 들어 있는 글자 스탬프입니다. 어느 방에서나 쓸 수 있으며 편집할 수 없습니다.",
         "dropHint": "이미지는 스탬프로, ZIP은 스탬프 세트로 불러옵니다",
         "limitsHint": "정지 이미지(PNG·JPEG·WebP)만. 긴 변 {{side}}px로 줄이고 {{kilobytes}}KB까지. 추가한 이미지는 이미지 목록에 \"スタンプ\" 태그로 들어갑니다. 세트당 {{stamps}}개, 방당 {{packs}}세트까지.",
@@ -2888,8 +2888,57 @@
         "emojiTab": "이모지",
         "emptyPack": "이 팩에는 아직 스탬프가 없습니다",
         "send": "스탬프 \"{{name}}\" 보내기",
-        "suggestions": "스탬프 후보",
+        "suggestions": "입력 후보",
+        "paletteLine": "채팅 팔레트 줄을 입력란에 넣기",
         "unnamed": "스탬프"
+      },
+      "syntax": {
+        "tab": "특수 표기",
+        "placeholder": {
+          "rubyBase": "글자",
+          "rubyReading": "읽기",
+          "resource": "HP",
+          "buffName": "버프명",
+          "effectName": "연출명"
+        },
+        "items": {
+          "ruby": {
+            "name": "루비",
+            "hint": "선택한 글자에 읽는 법을 붙입니다"
+          },
+          "secretDice": {
+            "name": "시크릿 다이스",
+            "hint": "줄 앞에 S를 붙여 결과를 숨기고 굴립니다"
+          },
+          "quote": {
+            "name": "인용",
+            "hint": "줄 앞에 >를 붙여 인용으로 표시합니다"
+          },
+          "resource": {
+            "name": "리소스 조작",
+            "hint": "발언 캐릭터의 항목을 증감합니다"
+          },
+          "targetResource": {
+            "name": "타깃 조작",
+            "hint": "타깃 중인 말의 항목을 증감합니다"
+          },
+          "buff": {
+            "name": "버프 부여",
+            "hint": "이름과 라운드 수로 버프를 붙입니다"
+          },
+          "reference": {
+            "name": "항목 참조",
+            "hint": "보낼 때 시트 값으로 바뀝니다"
+          },
+          "portrait": {
+            "name": "스탠딩 전환",
+            "hint": "문장 끝에서 스탠딩 그림을 번호나 이름으로 바꿉니다"
+          },
+          "effect": {
+            "name": "연출 실행",
+            "hint": "등록한 맵 연출을 재생합니다"
+          }
+        }
       },
       "tab": {
         "unnamedCharacter": "이름 없는 캐릭터",
@@ -3074,9 +3123,8 @@
         "previewSave": "이 형식으로 저장",
         "previewFrameTitle": "내보낼 로그 견본",
         "previewSaveText": "텍스트로 저장",
-        "formatLabel": "내보내기 형식",
-        "formatHtml": "HTML",
         "formatText": "텍스트 (.txt)",
+        "formatTextDescription": "글자만 있는 로그",
         "previewLimited": "최근 {{count}}건으로 표시하고 있습니다. 저장하면 탭 전체가 내보내집니다.",
         "previewSample": "아직 발언이 없어 견본 대화로 표시하고 있습니다.",
         "styles": {

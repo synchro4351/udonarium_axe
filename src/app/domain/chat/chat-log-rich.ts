@@ -375,7 +375,8 @@ function renderAttachments(message: ChatLogLine, context: RenderContext): string
     })
     .filter((tag) => tag.length > 0)
     .join('');
-  return tags ? `<div class="att">${tags}</div>` : '';
+  // A stamp is drawn at half an attachment's size, as it is a word said rather than a picture shown.
+  return tags ? `<div class="${message.stampName ? 'att st' : 'att'}">${tags}</div>` : '';
 }
 
 function textHtml(text: string): string {

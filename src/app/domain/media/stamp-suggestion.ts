@@ -1,13 +1,15 @@
 import { STAMP_LIMITS, StampItem, stampLabelOf } from '@axe/domain/media/stamp-pack';
 
-/** A `:word` being typed in chat, and where it sits in the line. */
+/** A `:word`, or a plain word, being typed in chat, and where it sits in the line. */
 export interface StampQuery {
-  /** What follows the colon. */
+  /** What follows the colon, or the plain word itself. */
   readonly word: string;
-  /** Where the colon is. */
+  /** Where the colon is, or where the plain word begins. */
   readonly start: number;
   /** Just past the last character of the word. */
   readonly end: number;
+  /** Whether the word was typed without a colon, and so only finds a stamp saved under it whole. */
+  readonly bare?: boolean;
 }
 
 /** A pack as the suggestions read it. */
@@ -49,20 +51,40 @@ export function stampQueryAt(text: string, caret: number): StampQuery | null {
   return { word: match[1], start: caret - match[1].length - 1, end: caret };
 }
 
+const WORD_BEFORE_CARET = new RegExp(`(?:^|\\s)([^\\s:：][^\\s]{1,${STAMP_LIMITS.wordLength - 1}})$`, 'u');
+
+/**
+ * The plain word, typed with no colon, the caret stands at the end of, or null.
+ *
+ * It is the run of text since the last space, at least two characters long, with nothing but a
+ * space or the end of the line after the caret. Such a word only finds a stamp saved under it whole
+ * (see `suggestStamps`), so ordinary writing is not met with a list at every other keystroke.
+ */
+export function stampWordAt(text: string, caret: number): StampQuery | null {
+  if (caret < 2 || caret > text.length) return null;
+  const after = text.charAt(caret);
+  if (after !== '' && !/\s/u.test(after)) return null;
+  const match = WORD_BEFORE_CARET.exec(text.slice(0, caret));
+  if (!match) return null;
+  return { word: match[1], start: caret - match[1].length, end: caret, bare: true };
+}
+
 /**
  * The stamps whose saved words begin with the word typed, in any case; those with the word itself
- * come first, then the rest in pack order. A stamp is offered once, under the first word of its
- * that fits. When two packs offer stamps by the same word or name, both are marked to show which
- * pack each comes from.
+ * come first, then the rest in pack order. With `whole`, only a stamp saved under the word itself
+ * is offered. A stamp is offered once, under the first word of its that fits. When two packs offer
+ * stamps by the same word or name, both are marked to show which pack each comes from.
  */
-export function suggestStamps(packs: readonly StampSuggestionPack[], word: string): StampSuggestion[] {
+export function suggestStamps(packs: readonly StampSuggestionPack[], word: string, whole = false): StampSuggestion[] {
   const needle = word.toLocaleLowerCase();
   if (needle.length === 0) return [];
   const exact: StampSuggestion[] = [];
   const partial: StampSuggestion[] = [];
   for (const pack of packs) {
     for (const item of pack.items) {
-      const fits = item.words.filter((one) => one.toLocaleLowerCase().startsWith(needle));
+      const fits = item.words.filter((one) =>
+        whole ? one.toLocaleLowerCase() === needle : one.toLocaleLowerCase().startsWith(needle)
+      );
       if (fits.length === 0) continue;
       const same = fits.find((one) => one.toLocaleLowerCase() === needle);
       const found = { packIdentifier: pack.identifier, packName: pack.name, item, word: same ?? fits[0] };

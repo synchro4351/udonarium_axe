@@ -201,10 +201,11 @@
           <chat-stamp-picker
             class="absolute inset-x-0 bottom-full z-20 mb-1"
             (emojiPicked)="insertEmoji($event)"
+            (syntaxPicked)="insertSyntax($event)"
             (stampPicked)="sendPickedStamp($event)"
             (closed)="closeStampPicker()"
           />
-        } @else if (stampSuggestions().length > 0) {
+        } @else if (suggestions().length > 0) {
           <div
             role="listbox"
             data-testid="chat-stamp-suggestions"
@@ -212,38 +213,57 @@
             [id]="suggestionListId"
             [attr.aria-label]="'feature.chat.stamp.suggestions' | transloco"
           >
-            @for (
-              suggestion of stampSuggestions();
-              track suggestion.packIdentifier + suggestion.item.id;
-              let i = $index
-            ) {
-              <button
-                type="button"
-                role="option"
-                tabindex="-1"
-                data-testid="chat-stamp-suggestion"
-                class="rounded-ui-sm hover:bg-ui-hover flex min-h-11 w-full min-w-0 cursor-pointer items-center gap-2 border-0 bg-transparent px-1.5 py-1 text-left text-[12px] transition-colors"
-                [class.bg-ui-accent-bg]="activeSuggestion() === i"
-                [id]="suggestionListId + '-' + i"
-                [attr.aria-selected]="activeSuggestion() === i"
-                (mousedown)="$event.preventDefault()"
-                (click)="sendSuggestion(suggestion)"
-              >
-                @if (stampImageUrl(suggestion.item.imageIdentifier); as url) {
-                  <img class="size-9 shrink-0 object-contain" alt="" [src]="url | safe: 'resourceUrl'" />
-                } @else {
-                  <span class="size-9 shrink-0"></span>
-                }
-                <span class="flex min-w-0 flex-col">
-                  <span class="text-ui-text truncate">{{ stampLabelOf(suggestion.item) || suggestion.packName }}</span>
-                  <span class="text-ui-dim truncate text-[11px]">
-                    :{{ suggestion.word }}
-                    @if (suggestion.showsPack) {
-                      · {{ suggestion.packName }}
-                    }
+            @for (suggestion of suggestions(); track $index; let i = $index) {
+              @if (suggestion.kind === 'stamp') {
+                <button
+                  type="button"
+                  role="option"
+                  tabindex="-1"
+                  data-testid="chat-stamp-suggestion"
+                  class="rounded-ui-sm hover:bg-ui-hover flex min-h-11 w-full min-w-0 cursor-pointer items-center gap-2 border-0 bg-transparent px-1.5 py-1 text-left text-[12px] transition-colors"
+                  [class.bg-ui-accent-bg]="activeSuggestion() === i"
+                  [id]="suggestionListId + '-' + i"
+                  [attr.aria-selected]="activeSuggestion() === i"
+                  (mousedown)="$event.preventDefault()"
+                  (click)="pickSuggestion(suggestion)"
+                >
+                  @if (stampImageUrl(suggestion.stamp.item.imageIdentifier); as url) {
+                    <img class="size-9 shrink-0 object-contain" alt="" [src]="url | safe: 'resourceUrl'" />
+                  } @else {
+                    <span class="size-9 shrink-0"></span>
+                  }
+                  <span class="flex min-w-0 flex-col">
+                    <span class="text-ui-text truncate">{{
+                      stampLabelOf(suggestion.stamp.item) || suggestion.stamp.packName
+                    }}</span>
+                    <span class="text-ui-dim truncate text-[11px]">
+                      {{ stampQueryHasColon() ? ':' : '' }}{{ suggestion.stamp.word }}
+                      @if (suggestion.stamp.showsPack) {
+                        · {{ suggestion.stamp.packName }}
+                      }
+                    </span>
                   </span>
-                </span>
-              </button>
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  role="option"
+                  tabindex="-1"
+                  data-testid="chat-palette-suggestion"
+                  class="rounded-ui-sm hover:bg-ui-hover flex min-h-9 w-full min-w-0 cursor-pointer items-center gap-2 border-0 bg-transparent px-1.5 py-1 text-left text-[12px] transition-colors"
+                  [class.bg-ui-accent-bg]="activeSuggestion() === i"
+                  [id]="suggestionListId + '-' + i"
+                  [attr.aria-selected]="activeSuggestion() === i"
+                  [title]="'feature.chat.stamp.paletteLine' | transloco"
+                  (mousedown)="$event.preventDefault()"
+                  (click)="pickSuggestion(suggestion)"
+                >
+                  <i aria-hidden="true" class="material-icons text-ui-dim shrink-0 text-[16px]!"
+                    >format_list_bulleted</i
+                  >
+                  <span class="text-ui-text min-w-0 truncate">{{ suggestion.line }}</span>
+                </button>
+              }
             }
           </div>
         }
@@ -269,8 +289,8 @@
           (keydown.control.arrowdown)="moveHistory($event, 1)"
           (keydown.arrowup)="selectAutoComplete($event, -1)"
           (keydown.arrowdown)="selectAutoComplete($event, 1)"
-          [attr.aria-autocomplete]="offersStamps() ? 'list' : null"
-          [attr.aria-controls]="stampSuggestions().length > 0 ? suggestionListId : null"
+          [attr.aria-autocomplete]="offersStamps() || suggestsPalette() ? 'list' : null"
+          [attr.aria-controls]="suggestions().length > 0 ? suggestionListId : null"
           [attr.aria-activedescendant]="activeSuggestionId()"
           #textArea
         ></textarea>

@@ -470,7 +470,7 @@
         "removeStamp": "Remove this stamp",
         "empty": "No stamp packs yet",
         "emptyPack": "This pack has no stamps",
-        "builtinPack": "Basics",
+        "builtinPack": "Presets",
         "builtinHint": "Lettering stamps that come with the app. They work in every room and cannot be edited.",
         "dropHint": "Drop images to add stamps, or a ZIP to load a stamp pack",
         "limitsHint": "Still images only (PNG, JPEG, WebP), shrunk to {{side}}px on the long side and up to {{kilobytes}} KB. Added images also appear in the image list under the \"スタンプ\" tag. Up to {{stamps}} stamps a pack and {{packs}} packs a room.",
@@ -2888,8 +2888,57 @@
         "emojiTab": "Emoji",
         "emptyPack": "This pack has no stamps yet",
         "send": "Send the stamp \"{{name}}\"",
-        "suggestions": "Stamp suggestions",
+        "suggestions": "Suggestions",
+        "paletteLine": "Put this chat palette line in the box",
         "unnamed": "Stamp"
+      },
+      "syntax": {
+        "tab": "Syntax",
+        "placeholder": {
+          "rubyBase": "text",
+          "rubyReading": "reading",
+          "resource": "HP",
+          "buffName": "Buff",
+          "effectName": "Effect"
+        },
+        "items": {
+          "ruby": {
+            "name": "Ruby",
+            "hint": "Adds a reading over the words picked out"
+          },
+          "secretDice": {
+            "name": "Secret dice",
+            "hint": "Puts S at the start of the line to roll out of sight"
+          },
+          "quote": {
+            "name": "Quote",
+            "hint": "Puts > at the start of the line to show it as a quotation"
+          },
+          "resource": {
+            "name": "Resource change",
+            "hint": "Changes a value on the speaking character"
+          },
+          "targetResource": {
+            "name": "Change on target",
+            "hint": "Changes a value on the targeted pieces"
+          },
+          "buff": {
+            "name": "Add buff",
+            "hint": "Adds a buff by name and rounds"
+          },
+          "reference": {
+            "name": "Sheet reference",
+            "hint": "Replaced with the sheet's value when sent"
+          },
+          "portrait": {
+            "name": "Switch portrait",
+            "hint": "Switches the portrait by number or name, at the end of the line"
+          },
+          "effect": {
+            "name": "Map effect",
+            "hint": "Plays a registered map effect"
+          }
+        }
       },
       "tab": {
         "unnamedCharacter": "Unnamed character",
@@ -3074,9 +3123,8 @@
         "previewSave": "Save in this style",
         "previewFrameTitle": "Sample of the exported log",
         "previewSaveText": "Save as text",
-        "formatLabel": "File format",
-        "formatHtml": "HTML",
         "formatText": "Text (.txt)",
+        "formatTextDescription": "Words only, no layout",
         "previewLimited": "Showing the latest {{count}} lines. Saving writes out the whole tab.",
         "previewSample": "Nothing has been said yet, so a sample conversation is shown.",
         "styles": {

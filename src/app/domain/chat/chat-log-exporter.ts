@@ -78,6 +78,7 @@ export class ChatLogExporter {
     '.bq{margin:0 4px 0 0;padding:2px 8px;border-left:3px solid #aaa;color:#666;font-size:.9em;background:#f7f7f7;display:inline-block;max-width:70%;vertical-align:middle}' +
     '.bn{font-weight:bold;margin-right:4px}' +
     '.ai{max-width:180px;max-height:120px;width:auto;height:auto;object-fit:contain;border:1px solid #ccc;border-radius:4px;background:#fff;vertical-align:top;margin:2px 4px 2px 0}' +
+    '.ai.st{max-width:90px;max-height:60px}' +
     '.aw{display:block;margin-top:6px;white-space:normal}' +
     '.rx{display:block;margin-top:2px;color:#666;font-size:.85em}' +
     '</style>\n';
@@ -518,7 +519,9 @@ export class ChatLogExporter {
         const key = imageSrcResolver?.(image) ?? image.url;
         if (!key) return '';
         const alt = message.stampName || image.name || '添付画像';
-        return `<img data-img-key="${ChatLogExporter.escapeAttribute(key)}" alt="${ChatLogExporter.escapeAttribute(alt)}" class="ai" />`;
+        // A stamp is drawn at half an attachment's size, as it is a word said rather than a picture shown.
+        const classes = message.stampName ? 'ai st' : 'ai';
+        return `<img data-img-key="${ChatLogExporter.escapeAttribute(key)}" alt="${ChatLogExporter.escapeAttribute(alt)}" class="${classes}" />`;
       })
       .filter((imageTag) => imageTag.length > 0)
       .join('');

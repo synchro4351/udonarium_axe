@@ -22,6 +22,19 @@
     >
       {{ 'feature.chat.stamp.emojiTab' | transloco }}
     </button>
+    <button
+      type="button"
+      role="tab"
+      data-testid="chat-stamp-tab"
+      class="rounded-ui-sm hover:bg-ui-hover min-h-8 shrink-0 cursor-pointer border-0 bg-transparent px-2 text-[12px] whitespace-nowrap transition-colors"
+      [class.bg-ui-accent-bg]="activeTab() === syntaxTab"
+      [class.text-ui-accent]="activeTab() === syntaxTab"
+      [attr.aria-selected]="activeTab() === syntaxTab"
+      [attr.tabindex]="activeTab() === syntaxTab ? 0 : -1"
+      (click)="selectTab(syntaxTab)"
+    >
+      {{ 'feature.chat.syntax.tab' | transloco }}
+    </button>
     @for (pack of packs(); track pack.identifier) {
       <button
         type="button"
@@ -40,7 +53,25 @@
     }
   </div>
   <div role="tabpanel" class="min-h-0 overflow-y-auto">
-    @if (activePack(); as pack) {
+    @if (activeTab() === syntaxTab) {
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-0.5">
+        @for (snippet of snippets; track snippet.id) {
+          <button
+            type="button"
+            data-testid="chat-syntax-choice"
+            class="rounded-ui-sm hover:bg-ui-hover focus-visible:bg-ui-hover flex min-h-9 min-w-0 cursor-pointer flex-col items-start justify-center border-0 bg-transparent px-1.5 py-0.5 text-left transition-colors"
+            [attr.data-syntax]="snippet.id"
+            [title]="'feature.chat.syntax.items.' + snippet.id + '.hint' | transloco"
+            (click)="pickSyntax(snippet)"
+          >
+            <span class="text-ui-text max-w-full truncate text-[12px]">{{
+              'feature.chat.syntax.items.' + snippet.id + '.name' | transloco
+            }}</span>
+            <code class="text-ui-dim max-w-full truncate font-mono text-[11px]">{{ exampleOf(snippet) }}</code>
+          </button>
+        }
+      </div>
+    } @else if (activePack(); as pack) {
       @if (pack.items.length === 0) {
         <p class="text-ui-dim m-0 p-2 text-[12px]" data-testid="chat-stamp-empty">
           {{ 'feature.chat.stamp.emptyPack' | transloco }}

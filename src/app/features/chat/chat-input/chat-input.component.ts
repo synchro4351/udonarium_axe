@@ -40,7 +40,9 @@ import { ChatBubbleColors, chatBubbleOf, chatColorOf, DEFAULT_CHAT_COLOR } from 
 import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { composeChatOutgoing } from '@axe/domain/chat/chat-outgoing';
 import { ChatOutgoing, ChatStampOutgoing } from '@axe/domain/chat/chat-outgoing';
+import { paletteLineText, suggestPaletteLines } from '@axe/domain/chat/chat-palette-suggestion';
 import { previewTextOf } from '@axe/domain/chat/chat-stamp-text';
+import { applyChatSyntax, ChatSyntaxSnippet } from '@axe/domain/chat/chat-syntax-snippet';
 import { DataElement } from '@axe/domain/data/data-element';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
 import { builtinStampPack, StampPackView } from '@axe/domain/media/builtin-stamps';
@@ -50,6 +52,7 @@ import {
   StampQuery,
   stampQueryAt,
   StampSuggestion,
+  stampWordAt,
   suggestStamps,
 } from '@axe/domain/media/stamp-suggestion';
 import { Config } from '@axe/domain/peer/config';
@@ -74,15 +77,18 @@ const COLOR_SETTING_PANEL = 'chat-color-setting';
 /** Tells each input's suggestion list apart, for the text box to point at the one highlighted. */
 let nextSuggestionListId = 0;
 
-function stampQueryKey(query: StampQuery): string {
-  return `${query.start}:${query.word}`;
-}
+/** A row of the list offered over the text box: a stamp to send, or a palette line to take in. */
+export type ChatInputSuggestion =
+  { readonly kind: 'stamp'; readonly stamp: StampSuggestion } | { readonly kind: 'palette'; readonly line: string };
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'chat-input',
   templateUrl: './chat-input.component.html',
-  host: { class: 'block min-w-0 [container-type:inline-size]' },
+  host: {
+    class: 'block min-w-0 [container-type:inline-size]',
+    '(document:pointerdown)': 'onDocumentPointerDown($event)',
+  },
   imports: [
     NgClass,
     NgSelectComponent,
@@ -262,8 +268,8 @@ export class ChatInputComponent {
   readonly autoCompleteDo = output<number>();
 
   /**
-   * Whether the stamp button and the stamps found by `:word` are offered. A host that turns them
-   * on sends what `stamp` reports.
+   * Whether the stamp button and the stamps found by a `:word`, or by a plain word saved whole, are
+   * offered. A host that turns them on sends what `stamp` reports.
    */
   readonly offersStamps = input(false);
   readonly stamp = output<ChatStampOutgoing>();
@@ -271,11 +277,19 @@ export class ChatInputComponent {
   private readonly injector = inject(Injector);
   private readonly stampButtonRef = viewChild<ElementRef<HTMLButtonElement>>('stampButton');
 
+  /**
+   * Whether the lines of the speaking character's chat palette that hold what is being written are
+   * offered with the stamps, to be taken into the box.
+   */
+  readonly suggestsPalette = input(false);
+
+  private readonly stampPickerRef = viewChild(ChatStampPickerComponent);
+
   readonly isStampPickerOpen = signal(false);
   /** Where the caret stood in the text box when it last moved. */
   private readonly caret = signal(0);
-  /** The `:word` Escape put away, not offered again until it changes. */
-  private readonly dismissedStampQuery = signal('');
+  /** The draft Escape put the suggestions away for, or the one a palette line just filled in. */
+  private readonly dismissedDraft = signal<string | null>(null);
   protected readonly suggestionListId = `chat-stamp-suggestions-${nextSuggestionListId++}`;
 
   /**
@@ -290,26 +304,62 @@ export class ChatInputComponent {
     return [...packs, builtinStampPack(this.t('feature.media.stamp.builtinPack'))];
   });
 
-  /** The `:word` the caret stands at the end of, while stamps are offered and this seat may speak. */
-  private readonly stampQuery = computed<StampQuery | null>(() => {
-    if (!this.offersStamps() || !this.canSpeak()) return null;
-    const query = stampQueryAt(this._text(), this.caret());
-    if (!query || stampQueryKey(query) === this.dismissedStampQuery()) return null;
-    return query;
-  });
+  /** Whether this draft's suggestions were put away, or this seat may not speak to be offered any. */
+  private readonly suggestionsSilenced = computed(() => !this.canSpeak() || this._text() === this.dismissedDraft());
 
-  /** The stamps offered for the `:word` being typed. */
-  readonly stampSuggestions = computed<StampSuggestion[]>(() => {
-    const query = this.stampQuery();
-    return query ? suggestStamps(this.stampPacks(), query.word) : [];
+  /**
+   * The `:word` the caret stands at the end of, or failing that the plain word, while stamps are
+   * offered and this seat may speak.
+   */
+  private readonly stampQuery = computed<StampQuery | null>(() => {
+    if (!this.offersStamps() || this.suggestionsSilenced()) return null;
+    return stampQueryAt(this._text(), this.caret()) ?? stampWordAt(this._text(), this.caret());
   });
 
   /**
-   * Which suggestion the arrow keys have picked out, or -1 for none. None is until an arrow is
-   * pressed, so Enter sends the line as written unless a stamp was deliberately chosen.
+   * The stamps offered for the word being typed: those whose words start with a `:word`, or those
+   * saved under a plain word whole.
    */
-  readonly activeSuggestion = linkedSignal<StampSuggestion[], number>({
-    source: this.stampSuggestions,
+  readonly stampSuggestions = computed<StampSuggestion[]>(() => {
+    const query = this.stampQuery();
+    return query ? suggestStamps(this.stampPacks(), query.word, query.bare === true) : [];
+  });
+
+  /** The speaking character's palette, followed through its edits, or null for anyone else. */
+  private readonly speakerPalette = computed(() => {
+    const object = this.objectStore.get(this._sendFrom());
+    if (!(object instanceof GameCharacter)) return null;
+    this.objectChange.versionOf(object.identifier)();
+    const palette = object.chatPalette;
+    if (palette) this.objectChange.versionOf(palette.identifier)();
+    return palette;
+  });
+
+  /**
+   * The speaking character's palette lines holding the draft, offered to be taken into the box.
+   * None while a `:word` is being typed, which asks for a stamp.
+   */
+  readonly paletteSuggestions = computed<string[]>(() => {
+    if (!this.suggestsPalette() || this.suggestionsSilenced()) return [];
+    if (this.stampQuery() && !this.stampQuery()!.bare) return [];
+    return suggestPaletteLines(this.speakerPalette(), this._text());
+  });
+
+  /** Everything offered for the draft, in the order it is listed: the stamps, then the palette lines. */
+  readonly suggestions = computed<ChatInputSuggestion[]>(() => [
+    ...this.stampSuggestions().map((stamp): ChatInputSuggestion => ({ kind: 'stamp', stamp })),
+    ...this.paletteSuggestions().map((line): ChatInputSuggestion => ({ kind: 'palette', line })),
+  ]);
+
+  /** Whether the `:word` or plain word the stamps were found by was typed with its colon. */
+  readonly stampQueryHasColon = computed(() => this.stampQuery()?.bare !== true);
+
+  /**
+   * Which suggestion the arrow keys have picked out, or -1 for none. None is until an arrow is
+   * pressed, so Enter sends the line as written unless a suggestion was deliberately chosen.
+   */
+  readonly activeSuggestion = linkedSignal<ChatInputSuggestion[], number>({
+    source: this.suggestions,
     computation: () => -1,
   });
 
@@ -345,6 +395,34 @@ export class ChatInputComponent {
   }
 
   /**
+   * Closes the stamp picker when a press lands anywhere but on it or on its own button, which
+   * toggles it by itself. Focus is left where the press put it.
+   */
+  onDocumentPointerDown(event: Event): void {
+    if (!this.isStampPickerOpen()) return;
+    const target = event.target;
+    if (this.stampPickerRef()?.contains(target)) return;
+    if (target instanceof Node && this.stampButtonRef()?.nativeElement.contains(target)) return;
+    this.isStampPickerOpen.set(false);
+  }
+
+  /**
+   * Puts one of the chat's ways of writing into the line, around any words picked out, and picks
+   * out the placeholder to write over next. Nothing is sent.
+   */
+  insertSyntax(snippet: ChatSyntaxSnippet): void {
+    const textArea = this.textAreaElementRef()?.nativeElement;
+    const text = this.text;
+    const start = textArea?.selectionStart ?? text.length;
+    const end = textArea?.selectionEnd ?? start;
+    const edit = applyChatSyntax(text, start, end, snippet);
+    this.text = edit.text;
+    this.isStampPickerOpen.set(false);
+    this.focusTextArea(edit.selectionEnd, edit.selectionStart);
+    this.kickCalcFitHeight();
+  }
+
+  /**
    * Puts an emoji into the line where the caret is, over any words picked out, and leaves the caret
    * after it. Nothing is sent.
    */
@@ -366,7 +444,24 @@ export class ChatInputComponent {
     this.focusTextArea();
   }
 
-  /** Sends the stamp chosen from the suggestions and takes the `:word` that found it out of the line. */
+  /**
+   * Acts on a suggestion chosen from the list: a stamp is sent, and the word that found it taken out
+   * of the line; a palette line takes the box's place, to be sent, or changed first, as the writer
+   * likes.
+   */
+  pickSuggestion(suggestion: ChatInputSuggestion): void {
+    if (suggestion.kind === 'stamp') {
+      this.sendSuggestion(suggestion.stamp);
+      return;
+    }
+    this.text = paletteLineText(suggestion.line);
+    this.dismissedDraft.set(this.text);
+    this.previousWritingLength = this.text.length;
+    this.focusTextArea(this.text.length);
+    this.kickCalcFitHeight();
+  }
+
+  /** Sends the stamp chosen from the suggestions and takes the word that found it out of the line. */
   sendSuggestion(suggestion: StampSuggestion): void {
     const query = this.stampQuery();
     if (!query || !this.emitStamp(suggestion.item, suggestion.packName)) return;
@@ -378,13 +473,12 @@ export class ChatInputComponent {
   }
 
   /**
-   * Escape puts the suggestions away for the `:word` they were offered for, or closes the picker.
-   * With neither open it is left to whatever else listens for it.
+   * Escape puts the suggestions away until the draft changes, or closes the picker. With neither
+   * open it is left to whatever else listens for it.
    */
   onEscape(event: Event): void {
-    const query = this.stampQuery();
-    if (query && this.stampSuggestions().length > 0) {
-      this.dismissedStampQuery.set(stampQueryKey(query));
+    if (this.suggestions().length > 0) {
+      this.dismissedDraft.set(this._text());
     } else if (this.isStampPickerOpen()) {
       this.isStampPickerOpen.set(false);
     } else {
@@ -426,8 +520,11 @@ export class ChatInputComponent {
     return true;
   }
 
-  /** Focuses the text box once drawn, with the caret where given. */
-  private focusTextArea(caret?: number): void {
+  /**
+   * Focuses the text box once drawn, with the caret where given, and the words from `from` up to
+   * it picked out when that is given too.
+   */
+  private focusTextArea(caret?: number, from = caret): void {
     if (caret !== undefined) this.caret.set(caret);
     afterNextRender(
       {
@@ -437,7 +534,7 @@ export class ChatInputComponent {
           // The box may not have been handed its new words yet, and the caret has to fall in them.
           if (textArea.value !== this.text) textArea.value = this.text;
           textArea.focus();
-          if (caret !== undefined) textArea.setSelectionRange(caret, caret);
+          if (caret !== undefined) textArea.setSelectionRange(from ?? caret, caret);
         },
       },
       { injector: this.injector }
@@ -740,14 +837,16 @@ export class ChatInputComponent {
    * Asks the parent to move the auto-complete highlight, on the arrow keys.
    *
    * The caret keeps moving as usual unless there is more than one suggestion to step through.
-   * While stamps are offered for a `:word`, the arrows step through those instead.
+   * While stamps or palette lines are offered here, the arrows step through those instead. Keys
+   * pressed while an IME is composing are left to the IME.
    */
   selectAutoComplete(event: Event, direction: number) {
-    const stampCount = this.stampSuggestions().length;
-    if (stampCount > 0) {
+    if (event && (event as KeyboardEvent).isComposing) return;
+    const count = this.suggestions().length;
+    if (count > 0) {
       if (event) event.preventDefault();
       this.activeSuggestion.update((index) =>
-        index < 0 ? (direction > 0 ? 0 : stampCount - 1) : (index + direction + stampCount) % stampCount
+        index < 0 ? (direction > 0 ? 0 : count - 1) : (index + direction + count) % count
       );
       return;
     }
@@ -761,8 +860,9 @@ export class ChatInputComponent {
    * Sends the draft, from the Enter key or the send button.
    *
    * It does nothing for a seat that may not speak, for an empty draft, or while an IME is
-   * composing. Enter on a stamp picked out with the arrows sends that stamp in place of the line.
-   * While a suggestion is highlighted it asks the parent to apply that instead. The
+   * composing. Enter on a stamp picked out with the arrows sends that stamp in place of the line,
+   * and on a palette line takes it into the box. While a row of the parent's completion is
+   * highlighted it asks the parent to apply that instead. The
    * message is emitted under the game system the dice bot hands over for the line, which does not
    * wait for the system's code when the line cannot be a secret roll; the draft, reply and quote are
    * cleared at once.
@@ -775,9 +875,9 @@ export class ChatInputComponent {
     if (event && (event as KeyboardEvent).key !== 'Enter') return;
     if (event && (event as KeyboardEvent).isComposing) return;
 
-    const picked = event ? this.stampSuggestions()[this.activeSuggestion()] : undefined;
+    const picked = event ? this.suggestions()[this.activeSuggestion()] : undefined;
     if (picked) {
-      this.sendSuggestion(picked);
+      this.pickSuggestion(picked);
       return;
     }
 
