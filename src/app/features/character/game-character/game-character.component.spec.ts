@@ -1615,12 +1615,23 @@ describe('GameCharacterComponent', () => {
       expect(bubbleOf()).toBeNull();
     });
 
-    it('rides above the target marker rather than over it', () => {
+    it('stays close to the piece rather than climbing above the target marker', () => {
       const before = at(component.speechOrbitFacing());
       character.targeted = true;
       TestBed.inject(UiSignalService).notifyTargetChange(character.identifier, character.aliasName);
       fixture.detectChanges();
-      expect(at(component.speechOrbitFacing())).not.toBe(before);
+      expect(at(component.speechOrbitFacing())).toBe(before);
+    });
+
+    it('sits below the target marker, over the gauges and buffs, while it is shown', () => {
+      const lift = (facing: BillboardFacing) => {
+        const match = /translateY\((-?[\d.]+)px\)/.exec(at(facing));
+        return match ? Number(match[1]) : NaN;
+      };
+      character.targeted = true;
+      TestBed.inject(UiSignalService).notifyTargetChange(character.identifier, character.aliasName);
+      fixture.detectChanges();
+      expect(lift(component.speechOrbitFacing())).toBeGreaterThan(lift(component.targetOrbitFacing()));
     });
   });
 

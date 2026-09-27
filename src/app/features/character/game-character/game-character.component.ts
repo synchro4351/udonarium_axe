@@ -153,8 +153,9 @@ const HEAL_AURA_MS = 760;
 const GAUGE_STACK_GAP_PX = 32;
 const BUFF_STACK_GAP_PX = 40;
 const TARGET_STACK_GAP_PX = 52;
-const TARGET_MARKER_PX = 32;
-const SPEECH_STACK_GAP_PX = 56;
+const SPEECH_LIFT_PX = 36;
+const SPEECH_LIFT_2D_PX = 66;
+const SPEECH_POSTER_LIFT_PX = 16;
 const BUFF_DETAIL_ROW_HEIGHT_PX = 12;
 const BUFF_BADGE_ROW_HEIGHT_PX = 22;
 const BUFF_BADGES_PER_ROW = 5;
@@ -979,12 +980,11 @@ export class GameCharacterComponent {
     return (rotation) => stand + orbit(rotation);
   });
 
-  // Above the target marker when there is one, so the two are never drawn over each other.
+  // Just above the name, close enough to read as the piece speaking. It sits over the gauges,
+  // buffs and target marker for the moment it is shown rather than climbing above them.
   private speechOrbit(): BillboardFacing {
-    const stack =
-      this.gaugePanelHeightEstimate() + this.buffPanelHeightEstimate() + (this.isTargeted() ? TARGET_MARKER_PX : 0);
-    if (this.isPoster()) return facesAlways(`translateY(${-(this.size() * this.gridSize + 24 + stack)}px)`);
-    return this.screenLiftFacing(SPEECH_STACK_GAP_PX + stack, 88 + stack);
+    if (this.isPoster()) return facesAlways(`translateY(${-(this.size() * this.gridSize + SPEECH_POSTER_LIFT_PX)}px)`);
+    return this.screenLiftFacing(SPEECH_LIFT_PX, SPEECH_LIFT_2D_PX);
   }
 
   readonly speechStackFacing = computed<BillboardFacing>(() =>
