@@ -133,6 +133,16 @@ describe('ChatSpeechService', () => {
     expect(synth.speak).toHaveBeenCalledTimes(2);
     expect(service.enabled()).toBe(true);
   });
+  it('reads a stamp by its name, its first search word', () => {
+    service.start();
+    service.setTabEnabled('Main', true);
+    service.readAutomatically(
+      message('', { stampName: 'ドンマイ', attachmentImageIdentifiers: '["assets/images/stamps/donmai.png"]' })
+    );
+
+    expect(synth.speak).toHaveBeenCalledTimes(1);
+    expect(lastUtterance().text).toBe('ドンマイ');
+  });
   it('allows manual replay while disabled without enabling automatic reading', () => {
     service.speak(message());
     expect(synth.speak).toHaveBeenCalledTimes(1);

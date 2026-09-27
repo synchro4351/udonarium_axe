@@ -48,6 +48,18 @@ export function speechText(text: string): string {
     .trim();
 }
 
+/**
+ * What is read aloud for a message: its words, or for a stamp sent without any, the stamp's name,
+ * which is its first search word.
+ */
+export function messageSpeechText(message: {
+  readonly text: string | null | undefined;
+  readonly stampName?: string | null;
+}): string {
+  const text = speechText(message.text ?? '');
+  return text.length > 0 ? text : speechText(message.stampName ?? '');
+}
+
 /** Keep the complete message and never split a Unicode code point. */
 export function speechChunks(text: string): string[] {
   const characters = Array.from(text);

@@ -1,4 +1,9 @@
-import { readSpeechSettings, speechChunks, speechText } from '@axe/application/chat/chat-speech-settings';
+import {
+  messageSpeechText,
+  readSpeechSettings,
+  speechChunks,
+  speechText,
+} from '@axe/application/chat/chat-speech-settings';
 
 describe('chat speech settings', () => {
   it('uses safe defaults and clamps numeric preferences', () => {
@@ -31,6 +36,13 @@ describe('chat speech settings', () => {
 
   it('removes markup, links and ruby syntax from spoken text', () => {
     expect(speechText('｜名前《なまえ》 <b>hello</b> https://example.test/x')).toBe('なまえ hello');
+  });
+
+  it('reads a stamp sent without words by its name, its first search word', () => {
+    expect(messageSpeechText({ text: '', stampName: 'ドンマイ' })).toBe('ドンマイ');
+    expect(messageSpeechText({ text: '  ', stampName: 'ドンマイ' })).toBe('ドンマイ');
+    expect(messageSpeechText({ text: 'hello', stampName: 'ドンマイ' })).toBe('hello');
+    expect(messageSpeechText({ text: '' })).toBe('');
   });
 
   it('chunks long text without dropping Unicode characters', () => {

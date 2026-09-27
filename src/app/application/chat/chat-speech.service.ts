@@ -1,10 +1,10 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import {
+  messageSpeechText,
   readSpeechSettings,
   SPEECH_STORAGE_KEY,
   speechChunks,
   SpeechSettings,
-  speechText,
 } from '@axe/application/chat/chat-speech-settings';
 import { AudioPlayer } from '@axe/core/storage/audio-player';
 import { ObjectStore } from '@axe/core/sync/object-store';
@@ -124,7 +124,7 @@ export class ChatSpeechService {
       message.isDisplayable &&
       !message.isSecret &&
       canRoleViewTab(tab, PeerCursor.myRole) &&
-      speechText(message.text ?? '').length > 0
+      messageSpeechText(message).length > 0
     );
   }
 
@@ -201,7 +201,7 @@ export class ChatSpeechService {
     this.current = item;
     clearTimeout(this.releaseTimer);
     const generation = this.generation;
-    const chunks = speechChunks(speechText(message.text));
+    const chunks = speechChunks(messageSpeechText(message));
     let index = 0;
     const next = () => {
       if (generation !== this.generation) return;
