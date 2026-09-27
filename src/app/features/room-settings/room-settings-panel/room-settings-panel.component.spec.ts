@@ -658,6 +658,40 @@ describe('RoomSettingsPanelComponent', () => {
     });
   });
 
+  describe('speech bubbles over pieces', () => {
+    function toggle(): HTMLInputElement {
+      return (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>(
+        '[data-testid="shows-overhead-speech"]'
+      )!;
+    }
+
+    afterEach(() => (Config.instance.showsOverheadSpeech = false));
+
+    it('starts off and lets the master turn it on for the room', async () => {
+      Config.instance.showsOverheadSpeech = false;
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(toggle().checked).toBe(false);
+      toggle().click();
+      fixture.detectChanges();
+
+      expect(Config.instance.showsOverheadSpeech).toBe(true);
+      expect(component.showsOverheadSpeech).toBe(true);
+    });
+
+    it('leaves it to the master', async () => {
+      PeerCursor.myCursor.role = PeerRole.Player;
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      component.showsOverheadSpeech = true;
+
+      expect(toggle().disabled).toBe(true);
+      expect(Config.instance.showsOverheadSpeech).toBe(false);
+    });
+  });
+
   it('does not throw when it is drawn', () => {
     expect(() => fixture.detectChanges()).not.toThrow();
   });

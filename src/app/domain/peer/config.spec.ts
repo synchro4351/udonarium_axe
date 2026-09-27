@@ -293,6 +293,17 @@ describe('Config', () => {
     Config.instance.allowPlayerCardEdit = false;
   });
 
+  it('keeps overhead speech off in old rooms and reads it back once the GM turns it on', () => {
+    Config.instance.removeAttribute('_overheadSpeech');
+    expect(Config.instance.showsOverheadSpeech).toBe(false);
+
+    Config.instance.showsOverheadSpeech = true;
+    Config.instance.setAttribute('_overheadSpeech', `${Config.instance.getAttribute('_overheadSpeech')}`);
+    expect(Config.instance.showsOverheadSpeech).toBe(true);
+    Config.instance.showsOverheadSpeech = false;
+    expect(Config.instance.getAttribute('_overheadSpeech')).toBe('');
+  });
+
   describe('system avatar', () => {
     it('starts with no picture of its own', () => {
       expect(Config.instance.systemAvatarIdentifier).toBe('');

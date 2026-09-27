@@ -196,6 +196,37 @@
             {{ 'feature.roomSettings.allowPlayerCardEdit' | transloco }}
           </label>
         </div>
+
+        <div
+          class="border-ui-border-panel bg-ui-surface rounded-ui flex flex-col gap-2.5 border border-solid p-3"
+          data-testid="room-settings-overhead-speech"
+        >
+          <div class="min-w-0">
+            <span class="text-ui-muted text-[11px] font-semibold tracking-[0.06em] uppercase">{{
+              'feature.roomSettings.sectionOverheadSpeech' | transloco
+            }}</span>
+            <p class="text-ui-dim m-0 text-[11px]">{{ 'feature.roomSettings.sharedHint' | transloco }}</p>
+          </div>
+          <label
+            class="text-ui-text flex items-center gap-1.5 text-[13px] select-none"
+            [class.cursor-pointer]="!isSharedReadOnly()"
+            [class.opacity-50]="isSharedReadOnly()"
+          >
+            <input
+              type="checkbox"
+              class="size-3.5 [accent-color:var(--ui-accent)] disabled:cursor-not-allowed"
+              [class.cursor-pointer]="!isSharedReadOnly()"
+              [(ngModel)]="showsOverheadSpeech"
+              name="showsOverheadSpeech"
+              data-testid="shows-overhead-speech"
+              [disabled]="isSharedReadOnly()"
+            />
+            {{ 'feature.roomSettings.showsOverheadSpeech' | transloco }}
+          </label>
+          <p class="text-ui-muted m-0 text-[11px] leading-relaxed">
+            {{ 'feature.roomSettings.overheadSpeechHint' | transloco }}
+          </p>
+        </div>
       </div>
     }
 

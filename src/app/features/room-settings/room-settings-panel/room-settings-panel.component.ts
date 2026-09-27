@@ -705,6 +705,19 @@ export class RoomSettingsPanelComponent {
   }
 
   /**
+   * Whether what a piece says in chat pops up over it on the table, read from the room's config.
+   *
+   * Only a user allowed to change the shared settings can set it.
+   */
+  get showsOverheadSpeech(): boolean {
+    this.objectChange.versionOf('Config')();
+    return this.config.showsOverheadSpeech;
+  }
+  set showsOverheadSpeech(shown: boolean) {
+    if (!this.isSharedReadOnly()) this.config.showsOverheadSpeech = shown;
+  }
+
+  /**
    * Loads a dice bot as soon as it is picked, by fetching its help text in the background; the text
    * itself is not used here.
    */

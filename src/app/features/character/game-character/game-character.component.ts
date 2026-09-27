@@ -13,6 +13,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
+import { OverheadSpeechService } from '@axe/application/chat/overhead-speech.service';
 import { CharacterDiceService } from '@axe/application/dice/character-dice.service';
 import { EffectAutoPlayService } from '@axe/application/effect/effect-auto-play.service';
 import { EffectCastService } from '@axe/application/effect/effect-cast.service';
@@ -47,6 +48,7 @@ import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { callResourceChange, resourceChange$ } from '@axe/core/event/domain-events';
 import { getPeerContext } from '@axe/core/network/peer-context-source';
 import { imageFileEqual } from '@axe/core/storage/image-file';
+import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { BuffBadge, toBuffBadges } from '@axe/domain/character/buff-badge';
 import { BUFF_VIEW_LABEL_KEYS, type BuffViewMode, nextBuffViewMode } from '@axe/domain/character/buff-view-mode';
@@ -151,6 +153,8 @@ const HEAL_AURA_MS = 760;
 const GAUGE_STACK_GAP_PX = 32;
 const BUFF_STACK_GAP_PX = 40;
 const TARGET_STACK_GAP_PX = 52;
+const TARGET_MARKER_PX = 32;
+const SPEECH_STACK_GAP_PX = 56;
 const BUFF_DETAIL_ROW_HEIGHT_PX = 12;
 const BUFF_BADGE_ROW_HEIGHT_PX = 22;
 const BUFF_BADGES_PER_ROW = 5;
@@ -221,6 +225,8 @@ export class GameCharacterComponent {
   private readonly rolePermission = inject(RolePermissionService);
   private readonly disclosureService = inject(DisclosureService);
   private readonly visionService = inject(VisionService);
+  private readonly overheadSpeechService = inject(OverheadSpeechService);
+  private readonly imageStorage = inject(ImageStorage);
 
   readonly isTargeted = computed(() => {
     this.uiSignalService.targetChange();
@@ -950,6 +956,38 @@ export class GameCharacterComponent {
   }
 
   readonly targetStackFacing = computed<BillboardFacing>(() =>
+    this.labelStackFacing(this.isPoster() ? NOT_TURNED : this.billboardFacing(0))
+  );
+
+  /** What the piece has just said in chat, over its head for a moment; null while it says nothing. */
+  readonly overheadSpeech = computed(() => {
+    const char = this.gameCharacter();
+    return char ? this.overheadSpeechService.bubbleOf(char.identifier) : null;
+  });
+
+  /** The picture a stamp said over the piece shows, once it has arrived. */
+  readonly overheadStampImage = computed(() => {
+    const speech = this.overheadSpeech()?.speech;
+    if (speech?.kind !== 'stamp') return null;
+    this.objectChange.fileVersion();
+    return this.imageStorage.get(speech.imageIdentifier);
+  });
+
+  readonly speechOrbitFacing = computed<BillboardFacing>(() => {
+    const stand = `translateX(${(this.size() * this.gridSize) / 2}px) `;
+    const orbit = this.speechOrbit();
+    return (rotation) => stand + orbit(rotation);
+  });
+
+  // Above the target marker when there is one, so the two are never drawn over each other.
+  private speechOrbit(): BillboardFacing {
+    const stack =
+      this.gaugePanelHeightEstimate() + this.buffPanelHeightEstimate() + (this.isTargeted() ? TARGET_MARKER_PX : 0);
+    if (this.isPoster()) return facesAlways(`translateY(${-(this.size() * this.gridSize + 24 + stack)}px)`);
+    return this.screenLiftFacing(SPEECH_STACK_GAP_PX + stack, 88 + stack);
+  }
+
+  readonly speechStackFacing = computed<BillboardFacing>(() =>
     this.labelStackFacing(this.isPoster() ? NOT_TURNED : this.billboardFacing(0))
   );
 

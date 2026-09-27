@@ -40,6 +40,8 @@ export class Config extends ObjectNode implements InnerXml {
   @SyncVar('_handGiveForbidden') private _handGiveForbidden: string = '';
   @SyncVar('_handVisibilityMode') private _handVisibilityMode: string = '';
   @SyncVar('_allowPlayerCardEdit') private _allowPlayerCardEdit: string = '';
+  // Blank is off, so a room saved before this existed does not start putting words over heads.
+  @SyncVar('_overheadSpeech') private _overheadSpeech: string = '';
 
   // How the round is taken, which is the room's own decision rather than a table's.
   @SyncVar('_turnOrderMode') private _turnOrderMode: string = '';
@@ -125,6 +127,17 @@ export class Config extends ObjectNode implements InnerXml {
   }
   set allowPlayerCardEdit(allowed: boolean) {
     this._allowPlayerCardEdit = allowed ? '1' : '';
+  }
+
+  /**
+   * Whether what a piece says in chat pops up over it on the table for a moment; off until the GM
+   * turns it on.
+   */
+  get showsOverheadSpeech(): boolean {
+    return this._overheadSpeech === '1';
+  }
+  set showsOverheadSpeech(shown: boolean) {
+    this._overheadSpeech = shown ? '1' : '';
   }
 
   /** The room's master volume, shared by every peer; a change applied to the config updates the jukebox at once. */

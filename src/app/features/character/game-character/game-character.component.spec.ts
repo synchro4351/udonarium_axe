@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { OverheadSpeechService } from '@axe/application/chat/overhead-speech.service';
 import { EffectPlaybackService } from '@axe/application/effect/effect-playback.service';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
@@ -18,6 +19,9 @@ import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { PERF_HEX_PEDESTAL_OUTLINE, perfCounters } from '@axe/core/util/perf-counters';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { ChatMessageContext } from '@axe/domain/chat/chat-message';
+import { ChatTab } from '@axe/domain/chat/chat-tab';
+import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { DataElement, DataElementAttribute, DataElementType } from '@axe/domain/data/data-element';
 import { DisclosureMode } from '@axe/domain/disclosure/disclosure';
 import { EffectPreset } from '@axe/domain/effect/effect-preset';
@@ -1547,6 +1551,77 @@ describe('GameCharacterComponent', () => {
 
   it('computes whether it is targeted', () => {
     expect(typeof component.isTargeted).toBe('function');
+  });
+
+  describe('what the piece says over its head', () => {
+    let tab: ChatTab;
+    let character: GameCharacter;
+    const bubbleOf = (): HTMLElement | null => fixture.nativeElement.querySelector('[data-testid="overhead-speech"]');
+    const say = (context: ChatMessageContext) => {
+      const line = tab.addMessage({
+        timestamp: Date.now(),
+        from: 'someone',
+        sendFrom: character.identifier,
+        ...context,
+      });
+      TestBed.inject(OverheadSpeechService).show(line);
+      fixture.detectChanges();
+    };
+
+    beforeEach(() => {
+      Config.instance.showsOverheadSpeech = true;
+      ChatTabList.instance.initialize();
+      tab = new ChatTab();
+      tab.initialize();
+      ChatTabList.instance.appendChild(tab);
+      character = GameCharacter.create('speaker', 1, '');
+      fixture.componentRef.setInput('gameCharacter', character);
+      fixture.detectChanges();
+    });
+
+    afterEach(() => {
+      TestBed.inject(OverheadSpeechService).clear();
+      Config.instance.showsOverheadSpeech = false;
+      character.destroy();
+      tab.destroy();
+    });
+
+    it('shows the quoted words without covering anything a touch could reach', () => {
+      expect(bubbleOf()).toBeNull();
+      say({ text: '剣を抜く。「来い！」' });
+      const bubble = bubbleOf()!;
+      expect(bubble.textContent).toContain('来い！');
+      expect(bubble.textContent).not.toContain('剣を抜く');
+      expect(bubble.closest('.pointer-events-none')).not.toBeNull();
+    });
+
+    it('shows an emoji-only line and a stamp picture', () => {
+      say({ text: '🎉' });
+      expect(bubbleOf()!.dataset['kind']).toBe('emoji');
+      expect(bubbleOf()!.textContent).toContain('🎉');
+
+      const image = TestBed.inject(ImageStorage).add('overhead-stamp-image');
+      say({ text: '', stampName: 'いいね', attachmentImageIdentifiers: JSON.stringify([image.identifier]) });
+      const stamp = fixture.nativeElement.querySelector('[data-testid="overhead-speech-stamp"]') as HTMLImageElement;
+      expect(stamp).not.toBeNull();
+      expect(stamp.alt).toBe('いいね');
+    });
+
+    it('leaves the piece bare once the bubble is taken down', () => {
+      say({ text: '「hi」' });
+      expect(bubbleOf()).not.toBeNull();
+      TestBed.inject(OverheadSpeechService).clear();
+      fixture.detectChanges();
+      expect(bubbleOf()).toBeNull();
+    });
+
+    it('rides above the target marker rather than over it', () => {
+      const before = at(component.speechOrbitFacing());
+      character.targeted = true;
+      TestBed.inject(UiSignalService).notifyTargetChange(character.identifier, character.aliasName);
+      fixture.detectChanges();
+      expect(at(component.speechOrbitFacing())).not.toBe(before);
+    });
   });
 
   describe('the target marker', () => {

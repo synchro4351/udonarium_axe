@@ -513,6 +513,53 @@
                     </div>
                   </div>
                 }
+                @if (overheadSpeech(); as bubble) {
+                  <div
+                    class="pointer-events-none absolute bottom-0 left-0 [-webkit-transform-style:preserve-3d] transform-3d"
+                    [appBillboard]="speechOrbitFacing()"
+                  >
+                    <div
+                      class="absolute bottom-0 left-0 origin-bottom-left [-webkit-transform-style:preserve-3d] transform-3d"
+                      [style.font-size.px]="decorFontSizePx"
+                      [appBillboard]="speechStackFacing()"
+                    >
+                      @for (shown of [bubble]; track shown.key) {
+                        <div
+                          data-testid="overhead-speech"
+                          class="animate-vn-pop relative w-max max-w-[18em] rounded-[0.9em] border border-solid border-black/25 bg-white/95 px-[0.7em] py-[0.35em] text-[#222] shadow-[0_0.15em_0.4em_rgba(0,0,0,0.55)]"
+                          [attr.data-kind]="shown.speech.kind"
+                        >
+                          @switch (shown.speech.kind) {
+                            @case ('stamp') {
+                              @if (overheadStampImage(); as image) {
+                                <img
+                                  data-testid="overhead-speech-stamp"
+                                  class="block max-h-[7em] max-w-[9em] object-contain"
+                                  [src]="image.url | safe: 'resourceUrl'"
+                                  [alt]="shown.speech.name"
+                                />
+                              } @else {
+                                <span class="text-[1.3em] leading-snug text-[#666]">[{{ shown.speech.name }}]</span>
+                              }
+                            }
+                            @case ('emoji') {
+                              <span class="block text-[2.6em] leading-none">{{ shown.speech.text }}</span>
+                            }
+                            @case ('text') {
+                              <span
+                                class="line-clamp-4 text-[1.3em] leading-snug wrap-break-word whitespace-pre-line"
+                                >{{ shown.speech.text }}</span
+                              >
+                            }
+                          }
+                          <span
+                            class="absolute top-full left-1/2 ml-[-0.45em] size-0 border-x-[0.45em] border-t-[0.55em] border-solid border-x-transparent border-t-white/95"
+                          ></span>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
               </div>
             </div>
           </div>
