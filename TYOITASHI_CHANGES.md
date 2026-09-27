@@ -2,7 +2,7 @@
 
 [紹介ページ](README.md) · [版ごとの履歴](TYOITASHI_VERSIONS.md)
 
-比較対象は公式Axe v1.57.1（85c89f98）です。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1〜r3の固定ソースと併せて確認してください。
+比較対象は公式Axe v1.57.1（85c89f98）です。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1〜r4の固定ソースと併せて確認してください。
 
 ## 機能別の入口
 
@@ -68,7 +68,7 @@
 | --- | --- | --- |
 | 不在参加者の手札をGMが引き継がせる | [bf66c752](https://github.com/synchro4351/udonarium_axe/commit/bf66c752) | r2固定ソース`6e5668dd`起点。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/orphan-hand-recovery)。既存の手札位置とCard.toHandを使用。カードは伏せて移り、保存・同期形式を追加しない。最新の保存・再読込では複製なし。既存卓へのZIP重ね読み込みは再確認待ち |
 | 自分の手札カードのホバー詳細 | [be02ffce](https://github.com/synchro4351/udonarium_axe/commit/be02ffce) | bf66c752起点。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hand-hover-preview)。場のカードと共通のツールチップを自分の手札へ適用。タッチ・ドラッグ中は抑止。他人の秘匿手札には適用しない。保存・同期形式の変更なし |
-## 開発版の追加変更（固定版r3には未収録）
+## r4の追加変更
 
 発言別リアクション：[8cee77d4](https://github.com/synchro4351/udonarium_axe/commit/8cee77d4)（参加者別の保存・同期）、[45d1561b](https://github.com/synchro4351/udonarium_axe/commit/45d1561b)（HTMLログ）、[c5d53252](https://github.com/synchro4351/udonarium_axe/commit/c5d53252)（選択画面）。r3固定ソース`cf5edecf`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-reactions)。発言ごと・参加者ごとに別の同期オブジェクトを使い、複数人の同時操作で票を上書きしない。従来の保存ZIPは反応なしとして読込。利用者がローカルで基本動作を確認済み。実2端末と弱回線での確認は未実施です。
 
@@ -76,17 +76,21 @@
 
 画像スタンプ：[04978b94](https://github.com/synchro4351/udonarium_axe/commit/04978b94)（部屋保存）、[100e611e](https://github.com/synchro4351/udonarium_axe/commit/100e611e)（セットZIP入出力）、[fe4b5dba](https://github.com/synchro4351/udonarium_axe/commit/fe4b5dba)（メディア管理）、[acd82b59](https://github.com/synchro4351/udonarium_axe/commit/acd82b59)（送信とログ）、[9a54146d](https://github.com/synchro4351/udonarium_axe/commit/9a54146d)（選択画面と候補入力）。`.txt`ログ入り本流`21cb573e`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-stamps)。静止画像セットは部屋ZIPと参加者へ同期し、スタンプ発言は添付画像として旧版でも表示できます。画像データは部屋内へ共有されるため、秘密発言でも画像バイト自体は秘匿されません。検索語の保存・別端末への反映・保存ZIP再読込はユーザーが確認済み。弱回線試験は未実施です。
 
-スタンプの使い勝手と絵文字表示：[66250c25](https://github.com/synchro4351/udonarium_axe/commit/66250c25)（独自の標準10個セット）、[33d91f3b](https://github.com/synchro4351/udonarium_axe/commit/33d91f3b)（画像一覧との共有・検索語の保存修正）、[34d6e3aa](https://github.com/synchro4351/udonarium_axe/commit/34d6e3aa)（スタンプ縮小・絵文字だけの発言を拡大）。`9a54146d`を基点に同じ機能ブランチで追加。標準素材は透過PNGとして同梱し、部屋ZIPへ重複保存しません。画面での修正後確認と弱回線試験は未実施です。
+スタンプの使い勝手と絵文字表示：[66250c25](https://github.com/synchro4351/udonarium_axe/commit/66250c25)（独自の標準10個セット）、[33d91f3b](https://github.com/synchro4351/udonarium_axe/commit/33d91f3b)（画像一覧との共有・検索語の保存修正）、[34d6e3aa](https://github.com/synchro4351/udonarium_axe/commit/34d6e3aa)（スタンプ縮小・絵文字だけの発言を拡大）。`9a54146d`を基点に同じ機能ブランチで追加。標準素材は透過PNGとして同梱し、部屋ZIPへ重複保存しません。画面での修正後確認は利用者が完了。弱回線試験は未実施です。
 
 標準セットの初期表示：[359c8941](https://github.com/synchro4351/udonarium_axe/commit/359c8941)。空の部屋ではスタンプ管理画面を開いた時に標準セットを表示。ChromiumのE2Eで標準セット、送信画像の大きさ、絵文字だけの拡大、追加直後の一覧、検索語保持を確認。ユーザーも保存ZIP再読込と別端末での検索語保持を確認済み。弱回線は未確認です。
 
-スタンプ操作・読み上げ・ログ：[4c754de0](https://github.com/synchro4351/udonarium_axe/commit/4c754de0)（検索語先頭の読み上げ）、[9171d281](https://github.com/synchro4351/udonarium_axe/commit/9171d281)（「プリセット」への改名、検索語・チャットパレット候補、特殊記法、外側クリック、ログ表示）。`689a64c1`起点。`.txt`をログの種類から選び、HTMLログのスタンプ画像だけを縮小します。候補は明示選択するまで普通の文字入力を置き換えません。Chromiumのスタンプ操作1件、全943ファイル／13,036件成功・1件skip、production build成功。今回の画面変更はユーザー確認待ちです。
+スタンプ操作・読み上げ・ログ：[4c754de0](https://github.com/synchro4351/udonarium_axe/commit/4c754de0)（検索語先頭の読み上げ）、[9171d281](https://github.com/synchro4351/udonarium_axe/commit/9171d281)（「プリセット」への改名、検索語・チャットパレット候補、特殊記法、外側クリック、ログ表示）。`689a64c1`起点。`.txt`をログの種類から選び、HTMLログのスタンプ画像だけを縮小します。候補は明示選択するまで普通の文字入力を置き換えません。Chromiumのスタンプ操作1件、全943ファイル／13,036件成功・1件skip、production build成功。利用者が画面確認済みです。
 
-キャラクター頭上の吹き出し：[82a18071](https://github.com/synchro4351/udonarium_axe/commit/82a18071)。同じ[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-stamps)で続けて実装。GMが部屋設定で有効にすると、引用された普通の発言、単独のスタンプ、絵文字だけの発言をキャラクター駒の上へ一時表示。設定は部屋ZIPと参加者へ同期し、吹き出し自体は保存しません。個別宛・秘密・閲覧不可タブ・システム発言は除外。全946ファイル／13,073件成功・1件skip、production build成功。実画面と弱回線は未確認です。
+キャラクター頭上の吹き出し：[82a18071](https://github.com/synchro4351/udonarium_axe/commit/82a18071)、[位置調整 d994fb16](https://github.com/synchro4351/udonarium_axe/commit/d994fb16)、[前面表示 a2999013](https://github.com/synchro4351/udonarium_axe/commit/a2999013)。同じ[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-stamps)で続けて実装。GMが部屋設定で有効にすると、引用された普通の発言、単独のスタンプ、絵文字だけの発言をキャラクター駒の上へ一時表示。設定は部屋ZIPと参加者へ同期し、吹き出し自体は保存しません。個別宛・秘密・閲覧不可タブ・システム発言は除外。利用者がローカル版でHPバー・バフの手前への表示と駒のドラッグを確認済み。弱回線は未確認です。
+
+チャットタブ設定の文字ログ：[92d6f95b](https://github.com/synchro4351/udonarium_axe/commit/92d6f95b)。現在タブと全タブの保存形式に`.txt`を追加。利用者がローカル版で確認済みです。
+
+ブラウザの名称：[38990bf4](https://github.com/synchro4351/udonarium_axe/commit/38990bf4)。タブ・PWAなどに`Udonarium Axe tyoitashi`を表示。保存・同期形式の変更はありません。
 
 ## 検証と制限
 
-- r3の固定ソース`cf5edecf`は、全体929ファイル／12,712件成功・1件skip、production build成功。r2の固定ソース`6e5668dd`は全体927ファイル／12,680件成功・1件skip、production build成功。
+- r4の固定ソース`a2999013`は、全体947ファイル／13,084件成功・1件skip、production build成功。r3の固定ソース`cf5edecf`は全体929ファイル／12,712件成功・1件skip、production build成功。r2の固定ソース`6e5668dd`は全体927ファイル／12,680件成功・1件skip、production build成功。
 - 2026-09-26に、ユーザーが前候補のカットイン見本とカード操作の確認表9項目を合格と報告。一覧から引く操作と演出調整もユーザーが合格を報告。低い「Level UP」と手札アイコンもユーザーが確認済み。手札の通常のセーブ・ロードと同じタブでの再接続は動作したが、既存卓へのZIP再読込でカード複製が報告されている。弱回線試験は未確認。
 - フォント選択・YouTube表示・ポインター入力を組み合わせた92件は、r1で直接Vitest・Angular経由の両方に成功。自動再生追加は対象22件を両経路で確認。
 - 初回ドラッグはChromium・Firefox・WebKitで、チャットフォーカスあり／なしの計6件を確認。

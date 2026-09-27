@@ -6,15 +6,15 @@
 
 ## バージョンとソース
 
-- **固定版：tyoitashi r3／Axe v1.57.1** — [ソース `cf5edecf`](https://github.com/synchro4351/udonarium_axe/tree/cf5edecf309aa245d974737fc8b5486e6131faac)
-- **開発版** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)。r3を基点に、発言ごとの絵文字リアクション、チャットログの`.txt`保存、画像スタンプ、任意の頭上吹き出しを追加しています。新機能は検証中で、固定版には含みません。
+- **固定版：tyoitashi r4／Axe v1.57.1** — [ソース `a2999013`](https://github.com/synchro4351/udonarium_axe/tree/a2999013624afe5ce18ed1ed4b46c4c17180758f)
+- **開発版** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)。固定版以降の変更はこちらへ順に取り込みます。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
 
 ## 公式Axe v1.57.1との違い
 
-**開発版で追加した変更：**
+**r4で追加した変更：**
 
 - 各チャット発言へ絵文字リアクションを付け外しでき、参加者数を表示します。定番候補のほか、名前検索や絵文字の直接入力もできます。絵文字だけのチャット発言は大きく表示します。秘匿・個別宛発言の表示範囲に従い、HTMLログには人数だけを記録します。
 - チャットログを装飾付きHTMLのほか、文字だけの`.txt`形式でも保存できます。現在タブ／全タブを選び、画像は短い説明に置き換えます。読めない発言の引用元がHTMLログに出る問題も修正しました。

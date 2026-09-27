@@ -6,9 +6,17 @@
 
 この番号は2026-09-24から導入した、固定コミットに対する私家版の識別名です。GitHub Release・Gitタグ・アプリ内のバージョン表示とは別であり、現時点では公式由来のpackage.jsonや配布ZIP名を変更していません。どの版かを厳密に確認する場合はコミットを参照してください。
 
+## tyoitashi r4／Axe v1.57.1 — 2026-09-27
+
+- 固定ソース：[a2999013](https://github.com/synchro4351/udonarium_axe/tree/a2999013624afe5ce18ed1ed4b46c4c17180758f)
+- r3を基点に、発言ごとの絵文字リアクション、文字だけのチャットログ、画像スタンプ、任意のキャラクター頭上吹き出しを追加しました。ブラウザのタイトルに`tyoitashi`を表示します。
+- チャットタブ設定からも`.txt`を保存でき、頭上吹き出しをHPバー・バフの手前へ表示します。スタンプのセット・検索語は保存ZIPと参加者間で共有されます。リアクションと吹き出しには公開範囲の制御があります。
+- 利用者はスタンプの登録・保存・読み込み・送信、絵文字とチャット候補、吹き出し、文字ログを目視確認済みです。最終位置の吹き出しと駒のドラッグもローカル版で確認済み。全体947ファイル／13,084件成功・1件skip、production build成功。弱回線・実2端末の動作確認は後日まとめて行います。
+- [r3からの差分](https://github.com/synchro4351/udonarium_axe/compare/cf5edecf309aa245d974737fc8b5486e6131faac...a2999013624afe5ce18ed1ed4b46c4c17180758f)
+
 ## tyoitashi r3／Axe v1.57.1 — 2026-09-26
 
-次版の開発ソースは[発言ごとの絵文字リアクション](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-reactions)、[チャットログの`.txt`保存](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-text-log)、[画像スタンプ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-stamps)を追加しています。r3の固定ソースには含みません。
+発言ごとの絵文字リアクション、チャットログの`.txt`保存、画像スタンプは次のr4に収録しました。
 
 - 固定ソース：[cf5edecf](https://github.com/synchro4351/udonarium_axe/tree/cf5edecf309aa245d974737fc8b5486e6131faac)
 - r2を基点に、GMによる不在手札の引継ぎと自分の手札カードのホバー詳細を追加しました。新しい保存・同期項目はありません。
