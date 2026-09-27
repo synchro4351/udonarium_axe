@@ -159,6 +159,86 @@ describe('ChatTabSettingComponent', () => {
         systemTab.destroy();
       }
     });
+
+    it('offers plain text in the format list alongside the html styles', () => {
+      const tab = ChatTabList.instance.addChatTab('テキスト候補');
+      try {
+        component.selectedTab.set(tab);
+        fixture.detectChanges();
+
+        const select = fixture.nativeElement.querySelector('select[name="log-style"]') as HTMLSelectElement;
+        const labels = Array.from(select.options).map((option) => option.textContent?.trim());
+        expect(select.options).toHaveLength(component.logStyles.length + 1);
+        expect(labels[0]).toContain('.txt');
+      } finally {
+        tab.destroy();
+      }
+    });
+
+    it('saves the selected tab as plain text when text is picked', () => {
+      const tab = new ChatTab();
+      tab.initialize();
+      component.selectedTab.set(tab);
+      const html = vi.spyOn(saveData, 'saveChatLog').mockResolvedValue(undefined);
+      const text = vi.spyOn(saveData, 'saveChatLogText').mockImplementation(() => undefined);
+
+      component.chooseLogStyle('text');
+      component.saveLog();
+
+      expect(component.logChoice).toBe('text');
+      expect(html).not.toHaveBeenCalled();
+      expect(text).toHaveBeenCalledWith('tab', [tab], tab.name);
+    });
+
+    it('saves every tab as plain text when text is picked', () => {
+      const text = vi.spyOn(saveData, 'saveChatLogText').mockImplementation(() => undefined);
+
+      component.chooseLogStyle('text');
+      component.saveAllLog();
+
+      expect(text).toHaveBeenCalledOnce();
+      expect(text.mock.calls[0][0]).toBe('all');
+      expect(text.mock.calls[0][1]).toEqual(component.chatTabs);
+    });
+
+    it('keeps the remembered html style when text is picked, and returns to html on a style', () => {
+      component.chooseLogStyle('washi');
+      component.chooseLogStyle('text');
+      expect(component.logStyle()).toBe('washi');
+
+      component.chooseLogStyle('parchment');
+      expect(component.logFormat()).toBe('html');
+      expect(component.logChoice).toBe('parchment');
+    });
+
+    it('writes a .txt file from the plain text log', async () => {
+      const tab = new ChatTab();
+      tab.initialize();
+      tab.addMessage({ from: 'someone', name: '誰か', text: 'こんにちは', timestamp: 1000 });
+      component.selectedTab.set(tab);
+      const download = vi.spyOn(saveData, 'saveChatLogText');
+      const created: Blob[] = [];
+      const createUrl = vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+        created.push(blob as Blob);
+        return 'blob:test';
+      });
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      const names: string[] = [];
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        names.push(this.download);
+      });
+
+      component.chooseLogStyle('text');
+      component.saveLog();
+
+      expect(download).toHaveBeenCalledOnce();
+      expect(createUrl).toHaveBeenCalled();
+      expect(names[0]).toMatch(/\.txt$/);
+      expect(created[0].type).toContain('text/plain');
+      const content = await created[0].text();
+      expect(content).toContain('こんにちは');
+      expect(content).not.toContain('<html');
+    });
   });
 
   describe('lets no spectator change the tabs themselves', () => {

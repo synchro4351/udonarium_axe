@@ -12,13 +12,17 @@ import { PanelService } from '@axe/application/ui/panel.service';
 import { sheetPanelBox } from '@axe/application/ui/sheet-panel';
 import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { ChatLogScope } from '@axe/domain/chat/chat-log-rich';
 import { CHAT_LOG_STYLES, ChatLogStyle } from '@axe/domain/chat/chat-log-style';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
-import { ChatLogPreviewComponent } from '@axe/features/chat/chat-log-preview/chat-log-preview.component';
+import { ChatLogFormat, ChatLogPreviewComponent } from '@axe/features/chat/chat-log-preview/chat-log-preview.component';
 import { TranslocoModule } from '@jsverse/transloco';
+
+/** An entry in the log format list: plain text, or one of the html styles. */
+export type ChatLogChoice = ChatLogStyle | 'text';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -46,6 +50,12 @@ export class ChatTabSettingComponent {
 
   readonly logStyles = CHAT_LOG_STYLES;
   readonly logStyle = this.logStylePreference.style;
+  readonly logFormat = signal<ChatLogFormat>('html');
+
+  /** The entry picked in the format list: plain text, or the html style in use. */
+  get logChoice(): ChatLogChoice {
+    return this.logFormat() === 'text' ? 'text' : this.logStyle();
+  }
 
   /**
    * The position of the tab that system messages go to when the room has no system tab.
@@ -254,9 +264,17 @@ export class ChatTabSettingComponent {
     }, 500);
   }
 
-  /** Picks the format logs are previewed and downloaded in, remembered in this browser. */
-  chooseLogStyle(style: ChatLogStyle): void {
-    this.logStylePreference.choose(style);
+  /**
+   * Picks the format logs are previewed and downloaded in. An html style is remembered in this
+   * browser; plain text is picked for this panel only and leaves the remembered style as it is.
+   */
+  chooseLogStyle(choice: ChatLogChoice): void {
+    if (choice === 'text') {
+      this.logFormat.set('text');
+      return;
+    }
+    this.logFormat.set('html');
+    this.logStylePreference.choose(choice);
   }
 
   /** Opens a panel previewing the selected tab's log in the chosen format. */
@@ -267,6 +285,7 @@ export class ChatTabSettingComponent {
       ...sheetPanelBox(coordinate, 820, 580),
     });
     component.tab.set(this.selectedTab());
+    component.format.set(this.logFormat());
   }
 
   /**
@@ -276,17 +295,20 @@ export class ChatTabSettingComponent {
   saveLog() {
     const tab = this.selectedTab();
     if (!tab) return;
-    this.saveDataService.saveChatLog(this.effectiveLogStyle, 'tab', [tab], tab.name);
+    this.writeLog('tab', [tab], tab.name);
   }
 
   /** Downloads the logs of every tab together in the chosen format. */
   saveAllLog() {
-    this.saveDataService.saveChatLog(
-      this.effectiveLogStyle,
-      'all',
-      this.chatMessageService.chatTabs,
-      this.t('feature.chat.tabSetting.allTabsLogName')
-    );
+    this.writeLog('all', this.chatMessageService.chatTabs, this.t('feature.chat.tabSetting.allTabsLogName'));
+  }
+
+  private writeLog(scope: ChatLogScope, tabs: readonly ChatTab[], label: string): void {
+    if (this.logFormat() === 'text') {
+      this.saveDataService.saveChatLogText(scope, tabs, label);
+    } else {
+      void this.saveDataService.saveChatLog(this.effectiveLogStyle, scope, tabs, label);
+    }
   }
 
   /**
