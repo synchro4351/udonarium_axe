@@ -74,11 +74,15 @@
 
 プレーンテキストのログ：[66490d3d](https://github.com/synchro4351/udonarium_axe/commit/66490d3d)（文字列生成）、[d1d26ea5](https://github.com/synchro4351/udonarium_axe/commit/d1d26ea5)（保存画面）、[21cb573e](https://github.com/synchro4351/udonarium_axe/commit/21cb573e)（HTML引用の秘匿修正）。リアクション入り本流`c5d53252`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-text-log)。HTMLの既存出力を残して`.txt`を追加し、読めない引用・返信先を両形式から除外。保存・同期形式は変えません。
 
-画像スタンプ：[04978b94](https://github.com/synchro4351/udonarium_axe/commit/04978b94)（部屋保存）、[100e611e](https://github.com/synchro4351/udonarium_axe/commit/100e611e)（セットZIP入出力）、[fe4b5dba](https://github.com/synchro4351/udonarium_axe/commit/fe4b5dba)（メディア管理）、[acd82b59](https://github.com/synchro4351/udonarium_axe/commit/acd82b59)（送信とログ）、[9a54146d](https://github.com/synchro4351/udonarium_axe/commit/9a54146d)（選択画面と候補入力）。`.txt`ログ入り本流`21cb573e`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-stamps)。静止画像セットは部屋ZIPと参加者へ同期し、スタンプ発言は添付画像として旧版でも表示できます。画像データは部屋内へ共有されるため、秘密発言でも画像バイト自体は秘匿されません。実2端末と弱回線での確認は未実施です。
+画像スタンプ：[04978b94](https://github.com/synchro4351/udonarium_axe/commit/04978b94)（部屋保存）、[100e611e](https://github.com/synchro4351/udonarium_axe/commit/100e611e)（セットZIP入出力）、[fe4b5dba](https://github.com/synchro4351/udonarium_axe/commit/fe4b5dba)（メディア管理）、[acd82b59](https://github.com/synchro4351/udonarium_axe/commit/acd82b59)（送信とログ）、[9a54146d](https://github.com/synchro4351/udonarium_axe/commit/9a54146d)（選択画面と候補入力）。`.txt`ログ入り本流`21cb573e`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-stamps)。静止画像セットは部屋ZIPと参加者へ同期し、スタンプ発言は添付画像として旧版でも表示できます。画像データは部屋内へ共有されるため、秘密発言でも画像バイト自体は秘匿されません。検索語の保存・別端末への反映・保存ZIP再読込はユーザーが確認済み。弱回線試験は未実施です。
 
 スタンプの使い勝手と絵文字表示：[66250c25](https://github.com/synchro4351/udonarium_axe/commit/66250c25)（独自の標準10個セット）、[33d91f3b](https://github.com/synchro4351/udonarium_axe/commit/33d91f3b)（画像一覧との共有・検索語の保存修正）、[34d6e3aa](https://github.com/synchro4351/udonarium_axe/commit/34d6e3aa)（スタンプ縮小・絵文字だけの発言を拡大）。`9a54146d`を基点に同じ機能ブランチで追加。標準素材は透過PNGとして同梱し、部屋ZIPへ重複保存しません。画面での修正後確認と弱回線試験は未実施です。
 
-標準セットの初期表示：[359c8941](https://github.com/synchro4351/udonarium_axe/commit/359c8941)。空の部屋ではスタンプ管理画面を開いた時に標準セットを表示。ChromiumのE2Eで標準セット、送信画像の大きさ、絵文字だけの拡大、追加直後の一覧、検索語保持を確認。保存ZIP再読込、実2端末、弱回線は未確認です。
+標準セットの初期表示：[359c8941](https://github.com/synchro4351/udonarium_axe/commit/359c8941)。空の部屋ではスタンプ管理画面を開いた時に標準セットを表示。ChromiumのE2Eで標準セット、送信画像の大きさ、絵文字だけの拡大、追加直後の一覧、検索語保持を確認。ユーザーも保存ZIP再読込と別端末での検索語保持を確認済み。弱回線は未確認です。
+
+スタンプ操作・読み上げ・ログ：[4c754de0](https://github.com/synchro4351/udonarium_axe/commit/4c754de0)（検索語先頭の読み上げ）、[9171d281](https://github.com/synchro4351/udonarium_axe/commit/9171d281)（「プリセット」への改名、検索語・チャットパレット候補、特殊記法、外側クリック、ログ表示）。`689a64c1`起点。`.txt`をログの種類から選び、HTMLログのスタンプ画像だけを縮小します。候補は明示選択するまで普通の文字入力を置き換えません。Chromiumのスタンプ操作1件、全943ファイル／13,036件成功・1件skip、production build成功。今回の画面変更はユーザー確認待ちです。
+
+キャラクター頭上の吹き出し：[82a18071](https://github.com/synchro4351/udonarium_axe/commit/82a18071)。同じ[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-stamps)で続けて実装。GMが部屋設定で有効にすると、引用された普通の発言、単独のスタンプ、絵文字だけの発言をキャラクター駒の上へ一時表示。設定は部屋ZIPと参加者へ同期し、吹き出し自体は保存しません。個別宛・秘密・閲覧不可タブ・システム発言は除外。全946ファイル／13,073件成功・1件skip、production build成功。実画面と弱回線は未確認です。
 
 ## 検証と制限
 
