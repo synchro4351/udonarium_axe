@@ -1633,6 +1633,43 @@ describe('GameCharacterComponent', () => {
       fixture.detectChanges();
       expect(lift(component.speechOrbitFacing())).toBeGreaterThan(lift(component.targetOrbitFacing()));
     });
+
+    it('is drawn in front of the gauges, buffs and target marker it shares a 3D context with', () => {
+      character.buffDataElement!.appendChild(DataElement.create('加護', 2, { type: DataElementType.NUMBER_RESOURCE }));
+      character.targeted = true;
+      const uiSignal = TestBed.inject(UiSignalService);
+      uiSignal.notifyTargetChange(character.identifier, character.aliasName);
+      // A shallow tilt from the far side, where the labels' push back along the table comes nearer the viewer.
+      uiSignal.notifyTableViewRotation(25, 0, 190);
+      say({ text: '「前へ」' });
+
+      const root = fixture.nativeElement as HTMLElement;
+      const stack = root.querySelector<HTMLElement>('[data-testid="overhead-speech-stack"]')!;
+      for (const id of ['piece-gauge', 'buff-plate', 'target-marker']) {
+        const other = root.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+        expect(other, id).not.toBeNull();
+        // Every frame up to the one they share keeps a single 3D context, so depth orders them, not z-index.
+        let frame = stack.parentElement!;
+        while (!frame.contains(other)) {
+          expect(frame.classList.contains('transform-3d'), id).toBe(true);
+          frame = frame.parentElement!;
+        }
+        expect(frame.classList.contains('transform-3d'), id).toBe(true);
+        expect(other!.compareDocumentPosition(stack) & Node.DOCUMENT_POSITION_FOLLOWING, id).toBeTruthy();
+      }
+
+      const number = (pattern: RegExp, css: string) => Number(pattern.exec(css)?.[1] ?? NaN);
+      // How far a lifted label can reach from the piece: up by its lift, back by its billboard's push.
+      const reach = (orbit: BillboardFacing, stackFacing: BillboardFacing) =>
+        Math.hypot(
+          number(/translateY\((-?[\d.]+)px\)/, at(orbit)),
+          number(/^translateZ\((-?[\d.]+)px\)/, at(stackFacing))
+        );
+      const forward = number(/rotateY\([^)]*\) translateZ\((-?[\d.]+)px\) scale/, stack.style.transform);
+      expect(forward).toBeGreaterThan(reach(component.gaugeOrbitFacing(), component.gaugeStackFacing()));
+      expect(forward).toBeGreaterThan(reach(component.buffOrbitFacing(), component.buffStackFacing()));
+      expect(forward).toBeGreaterThan(reach(component.floatOrbitFacing(), component.floatStackFacing()));
+    });
   });
 
   describe('the target marker', () => {

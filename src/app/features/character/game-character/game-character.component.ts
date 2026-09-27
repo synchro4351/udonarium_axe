@@ -156,6 +156,8 @@ const TARGET_STACK_GAP_PX = 52;
 const SPEECH_LIFT_PX = 36;
 const SPEECH_LIFT_2D_PX = 66;
 const SPEECH_POSTER_LIFT_PX = 16;
+const SPEECH_DEPTH_MARGIN_PX = 8;
+const FLOAT_STACK_GAP_PX = 56;
 const BUFF_DETAIL_ROW_HEIGHT_PX = 12;
 const BUFF_BADGE_ROW_HEIGHT_PX = 22;
 const BUFF_BADGES_PER_ROW = 5;
@@ -775,14 +777,14 @@ export class GameCharacterComponent {
   readonly nameStackFacing = computed<BillboardFacing>(() => this.labelStackFacing(this.nameFacing()));
 
   readonly floatStackFacing = computed<BillboardFacing>(() =>
-    this.labelStackFacing(this.isPoster() ? NOT_TURNED : this.billboardFacing(56))
+    this.labelStackFacing(this.isPoster() ? NOT_TURNED : this.billboardFacing(FLOAT_STACK_GAP_PX))
   );
 
   readonly floatOrbitFacing = computed<BillboardFacing>(() => this.labelStandFacing(this.floatOrbit()));
 
   private floatOrbit(): BillboardFacing {
     if (this.isPoster()) return facesAlways(`translateY(${-(this.size() * this.gridSize + 20)}px)`);
-    return this.labelOrbitFacing(56, 96);
+    return this.labelOrbitFacing(FLOAT_STACK_GAP_PX, 96);
   }
 
   private readonly gaugePanelHeightEstimate = computed(() =>
@@ -987,9 +989,26 @@ export class GameCharacterComponent {
     return this.screenLiftFacing(SPEECH_LIFT_PX, SPEECH_LIFT_2D_PX);
   }
 
-  readonly speechStackFacing = computed<BillboardFacing>(() =>
-    this.labelStackFacing(this.isPoster() ? NOT_TURNED : this.billboardFacing(0))
-  );
+  // The labels over a piece share one 3D rendering context, where the browser draws them in
+  // order of depth and z-index has no say. The gauges, buffs and change numbers are lifted
+  // straight up and pushed back along the table, so on a tilted table they come nearer the
+  // viewer than the bubble, which is lifted along the screen and stays level with the piece.
+  // Once turned to face the viewer, the bubble is brought forward by more than any of them can
+  // be from the piece, however the table and the piece are turned. On a poster everything lies
+  // in one plane, where the bubble, drawn last, is already on top.
+  readonly speechStackFacing = computed<BillboardFacing>(() => {
+    if (this.isPoster()) return this.labelStackFacing(NOT_TURNED);
+    const facing = this.billboardFacing(0);
+    const forward = ` translateZ(${this.speechDepthPx().toFixed(2)}px)`;
+    return this.labelStackFacing((rotation) => facing(rotation) + forward);
+  });
+
+  // A label lifted by d is pushed back along the table by at most d, so it lies within d√2 of
+  // the piece in any direction, the viewer's included.
+  private readonly speechDepthPx = computed(() => {
+    const highestLift = Math.max(FLOAT_STACK_GAP_PX, BUFF_STACK_GAP_PX + this.gaugePanelHeightEstimate());
+    return highestLift * Math.SQRT2 + SPEECH_DEPTH_MARGIN_PX;
+  });
 
   private screenLiftFacing(screenLift3d: number, distance2d: number): BillboardFacing {
     const pieceRotate = this.rotateSignal();
