@@ -33,6 +33,11 @@ const RAIN_FALL = 0.35;
 const RAIN_SPREAD = 2.4;
 /** How high the rain starts, in cells above the target. */
 const RAIN_HEIGHT = 6;
+/**
+ * How far a thrown mark turns over on its way, in degrees. Whole turns only, so it tumbles in the
+ * air yet lands the right way up: a face or a word arriving upside down reads as a mistake.
+ */
+export const THROW_SPIN_DEGREES = 720;
 
 /** The picture or the text a reaction shows. Exactly one of the two is filled. */
 export interface ReactionMark {
@@ -100,7 +105,7 @@ export function appendReactionThrow(
       z: origin.z + (landing.z - origin.z) * at + Math.sin(Math.PI * at) * base * 1.6,
       size,
       opacity: 1,
-      rotate: at * 540,
+      rotate: at * THROW_SPIN_DEGREES,
     });
     return;
   }
@@ -115,7 +120,7 @@ export function appendReactionThrow(
     z: landing.z + bounce,
     size: size * squash,
     opacity: local < 0.6 ? 1 : 1 - (local - 0.6) / 0.4,
-    rotate: 540,
+    rotate: THROW_SPIN_DEGREES,
   });
 
   const ring = clamp01(local / 0.5);

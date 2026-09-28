@@ -148,6 +148,24 @@ describe('the light reactions', () => {
       expect(mark(700)).toMatchObject({ x: 400, y: 300 });
     });
 
+    it('tumbles in flight but lands and settles the right way up', () => {
+      const preset = makePreset('reactthrow');
+      const cast = makeCast({ x: 0, y: 0, z: 0 });
+      const turn = (elapsed: number) => {
+        const sprite = effectSprites(preset, cast, elapsed, { baseSize: base }).find(
+          (candidate) => candidate.key === '0-reactthrow'
+        )!;
+        return ((sprite.rotate % 360) + 360) % 360;
+      };
+
+      // A quarter of the way through the flight it is upside down, so the spin is still there.
+      expect(turn(112)).toBeGreaterThan(90);
+      expect(turn(112)).toBeLessThan(270);
+      // Just before it hits, it has all but come round, so the landing does not snap it upright.
+      expect(Math.min(turn(445), 360 - turn(445))).toBeLessThan(10);
+      for (const elapsed of [450, 600, 900]) expect(turn(elapsed)).toBe(0);
+    });
+
     it('marks the spot where it lands on the ground', () => {
       const sprites = effectSprites(makePreset('reactthrow'), makeCast({ x: 0, y: 0, z: 0 }), 500, {
         baseSize: base,
