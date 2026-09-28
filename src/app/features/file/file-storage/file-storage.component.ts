@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  ElementRef,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
@@ -10,10 +19,57 @@ import { FileArchiver } from '@axe/core/storage/file-archiver';
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { canBrowseImage, ImageTag, SYSTEM_RESERVED_TAG } from '@axe/domain/media/image-tag';
+import {
+  ClipboardImageResult,
+  imageFromPaste,
+  isPasteableImage,
+  readClipboardImage,
+} from '@axe/features/file/file-storage/clipboard-image';
+import {
+  canClearBackground,
+  clearBackgroundAt,
+  PickedColor,
+} from '@axe/features/file/file-storage/transparent-background';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
 const ALL_TAG = '__all__';
+
+type PendingNotice =
+  | Exclude<ClipboardImageResult['kind'], 'image'>
+  | 'noPermission'
+  | 'oversized'
+  | 'duplicate'
+  | 'added'
+  | 'failed'
+  | 'pickMissed'
+  | 'clearFailed';
+
+/** The message shown for each outcome of pasting or choosing a picture and adding it. */
+export const PENDING_NOTICE_KEYS: Readonly<Record<PendingNotice, string>> = {
+  none: 'feature.file.fileStorage.paste.none',
+  unsupported: 'feature.file.fileStorage.paste.unsupported',
+  unreadable: 'feature.file.fileStorage.paste.unreadable',
+  noPermission: 'feature.file.fileStorage.pending.noPermission',
+  oversized: 'feature.file.fileStorage.pending.oversized',
+  duplicate: 'feature.file.fileStorage.pending.duplicate',
+  added: 'feature.file.fileStorage.pending.added',
+  failed: 'feature.file.fileStorage.pending.failed',
+  pickMissed: 'feature.file.fileStorage.transparent.missed',
+  clearFailed: 'feature.file.fileStorage.transparent.failed',
+};
+
+/** A picture held for the user to look over, with the object URL its preview is shown from. */
+interface HeldFile {
+  readonly file: File;
+  readonly url: string;
+}
+
+/** A picture waiting for the user to add it, and the transparent copy made of it, if any. */
+export interface PendingImage {
+  readonly original: HeldFile;
+  readonly transparent: (HeldFile & { readonly color: PickedColor }) | null;
+}
 
 @Component({
   selector: 'file-storage',
@@ -178,12 +234,18 @@ export class FileStorageComponent {
 
   constructor() {
     queueMicrotask(() => (this.panelService.title = this.t('common.panel.fileStorage')));
+    inject(DestroyRef).onDestroy(() => {
+      this.destroyed = true;
+      this.dropPendingImage();
+    });
   }
 
   /**
    * Loads the files chosen in the upload dialog into storage, then clears the input so the same
    * file can be chosen again.
    *
+   * A single picture is held for the user to look over first, as a pasted one is, so its background
+   * can be made transparent. Several files, or one the preview cannot show, load straight away.
    * A seat that may not edit the table loads nothing.
    */
   handleFileSelect(event: Event) {
@@ -193,8 +255,181 @@ export class FileStorageComponent {
       return;
     }
     const files = input.files;
-    if (files && files.length) this.fileArchiver.load(files);
+    if (files?.length === 1 && isPasteableImage(files[0].type) && !this.pendingAdding()) {
+      this.holdResult({ kind: 'image', file: files[0] });
+    } else if (files && files.length) {
+      this.fileArchiver.load(files);
+    }
     input.value = '';
+  }
+
+  private readonly pasteBox = viewChild<ElementRef<HTMLElement>>('pasteBox');
+  private destroyed = false;
+
+  /** The picture pasted or chosen and waiting for the user to add it or not. */
+  readonly pendingImage = signal<PendingImage | null>(null);
+  /** What the last paste, pick or add came to, shown under the paste box; null shows nothing. */
+  readonly pendingNotice = signal<PendingNotice | null>(null);
+  readonly pendingAdding = signal(false);
+  /** Whether the held picture may have its background cleared; a moving picture may not. */
+  readonly canClearPending = signal(false);
+  /** Whether the next click on the preview picks the colour to clear. */
+  readonly pickingColor = signal(false);
+  readonly clearingColor = signal(false);
+  protected readonly pendingNoticeKeys = PENDING_NOTICE_KEYS;
+
+  /** Makes the transparent copy; a test stands in for it, having no canvas to draw on. */
+  protected clearBackground = clearBackgroundAt;
+  /** Tells whether a picture may be cleared; a test stands in for it. */
+  protected canClear = canClearBackground;
+
+  /**
+   * Takes the picture from a paste made while the paste box, or a button in it, has focus, holding
+   * it for confirmation rather than storing it. Pastes anywhere else never reach here.
+   */
+  onPaste(event: ClipboardEvent): void {
+    event.preventDefault();
+    if (!this.rolePermission.canEditTabletop) {
+      this.holdResult({ kind: 'noPermission' });
+      return;
+    }
+    this.holdResult(imageFromPaste(event.clipboardData));
+  }
+
+  /** Reads a picture from the clipboard on request, holding it for confirmation. */
+  async readFromClipboard(): Promise<void> {
+    if (!this.rolePermission.canEditTabletop) {
+      this.holdResult({ kind: 'noPermission' });
+      return;
+    }
+    const result = await readClipboardImage(navigator.clipboard);
+    if (!this.destroyed) this.holdResult(result);
+  }
+
+  /**
+   * Stores the held picture, or its transparent copy when one was made, the same way the upload
+   * dialog does, so the usual size limit applies and the room is told of it like any other picture.
+   * A picture already stored is reported as a duplicate.
+   */
+  async confirmPending(): Promise<void> {
+    const pending = this.pendingImage();
+    if (!pending || this.pendingAdding() || this.clearingColor()) return;
+    if (!this.rolePermission.canEditTabletop) {
+      this.dropPendingImage();
+      this.pendingNotice.set('noPermission');
+      return;
+    }
+    this.pendingAdding.set(true);
+    this.pickingColor.set(false);
+    const stored = new Set(this.imageStorage.images.map((image) => image.identifier));
+    let notice: PendingNotice;
+    try {
+      const file = (pending.transparent ?? pending.original).file;
+      const { images, oversized } = await this.fileArchiver.loadImages([file]);
+      if (oversized.length) notice = 'oversized';
+      else if (!images.length) notice = 'failed';
+      else notice = stored.has(images[0].identifier) ? 'duplicate' : 'added';
+    } catch {
+      notice = 'failed';
+    }
+    this.pendingAdding.set(false);
+    this.dropPendingImage();
+    this.pendingNotice.set(notice);
+    this.pasteBox()?.nativeElement.focus();
+  }
+
+  /** Drops the held picture, and any transparent copy of it, without storing either. */
+  cancelPending(): void {
+    if (this.pendingAdding()) return;
+    this.dropPendingImage();
+    this.pendingNotice.set(null);
+    this.pasteBox()?.nativeElement.focus();
+  }
+
+  /** Starts, or stops, picking the colour to clear with a click on the preview. */
+  togglePicking(): void {
+    if (!this.pendingImage() || !this.canClearPending()) return;
+    this.pickingColor.update((picking) => !picking);
+  }
+
+  /**
+   * Clears the colour under a click on the preview, always from the original so that picking
+   * again starts over rather than clearing a second colour.
+   */
+  async pickColor(event: MouseEvent): Promise<void> {
+    const pending = this.pendingImage();
+    const preview = event.currentTarget as HTMLElement | null;
+    if (!pending || !preview || !this.pickingColor() || this.clearingColor()) return;
+    this.clearingColor.set(true);
+    const result = await this.clearBackground(
+      pending.original.file,
+      { x: event.offsetX, y: event.offsetY },
+      { width: preview.clientWidth, height: preview.clientHeight }
+    );
+    this.clearingColor.set(false);
+    // The picture may have been added or dropped while the copy was being made.
+    if (this.destroyed || this.pendingImage() !== pending) return;
+    if (result.kind === 'missed') {
+      this.pendingNotice.set('pickMissed');
+      return;
+    }
+    if (result.kind === 'failed') {
+      this.pendingNotice.set('clearFailed');
+      this.pickingColor.set(false);
+      return;
+    }
+    if (pending.transparent) URL.revokeObjectURL(pending.transparent.url);
+    this.pendingImage.set({
+      original: pending.original,
+      transparent: { file: result.file, url: URL.createObjectURL(result.file), color: result.color },
+    });
+    this.pendingNotice.set(null);
+    this.pickingColor.set(false);
+  }
+
+  /** Goes back to the original picture, dropping the transparent copy. */
+  undoTransparent(): void {
+    const pending = this.pendingImage();
+    if (!pending?.transparent || this.clearingColor()) return;
+    URL.revokeObjectURL(pending.transparent.url);
+    this.pendingImage.set({ original: pending.original, transparent: null });
+    this.pickingColor.set(false);
+  }
+
+  /** The colour cleared from the held picture, as CSS, for the swatch beside the preview. */
+  protected swatch(color: PickedColor): string {
+    return `rgb(${color.r} ${color.g} ${color.b})`;
+  }
+
+  private holdResult(result: ClipboardImageResult | { kind: 'noPermission' }): void {
+    // A picture still being stored is not pushed aside by the next one.
+    if (this.pendingAdding()) return;
+    this.dropPendingImage();
+    if (result.kind !== 'image') {
+      this.pendingNotice.set(result.kind);
+      return;
+    }
+    const pending: PendingImage = {
+      original: { file: result.file, url: URL.createObjectURL(result.file) },
+      transparent: null,
+    };
+    this.pendingImage.set(pending);
+    this.pendingNotice.set(null);
+    this.canClear(result.file).then(
+      (can) => this.pendingImage() === pending && this.canClearPending.set(can),
+      () => this.pendingImage() === pending && this.canClearPending.set(false)
+    );
+  }
+
+  private dropPendingImage(): void {
+    const pending = this.pendingImage();
+    if (pending) {
+      URL.revokeObjectURL(pending.original.url);
+      if (pending.transparent) URL.revokeObjectURL(pending.transparent.url);
+    }
+    this.pendingImage.set(null);
+    this.canClearPending.set(false);
+    this.pickingColor.set(false);
   }
 
   /** Selects a picture and announces it as the chosen file to anything waiting for one. */

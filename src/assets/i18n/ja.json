@@ -1580,7 +1580,34 @@
         "makeSecret": "秘匿にする",
         "clearSecret": "秘匿を解除",
         "makeSecretHint": "チェックした画像を GM 以外の一覧から隠します",
-        "secretMark": "秘匿画像"
+        "secretMark": "秘匿画像",
+        "paste": {
+          "boxLabel": "クリップボードから画像を追加",
+          "hint": "この枠を選んで Ctrl+V（Mac は ⌘V）で画像を貼り付け",
+          "read": "クリップボードを読む",
+          "none": "クリップボードに画像がありません",
+          "unsupported": "この形式は画像として追加できません",
+          "unreadable": "ブラウザがクリップボードの読み取りを許可しませんでした。枠を選んで Ctrl+V で貼り付けてください"
+        },
+        "pending": {
+          "confirm": "この画像を追加しますか？",
+          "add": "追加",
+          "cancel": "やめる",
+          "noPermission": "この席では画像を追加できません",
+          "oversized": "2MB を超えるため追加できません",
+          "duplicate": "同じ画像がすでにあります",
+          "added": "画像を追加しました",
+          "failed": "画像を追加できませんでした"
+        },
+        "transparent": {
+          "pick": "背景色を透明にする",
+          "repick": "色を選び直す",
+          "pickHint": "プレビューで透明にしたい色をクリックしてください",
+          "applied": "この色を透明にしました",
+          "undo": "元に戻す",
+          "missed": "画像の上をクリックしてください",
+          "failed": "透明にできませんでした"
+        }
       }
     },
     "character": {

@@ -50,6 +50,130 @@
   </label>
 
   <div
+    #pasteBox
+    class="border-ui-border-panel text-ui-dim focus-within:border-ui-accent rounded-ui-sm focus:bg-ui-accent-bg mt-2 flex flex-col gap-2 border border-dashed p-2 text-[12px] transition-[background,border-color] outline-none"
+    tabindex="0"
+    role="group"
+    data-testid="paste-box"
+    [attr.aria-label]="'feature.file.fileStorage.paste.boxLabel' | transloco"
+    (paste)="onPaste($event)"
+  >
+    <div class="flex flex-wrap items-center gap-2">
+      <i class="material-icons text-[18px]! opacity-55" aria-hidden="true">content_paste</i>
+      <span class="min-w-0 flex-1">{{ 'feature.file.fileStorage.paste.hint' | transloco }}</span>
+      <button
+        class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+        type="button"
+        [disabled]="pendingAdding()"
+        (click)="readFromClipboard()"
+      >
+        <i class="material-icons" aria-hidden="true">content_paste_go</i>
+        {{ 'feature.file.fileStorage.paste.read' | transloco }}
+      </button>
+    </div>
+  </div>
+
+  @if (pendingImage(); as pending) {
+    <div
+      class="border-ui-border-panel rounded-ui-sm mt-2 flex flex-col gap-2 border border-solid p-2 text-[12px]"
+      role="group"
+      data-testid="pending-image"
+      [attr.aria-label]="'feature.file.fileStorage.pending.confirm' | transloco"
+    >
+      <span class="text-ui-text">{{ 'feature.file.fileStorage.pending.confirm' | transloco }}</span>
+      <div class="rounded-xs bg-[repeating-conic-gradient(#c4c4c4_0%_25%,#f2f2f2_0%_50%)] bg-size-[16px_16px]">
+        @if (pickingColor() || !pending.transparent) {
+          <img
+            class="block h-48 w-full object-contain"
+            [class.cursor-crosshair]="pickingColor()"
+            [src]="pending.original.url | safe: 'resourceUrl'"
+            [alt]="pending.original.file.name"
+            (click)="pickColor($event)"
+          />
+        } @else {
+          <img
+            class="block h-48 w-full object-contain"
+            [src]="pending.transparent.url | safe: 'resourceUrl'"
+            [alt]="pending.transparent.file.name"
+          />
+        }
+      </div>
+      <span class="text-ui-dim truncate text-[11px]">{{ (pending.transparent ?? pending.original).file.name }}</span>
+      @if (canClearPending()) {
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button
+            class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+            type="button"
+            [class.border-ui-accent!]="pickingColor()"
+            [class.text-ui-accent!]="pickingColor()"
+            [attr.aria-pressed]="pickingColor()"
+            [disabled]="pendingAdding() || clearingColor()"
+            (click)="togglePicking()"
+          >
+            <i class="material-icons" aria-hidden="true">colorize</i>
+            {{
+              (pending.transparent
+                ? 'feature.file.fileStorage.transparent.repick'
+                : 'feature.file.fileStorage.transparent.pick'
+              ) | transloco
+            }}
+          </button>
+          @if (pending.transparent; as transparent) {
+            <span
+              class="border-ui-border-panel inline-block size-4 shrink-0 rounded-xs border border-solid"
+              [style.background-color]="swatch(transparent.color)"
+              aria-hidden="true"
+            ></span>
+            <span class="text-ui-muted">{{ 'feature.file.fileStorage.transparent.applied' | transloco }}</span>
+            <button
+              class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+              type="button"
+              [disabled]="pendingAdding() || clearingColor()"
+              (click)="undoTransparent()"
+            >
+              <i class="material-icons" aria-hidden="true">undo</i>
+              {{ 'feature.file.fileStorage.transparent.undo' | transloco }}
+            </button>
+          }
+        </div>
+        @if (pickingColor()) {
+          <span class="text-ui-muted">{{ 'feature.file.fileStorage.transparent.pickHint' | transloco }}</span>
+        }
+      }
+      <div class="flex flex-wrap gap-1.5">
+        <button
+          class="bg-ui-accent-bg border-ui-accent text-ui-accent rounded-ui-sm hover:bg-ui-hover inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+          type="button"
+          [disabled]="pendingAdding() || clearingColor()"
+          (click)="confirmPending()"
+        >
+          <i class="material-icons" aria-hidden="true">add_photo_alternate</i>
+          {{ 'feature.file.fileStorage.pending.add' | transloco }}
+        </button>
+        <button
+          class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+          type="button"
+          [disabled]="pendingAdding()"
+          (click)="cancelPending()"
+        >
+          <i class="material-icons" aria-hidden="true">close</i>
+          {{ 'feature.file.fileStorage.pending.cancel' | transloco }}
+        </button>
+      </div>
+    </div>
+  }
+  <p
+    class="m-0 mt-1 text-[12px]"
+    [class.text-ui-danger]="pendingNotice() !== 'added'"
+    role="status"
+    data-testid="pending-notice"
+  >
+    @if (pendingNotice(); as notice) {
+      {{ pendingNoticeKeys[notice] | transloco }}
+    }
+  </p>
+
+  <div
     class="bg-ui-panel border-ui-border-panel z-1 mx-[-8] mt-2.5 flex flex-wrap items-center gap-1.5 border-y border-solid px-2.5 py-2"
   >
     <input

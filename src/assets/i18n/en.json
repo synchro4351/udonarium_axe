@@ -1580,7 +1580,34 @@
         "makeSecret": "Keep back",
         "clearSecret": "Give up",
         "makeSecretHint": "Keeps the ticked pictures out of everyone else’s lists",
-        "secretMark": "Kept back"
+        "secretMark": "Kept back",
+        "paste": {
+          "boxLabel": "Add an image from the clipboard",
+          "hint": "Select this box and press Ctrl+V (⌘V on Mac) to paste an image",
+          "read": "Read clipboard",
+          "none": "There is no image on the clipboard",
+          "unsupported": "This can’t be added as an image",
+          "unreadable": "The browser didn’t allow reading the clipboard. Select the box and press Ctrl+V instead"
+        },
+        "pending": {
+          "confirm": "Add this image?",
+          "add": "Add",
+          "cancel": "Cancel",
+          "noPermission": "This seat can’t add images",
+          "oversized": "Over 2MB, so it can’t be added",
+          "duplicate": "The same image is already stored",
+          "added": "Image added",
+          "failed": "The image couldn’t be added"
+        },
+        "transparent": {
+          "pick": "Make background transparent",
+          "repick": "Pick another colour",
+          "pickHint": "Click the colour to make transparent in the preview",
+          "applied": "This colour is now transparent",
+          "undo": "Undo",
+          "missed": "Click on the image itself",
+          "failed": "The background couldn’t be made transparent"
+        }
       }
     },
     "character": {

@@ -1,11 +1,17 @@
+import { readFileSync } from 'node:fs';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { FileArchiver } from '@axe/core/storage/file-archiver';
+import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ImageTag, SYSTEM_RESERVED_TAG } from '@axe/domain/media/image-tag';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
-import { FileStorageComponent } from '@axe/features/file/file-storage/file-storage.component';
+import { FileStorageComponent, PENDING_NOTICE_KEYS } from '@axe/features/file/file-storage/file-storage.component';
+import type { clearBackgroundAt, ClearBackgroundResult } from '@axe/features/file/file-storage/transparent-background';
 import { expectPanelDragRecovery, PanelDragTestHostComponent } from '@axe/testing/panel-drag-recovery';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
+import type { Mock } from 'vitest';
 
 describe('FileStorageComponent', () => {
   let component: FileStorageComponent;
@@ -128,6 +134,381 @@ describe('FileStorageComponent', () => {
 
       expect(ImageTag.isSecret('kept')).toBe(true);
       expect(ImageTag.isSecret('not-kept')).toBe(false);
+    });
+  });
+
+  describe('holding a pasted or chosen picture before adding it', () => {
+    let loadImages: ReturnType<typeof vi.spyOn>;
+    let load: ReturnType<typeof vi.spyOn>;
+    let revokeObjectURL: ReturnType<typeof vi.spyOn>;
+    let clearBackground: Mock<typeof clearBackgroundAt>;
+
+    function screenshot(): File {
+      return new File([new Uint8Array(4)], 'image.png', { type: 'image/png' });
+    }
+
+    function transparentCopy(): File {
+      return new File([new Uint8Array(2)], 'clipboard-transparent.webp', { type: 'image/webp' });
+    }
+
+    function pasteEvent(...files: File[]): ClipboardEvent {
+      const event = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: { files } });
+      return event as ClipboardEvent;
+    }
+
+    function pasteBox(): HTMLElement {
+      return fixture.nativeElement.querySelector('[data-testid="paste-box"]');
+    }
+
+    function pendingPanel(): HTMLElement | null {
+      return fixture.nativeElement.querySelector('[data-testid="pending-image"]');
+    }
+
+    /** The buttons in an element, told apart by their icons. */
+    function buttonsOf(element: HTMLElement | null): string[] {
+      return Array.from(element?.querySelectorAll('button .material-icons') ?? []).map((icon) =>
+        icon.textContent!.trim()
+      );
+    }
+
+    function chooseFiles(...files: File[]): HTMLInputElement {
+      const input = fixture.nativeElement.querySelector('input[type="file"]') as HTMLInputElement;
+      Object.defineProperty(input, 'files', { value: files, configurable: true });
+      input.dispatchEvent(new Event('change'));
+      return input;
+    }
+
+    /** A click on the preview, as the eyedropper takes it. */
+    function clickPreview(): MouseEvent {
+      const preview = pendingPanel()!.querySelector('img')!;
+      const event = new MouseEvent('click');
+      Object.defineProperty(event, 'offsetX', { value: 10 });
+      Object.defineProperty(event, 'offsetY', { value: 20 });
+      Object.defineProperty(event, 'currentTarget', { value: preview });
+      return event;
+    }
+
+    async function settle(): Promise<void> {
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    beforeEach(() => {
+      let count = 0;
+      vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:preview-${++count}`);
+      revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+      loadImages = vi
+        .spyOn(TestBed.inject(FileArchiver), 'loadImages')
+        .mockResolvedValue({ images: [ImageFile.createEmpty('pasted')], oversized: [] });
+      load = vi.spyOn(TestBed.inject(FileArchiver), 'load').mockResolvedValue();
+      clearBackground = vi.fn<typeof clearBackgroundAt>().mockResolvedValue({
+        kind: 'cleared',
+        file: transparentCopy(),
+        color: { r: 255, g: 255, b: 255 },
+      });
+      component['clearBackground'] = clearBackground;
+      component['canClear'] = () => Promise.resolve(true);
+      fixture.detectChanges();
+    });
+
+    afterEach(() => {
+      PeerCursor.myCursor = null!;
+      vi.restoreAllMocks();
+    });
+
+    it('holds a picture pasted into the box for confirmation, storing nothing yet', () => {
+      const event = pasteEvent(screenshot());
+      pasteBox().dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(component.pendingImage()?.original.file.name).toMatch(/^clipboard-\d{8}-\d{6}\.png$/);
+      expect(component.pendingImage()?.original.url).toBe('blob:preview-1');
+      expect(loadImages).not.toHaveBeenCalled();
+    });
+
+    it('shows the held picture with the choice to add it, make it transparent or not add it', async () => {
+      pasteBox().dispatchEvent(pasteEvent(screenshot()));
+      await settle();
+
+      expect(pendingPanel()!.querySelector('img')?.getAttribute('src')).toBe('blob:preview-1');
+      expect(buttonsOf(pendingPanel())).toEqual(['colorize', 'add_photo_alternate', 'close']);
+    });
+
+    it('offers no transparency for a moving picture', async () => {
+      component['canClear'] = () => Promise.resolve(false);
+      pasteBox().dispatchEvent(pasteEvent(new File(['GIF89a'], 'a.gif', { type: 'image/gif' })));
+      await settle();
+
+      expect(buttonsOf(pendingPanel())).toEqual(['add_photo_alternate', 'close']);
+    });
+
+    it('leaves alone a paste made anywhere else on the page', () => {
+      const event = pasteEvent(screenshot());
+      document.body.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(component.pendingImage()).toBeNull();
+    });
+
+    it('stores the held picture through the upload path once confirmed', async () => {
+      pasteBox().dispatchEvent(pasteEvent(screenshot()));
+      const held = component.pendingImage()!.original.file;
+
+      await component.confirmPending();
+
+      expect(loadImages).toHaveBeenCalledWith([held]);
+      expect(component.pendingImage()).toBeNull();
+      expect(component.pendingNotice()).toBe('added');
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+    });
+
+    it('announces the outcome in a status line that stays in place', async () => {
+      pasteBox().dispatchEvent(pasteEvent(screenshot()));
+      await component.confirmPending();
+      fixture.detectChanges();
+
+      const status = fixture.nativeElement.querySelector('[data-testid="pending-notice"]') as HTMLElement;
+      expect(status.getAttribute('role')).toBe('status');
+      expect(status.textContent!.trim()).toBe('画像を追加しました');
+      expect(document.activeElement).toBe(pasteBox());
+    });
+
+    it('tells the user when the same picture is already stored', async () => {
+      TestBed.inject(ImageStorage).add('pasted');
+      pasteBox().dispatchEvent(pasteEvent(screenshot()));
+
+      await component.confirmPending();
+
+      expect(component.pendingNotice()).toBe('duplicate');
+    });
+
+    it('tells the user when the picture is over the size limit', async () => {
+      loadImages.mockResolvedValue({ images: [], oversized: ['clipboard.png'] });
+      pasteBox().dispatchEvent(pasteEvent(screenshot()));
+
+      await component.confirmPending();
+
+      expect(component.pendingNotice()).toBe('oversized');
+    });
+
+    it('tells the user when storing fails', async () => {
+      loadImages.mockRejectedValue(new Error('decode failed'));
+      pasteBox().dispatchEvent(pasteEvent(screenshot()));
+
+      await component.confirmPending();
+
+      expect(component.pendingNotice()).toBe('failed');
+      expect(component.pendingAdding()).toBe(false);
+    });
+
+    it('drops the held picture when the user decides against it', () => {
+      pasteBox().dispatchEvent(pasteEvent(screenshot()));
+
+      component.cancelPending();
+
+      expect(component.pendingImage()).toBeNull();
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+      expect(loadImages).not.toHaveBeenCalled();
+    });
+
+    it('lets go of the preview when the panel closes', () => {
+      pasteBox().dispatchEvent(pasteEvent(screenshot()));
+
+      fixture.destroy();
+
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+    });
+
+    it('says so when the paste holds no picture', () => {
+      pasteBox().dispatchEvent(pasteEvent());
+
+      expect(component.pendingImage()).toBeNull();
+      expect(component.pendingNotice()).toBe('none');
+    });
+
+    it('takes nothing from a seat that may not edit the table', () => {
+      PeerCursor.createMyCursor().role = PeerRole.Guest;
+
+      pasteBox().dispatchEvent(pasteEvent(screenshot()));
+
+      expect(component.pendingImage()).toBeNull();
+      expect(component.pendingNotice()).toBe('noPermission');
+    });
+
+    it('holds a single chosen picture under its own name instead of storing it at once', () => {
+      const map = new File([new Uint8Array(3)], 'dungeon-map.jpg', { type: 'image/jpeg' });
+
+      const input = chooseFiles(map);
+
+      expect(component.pendingImage()?.original.file).toBe(map);
+      expect(load).not.toHaveBeenCalled();
+      expect(input.value).toBe('');
+    });
+
+    it('still loads several chosen files straight away', () => {
+      const files = [new File(['a'], 'a.png', { type: 'image/png' }), new File(['b'], 'b.png', { type: 'image/png' })];
+
+      chooseFiles(...files);
+
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(Array.from(load.mock.calls[0][0] as File[])).toEqual(files);
+      expect(component.pendingImage()).toBeNull();
+    });
+
+    it('still loads straight away a single file the preview cannot show', () => {
+      const svg = new File(['<svg/>'], 'icon.svg', { type: 'image/svg+xml' });
+
+      chooseFiles(svg);
+
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(component.pendingImage()).toBeNull();
+    });
+
+    describe('making the background transparent', () => {
+      beforeEach(async () => {
+        pasteBox().dispatchEvent(pasteEvent(screenshot()));
+        await settle();
+      });
+
+      it('only picks a colour once the eyedropper is taken up', async () => {
+        await component.pickColor(clickPreview());
+
+        expect(clearBackground).not.toHaveBeenCalled();
+        expect(component.pendingImage()?.transparent).toBeNull();
+      });
+
+      it('clears the colour under the click from the original and previews the copy', async () => {
+        component.togglePicking();
+        fixture.detectChanges();
+        const preview = pendingPanel()!.querySelector('img')!;
+        const original = component.pendingImage()!.original;
+
+        await component.pickColor(clickPreview());
+        fixture.detectChanges();
+
+        expect(clearBackground).toHaveBeenCalledWith(
+          original.file,
+          { x: 10, y: 20 },
+          { width: preview.clientWidth, height: preview.clientHeight }
+        );
+        expect(component.pickingColor()).toBe(false);
+        expect(component.pendingImage()?.original).toBe(original);
+        expect(pendingPanel()!.querySelector('img')?.getAttribute('src')).toBe('blob:preview-2');
+        expect(buttonsOf(pendingPanel())).toEqual(['colorize', 'undo', 'add_photo_alternate', 'close']);
+      });
+
+      it('shows the original again while picking anew, and replaces the earlier copy', async () => {
+        component.togglePicking();
+        await component.pickColor(clickPreview());
+        component.togglePicking();
+        fixture.detectChanges();
+
+        expect(pendingPanel()!.querySelector('img')?.getAttribute('src')).toBe('blob:preview-1');
+
+        await component.pickColor(clickPreview());
+
+        expect(clearBackground).toHaveBeenLastCalledWith(
+          component.pendingImage()!.original.file,
+          expect.anything(),
+          expect.anything()
+        );
+        expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-2');
+        expect(component.pendingImage()?.transparent?.url).toBe('blob:preview-3');
+      });
+
+      it('stores the transparent copy, not the original, once confirmed', async () => {
+        component.togglePicking();
+        await component.pickColor(clickPreview());
+        const copy = component.pendingImage()!.transparent!.file;
+
+        await component.confirmPending();
+
+        expect(loadImages).toHaveBeenCalledWith([copy]);
+        expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+        expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-2');
+      });
+
+      it('goes back to the original on undo', async () => {
+        component.togglePicking();
+        await component.pickColor(clickPreview());
+        const original = component.pendingImage()!.original.file;
+
+        component.undoTransparent();
+        await component.confirmPending();
+
+        expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-2');
+        expect(loadImages).toHaveBeenCalledWith([original]);
+      });
+
+      it('stores nothing, copy or original, when cancelled', async () => {
+        component.togglePicking();
+        await component.pickColor(clickPreview());
+
+        component.cancelPending();
+
+        expect(loadImages).not.toHaveBeenCalled();
+        expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+        expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-2');
+      });
+
+      it('keeps picking after a click beside the picture', async () => {
+        clearBackground.mockResolvedValue({ kind: 'missed' });
+        component.togglePicking();
+
+        await component.pickColor(clickPreview());
+
+        expect(component.pickingColor()).toBe(true);
+        expect(component.pendingNotice()).toBe('pickMissed');
+        expect(component.pendingImage()?.transparent).toBeNull();
+      });
+
+      it('keeps the original when the copy cannot be made', async () => {
+        clearBackground.mockResolvedValue({ kind: 'failed' });
+        component.togglePicking();
+
+        await component.pickColor(clickPreview());
+
+        expect(component.pendingNotice()).toBe('clearFailed');
+        expect(component.pendingImage()?.transparent).toBeNull();
+      });
+
+      it('throws away a copy that finishes after the picture was dropped', async () => {
+        let finish!: (value: ClearBackgroundResult) => void;
+        clearBackground.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+        component.togglePicking();
+
+        const picking = component.pickColor(clickPreview());
+        component.cancelPending();
+        finish({ kind: 'cleared', file: transparentCopy(), color: { r: 0, g: 0, b: 0 } });
+        await picking;
+
+        expect(component.pendingImage()).toBeNull();
+        expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('has a message for every outcome and label in every language', () => {
+      const labels = [
+        'feature.file.fileStorage.paste.boxLabel',
+        'feature.file.fileStorage.paste.hint',
+        'feature.file.fileStorage.paste.read',
+        'feature.file.fileStorage.pending.confirm',
+        'feature.file.fileStorage.pending.add',
+        'feature.file.fileStorage.pending.cancel',
+        'feature.file.fileStorage.transparent.pick',
+        'feature.file.fileStorage.transparent.repick',
+        'feature.file.fileStorage.transparent.pickHint',
+        'feature.file.fileStorage.transparent.applied',
+        'feature.file.fileStorage.transparent.undo',
+      ];
+      for (const language of ['ja', 'en', 'ko']) {
+        const dictionary = JSON.parse(readFileSync(`src/assets/i18n/${language}.json`, 'utf-8'));
+        for (const key of [...labels, ...Object.values(PENDING_NOTICE_KEYS)]) {
+          const text = key.split('.').reduce((node, part) => node?.[part], dictionary);
+          expect(typeof text, `${language}: ${key}`).toBe('string');
+        }
+      }
     });
   });
 
