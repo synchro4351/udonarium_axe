@@ -82,6 +82,11 @@ export interface ImageDroppedEvent {
   identifier: string;
   fileName: string;
   dropPoint: { x: number; y: number };
+  /**
+   * The element under the drop point when the drop was made, for an image placed only once the user
+   * confirmed it; without it, whatever is under the point now is taken instead.
+   */
+  dropTarget?: Element | null;
 }
 
 export interface CcfoliaRoomDroppedEvent {

@@ -164,7 +164,7 @@
   }
   <p
     class="m-0 mt-1 text-[12px]"
-    [class.text-ui-danger]="pendingNotice() !== 'added'"
+    [class.text-ui-danger]="!goodNotices.has(pendingNotice()!)"
     role="status"
     data-testid="pending-notice"
   >

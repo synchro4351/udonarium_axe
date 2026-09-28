@@ -15,7 +15,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { PanelService } from '@axe/application/ui/panel.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
 import { emitSelectFile } from '@axe/core/event/domain-events';
-import { FileArchiver } from '@axe/core/storage/file-archiver';
+import { FileArchiver, ImageDropPlace } from '@axe/core/storage/file-archiver';
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { canBrowseImage, ImageTag, SYSTEM_RESERVED_TAG } from '@axe/domain/media/image-tag';
@@ -25,6 +25,11 @@ import {
   isPasteableImage,
   readClipboardImage,
 } from '@axe/features/file/file-storage/clipboard-image';
+import {
+  DroppedImageEventHandlerService,
+  DroppedImageHolder,
+  UnconfirmedImage,
+} from '@axe/features/file/file-storage/dropped-image-event-handler.service';
 import {
   canClearBackground,
   clearBackgroundAt,
@@ -43,7 +48,13 @@ type PendingNotice =
   | 'added'
   | 'failed'
   | 'pickMissed'
-  | 'clearFailed';
+  | 'clearFailed'
+  | 'previousAdded'
+  | 'previousDuplicate'
+  | 'keptOversized'
+  | 'keptFailed'
+  | 'keptNoPermission'
+  | 'returned';
 
 /** The message shown for each outcome of pasting or choosing a picture and adding it. */
 export const PENDING_NOTICE_KEYS: Readonly<Record<PendingNotice, string>> = {
@@ -57,7 +68,16 @@ export const PENDING_NOTICE_KEYS: Readonly<Record<PendingNotice, string>> = {
   failed: 'feature.file.fileStorage.pending.failed',
   pickMissed: 'feature.file.fileStorage.transparent.missed',
   clearFailed: 'feature.file.fileStorage.transparent.failed',
+  previousAdded: 'feature.file.fileStorage.pending.previousAdded',
+  previousDuplicate: 'feature.file.fileStorage.pending.previousDuplicate',
+  keptOversized: 'feature.file.fileStorage.pending.keptOversized',
+  keptFailed: 'feature.file.fileStorage.pending.keptFailed',
+  keptNoPermission: 'feature.file.fileStorage.pending.keptNoPermission',
+  returned: 'feature.file.fileStorage.pending.returned',
 };
+
+/** The outcomes that are good news, shown without the warning colour. */
+const GOOD_NOTICES: ReadonlySet<PendingNotice> = new Set(['added', 'previousAdded']);
 
 /** A picture held for the user to look over, with the object URL its preview is shown from. */
 interface HeldFile {
@@ -65,10 +85,14 @@ interface HeldFile {
   readonly url: string;
 }
 
-/** A picture waiting for the user to add it, and the transparent copy made of it, if any. */
+/**
+ * A picture waiting for the user to add it, the transparent copy made of it, if any, and where it
+ * was dropped, if it was, so that adding it places it there as an unconfirmed drop would have.
+ */
 export interface PendingImage {
   readonly original: HeldFile;
   readonly transparent: (HeldFile & { readonly color: PickedColor }) | null;
+  readonly place: ImageDropPlace | null;
 }
 
 @Component({
@@ -78,13 +102,14 @@ export interface PendingImage {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, SafePipe, TranslocoModule],
 })
-export class FileStorageComponent {
+export class FileStorageComponent implements DroppedImageHolder {
   protected readonly isCompact = inject(ViewportService).isCompact;
   private readonly panelService = inject(PanelService);
   private readonly imageStorage = inject(ImageStorage);
   private readonly fileArchiver = inject(FileArchiver);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly rolePermission = inject(RolePermissionService);
+  private readonly droppedImages = inject(DroppedImageEventHandlerService);
   private readonly t = inject(TRANSLATE_FN);
 
   /** The label shown for a tag in the tag filter, with the all and untagged entries translated. */
@@ -234,9 +259,11 @@ export class FileStorageComponent {
 
   constructor() {
     queueMicrotask(() => (this.panelService.title = this.t('common.panel.fileStorage')));
+    const detach = this.droppedImages.attach(this);
     inject(DestroyRef).onDestroy(() => {
       this.destroyed = true;
-      this.dropPendingImage();
+      detach();
+      void this.handOverUnconfirmed();
     });
   }
 
@@ -255,8 +282,8 @@ export class FileStorageComponent {
       return;
     }
     const files = input.files;
-    if (files?.length === 1 && isPasteableImage(files[0].type) && !this.pendingAdding()) {
-      this.holdResult({ kind: 'image', file: files[0] });
+    if (files?.length === 1 && isPasteableImage(files[0].type)) {
+      void this.offer({ kind: 'image', file: files[0] });
     } else if (files && files.length) {
       this.fileArchiver.load(files);
     }
@@ -277,6 +304,16 @@ export class FileStorageComponent {
   readonly pickingColor = signal(false);
   readonly clearingColor = signal(false);
   protected readonly pendingNoticeKeys = PENDING_NOTICE_KEYS;
+  protected readonly goodNotices = GOOD_NOTICES;
+
+  /** The held picture being stored, until it is; another arrival waits for it rather than storing it again. */
+  private adding: Promise<PendingNotice> | null = null;
+  /** The transparent copy being made, until it is shown; another arrival waits so the copy is what gets added. */
+  private clearing: Promise<void> | null = null;
+  /** The last picture or clipboard reading to arrive, which the next one waits for, so they are taken in turn. */
+  private intake: Promise<void> | null = null;
+  /** Pictures that have arrived but are not yet held, in the order they came. */
+  private readonly arrivals: UnconfirmedImage[] = [];
 
   /** Makes the transparent copy; a test stands in for it, having no canvas to draw on. */
   protected clearBackground = clearBackgroundAt;
@@ -290,51 +327,39 @@ export class FileStorageComponent {
   onPaste(event: ClipboardEvent): void {
     event.preventDefault();
     if (!this.rolePermission.canEditTabletop) {
-      this.holdResult({ kind: 'noPermission' });
+      this.pendingNotice.set('noPermission');
       return;
     }
-    this.holdResult(imageFromPaste(event.clipboardData));
+    void this.offer(imageFromPaste(event.clipboardData));
   }
 
   /** Reads a picture from the clipboard on request, holding it for confirmation. */
   async readFromClipboard(): Promise<void> {
     if (!this.rolePermission.canEditTabletop) {
-      this.holdResult({ kind: 'noPermission' });
+      this.pendingNotice.set('noPermission');
       return;
     }
     const result = await readClipboardImage(navigator.clipboard);
-    if (!this.destroyed) this.holdResult(result);
+    await this.offer(result);
+  }
+
+  /**
+   * Holds a picture dropped on the page for confirmation, to be placed where it was dropped once
+   * added, or one a closed panel could not add, with a warning saying so.
+   */
+  holdDroppedImage(file: File, place: ImageDropPlace | null, returned = false): void {
+    void this.offer({ kind: 'image', file }, place, returned);
   }
 
   /**
    * Stores the held picture, or its transparent copy when one was made, the same way the upload
    * dialog does, so the usual size limit applies and the room is told of it like any other picture.
-   * A picture already stored is reported as a duplicate.
+   * A picture already stored is reported as a duplicate. One that could not be stored stays held.
    */
   async confirmPending(): Promise<void> {
     const pending = this.pendingImage();
-    if (!pending || this.pendingAdding() || this.clearingColor()) return;
-    if (!this.rolePermission.canEditTabletop) {
-      this.dropPendingImage();
-      this.pendingNotice.set('noPermission');
-      return;
-    }
-    this.pendingAdding.set(true);
-    this.pickingColor.set(false);
-    const stored = new Set(this.imageStorage.images.map((image) => image.identifier));
-    let notice: PendingNotice;
-    try {
-      const file = (pending.transparent ?? pending.original).file;
-      const { images, oversized } = await this.fileArchiver.loadImages([file]);
-      if (oversized.length) notice = 'oversized';
-      else if (!images.length) notice = 'failed';
-      else notice = stored.has(images[0].identifier) ? 'duplicate' : 'added';
-    } catch {
-      notice = 'failed';
-    }
-    this.pendingAdding.set(false);
-    this.dropPendingImage();
-    this.pendingNotice.set(notice);
+    if (!pending || this.adding || this.clearingColor()) return;
+    this.pendingNotice.set(await this.add(pending));
     this.pasteBox()?.nativeElement.focus();
   }
 
@@ -361,14 +386,32 @@ export class FileStorageComponent {
     const preview = event.currentTarget as HTMLElement | null;
     if (!pending || !preview || !this.pickingColor() || this.clearingColor()) return;
     this.clearingColor.set(true);
-    const result = await this.clearBackground(
-      pending.original.file,
+    const clearing = this.clearWith(
+      pending,
       { x: event.offsetX, y: event.offsetY },
       { width: preview.clientWidth, height: preview.clientHeight }
     );
-    this.clearingColor.set(false);
-    // The picture may have been added or dropped while the copy was being made.
-    if (this.destroyed || this.pendingImage() !== pending) return;
+    this.clearing = clearing;
+    await clearing;
+    if (this.clearing === clearing) this.clearing = null;
+  }
+
+  private async clearWith(
+    pending: PendingImage,
+    point: { x: number; y: number },
+    size: { width: number; height: number }
+  ): Promise<void> {
+    let result: Awaited<ReturnType<typeof clearBackgroundAt>>;
+    try {
+      result = await this.clearBackground(pending.original.file, point, size);
+    } catch {
+      result = { kind: 'failed' };
+    } finally {
+      this.clearingColor.set(false);
+    }
+    // The picture may have been added or dropped while the copy was being made. A panel closed
+    // meanwhile still takes the copy, since it is what gets added as the panel goes.
+    if (this.pendingImage() !== pending) return;
     if (result.kind === 'missed') {
       this.pendingNotice.set('pickMissed');
       return;
@@ -380,7 +423,7 @@ export class FileStorageComponent {
     }
     if (pending.transparent) URL.revokeObjectURL(pending.transparent.url);
     this.pendingImage.set({
-      original: pending.original,
+      ...pending,
       transparent: { file: result.file, url: URL.createObjectURL(result.file), color: result.color },
     });
     this.pendingNotice.set(null);
@@ -392,7 +435,7 @@ export class FileStorageComponent {
     const pending = this.pendingImage();
     if (!pending?.transparent || this.clearingColor()) return;
     URL.revokeObjectURL(pending.transparent.url);
-    this.pendingImage.set({ original: pending.original, transparent: null });
+    this.pendingImage.set({ ...pending, transparent: null });
     this.pickingColor.set(false);
   }
 
@@ -401,21 +444,136 @@ export class FileStorageComponent {
     return `rgb(${color.r} ${color.g} ${color.b})`;
   }
 
-  private holdResult(result: ClipboardImageResult | { kind: 'noPermission' }): void {
-    // A picture still being stored is not pushed aside by the next one.
-    if (this.pendingAdding()) return;
-    this.dropPendingImage();
+  /**
+   * Takes what a paste, clipboard reading, choice or drop brought, after anything that arrived
+   * before it. Whatever is started here without waiting on anything happens before this returns.
+   */
+  private offer(result: ClipboardImageResult, place: ImageDropPlace | null = null, returned = false): Promise<void> {
+    const arrival = result.kind === 'image' ? { file: result.file, place } : null;
+    if (arrival) this.arrivals.push(arrival);
+    const receive = () => this.receive(result, arrival, returned);
+    const received = this.intake ? this.intake.then(receive, receive) : receive();
+    this.intake = received;
+    const settle = () => {
+      if (this.intake === received) this.intake = null;
+    };
+    void received.then(settle, settle);
+    return received;
+  }
+
+  /**
+   * Holds a new picture for confirmation. One already held is added to the room first, with its
+   * transparent copy if one was made, so taking in the next picture never throws it away; only
+   * cancelling does. If it cannot be added it stays held and the new picture is not taken.
+   * Something that is not a picture leaves the held one where it is.
+   *
+   * A picture still to be taken when the panel closes stays among the arrivals, to be added then.
+   */
+  private async receive(
+    result: ClipboardImageResult,
+    arrival: UnconfirmedImage | null,
+    returned: boolean
+  ): Promise<void> {
+    if (this.destroyed) return;
     if (result.kind !== 'image') {
       this.pendingNotice.set(result.kind);
       return;
     }
+    if (!arrival) return;
+    // The copy being made is what gets added, and a picture already being added is not added twice.
+    while (this.adding || this.clearing) await (this.adding ?? this.clearing);
+    if (this.destroyed) return;
+    const held = this.pendingImage();
+    let previous: PendingNotice | null = null;
+    if (held) {
+      previous = await this.add(held);
+      if (this.destroyed) return;
+      if (previous === 'oversized' || previous === 'failed' || previous === 'noPermission') {
+        this.letGoOf(arrival);
+        this.pendingNotice.set(
+          previous === 'oversized' ? 'keptOversized' : previous === 'failed' ? 'keptFailed' : 'keptNoPermission'
+        );
+        return;
+      }
+    }
+    this.letGoOf(arrival);
+    this.hold(arrival.file, arrival.place);
+    if (returned) this.pendingNotice.set('returned');
+    else if (previous === 'added') this.pendingNotice.set('previousAdded');
+    else if (previous === 'duplicate') this.pendingNotice.set('previousDuplicate');
+  }
+
+  private letGoOf(arrival: UnconfirmedImage): void {
+    const index = this.arrivals.indexOf(arrival);
+    if (index >= 0) this.arrivals.splice(index, 1);
+  }
+
+  /**
+   * Hands whatever is left unconfirmed as the panel closes to be added, once anything under way
+   * has finished, so that nothing is added twice. Only cancelling throws a picture away.
+   */
+  private async handOverUnconfirmed(): Promise<void> {
+    while (this.intake || this.adding || this.clearing) {
+      try {
+        await (this.intake ?? this.adding ?? this.clearing);
+      } catch {
+        // Whatever went wrong is left to show in what remains held.
+      }
+    }
+    const pending = this.pendingImage();
+    const left: UnconfirmedImage[] = pending
+      ? [{ file: (pending.transparent ?? pending.original).file, place: pending.place }]
+      : [];
+    left.push(...this.arrivals.splice(0));
+    this.dropPendingImage();
+    if (left.length) await this.droppedImages.addUnconfirmed(left);
+  }
+
+  /**
+   * Stores a held picture, letting go of it once stored. One that could not be stored, or that
+   * this seat no longer has leave to add, is kept.
+   */
+  private add(pending: PendingImage): Promise<PendingNotice> {
+    if (!this.rolePermission.canEditTabletop) return Promise.resolve('noPermission');
+    this.pendingAdding.set(true);
+    this.pickingColor.set(false);
+    const adding = this.store(pending).then((notice) => {
+      this.adding = null;
+      this.pendingAdding.set(false);
+      if (notice !== 'oversized' && notice !== 'failed' && this.pendingImage() === pending) this.dropPendingImage();
+      return notice;
+    });
+    this.adding = adding;
+    return adding;
+  }
+
+  private async store(pending: PendingImage): Promise<PendingNotice> {
+    const stored = new Set(this.imageStorage.images.map((image) => image.identifier));
+    try {
+      const file = (pending.transparent ?? pending.original).file;
+      // A dropped picture is placed where it was dropped, as it would have been without asking.
+      const { images, oversized } = pending.place
+        ? await this.fileArchiver.loadImages([file], pending.place)
+        : await this.fileArchiver.loadImages([file]);
+      if (oversized.length) return 'oversized';
+      if (!images.length) return 'failed';
+      return stored.has(images[0].identifier) ? 'duplicate' : 'added';
+    } catch {
+      return 'failed';
+    }
+  }
+
+  private hold(file: File, place: ImageDropPlace | null): void {
     const pending: PendingImage = {
-      original: { file: result.file, url: URL.createObjectURL(result.file) },
+      original: { file, url: URL.createObjectURL(file) },
       transparent: null,
+      place,
     };
     this.pendingImage.set(pending);
+    this.canClearPending.set(false);
+    this.pickingColor.set(false);
     this.pendingNotice.set(null);
-    this.canClear(result.file).then(
+    this.canClear(file).then(
       (can) => this.pendingImage() === pending && this.canClearPending.set(can),
       () => this.pendingImage() === pending && this.canClearPending.set(false)
     );

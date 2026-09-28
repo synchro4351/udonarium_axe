@@ -118,6 +118,36 @@ describe('ImageDropEventHandlerService', () => {
     expect(createGameCharacterWith).toHaveBeenCalledWith({ x: 975, y: 25, z: 0 }, expect.anything(), 'image-1');
   });
 
+  it('judges a drop confirmed later by where it landed, not by a panel opened over it since', () => {
+    document.body.innerHTML = '<div id="app-table-layer"><div id="piece"></div></div><div id="panel"></div>';
+    dropTarget = document.querySelector('#panel');
+    setup();
+
+    imageDropped$.emit({
+      identifier: 'image-1',
+      fileName: 'ゴブリン.png',
+      dropPoint: { x: 10, y: 20 },
+      dropTarget: document.querySelector('#piece'),
+    });
+
+    expect(createGameCharacterWith).toHaveBeenCalledWith({ x: 100, y: 200, z: 0 }, 'ゴブリン', 'image-1');
+  });
+
+  it('falls back to what is under the point when the element it landed on is gone', () => {
+    document.body.innerHTML = '<div id="panel"></div>';
+    dropTarget = document.querySelector('#panel');
+    setup();
+
+    imageDropped$.emit({
+      identifier: 'image-1',
+      fileName: 'ゴブリン.png',
+      dropPoint: { x: 10, y: 20 },
+      dropTarget: document.createElement('div'),
+    });
+
+    expect(createGameCharacterWith).not.toHaveBeenCalled();
+  });
+
   it('makes nothing when it cannot tell where the drop landed', () => {
     dropTarget = null;
     setup();

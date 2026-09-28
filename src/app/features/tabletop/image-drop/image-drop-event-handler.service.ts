@@ -34,7 +34,10 @@ export class ImageDropEventHandlerService {
   private createCharacter(event: ImageDroppedEvent): void {
     if (!this.rolePermission.canEditTabletop) return;
 
-    const dropTarget = document.elementFromPoint(event.dropPoint.x, event.dropPoint.y) as HTMLElement | null;
+    // A drop confirmed later is judged by where it landed, not by a panel since opened over it.
+    const dropTarget = (
+      event.dropTarget?.isConnected ? event.dropTarget : document.elementFromPoint(event.dropPoint.x, event.dropPoint.y)
+    ) as HTMLElement | null;
     if (!isTabletopDropTarget(dropTarget)) return;
 
     const position = this.clampToTable(

@@ -7,6 +7,7 @@ import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ImageTag, SYSTEM_RESERVED_TAG } from '@axe/domain/media/image-tag';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
+import { DroppedImageEventHandlerService } from '@axe/features/file/file-storage/dropped-image-event-handler.service';
 import { FileStorageComponent, PENDING_NOTICE_KEYS } from '@axe/features/file/file-storage/file-storage.component';
 import type { clearBackgroundAt, ClearBackgroundResult } from '@axe/features/file/file-storage/transparent-background';
 import { expectPanelDragRecovery, PanelDragTestHostComponent } from '@axe/testing/panel-drag-recovery';
@@ -142,6 +143,7 @@ describe('FileStorageComponent', () => {
     let load: ReturnType<typeof vi.spyOn>;
     let revokeObjectURL: ReturnType<typeof vi.spyOn>;
     let clearBackground: Mock<typeof clearBackgroundAt>;
+    let addUnconfirmed: ReturnType<typeof vi.spyOn>;
 
     function screenshot(): File {
       return new File([new Uint8Array(4)], 'image.png', { type: 'image/png' });
@@ -209,10 +211,14 @@ describe('FileStorageComponent', () => {
       });
       component['clearBackground'] = clearBackground;
       component['canClear'] = () => Promise.resolve(true);
+      addUnconfirmed = vi.spyOn(TestBed.inject(DroppedImageEventHandlerService), 'addUnconfirmed').mockResolvedValue();
       fixture.detectChanges();
     });
 
-    afterEach(() => {
+    afterEach(async () => {
+      // Closed while the stand-ins are still in place, so what it hands over goes nowhere real.
+      fixture.destroy();
+      await new Promise((resolve) => setTimeout(resolve));
       PeerCursor.myCursor = null!;
       vi.restoreAllMocks();
     });
@@ -312,12 +318,96 @@ describe('FileStorageComponent', () => {
       expect(loadImages).not.toHaveBeenCalled();
     });
 
-    it('lets go of the preview when the panel closes', () => {
-      pasteBox().dispatchEvent(pasteEvent(screenshot()));
+    describe('when the panel closes', () => {
+      it('hands the held picture over to be added, and lets go of the preview', async () => {
+        pasteBox().dispatchEvent(pasteEvent(screenshot()));
+        const held = component.pendingImage()!.original.file;
 
-      fixture.destroy();
+        fixture.destroy();
+        await vi.waitFor(() => expect(addUnconfirmed).toHaveBeenCalled());
 
-      expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+        expect(addUnconfirmed).toHaveBeenCalledWith([{ file: held, place: null }]);
+        expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+      });
+
+      it('hands over a dropped one with where it was dropped, as its transparent copy if made', async () => {
+        const place = { point: { x: 30, y: 40 }, target: document.body };
+        component.holdDroppedImage(screenshot(), place);
+        await settle();
+        component.togglePicking();
+        await component.pickColor(clickPreview());
+        const copy = component.pendingImage()!.transparent!.file;
+
+        fixture.destroy();
+        await vi.waitFor(() => expect(addUnconfirmed).toHaveBeenCalled());
+
+        expect(addUnconfirmed).toHaveBeenCalledWith([{ file: copy, place }]);
+      });
+
+      it('hands over nothing the user cancelled', async () => {
+        pasteBox().dispatchEvent(pasteEvent(screenshot()));
+        component.cancelPending();
+
+        fixture.destroy();
+        await new Promise((resolve) => setTimeout(resolve));
+
+        expect(addUnconfirmed).not.toHaveBeenCalled();
+        expect(loadImages).not.toHaveBeenCalled();
+      });
+
+      it('waits for an add under way, handing over nothing it stored', async () => {
+        let finish!: (value: { images: ImageFile[]; oversized: string[] }) => void;
+        loadImages.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+        pasteBox().dispatchEvent(pasteEvent(screenshot()));
+        const confirming = component.confirmPending();
+
+        fixture.destroy();
+        finish({ images: [ImageFile.createEmpty('pasted')], oversized: [] });
+        await confirming;
+        await new Promise((resolve) => setTimeout(resolve));
+
+        expect(loadImages).toHaveBeenCalledTimes(1);
+        expect(addUnconfirmed).not.toHaveBeenCalled();
+      });
+
+      it('hands over a picture an add under way could not store', async () => {
+        let finish!: (value: { images: ImageFile[]; oversized: string[] }) => void;
+        loadImages.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+        pasteBox().dispatchEvent(pasteEvent(screenshot()));
+        const held = component.pendingImage()!.original.file;
+        const confirming = component.confirmPending();
+
+        fixture.destroy();
+        finish({ images: [], oversized: ['image.png'] });
+        await confirming;
+        await vi.waitFor(() => expect(addUnconfirmed).toHaveBeenCalled());
+
+        expect(addUnconfirmed).toHaveBeenCalledWith([{ file: held, place: null }]);
+      });
+
+      it('keeps the held picture for handing over when the seat loses leave to add it', async () => {
+        pasteBox().dispatchEvent(pasteEvent(screenshot()));
+        const held = component.pendingImage()!.original.file;
+        PeerCursor.createMyCursor().role = PeerRole.Guest;
+
+        await component.confirmPending();
+        expect(component.pendingNotice()).toBe('noPermission');
+        expect(component.pendingImage()?.original.file).toBe(held);
+
+        fixture.destroy();
+        await vi.waitFor(() => expect(addUnconfirmed).toHaveBeenCalled());
+        expect(addUnconfirmed).toHaveBeenCalledWith([{ file: held, place: null }]);
+      });
+    });
+
+    it('holds a picture a closed panel could not add, saying so', async () => {
+      const file = screenshot();
+
+      component.holdDroppedImage(file, null, true);
+      await vi.waitFor(() => expect(component['intake']).toBeNull());
+
+      expect(component.pendingImage()?.original.file).toBe(file);
+      expect(component.pendingNotice()).toBe('returned');
     });
 
     it('says so when the paste holds no picture', () => {
@@ -363,6 +453,247 @@ describe('FileStorageComponent', () => {
 
       expect(load).toHaveBeenCalledTimes(1);
       expect(component.pendingImage()).toBeNull();
+    });
+
+    it('keeps a picture that could not be stored, so it can be tried again or cancelled', async () => {
+      loadImages.mockResolvedValue({ images: [], oversized: ['clipboard.png'] });
+      pasteBox().dispatchEvent(pasteEvent(screenshot()));
+
+      await component.confirmPending();
+
+      expect(component.pendingImage()).not.toBeNull();
+      expect(revokeObjectURL).not.toHaveBeenCalled();
+    });
+
+    describe('a picture dropped on the page', () => {
+      const place = { point: { x: 30, y: 40 }, target: document.body };
+
+      it('is held for confirmation rather than stored at once', () => {
+        const token = new File([new Uint8Array(3)], 'goblin.png', { type: 'image/png' });
+
+        component.holdDroppedImage(token, place);
+
+        expect(component.pendingImage()?.original.file).toBe(token);
+        expect(loadImages).not.toHaveBeenCalled();
+      });
+
+      it('is placed where it was dropped once confirmed', async () => {
+        const token = new File([new Uint8Array(3)], 'goblin.png', { type: 'image/png' });
+        component.holdDroppedImage(token, place);
+
+        await component.confirmPending();
+
+        expect(loadImages).toHaveBeenCalledWith([token], place);
+      });
+
+      it('is placed as its transparent copy when one was made', async () => {
+        component['canClear'] = () => Promise.resolve(true);
+        component.holdDroppedImage(screenshot(), place);
+        await settle();
+        component.togglePicking();
+        await component.pickColor(clickPreview());
+        const copy = component.pendingImage()!.transparent!.file;
+
+        await component.confirmPending();
+
+        expect(loadImages).toHaveBeenCalledWith([copy], place);
+      });
+    });
+
+    describe('when another picture arrives while one is held', () => {
+      function named(name: string): File {
+        return new File([new Uint8Array(3)], name, { type: 'image/png' });
+      }
+
+      async function pasteAndSettle(...files: File[]): Promise<void> {
+        pasteBox().dispatchEvent(pasteEvent(...files));
+        await vi.waitFor(() => expect(component['intake']).toBeNull());
+      }
+
+      it('adds the held one to the room, then holds the new one', async () => {
+        loadImages.mockResolvedValue({ images: [ImageFile.createEmpty('first-added')], oversized: [] });
+        const first = named('first.png');
+        await pasteAndSettle(first);
+
+        await pasteAndSettle(named('second.png'));
+
+        expect(loadImages).toHaveBeenCalledTimes(1);
+        expect(loadImages).toHaveBeenCalledWith([first]);
+        expect(component.pendingImage()?.original.file.name).toBe('second.png');
+        expect(component.pendingNotice()).toBe('previousAdded');
+        expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+      });
+
+      it('adds the transparent copy of the held one when one was made', async () => {
+        await pasteAndSettle(named('first.png'));
+        await settle();
+        component.togglePicking();
+        await component.pickColor(clickPreview());
+        const copy = component.pendingImage()!.transparent!.file;
+
+        await pasteAndSettle(named('second.png'));
+
+        expect(loadImages).toHaveBeenCalledWith([copy]);
+      });
+
+      it('waits for a transparent copy still being made, and adds that', async () => {
+        await pasteAndSettle(named('first.png'));
+        await settle();
+        let finish!: (value: ClearBackgroundResult) => void;
+        clearBackground.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+        component.togglePicking();
+        const picking = component.pickColor(clickPreview());
+
+        pasteBox().dispatchEvent(pasteEvent(named('second.png')));
+        expect(loadImages).not.toHaveBeenCalled();
+        const copy = transparentCopy();
+        finish({ kind: 'cleared', file: copy, color: { r: 0, g: 0, b: 0 } });
+        await picking;
+        await vi.waitFor(() => expect(component['intake']).toBeNull());
+
+        expect(loadImages).toHaveBeenCalledWith([copy]);
+        expect(component.pendingImage()?.original.file.name).toBe('second.png');
+      });
+
+      it('adds a dropped one where it was dropped before holding the next', async () => {
+        const place = { point: { x: 30, y: 40 }, target: document.body };
+        const token = named('goblin.png');
+        component.holdDroppedImage(token, place);
+
+        await pasteAndSettle(named('second.png'));
+
+        expect(loadImages).toHaveBeenCalledWith([token], place);
+        expect(component.pendingImage()?.place).toBeNull();
+      });
+
+      it('does the same for a picture chosen in the dialog', async () => {
+        const first = named('first.png');
+        await pasteAndSettle(first);
+
+        chooseFiles(named('map.png'));
+        await vi.waitFor(() => expect(component['intake']).toBeNull());
+
+        expect(loadImages).toHaveBeenCalledWith([first]);
+        expect(component.pendingImage()?.original.file.name).toBe('map.png');
+        expect(load).not.toHaveBeenCalled();
+      });
+
+      it('keeps the held one, and does not take the new one, when the held one is too big', async () => {
+        loadImages.mockResolvedValue({ images: [], oversized: ['first.png'] });
+        await pasteAndSettle(named('first.png'));
+
+        await pasteAndSettle(named('second.png'));
+
+        expect(component.pendingImage()?.original.file.name).toBe('first.png');
+        expect(component.pendingNotice()).toBe('keptOversized');
+        expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+      });
+
+      it('keeps the held one when storing it fails', async () => {
+        loadImages.mockRejectedValue(new Error('decode failed'));
+        await pasteAndSettle(named('first.png'));
+
+        await pasteAndSettle(named('second.png'));
+
+        expect(component.pendingImage()?.original.file.name).toBe('first.png');
+        expect(component.pendingNotice()).toBe('keptFailed');
+      });
+
+      it('keeps the held one when the paste holds no picture', async () => {
+        await pasteAndSettle(named('first.png'));
+
+        await pasteAndSettle();
+        await pasteAndSettle(new File(['text'], 'notes.txt', { type: 'text/plain' }));
+
+        expect(loadImages).not.toHaveBeenCalled();
+        expect(component.pendingImage()?.original.file.name).toBe('first.png');
+        expect(component.pendingNotice()).toBe('unsupported');
+      });
+
+      it('keeps the held one when the seat may no longer add pictures', async () => {
+        await pasteAndSettle(named('first.png'));
+        PeerCursor.createMyCursor().role = PeerRole.Guest;
+
+        await pasteAndSettle(named('second.png'));
+
+        expect(loadImages).not.toHaveBeenCalled();
+        expect(component.pendingImage()?.original.file.name).toBe('first.png');
+        expect(component.pendingNotice()).toBe('noPermission');
+      });
+
+      it('keeps the held one, not taking the next, when leave to add is lost before it arrives', async () => {
+        await pasteAndSettle(named('first.png'));
+        PeerCursor.createMyCursor().role = PeerRole.Guest;
+
+        component.holdDroppedImage(named('second.png'), null, true);
+        await vi.waitFor(() => expect(component['intake']).toBeNull());
+
+        expect(loadImages).not.toHaveBeenCalled();
+        expect(component.pendingImage()?.original.file.name).toBe('first.png');
+        expect(component.pendingNotice()).toBe('keptNoPermission');
+      });
+
+      it('never adds the held one twice when it is already being added', async () => {
+        const first = named('first.png');
+        await pasteAndSettle(first);
+
+        const confirming = component.confirmPending();
+        await pasteAndSettle(named('second.png'));
+        await confirming;
+
+        expect(loadImages).toHaveBeenCalledTimes(1);
+        expect(component.pendingImage()?.original.file.name).toBe('second.png');
+      });
+
+      it('takes pictures arriving together in turn', async () => {
+        const first = named('first.png');
+        const second = named('second.png');
+        await pasteAndSettle(first);
+
+        pasteBox().dispatchEvent(pasteEvent(second));
+        await pasteAndSettle(named('third.png'));
+
+        expect(loadImages.mock.calls.map((call: unknown[]) => (call[0] as File[])[0].name)).toEqual([
+          'first.png',
+          'second.png',
+        ]);
+        expect(component.pendingImage()?.original.file.name).toBe('third.png');
+      });
+
+      it('hands over, rather than holds, one still waiting its turn when the panel closes', async () => {
+        let finish!: (value: { images: ImageFile[]; oversized: string[] }) => void;
+        await pasteAndSettle(named('first.png'));
+        loadImages.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+        const second = named('second.png');
+
+        pasteBox().dispatchEvent(pasteEvent(second));
+        fixture.destroy();
+        finish({ images: [ImageFile.createEmpty('pasted')], oversized: [] });
+        await vi.waitFor(() => expect(addUnconfirmed).toHaveBeenCalled());
+
+        expect(loadImages).toHaveBeenCalledTimes(1);
+        expect(addUnconfirmed).toHaveBeenCalledWith([{ file: second, place: null }]);
+        expect(component.pendingImage()).toBeNull();
+        expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+      });
+
+      it('hands over the held one and the next when the held one fails as the panel closes', async () => {
+        let finish!: (value: { images: ImageFile[]; oversized: string[] }) => void;
+        const first = named('first.png');
+        await pasteAndSettle(first);
+        loadImages.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+        const second = named('second.png');
+
+        pasteBox().dispatchEvent(pasteEvent(second));
+        fixture.destroy();
+        finish({ images: [], oversized: ['first.png'] });
+        await vi.waitFor(() => expect(addUnconfirmed).toHaveBeenCalled());
+
+        expect(addUnconfirmed).toHaveBeenCalledWith([
+          { file: first, place: null },
+          { file: second, place: null },
+        ]);
+      });
     });
 
     describe('making the background transparent', () => {

@@ -1597,7 +1597,13 @@
           "oversized": "Over 2MB, so it can’t be added",
           "duplicate": "The same image is already stored",
           "added": "Image added",
-          "failed": "The image couldn’t be added"
+          "failed": "The image couldn’t be added",
+          "previousAdded": "The previous image was added",
+          "previousDuplicate": "The previous image was already stored",
+          "keptOversized": "The previous image is over 2MB and couldn’t be added, so the new one wasn’t taken. Cancel the previous image, then try again",
+          "keptFailed": "The previous image couldn’t be added, so the new one wasn’t taken. Add or cancel the previous image, then try again",
+          "keptNoPermission": "This seat can’t add the previous image, so the new one wasn’t taken. Cancel the previous image, then try again",
+          "returned": "This image couldn’t be added when the panel closed, so it was brought back. Add or cancel it"
         },
         "transparent": {
           "pick": "Make background transparent",

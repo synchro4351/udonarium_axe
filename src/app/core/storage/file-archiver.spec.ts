@@ -143,6 +143,58 @@ describe('FileArchiver', () => {
     });
   });
 
+  describe('a drop of a single file', () => {
+    function drop(files: File[]): Event {
+      const event = new Event('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'], files } });
+      Object.defineProperty(event, 'clientX', { value: 10 });
+      Object.defineProperty(event, 'clientY', { value: 20 });
+      document.body.dispatchEvent(event);
+      return event;
+    }
+
+    function png(name: string): File {
+      return new File([new Uint8Array([1])], name, { type: 'image/png' });
+    }
+
+    it('is offered first to whatever wants it, with where it landed, and loads nothing once taken', () => {
+      const load = vi.spyOn(FileArchiver.instance, 'load');
+      const handler = vi.fn(() => true);
+      FileArchiver.instance.singleFileDropHandler = handler;
+      FileArchiver.instance.initialize();
+      const file = png('a.png');
+
+      drop([file]);
+
+      expect(handler).toHaveBeenCalledWith(file, { point: { x: 10, y: 20 }, target: document.body });
+      expect(load).not.toHaveBeenCalled();
+    });
+
+    it('loads as before when the offer is declined', () => {
+      const load = vi.spyOn(FileArchiver.instance, 'load').mockResolvedValue();
+      FileArchiver.instance.singleFileDropHandler = () => false;
+      FileArchiver.instance.initialize();
+      const file = png('a.png');
+
+      drop([file]);
+
+      expect(Array.from(load.mock.calls[0][0])).toEqual([file]);
+      expect(load.mock.calls[0][1]).toEqual({ x: 10, y: 20 });
+    });
+
+    it('is not offered when several files are dropped together', () => {
+      const load = vi.spyOn(FileArchiver.instance, 'load').mockResolvedValue();
+      const handler = vi.fn(() => true);
+      FileArchiver.instance.singleFileDropHandler = handler;
+      FileArchiver.instance.initialize();
+
+      drop([png('a.png'), png('b.png')]);
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(load).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('load', () => {
     it('survives an empty file list', async () => {
       await FileArchiver.instance.load([]);
@@ -273,6 +325,32 @@ describe('FileArchiver', () => {
       off();
 
       expect(dropped).toHaveLength(0);
+    });
+
+    it('places an image where it was dropped when told, as for a drop confirmed later', async () => {
+      const dropped: ImageDroppedEvent[] = [];
+      const off = imageDropped$.subscribe((event) => dropped.push(event));
+      const target = document.createElement('div');
+
+      await FileArchiver.instance.loadImages([imageFile('a.png')], { point: { x: 10, y: 20 }, target });
+      off();
+
+      expect(dropped).toEqual([
+        { identifier: 'image-a.png', fileName: 'a.png', dropPoint: { x: 10, y: 20 }, dropTarget: target },
+      ]);
+    });
+
+    it('places nothing it could not store', async () => {
+      const dropped: ImageDroppedEvent[] = [];
+      const off = imageDropped$.subscribe((event) => dropped.push(event));
+
+      await FileArchiver.instance.loadImages([imageFile('huge.png', 2 * 1024 * 1024 + 1)], {
+        point: { x: 10, y: 20 },
+        target: null,
+      });
+      off();
+
+      expect(dropped).toEqual([]);
     });
 
     it('takes images even after a room load was declined', async () => {

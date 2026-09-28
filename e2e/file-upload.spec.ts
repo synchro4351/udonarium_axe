@@ -46,13 +46,18 @@ test.describe('画像アップロード (file-storage)', () => {
     await openFileStorage(page);
   });
 
-  test('PNG ファイルをアップロードすると画像グリッドに追加されること', async ({ page }) => {
+  test('PNG ファイルを選んで追加すると画像グリッドに追加されること', async ({ page }) => {
     const beforeImageCount = await page.locator('file-storage img').count();
     await page.locator('file-storage input[type="file"][accept="image/*"]').setInputFiles({
       name: 'tiny.png',
       mimeType: 'image/png',
       buffer: TINY_PNG,
     });
+    // A single picture is held for confirmation first; its preview is not yet in the grid.
+    const pending = page.locator('file-storage [data-testid="pending-image"]');
+    await expect(pending).toBeVisible({ timeout: 10000 });
+    await pending.getByRole('button', { name: /追加/ }).click();
+    await expect(pending).toBeHidden({ timeout: 10000 });
     await expect
       .poll(() => page.locator('file-storage img').count(), { timeout: 10000 })
       .toBeGreaterThan(beforeImageCount);

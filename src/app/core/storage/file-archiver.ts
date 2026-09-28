@@ -38,6 +38,18 @@ export interface ImageLoadResult {
   readonly oversized: string[];
 }
 
+/** Where an image was dropped: the point on screen, and the element under it at that moment. */
+export interface ImageDropPlace {
+  readonly point: { x: number; y: number };
+  readonly target: Element | null;
+}
+
+/**
+ * Offered a lone file dropped from outside the page before anything is loaded, answering whether it
+ * took the file. One that did has it to itself, and nothing more is done with the drop here.
+ */
+export type SingleFileDropHandler = (file: File, place: ImageDropPlace) => boolean;
+
 /**
  * Whether a dropped file may be room or object XML: typed as plain text or XML, and not
  * named as some other kind of file.
@@ -69,6 +81,12 @@ export class FileArchiver {
   get reloadCheck(): LoadGuard | null {
     return ObjectStore.instance.get<LoadGuard>('ReloadCheck');
   }
+
+  /**
+   * Asked first about a drop of a single file, so it can hold a picture for the user to look over
+   * rather than have it stored at once; null lets every drop load as it is.
+   */
+  singleFileDropHandler: SingleFileDropHandler | null = null;
 
   private maxImageSize = 2 * MEGA_BYTE;
   private maxAudioSize = 10 * MEGA_BYTE;
@@ -144,7 +162,12 @@ export class FileArchiver {
 
     const files = event.dataTransfer?.files;
     if (!files) return;
-    this.load(files, { x: event.clientX, y: event.clientY });
+    const place: ImageDropPlace = {
+      point: { x: event.clientX, y: event.clientY },
+      target: event.target instanceof Element ? event.target : null,
+    };
+    if (files.length === 1 && this.singleFileDropHandler?.(files[0], place)) return;
+    this.load(files, place.point);
   }
 
   /**
@@ -193,15 +216,30 @@ export class FileArchiver {
    *
    * Other kinds of file are ignored rather than read, so no room data or zip is opened and
    * nothing is placed on the table. Images over 2 MB are left out and named in the result.
+   *
+   * Given where they were dropped, as for a dropped picture the user confirmed later, each image
+   * stored is announced for placing there, the next one offset a little from the last.
    */
-  async loadImages(files: File[] | FileList): Promise<ImageLoadResult> {
+  async loadImages(files: File[] | FileList, dropPlace?: ImageDropPlace): Promise<ImageLoadResult> {
     const images: ImageFile[] = [];
     const oversized: string[] = [];
     for (const file of files instanceof FileList ? toArrayOfFileList(files) : files) {
       if (!file.type.startsWith('image/')) continue;
       const image = await this.storeImage(file);
-      if (image) images.push(image);
-      else oversized.push(file.name);
+      if (!image) {
+        oversized.push(file.name);
+        continue;
+      }
+      const dropPoint = this.offsetDropPoint(dropPlace?.point, images.length);
+      if (dropPoint) {
+        emitImageDropped({
+          identifier: image.identifier,
+          fileName: file.name,
+          dropPoint,
+          dropTarget: dropPlace?.target,
+        });
+      }
+      images.push(image);
     }
     if (images.length) emitFileLoaded();
     return { images, oversized };
