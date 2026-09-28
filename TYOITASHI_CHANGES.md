@@ -96,6 +96,8 @@
 
 短時間の反応エフェクト：[5e5dd408](https://github.com/synchro4351/udonarium_axe/commit/5e5dd408)。`4cf3254f`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/emoji-effects)。既存エフェクトへ「ぽんと出る」「対象へ投げる」「降らせる」の3種を追加し、絵文字・短い文字列・卓の画像を選べる。同期項目は`reactionText`と`reactionImageIdentifier`。旧設定は空欄として読める。対象574件、関連2,570件成功、型検査・lint・整形・ビルド成功。実画面・複数端末の目視は未確認。
 
+キャラクター画像を差し込むカットイン：[4665bea5](https://github.com/synchro4351/udonarium_axe/commit/4665bea5)（実装）、[a8b9ef05](https://github.com/synchro4351/udonarium_axe/commit/a8b9ef05)（表示文言）。`5e5dd408`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-character-template)。発動時のキャラクター・画像IDと画像ごとの調整値を同期し、未設定時は内蔵シルエットを表示。既存の固定画像カットインは変更しない。型検査2経路、対象84件、コミット時の全13,219件成功・1件skip、lint・整形・ビルド成功。実画面・複数端末は未確認。録画からの動画書き出しは立ち絵差し込みに未対応。
+
 ## 検証と制限
 
 - r4の固定ソース`a2999013`は、全体947ファイル／13,084件成功・1件skip、production build成功。r3の固定ソース`cf5edecf`は全体929ファイル／12,712件成功・1件skip、production build成功。r2の固定ソース`6e5668dd`は全体927ファイル／12,680件成功・1件skip、production build成功。
