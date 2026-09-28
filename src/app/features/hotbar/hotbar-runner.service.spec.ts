@@ -14,6 +14,7 @@ import { AudioStorage } from '@axe/core/storage/audio-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DataElement } from '@axe/domain/data/data-element';
+import { createEffectPreset, DEFAULT_EFFECT_PRESET_SEEDS } from '@axe/domain/effect/builtin-effect-presets';
 import { EffectField } from '@axe/domain/effect/effect-field';
 import { Hotbar } from '@axe/domain/hotbar/hotbar';
 import { emptyHotbarSlotDraft, HotbarSlotDraft } from '@axe/domain/hotbar/hotbar-draft';
@@ -115,6 +116,18 @@ describe('HotbarRunnerService', () => {
 
       expect(run(slotOf('effect', '爆炎'), character)).toEqual({ ok: true });
       expect(fire).toHaveBeenCalledWith(preset, character);
+    });
+
+    it('fires a reaction from the shelf the same way as any other effect', () => {
+      const seed = DEFAULT_EFFECT_PRESET_SEEDS.find((candidate) => candidate.kind === 'reactthrow')!;
+      const reaction = createEffectPreset(seed);
+      const fire = vi.spyOn(TestBed.inject(EffectCastService), 'fireFromCharacter').mockReturnValue({} as never);
+      try {
+        expect(run(slotOf('effect', seed.name), character)).toEqual({ ok: true });
+        expect(fire).toHaveBeenCalledWith(reaction, character);
+      } finally {
+        ObjectStore.instance.remove(reaction);
+      }
     });
 
     it('says so when the effect it points at is gone', () => {

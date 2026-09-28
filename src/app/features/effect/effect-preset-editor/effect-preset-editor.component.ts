@@ -8,6 +8,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { ModalService } from '@axe/application/ui/modal.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
+import { ImageStorage } from '@axe/core/storage/image-storage';
 import { EFFECT_KINDS, EffectKind } from '@axe/domain/effect/effect-kind';
 import { EFFECT_MOTE_OPTIONS } from '@axe/domain/effect/effect-motes';
 import { EffectPreset } from '@axe/domain/effect/effect-preset';
@@ -18,6 +19,7 @@ import {
   SLASH_STYLE_OPTIONS,
   usesImpactKindField,
   usesProjectileFields,
+  usesReactionFields,
   usesShotFields,
   usesSlashFields,
   usesTargetLimit,
@@ -42,6 +44,7 @@ import {
   updateStage,
 } from '@axe/domain/effect/effect-stage-form';
 import { presetSoundLabelKey, soundFileName } from '@axe/domain/media/preset-sound-labels';
+import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -67,6 +70,7 @@ export class EffectPresetEditorComponent {
   private readonly castService = inject(EffectCastService);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly audioStorage = inject(AudioStorage);
+  private readonly imageStorage = inject(ImageStorage);
   private readonly modalService = inject(ModalService);
   private readonly panelService = inject(PanelService);
   private readonly saveDataService = inject(SaveDataService);
@@ -125,6 +129,22 @@ export class EffectPresetEditorComponent {
   protected readonly showsSlash = computed(() => usesSlashFields(this.effectKind()));
   protected readonly showsShots = computed(() => usesShotFields(this.effectKind()));
   protected readonly showsImpactKind = computed(() => usesImpactKindField(this.effectKind()));
+  protected readonly showsReaction = computed(() => usesReactionFields(this.effectKind()));
+
+  /**
+   * The picture a reaction shows, as it stands in this room.
+   *
+   * `missing` is a picture that was chosen but is not here - left behind by a file, or not yet
+   * handed over - in which case the reaction shows its text instead.
+   */
+  protected readonly reactionImage = computed<{ url: string; missing: boolean }>(() => {
+    this.version();
+    this.objectChange.fileVersion();
+    const identifier = this.preset()?.reactionImageIdentifier ?? '';
+    if (identifier.length < 1) return { url: '', missing: false };
+    const url = this.imageStorage.get(identifier)?.url ?? '';
+    return { url, missing: url.length < 1 };
+  });
   protected readonly showsTargetLimit = computed(() => {
     this.version();
     return usesTargetLimit(this.preset()?.effectTargeting ?? 'single');
@@ -241,6 +261,21 @@ export class EffectPresetEditorComponent {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return;
     this.editBranch(index, branchIndex, { durationMs: numeric });
+  }
+
+  /** Chooses the reaction's picture from the room's images. Choosing none goes back to the text. */
+  protected chooseReactionImage(): void {
+    void this.modalService
+      .open<string>(FileSelecterComponent, { isAllowedEmpty: true })
+      .then((identifier) => {
+        if (identifier == null) return;
+        this.edit('reactionImageIdentifier', identifier);
+      })
+      .catch(() => undefined);
+  }
+
+  protected clearReactionImage(): void {
+    this.edit('reactionImageIdentifier', '');
   }
 
   /** A test fire, played on this screen alone. */

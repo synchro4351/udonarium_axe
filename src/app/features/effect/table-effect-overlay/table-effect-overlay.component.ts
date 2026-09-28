@@ -6,6 +6,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
+import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { PERF_EFFECT_RENDERABLES, perfCounters } from '@axe/core/util/perf-counters';
 import { GameCharacter } from '@axe/domain/character/game-character';
@@ -55,6 +56,7 @@ export class TableEffectOverlayComponent {
   private readonly visionService = inject(VisionService);
   private readonly objectStore = inject(ObjectStore);
   private readonly objectChange = inject(ObjectChangeService);
+  private readonly imageStorage = inject(ImageStorage);
 
   /**
    * Gathers the effects playing and the fields left standing into one thing to draw.
@@ -110,6 +112,7 @@ export class TableEffectOverlayComponent {
         viewRotation: this.uiSignalService.tableViewRotation(),
         resolvePosition: (identifier) => this.centerOf(identifier, gridSize),
         resolveImage: (identifier) => this.imageUrlOf(identifier),
+        resolveImageFile: (identifier) => this.imageStorage.get(identifier)?.url ?? '',
       });
       for (const part of parts) sprites.push({ ...part, key: `${active.key}-${part.key}` });
     }
@@ -212,6 +215,19 @@ export class TableEffectOverlayComponent {
     };
     if (!this.hasPaintLayer(sprite)) Object.assign(style, this.paint(sprite));
     return style;
+  }
+
+  /**
+   * The characters a reaction writes, sized to the sprite. A dark edge keeps a word readable
+   * over a bright map as well as a dark one.
+   */
+  protected textStyle(sprite: EffectSprite): Record<string, string> {
+    return {
+      'font-size': `${Math.max(1, sprite.height * 0.8).toFixed(1)}px`,
+      color: sprite.textColor || '#ffffff',
+      'text-shadow': '0 1px 3px rgba(0, 0, 0, 0.7)',
+      'font-weight': '700',
+    };
   }
 
   /** The inner layer, which carries the look and the animation. */

@@ -338,6 +338,64 @@
       </label>
     </fieldset>
 
+    @if (showsReaction()) {
+      <fieldset class="border-ui-border-panel m-0 flex flex-col gap-2 rounded-sm border border-solid p-2.5">
+        <legend class="text-ui-muted px-1 text-[11px] font-semibold tracking-wider">
+          {{ 'feature.effect.sectionReaction' | transloco }}
+        </legend>
+
+        <label class="flex items-center gap-2">
+          <span class="text-ui-muted w-20 shrink-0 text-[11px]">{{
+            'feature.effect.reactionTextLabel' | transloco
+          }}</span>
+          <input
+            class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm min-w-0 flex-1 border border-solid px-2 py-1 text-[13px] outline-none"
+            name="effect-reaction-text"
+            maxlength="40"
+            [ngModel]="target.reactionText"
+            (ngModelChange)="edit('reactionText', $event)"
+            [placeholder]="'feature.effect.reactionTextPlaceholder' | transloco"
+          />
+        </label>
+
+        <div class="flex items-center gap-2">
+          <span class="text-ui-muted w-20 shrink-0 text-[11px]">{{
+            'feature.effect.reactionImageLabel' | transloco
+          }}</span>
+          @if (reactionImage().url) {
+            <img
+              class="border-ui-border-panel size-8 rounded-sm border border-solid object-contain"
+              [src]="reactionImage().url"
+              alt=""
+            />
+          }
+          <button
+            class="bg-ui-input border-ui-border-panel text-ui-text hover:bg-ui-hover hover:border-ui-accent rounded-ui-sm inline-flex cursor-pointer items-center gap-1 border border-solid px-2 py-1 text-[12px] [&_.material-icons]:text-[15px]!"
+            type="button"
+            (click)="chooseReactionImage()"
+          >
+            <i class="material-icons">image</i>{{ 'feature.effect.reactionImageChoose' | transloco }}
+          </button>
+          @if (target.reactionImageIdentifier) {
+            <button
+              class="text-ui-muted hover:text-ui-danger cursor-pointer border-none bg-transparent p-0.5"
+              type="button"
+              (click)="clearReactionImage()"
+              [attr.aria-label]="'feature.effect.reactionImageClear' | transloco"
+              [title]="'feature.effect.reactionImageClear' | transloco"
+            >
+              <i class="material-icons text-[16px]!">close</i>
+            </button>
+          }
+        </div>
+
+        @if (reactionImage().missing) {
+          <p class="text-ui-danger m-0 text-[11px]">{{ 'feature.effect.reactionImageMissing' | transloco }}</p>
+        }
+        <p class="text-ui-muted m-0 text-[11px]">{{ 'feature.effect.reactionHint' | transloco }}</p>
+      </fieldset>
+    }
+
     <fieldset class="border-ui-border-panel m-0 flex flex-col gap-2 rounded-sm border border-solid p-2.5">
       <legend class="text-ui-muted px-1 text-[11px] font-semibold tracking-wider">
         {{ 'feature.effect.sectionTarget' | transloco }}

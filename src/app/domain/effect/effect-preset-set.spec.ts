@@ -153,6 +153,42 @@ describe('EffectPresetSet', () => {
       const [kept] = ObjectStore.instance.getObjects<EffectPreset>(EffectPreset);
       expect(kept.stageList.map((stage) => stage.kind)).toEqual(['projectile', 'frost']);
     });
+
+    it('carries a reaction across with its text and its picture', () => {
+      const source = makePreset('いいね');
+      source.kind = 'reactthrow';
+      source.reactionText = '👍 ナイス';
+      source.reactionImageIdentifier = 'reaction-image';
+      const xml = EffectPresetSet.of([source]).innerXml();
+      source.destroy();
+      makePreset('いいね');
+
+      parse(xml);
+
+      const [kept] = ObjectStore.instance.getObjects<EffectPreset>(EffectPreset);
+      expect(kept.effectKind).toBe('reactthrow');
+      expect(kept.reactionText).toBe('👍 ナイス');
+      expect(kept.reactionImageIdentifier).toBe('reaction-image');
+    });
+
+    it('reads an effect written before there were reactions with no mark of its own', () => {
+      const source = makePreset('爆炎');
+      source.kind = 'flame';
+      const xml = EffectPresetSet.of([source])
+        .innerXml()
+        .replace(/ reactionText="[^"]*"/, '')
+        .replace(/ reactionImageIdentifier="[^"]*"/, '');
+      expect(xml).not.toContain('reaction');
+      source.destroy();
+      ObjectStore.instance.clearDeleteHistory();
+
+      parse(xml);
+
+      const [kept] = ObjectStore.instance.getObjects<EffectPreset>(EffectPreset);
+      expect(kept.effectKind).toBe('flame');
+      expect(kept.reactionText).toBe('');
+      expect(kept.reactionImageIdentifier).toBe('');
+    });
   });
 
   describe('an effect handed on and handed back', () => {

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { EffectPlaybackService } from '@axe/application/effect/effect-playback.service';
+import { EffectPlaybackService, MAX_ACTIVE_REACTIONS } from '@axe/application/effect/effect-playback.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { EffectPreset } from '@axe/domain/effect/effect-preset';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -51,6 +51,35 @@ describe('EffectPlaybackService', () => {
     for (let count = 0; count < 20; count++) service.play(cast());
 
     expect(service.activeCasts()).toHaveLength(12);
+  });
+
+  it('keeps only the latest few reactions up, leaving the other effects alone', () => {
+    const reaction = new EffectPreset();
+    reaction.kind = 'reactpop';
+    reaction.reactionText = '👍';
+    ObjectStore.instance.add(reaction, false);
+    try {
+      service.play(cast());
+      for (let count = 0; count < 9; count++) {
+        service.play(cast({ presetIdentifier: reaction.identifier, seed: count }));
+      }
+
+      const reactions = service.activeCasts().filter((active) => active.preset === reaction);
+      expect(reactions).toHaveLength(MAX_ACTIVE_REACTIONS);
+      expect(reactions.map((active) => active.cast.seed)).toEqual([5, 6, 7, 8]);
+      expect(service.activeCasts().filter((active) => active.preset === preset)).toHaveLength(1);
+    } finally {
+      ObjectStore.instance.remove(reaction);
+    }
+  });
+
+  it('never shakes the screen for a reaction', () => {
+    preset.kind = 'reactthrow';
+    preset.grade = 3;
+    service.play(cast());
+
+    expect(service.shake()).toBe('');
+    expect(service.flash()).toBe('');
   });
 
   it('shakes the screen only for an effect that lands', () => {

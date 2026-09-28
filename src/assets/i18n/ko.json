@@ -1080,6 +1080,14 @@
       "sectionLook": "겉모습",
       "sectionTarget": "대상",
       "sectionKind": "종류별 설정",
+      "sectionReaction": "리액션",
+      "reactionTextLabel": "표시할 글자",
+      "reactionTextPlaceholder": "이모지나 짧은 말 (예: 👍 나이스!)",
+      "reactionImageLabel": "이미지",
+      "reactionImageChoose": "이미지 선택",
+      "reactionImageClear": "이미지를 빼고 글자로 되돌리기",
+      "reactionImageMissing": "선택한 이미지가 이 룸에 없습니다. 대신 글자(비어 있으면 ❔)를 표시합니다.",
+      "reactionHint": "이미지를 선택하면 글자보다 우선합니다. 긴 글자는 12자에서 자르고, 표시는 최대 3초입니다.",
       "sectionSound": "소리",
       "nameLabel": "이름",
       "kindLabel": "종류",
@@ -1136,7 +1144,10 @@
         "skyblade": "빛의 검",
         "raybeam": "레이저 조사",
         "arrowrain": "애로우 레인",
-        "ballistic": "탄도 미사일"
+        "ballistic": "탄도 미사일",
+        "reactpop": "리액션: 팝업",
+        "reactthrow": "리액션: 던지기",
+        "reactrain": "리액션: 쏟아지기"
       },
       "targeting": {
         "self": "자신",

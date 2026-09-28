@@ -18,6 +18,8 @@ export interface ActiveEffectCast {
 }
 
 const MAX_ACTIVE_CASTS = 12;
+/** How many light reactions may be up at once, among those casts; the oldest makes way. */
+export const MAX_ACTIVE_REACTIONS = 4;
 /** How long the shake and the flash last. Separate from the effect's own length, and kept short or the screen turns queasy. */
 const SHAKE_MS = 340;
 
@@ -95,7 +97,7 @@ export class EffectPlaybackService {
    *
    * A cast that cannot be read, or names no preset in the room, plays nothing and answers null. Its
    * sounds play even with motion turned off, but nothing is drawn and the answer is null. At most
-   * 12 casts run at once; the oldest is dropped.
+   * 12 casts run at once, 4 of them reactions; the oldest is dropped.
    */
   play(raw: unknown): ActiveEffectCast | null {
     const cast = normalizeEffectCast(raw);
@@ -111,7 +113,7 @@ export class EffectPlaybackService {
     this.startScreenShake(preset);
 
     const active: ActiveEffectCast = { key: ++this.nextKey, cast, preset, startedAt: clock() };
-    this._activeCasts.update((casts) => [...casts, active].slice(-MAX_ACTIVE_CASTS));
+    this._activeCasts.update((casts) => withoutOldReactions([...casts, active]).slice(-MAX_ACTIVE_CASTS));
     this.now.set(active.startedAt);
     this.startLoop();
     return active;
@@ -201,6 +203,22 @@ export class EffectPlaybackService {
     cancelAnimationFrame(this.frameHandle);
     this.frameHandle = null;
   }
+}
+
+/**
+ * Drops the oldest reactions past the most that may be up at once.
+ *
+ * A reaction is pressed again and again by a whole table, and every press left up would pile
+ * marks over the pieces. The effects that are not reactions are left alone.
+ */
+function withoutOldReactions(casts: ActiveEffectCast[]): ActiveEffectCast[] {
+  let excess = casts.filter((active) => active.preset.isReaction).length - MAX_ACTIVE_REACTIONS;
+  if (excess <= 0) return casts;
+  return casts.filter((active) => {
+    if (excess <= 0 || !active.preset.isReaction) return true;
+    excess--;
+    return false;
+  });
 }
 
 function clock(): number {

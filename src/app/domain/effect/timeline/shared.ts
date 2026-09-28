@@ -58,6 +58,10 @@ export interface EffectSprite {
   svg: string;
   /** True to lay it flat on the board, false to face it at the camera. */
   flat: boolean;
+  /** Characters written across it, as a reaction shows an emoji or a word. Left off for none. */
+  text?: string;
+  /** The colour of that text. An emoji keeps its own colours whatever this says. */
+  textColor?: string;
 }
 
 /** Where the effect is happening, which follows the target when it is set to. */
@@ -83,6 +87,11 @@ export interface EffectSpriteOptions {
    * A piece with no picture makes do with shards of light.
    */
   resolveImage?: (identifier: string) => string;
+  /**
+   * Where a picture from the room's images is, by its identifier, for a reaction that shows
+   * one. Empty when the room has no such picture, or not yet.
+   */
+  resolveImageFile?: (identifier: string) => string;
 }
 
 export interface Point3 {

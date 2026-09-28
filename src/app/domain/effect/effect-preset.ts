@@ -3,12 +3,14 @@ import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
 import { GameObject } from '@axe/core/sync/game-object';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { parseAttributesKeepingIdentifier, toAttributesKeepingIdentifier } from '@axe/core/sync/persisted-identifier';
+import { graphemesOf } from '@axe/domain/chat/emoji-only-text';
 import {
   EffectKind,
   EffectTargeting,
   isEffectKind,
   isEffectTargeting,
   isProjectileStyle,
+  isReactionKind,
   isSlashStyle,
   ProjectileStyle,
   SlashStyle,
@@ -24,6 +26,12 @@ const MAX_STAGGER_MS = 2000;
 const MAX_TARGET_LIMIT = 20;
 const MAX_SHOTS = 24;
 const MAX_AREA_RADIUS = 12;
+/** The longest a reaction stays up, in milliseconds. */
+export const MAX_REACTION_DURATION_MS = 3000;
+/** Where through the playback a thrown reaction lands. */
+export const REACTION_THROW_LAND = 0.45;
+/** The most characters a reaction shows, counting an emoji as one. */
+export const MAX_REACTION_LABEL_LENGTH = 12;
 
 @SyncObject('effect-preset')
 export class EffectPreset extends GameObject {
@@ -59,6 +67,14 @@ export class EffectPreset extends GameObject {
   @SyncVar() areaRadius: number = 0;
   /** The particles scattered along the way. Empty for whatever the family gives. */
   @SyncVar() moteStyle: string = '';
+  /** What a reaction shows: an emoji or a few words. Only a reaction reads it. */
+  @SyncVar() reactionText: string = '';
+  /**
+   * A picture from the room's images for a reaction to show instead of its text. Empty for the text.
+   *
+   * The name ends as every picture reference does, so a saved room carries the picture with it.
+   */
+  @SyncVar() reactionImageIdentifier: string = '';
 
   /**
    * The run this effect goes through, written as a list of stages.
@@ -136,7 +152,22 @@ export class EffectPreset extends GameObject {
   get duration(): number {
     // A run is as long as its stages take; the written length belongs to the one look.
     if (this.isStaged) return stagedEffectDuration(this.stageList);
+    // A reaction is a passing remark; left up for long, a few of them bury the table.
+    if (this.isReaction) return clamp(this.durationMs, MIN_DURATION_MS, MAX_REACTION_DURATION_MS, 900);
     return clamp(this.durationMs, MIN_DURATION_MS, MAX_DURATION_MS, 900);
+  }
+
+  /** Whether this is one of the light reactions, which show a mark rather than an element. */
+  get isReaction(): boolean {
+    return !this.isStaged && isReactionKind(this.kind);
+  }
+
+  /**
+   * The text a reaction shows, trimmed and cut to a few characters so a pasted paragraph
+   * cannot cover the table. Empty when none was written.
+   */
+  get reactionLabel(): string {
+    return reactionLabelOf(this.reactionText);
   }
 
   /** How long each target waits after the one before it, in milliseconds, held to at most 2000. */
@@ -166,6 +197,8 @@ export class EffectPreset extends GameObject {
     if (this.effectKind === 'arrowrain') return 0.35;
     // A ballistic shot strikes nothing between the launch and the fall.
     if (this.effectKind === 'ballistic') return 0.86;
+    // A thrown reaction sounds as it hits, not while it is still in the air.
+    if (this.effectKind === 'reactthrow') return REACTION_THROW_LAND;
     return 0.5;
   }
 
@@ -218,6 +251,20 @@ export class EffectPreset extends GameObject {
     const count = Math.max(targetCount, 1);
     return this.duration + this.stagger * (count - 1);
   }
+}
+
+/**
+ * A reaction's text, trimmed, on one line and cut to at most 12 characters.
+ *
+ * An emoji built of several code points, such as a family or a skin tone, counts as one where
+ * the runtime can tell where characters end.
+ */
+export function reactionLabelOf(text: string | null | undefined): string {
+  const line = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (line.length < 1) return '';
+  const characters = graphemesOf(line);
+  if (characters.length <= MAX_REACTION_LABEL_LENGTH) return line;
+  return characters.slice(0, MAX_REACTION_LABEL_LENGTH).join('');
 }
 
 function clamp(value: number, min: number, max: number, fallback: number): number {

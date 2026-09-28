@@ -3,6 +3,14 @@
     @if (hasPaintLayer(sprite)) {
       <div class="size-full" [ngStyle]="paintStyle(sprite)" [innerHTML]="sprite.svg | safe: 'html'"></div>
     }
+    @if (sprite.text) {
+      <div
+        class="flex size-full items-center justify-center leading-none whitespace-nowrap select-none"
+        [ngStyle]="textStyle(sprite)"
+      >
+        {{ sprite.text }}
+      </div>
+    }
   </div>
 }
 @for (placement of canvases(); track placement.key) {

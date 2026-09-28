@@ -1080,6 +1080,14 @@
       "sectionLook": "Look",
       "sectionTarget": "Targets",
       "sectionKind": "Kind settings",
+      "sectionReaction": "Reaction",
+      "reactionTextLabel": "Text",
+      "reactionTextPlaceholder": "An emoji or a few words (e.g. 👍 Nice!)",
+      "reactionImageLabel": "Image",
+      "reactionImageChoose": "Choose image",
+      "reactionImageClear": "Drop the image and show the text",
+      "reactionImageMissing": "The chosen image is not in this room. The text (or ❔ if empty) is shown instead.",
+      "reactionHint": "An image takes priority over the text. Text is cut at 12 characters, and a reaction lasts at most 3 seconds.",
       "sectionSound": "Sound",
       "nameLabel": "Name",
       "kindLabel": "Kind",
@@ -1136,7 +1144,10 @@
         "skyblade": "Sky blade",
         "raybeam": "Sustained ray",
         "arrowrain": "Arrow rain",
-        "ballistic": "Ballistic missile"
+        "ballistic": "Ballistic missile",
+        "reactpop": "Reaction: pop up",
+        "reactthrow": "Reaction: throw",
+        "reactrain": "Reaction: rain down"
       },
       "targeting": {
         "self": "Self",

@@ -11,7 +11,8 @@ const WORDISH = /[\p{L}\p{N}]/u;
 
 let segmenter: Intl.Segmenter | null | undefined;
 
-function graphemesOf(text: string): string[] {
+/** The characters of a text as a reader counts them, a joined emoji being one. */
+export function graphemesOf(text: string): string[] {
   if (segmenter === undefined) {
     segmenter =
       typeof Intl !== 'undefined' && 'Segmenter' in Intl

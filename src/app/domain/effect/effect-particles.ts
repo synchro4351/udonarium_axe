@@ -1,4 +1,4 @@
-import { type EffectKind } from '@axe/domain/effect/effect-kind';
+import { type EffectKind, isReactionKind } from '@axe/domain/effect/effect-kind';
 import { type EffectPreset } from '@axe/domain/effect/effect-preset';
 import {
   emitAura,
@@ -78,6 +78,8 @@ function emitFor(
   ramp: ColorRamp,
   particles: EffectParticle[]
 ): void {
+  // A reaction is its mark alone; a glow under it would turn a passing remark into an attack.
+  if (isReactionKind(preset.effectKind)) return;
   if (preset.effectKind === 'slash') {
     // Sparks fly from each stroke; thrown once for them all, a combination reads as a single cut.
     for (const hit of slashHits(preset.slashLook)) {

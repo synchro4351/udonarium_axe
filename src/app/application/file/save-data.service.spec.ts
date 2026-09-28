@@ -6,6 +6,7 @@ import { ImageFile, ImageState } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import * as MimeType from '@axe/core/storage/mime-type';
 import { ObjectSerializer } from '@axe/core/sync/object-serializer';
+import { EffectPreset } from '@axe/domain/effect/effect-preset';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
@@ -309,6 +310,27 @@ describe('SaveDataService', () => {
       const found = privateApi.searchImageFiles('<game-table ceilingImageIdentifier="ceiling-paper"></game-table>');
 
       expect(found.map((image) => image.identifier)).toEqual(['ceiling-paper']);
+    });
+  });
+
+  describe('the picture a reaction shows', () => {
+    it('goes into the save with the effect that names it', () => {
+      const service = TestBed.inject(SaveDataService);
+      const privateApi = service as unknown as SaveDataServicePrivateApi;
+      ImageStorage.instance.add(ImageFile.createEmpty('reaction-face'));
+
+      const preset = new EffectPreset();
+      preset.initialize();
+      preset.kind = 'reactpop';
+      preset.reactionImageIdentifier = 'reaction-face';
+      try {
+        const found = privateApi.searchImageFiles(ObjectSerializer.instance.toXml(preset));
+
+        expect(found.map((image) => image.identifier)).toEqual(['reaction-face']);
+      } finally {
+        preset.destroy();
+        ImageStorage.instance.delete('reaction-face');
+      }
     });
   });
 

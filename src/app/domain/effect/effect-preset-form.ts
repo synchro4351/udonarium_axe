@@ -1,6 +1,7 @@
 import {
   EffectKind,
   EffectTargeting,
+  isReactionKind,
   PROJECTILE_STYLES,
   ProjectileStyle,
   SlashStyle,
@@ -52,8 +53,14 @@ export function needsCaster(kind: EffectKind): boolean {
     kind === 'skyblade' ||
     kind === 'raybeam' ||
     kind === 'arrowrain' ||
-    kind === 'ballistic'
+    kind === 'ballistic' ||
+    kind === 'reactthrow'
   );
+}
+
+/** The kinds that show a mark of their own - an emoji, a word or a picture - and so need one chosen. */
+export function usesReactionFields(kind: EffectKind): boolean {
+  return isReactionKind(kind);
 }
 
 /** Whether it takes several targets, which decides whether the limit may be edited. */

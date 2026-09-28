@@ -1,4 +1,4 @@
-import { type EffectKind } from '@axe/domain/effect/effect-kind';
+import { type EffectKind, isReactionKind } from '@axe/domain/effect/effect-kind';
 import { DEFAULT_STAGE_MS, type EffectStage, type EffectStageRole, MAX_STAGES } from '@axe/domain/effect/effect-stage';
 import { AIMED_EFFECT_KINDS, CENTERED_EFFECT_KINDS } from '@axe/domain/effect/effect-timeline';
 
@@ -15,9 +15,12 @@ import { AIMED_EFFECT_KINDS, CENTERED_EFFECT_KINDS } from '@axe/domain/effect/ef
 /** A burst is what an unknown look falls back to, so it is offered rather than left out. */
 const LANDING_KINDS: readonly EffectKind[] = ['burst', ...CENTERED_EFFECT_KINDS.filter((kind) => kind !== 'burst')];
 
+/** A reaction is a look of its own, with its own short length; it is not a part to build a run from. */
+const TRAVEL_KINDS: readonly EffectKind[] = AIMED_EFFECT_KINDS.filter((kind) => !isReactionKind(kind));
+
 /** What travels needs somewhere to run from; what lands and what is left behind do not. */
 export function kindsForRole(role: EffectStageRole): readonly EffectKind[] {
-  return role === 'travel' ? AIMED_EFFECT_KINDS : LANDING_KINDS;
+  return role === 'travel' ? TRAVEL_KINDS : LANDING_KINDS;
 }
 
 /** The look a new stage of this role starts with: a projectile to travel, flame for a field, a burst otherwise. */

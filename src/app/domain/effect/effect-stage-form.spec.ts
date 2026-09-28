@@ -18,6 +18,9 @@ describe('kindsForRole()', () => {
   it('offers what travels only where something runs from somewhere', () => {
     expect(kindsForRole('travel')).toContain('projectile');
     expect(kindsForRole('travel')).not.toContain('burst');
+    // A reaction is a look of its own, not a part to build a run from.
+    expect(kindsForRole('travel')).not.toContain('reactthrow');
+    expect(kindsForRole('impact')).not.toContain('reactpop');
   });
 
   it('offers what happens about the target everywhere else', () => {

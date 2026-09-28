@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { EffectPlaybackService } from '@axe/application/effect/effect-playback.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
+import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { EffectPreset } from '@axe/domain/effect/effect-preset';
@@ -165,6 +166,47 @@ describe('TableEffectOverlayComponent', () => {
       expect(host.querySelector('canvas')).not.toBeNull();
     }
   });
+  it('writes a reaction as text over the target, with no canvas under it', () => {
+    preset.kind = 'reactpop';
+    preset.reactionText = 'ナイス！';
+    playback.play({
+      presetIdentifier: preset.identifier,
+      targets: [{ identifier: 'char', x: 100, y: 200, z: 0 }],
+      seed: 3,
+    });
+    playback.now.set(playback.activeCasts()[0].startedAt + 500);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.textContent).toContain('ナイス！');
+    expect(host.querySelectorAll('effect-canvas')).toHaveLength(0);
+  });
+
+  it('shows the room picture a reaction names, and its text once that picture is gone', () => {
+    // An image added by its address goes by that address, and draws from it.
+    const face = 'https://example.test/reaction-face.png';
+    TestBed.inject(ImageStorage).add(face);
+    preset.kind = 'reactrain';
+    preset.reactionText = '🎉';
+    preset.reactionImageIdentifier = face;
+    playback.play({
+      presetIdentifier: preset.identifier,
+      targets: [{ identifier: 'char', x: 0, y: 0, z: 0 }],
+      seed: 3,
+    });
+    // Halfway through, every mark of the rain has started falling.
+    playback.now.set(playback.activeCasts()[0].startedAt + 1500);
+
+    const sprites = component.sprites();
+    expect(sprites.length).toBeGreaterThan(0);
+    expect(sprites.every((sprite) => sprite.background.includes(face))).toBe(true);
+
+    TestBed.inject(ImageStorage).delete(face);
+    playback.now.set(playback.activeCasts()[0].startedAt + 1520);
+
+    expect(component.sprites().every((sprite) => sprite.text === '🎉')).toBe(true);
+  });
+
   it('glows along the outline of a drawing rather than round its box', () => {
     const sprite = {
       key: 'shot',

@@ -29,7 +29,25 @@ export type EffectKind =
   | 'skyblade'
   | 'raybeam'
   | 'arrowrain'
-  | 'ballistic';
+  | 'ballistic'
+  | 'reactpop'
+  | 'reactthrow'
+  | 'reactrain';
+
+/**
+ * The light reactions, which show a mark of the preset's own - an emoji, a word or a picture -
+ * rather than a drawn element: popping up at the target, thrown at it, or raining down on it.
+ */
+export type ReactionKind = 'reactpop' | 'reactthrow' | 'reactrain';
+
+export const REACTION_KINDS: readonly ReactionKind[] = ['reactpop', 'reactthrow', 'reactrain'];
+
+const REACTION_KIND_SET = new Set<string>(REACTION_KINDS);
+
+/** Whether a kind is one of the light reactions, which carry a mark rather than an element. */
+export function isReactionKind(value: unknown): value is ReactionKind {
+  return typeof value === 'string' && REACTION_KIND_SET.has(value);
+}
 
 export type EffectTargeting = 'self' | 'single' | 'multi';
 
@@ -103,6 +121,7 @@ export const EFFECT_KINDS: readonly EffectKind[] = [
   'raybeam',
   'arrowrain',
   'ballistic',
+  ...REACTION_KINDS,
 ];
 
 export const EFFECT_TARGETINGS: readonly EffectTargeting[] = ['self', 'single', 'multi'];

@@ -1,6 +1,13 @@
-import { EFFECT_KINDS, EffectKind } from '@axe/domain/effect/effect-kind';
+import { EFFECT_KINDS, EffectKind, REACTION_KINDS } from '@axe/domain/effect/effect-kind';
 import { effectParticles, PARTICLE_EFFECT_KINDS, seededRandom } from '@axe/domain/effect/effect-particles';
 import { EffectPreset } from '@axe/domain/effect/effect-preset';
+
+function makePresetOf(kind: EffectKind): EffectPreset {
+  const preset = new EffectPreset('preset');
+  preset.kind = kind;
+  preset.durationMs = 1000;
+  return preset;
+}
 
 describe('effectParticles()', () => {
   function makePreset(kind: EffectKind): EffectPreset {
@@ -17,7 +24,9 @@ describe('effectParticles()', () => {
   it('returns particles through the height of every kind', () => {
     // The kinds that show nothing at the target until they arrive are checked apart.
     const flying: EffectKind[] = ['projectile', 'beam', 'skyblade', 'arrowrain', 'ballistic'];
-    for (const kind of EFFECT_KINDS.filter((candidate) => !flying.includes(candidate))) {
+    // A reaction is its mark alone and makes no particles at all.
+    const quiet = [...flying, ...REACTION_KINDS];
+    for (const kind of EFFECT_KINDS.filter((candidate) => !quiet.includes(candidate))) {
       for (const progress of [0.3, 0.6]) {
         const layer = effectParticles(makePreset(kind), 7, progress, base);
         expect(layer.particles.length).toBeGreaterThan(0);
@@ -202,6 +211,24 @@ describe('which kind gets which particles', () => {
     // Anything not in the table falls back to bursting; only what uses no canvas in flight belongs here.
     const unrouted = EFFECT_KINDS.filter((kind) => !PARTICLE_EFFECT_KINDS.includes(kind));
 
-    expect(unrouted.sort()).toEqual(['arrowrain', 'ballistic', 'burst', 'projectile', 'raybeam', 'skyblade']);
+    expect(unrouted.sort()).toEqual([
+      'arrowrain',
+      'ballistic',
+      'burst',
+      'projectile',
+      'raybeam',
+      'reactpop',
+      'reactrain',
+      'reactthrow',
+      'skyblade',
+    ]);
+  });
+
+  it('gives a reaction no particles, so a pile of them does not glow over the table', () => {
+    for (const kind of REACTION_KINDS) {
+      for (const progress of [0.1, 0.5, 0.9]) {
+        expect(effectParticles(makePresetOf(kind), 7, progress, 50).particles).toHaveLength(0);
+      }
+    }
   });
 });

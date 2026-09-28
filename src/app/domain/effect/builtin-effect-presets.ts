@@ -45,11 +45,72 @@ export interface EffectPresetSeed {
   moteStyle?: string;
   /** The run this effect goes through. Left off for an effect that draws one look. */
   stages?: EffectStage[];
+  /** What a reaction shows. */
+  reactionText?: string;
 }
 
 /** A sound too short or too long makes no effect at all, so it is kept within this range. */
 const MIN_EFFECT_MS = 400;
 const MAX_EFFECT_MS = 6000;
+
+/**
+ * One light reaction for each way a mark moves, so there is something to press, copy and
+ * change the emoji of. They are short and quiet on purpose.
+ */
+const REACTION_SEEDS: readonly EffectPresetSeed[] = [
+  {
+    identifier: 'EffectPreset_react_pop',
+    name: 'いいね',
+    tagName: 'リアクション',
+    kind: 'reactpop',
+    colorPrimary: '#ffffff',
+    colorSecondary: '#ffcc33',
+    soundMs: 1400,
+    durationMs: 1400,
+    staggerMs: 80,
+    scale: 1,
+    targeting: 'single',
+    maxTargets: 1,
+    soundKey: 'chatBubble',
+    grade: 2,
+    reactionText: '👍',
+  },
+  {
+    identifier: 'EffectPreset_react_throw',
+    name: 'ハートを投げる',
+    tagName: 'リアクション',
+    kind: 'reactthrow',
+    colorPrimary: '#ff7ab8',
+    colorSecondary: '#ff3d8b',
+    soundMs: 1500,
+    durationMs: 1500,
+    staggerMs: 80,
+    scale: 1,
+    targeting: 'single',
+    maxTargets: 1,
+    soundKey: 'windSmall',
+    impactSoundKey: 'chatBubble',
+    grade: 2,
+    reactionText: '💖',
+  },
+  {
+    identifier: 'EffectPreset_react_rain',
+    name: '紙吹雪',
+    tagName: 'リアクション',
+    kind: 'reactrain',
+    colorPrimary: '#ffe27a',
+    colorSecondary: '#ff8ad8',
+    soundMs: 2400,
+    durationMs: 2400,
+    staggerMs: 80,
+    scale: 1,
+    targeting: 'single',
+    maxTargets: 1,
+    soundKey: 'chatNotify1',
+    grade: 2,
+    reactionText: '🎉',
+  },
+];
 
 /**
  * A few runs built out of stages, so what the editor can do is on the shelf rather than
@@ -1624,6 +1685,7 @@ export const DEFAULT_EFFECT_PRESET_SEEDS: readonly EffectPresetSeed[] = [
     grade: 2,
   },
   ...STAGED_SEEDS,
+  ...REACTION_SEEDS,
 ];
 
 /** Copies a seed onto an effect. It is also how the defaults are applied again. */
@@ -1653,6 +1715,8 @@ export function applyEffectPresetSeed(preset: EffectPreset, seed: EffectPresetSe
   preset.moteStyle = seed.moteStyle ?? '';
   preset.soundIdentifier = PresetSound[seed.soundKey];
   preset.stages = encodeEffectStages(seed.stages ?? []);
+  preset.reactionText = seed.reactionText ?? '';
+  preset.reactionImageIdentifier = '';
 }
 
 /**

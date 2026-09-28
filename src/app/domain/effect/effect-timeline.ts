@@ -39,6 +39,13 @@ import {
   appendUpheaval,
 } from '@axe/domain/effect/timeline/ground';
 import {
+  appendReactionPop,
+  appendReactionRain,
+  appendReactionThrow,
+  type ReactionMark,
+  reactionMarkOf,
+} from '@axe/domain/effect/timeline/reaction';
+import {
   type EffectSprite,
   type EffectSpriteOptions,
   effectTargetCenter,
@@ -232,6 +239,13 @@ const AIMED: Partial<Record<EffectKind, (ctx: AimedContext) => void>> = {
   drain: (c) => appendDrain(c.sprites, c.prefix, c.center, c.base, c.progress, c.preset, originOf(c), c.view),
   projectile: (c) =>
     appendProjectile(c.sprites, c.prefix, c.center, c.base, c.progress, c.preset, originOf(c), c.view, painterOf(c)),
+  // The reactions show the preset's own mark, which may be a picture found through the options,
+  // so they are reached from here even where they need no origin.
+  reactpop: (c) => appendReactionPop(c.sprites, c.prefix, c.center, c.base, c.progress, c.preset, markOf(c)),
+  reactthrow: (c) =>
+    appendReactionThrow(c.sprites, c.prefix, c.center, c.base, c.progress, c.preset, originOf(c), markOf(c)),
+  reactrain: (c) =>
+    appendReactionRain(c.sprites, c.prefix, c.center, c.base, c.progress, c.preset, c.random, markOf(c)),
 };
 
 interface CenteredContext {
@@ -271,6 +285,10 @@ function painterOf(context: AimedContext): ImpactPainter {
 
 function imageOfTarget(context: AimedContext): string {
   return imageOf(context.options, context.target.identifier);
+}
+
+function markOf(context: AimedContext): ReactionMark {
+  return reactionMarkOf(context.preset, context.options);
 }
 
 /** The kinds that need an origin and a direction. Anything not in the table happens about the target. */
