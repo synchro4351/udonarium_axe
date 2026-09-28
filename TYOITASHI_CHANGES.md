@@ -90,9 +90,11 @@
 
 ## r4以降の開発版
 
-クリップボード画像の登録と背景色の透明化：[ca2e9532](https://github.com/synchro4351/udonarium_axe/commit/ca2e9532)。固定ソース`a2999013`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/clipboard-media-image)。メディアの画像一覧で貼り付けまたは単一ファイル選択後にプレビューし、指定色に近い画素を透過したコピーを登録できる。複数ファイル選択は従来どおり。保存形式を増やさず、既存の画像登録・同期経路を使う。全体949ファイル／13,133件成功・1件skip、production build成功。実ブラウザの目視は未確認。
+クリップボード画像の登録と背景色の透明化：[ca2e9532](https://github.com/synchro4351/udonarium_axe/commit/ca2e9532)。固定ソース`a2999013`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/clipboard-media-image)。メディアの画像一覧で貼り付けまたは単一ファイル選択後にプレビューし、指定色に近い画素を透過したコピーを登録できる。複数ファイル選択は従来どおり。保存形式を増やさず、既存の画像登録・同期経路を使う。全体949ファイル／13,133件成功・1件skip、production build成功。利用者がローカル画面・別端末・保存ZIPで確認済み。
 
-単一画像ドロップの確認と連続取込：[4cf3254f](https://github.com/synchro4351/udonarium_axe/commit/4cf3254f)。`ca2e9532`から継続。ドロップ位置を保って透過確認後に追加できる。次の画像を取り込む際は確認中の画像を先に追加し、追加失敗時は保留する。保存・同期形式は不変。全体950ファイル／13,179件成功・1件skip、型検査・lint・整形・ビルド成功。追加動作の目視は未確認。
+単一画像ドロップの確認と連続取込：[4cf3254f](https://github.com/synchro4351/udonarium_axe/commit/4cf3254f)。`ca2e9532`から継続。ドロップ位置を保って透過確認後に追加できる。次の画像を取り込む際は確認中の画像を先に追加し、追加失敗時は保留する。保存・同期形式は不変。全体950ファイル／13,179件成功・1件skip、型検査・lint・整形・ビルド成功。利用者がローカル画面で確認済み。
+
+短時間の反応エフェクト：[5e5dd408](https://github.com/synchro4351/udonarium_axe/commit/5e5dd408)。`4cf3254f`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/emoji-effects)。既存エフェクトへ「ぽんと出る」「対象へ投げる」「降らせる」の3種を追加し、絵文字・短い文字列・卓の画像を選べる。同期項目は`reactionText`と`reactionImageIdentifier`。旧設定は空欄として読める。対象574件、関連2,570件成功、型検査・lint・整形・ビルド成功。実画面・複数端末の目視は未確認。
 
 ## 検証と制限
 
