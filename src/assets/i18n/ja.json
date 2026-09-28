@@ -582,9 +582,19 @@
         "sceneTemplate_levelUp": "Level UP",
         "sceneTemplate_questClear": "Quest Clear",
         "sceneTemplate_rebuttal": "論破",
-        "sceneTemplate_ending": "おしまい"
+        "sceneTemplate_ending": "おしまい",
+        "sceneTemplate_portrait": "キャラクター登場",
+        "portraitCharacter": "差し込むキャラクター",
+        "portraitNone": "画像なし（シルエット）",
+        "portraitImage": "立ち絵",
+        "portraitFit": "立ち絵の位置合わせ",
+        "portraitZoom": "拡大率",
+        "portraitX": "横位置 %",
+        "portraitY": "縦位置 %"
       },
       "cutInEditor": {
+        "portraitSlot": "再生時のキャラクター画像を使う",
+        "portraitSlotHint": "画像がない場合はシルエットを表示します。",
         "tabBasic": "基本設定",
         "tabScene": "シーン",
         "addImage": "画像を足す",

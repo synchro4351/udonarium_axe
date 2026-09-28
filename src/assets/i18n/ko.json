@@ -582,9 +582,19 @@
         "sceneTemplate_levelUp": "Level UP",
         "sceneTemplate_questClear": "Quest Clear",
         "sceneTemplate_rebuttal": "반론!",
-        "sceneTemplate_ending": "끝"
+        "sceneTemplate_ending": "끝",
+        "sceneTemplate_portrait": "캐릭터 등장",
+        "portraitCharacter": "표시할 캐릭터",
+        "portraitNone": "이미지 없음 (실루엣)",
+        "portraitImage": "초상화",
+        "portraitFit": "초상화 위치 조정",
+        "portraitZoom": "확대율",
+        "portraitX": "가로 위치 %",
+        "portraitY": "세로 위치 %"
       },
       "cutInEditor": {
+        "portraitSlot": "재생할 때 캐릭터 초상화 사용",
+        "portraitSlotHint": "이미지가 없으면 실루엣을 표시합니다.",
         "tabBasic": "기본 설정",
         "tabScene": "장면",
         "addImage": "이미지 추가",

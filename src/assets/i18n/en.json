@@ -582,9 +582,19 @@
         "sceneTemplate_levelUp": "Level UP",
         "sceneTemplate_questClear": "Quest Clear",
         "sceneTemplate_rebuttal": "Objection!",
-        "sceneTemplate_ending": "The end"
+        "sceneTemplate_ending": "The end",
+        "sceneTemplate_portrait": "Character entrance",
+        "portraitCharacter": "Character to show",
+        "portraitNone": "No image (silhouette)",
+        "portraitImage": "Portrait",
+        "portraitFit": "Portrait fit",
+        "portraitZoom": "Zoom",
+        "portraitX": "Horizontal position %",
+        "portraitY": "Vertical position %"
       },
       "cutInEditor": {
+        "portraitSlot": "Use character portrait at playback",
+        "portraitSlotHint": "Shows a silhouette when no image is available.",
         "tabBasic": "Settings",
         "tabScene": "Scene",
         "addImage": "Add image",
