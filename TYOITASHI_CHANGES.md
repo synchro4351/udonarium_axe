@@ -88,6 +88,10 @@
 
 ブラウザの名称：[38990bf4](https://github.com/synchro4351/udonarium_axe/commit/38990bf4)。タブ・PWAなどに`Udonarium Axe tyoitashi`を表示。保存・同期形式の変更はありません。
 
+## r4以降の開発版
+
+クリップボード画像の登録と背景色の透明化：[ca2e9532](https://github.com/synchro4351/udonarium_axe/commit/ca2e9532)。固定ソース`a2999013`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/clipboard-media-image)。メディアの画像一覧で貼り付けまたは単一ファイル選択後にプレビューし、指定色に近い画素を透過したコピーを登録できる。複数ファイル選択は従来どおり。保存形式を増やさず、既存の画像登録・同期経路を使う。全体949ファイル／13,133件成功・1件skip、production build成功。実ブラウザの目視は未確認。
+
 ## 検証と制限
 
 - r4の固定ソース`a2999013`は、全体947ファイル／13,084件成功・1件skip、production build成功。r3の固定ソース`cf5edecf`は全体929ファイル／12,712件成功・1件skip、production build成功。r2の固定ソース`6e5668dd`は全体927ファイル／12,680件成功・1件skip、production build成功。
