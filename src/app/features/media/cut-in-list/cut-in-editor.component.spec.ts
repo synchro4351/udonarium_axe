@@ -1,10 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
+import { CutInLauncher } from '@axe/domain/media/cut-in-launcher';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
+import { CutInPortraitPickService } from '@axe/features/media/cut-in-editor/cut-in-portrait-pick.service';
+import { CutInPortraitPickerComponent } from '@axe/features/media/cut-in-editor/cut-in-portrait-picker.component';
 import { CutInEditorComponent } from '@axe/features/media/cut-in-list/cut-in-editor.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
@@ -63,15 +67,50 @@ describe('CutInEditorComponent', () => {
     layer.initialize();
     scene.appendChild(layer);
     const character = GameCharacter.create('Hero', 1, 'hero-image');
+    fixture.detectChanges();
 
-    component.portraitCharacter = character.identifier;
-    component.portraitZoom = 2;
-    component.portraitX = 40;
-    component.portraitY = 20;
+    const picker = fixture.debugElement.query(By.directive(CutInPortraitPickerComponent))
+      .componentInstance as CutInPortraitPickerComponent;
+    picker.character = character.identifier;
+    picker.zoom = 2;
+    picker.x = 40;
+    picker.y = 20;
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-character"]')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-image"]')).not.toBeNull();
     expect(JSON.parse(scene.portraitFits)['hero-image']).toEqual({ zoom: 2, x: 40, y: 20 });
+  });
+
+  it('launches with the character chosen on either tab, and their name for a scene that names them', () => {
+    const scene = new CutInScene();
+    scene.cutInIdentifier = cutIn.identifier;
+    scene.initialize();
+    const layer = new CutInLayer();
+    layer.kind = 'text';
+    layer.text = '{character} 参戦！';
+    layer.initialize();
+    scene.appendChild(layer);
+    const character = GameCharacter.create('Hero', 1, 'hero-image');
+    TestBed.inject(CutInPortraitPickService).choose(cutIn.identifier, {
+      characterIdentifier: character.identifier,
+      imageIdentifier: 'hero-image',
+    });
+    const launcher = new CutInLauncher('CutInLauncher');
+    launcher.initialize();
+    TestBed.inject(ObjectStore).add(launcher);
+    const spy = vi.spyOn(launcher, 'startCutInMySelf').mockImplementation(() => {});
+    fixture.detectChanges();
+
+    // Only the name is asked for: the scene has no slot to fit a picture to.
+    expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-character"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-image"]')).toBeNull();
+
+    component.previewCutIn();
+
+    expect(spy).toHaveBeenCalledWith(
+      cutIn,
+      expect.objectContaining({ characterIdentifier: character.identifier, characterName: 'Hero', imageIdentifier: '' })
+    );
   });
 });

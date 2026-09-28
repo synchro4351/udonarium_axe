@@ -52,6 +52,8 @@ const LAYER_FIELDS = [
   'letterSpacingPx',
   'lineHeight',
   'vertical',
+  'letterMotion',
+  'letterTiltDeg',
   'fillShape',
   'fillFrom',
   'fillMid',

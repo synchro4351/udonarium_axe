@@ -28,6 +28,13 @@ import {
 import { CUT_IN_TRACKS, type CutInTrackName } from '@axe/domain/media/cut-in-keyframe';
 import { CUT_IN_TEXT_ALIGNS, CutInLayer, type CutInTextAlign, isCutInTextAlign } from '@axe/domain/media/cut-in-layer';
 import { applyLayerPreset, CUT_IN_LAYER_PRESETS } from '@axe/domain/media/cut-in-layer-presets';
+import {
+  CUT_IN_CHARACTER_TOKEN,
+  CUT_IN_LETTER_MOTIONS,
+  type CutInLetterMotion,
+  isCutInLetterMotion,
+  MAX_LETTER_TILT_DEG,
+} from '@axe/domain/media/cut-in-text';
 import { CUT_IN_WIPES, type CutInWipe, isCutInWipe } from '@axe/domain/media/cut-in-wipe';
 import { CUT_IN_FONT_OPTIONS, cutInFontOption } from '@axe/features/media/cut-in-editor/cut-in-font-options';
 import {
@@ -73,6 +80,9 @@ export class CutInLayerPropertiesComponent {
   readonly commit = output<void>();
 
   readonly textAligns = CUT_IN_TEXT_ALIGNS;
+  readonly letterMotions = CUT_IN_LETTER_MOTIONS;
+  readonly maxLetterTiltDeg = MAX_LETTER_TILT_DEG;
+  readonly characterToken = CUT_IN_CHARACTER_TOKEN;
   readonly fontOptions = CUT_IN_FONT_OPTIONS;
   readonly easings = CUT_IN_EASING_NAMES;
   readonly fillShapes = CUT_IN_FILL_SHAPES;
@@ -449,6 +459,31 @@ export class CutInLayerPropertiesComponent {
   }
   set vertical(vertical: boolean) {
     this.write((layer) => (layer.vertical = vertical));
+  }
+
+  /** How the letters move one at a time. */
+  get letterMotion(): CutInLetterMotion {
+    const motion = this.layer()?.letterMotion;
+    return isCutInLetterMotion(motion) ? motion : 'none';
+  }
+  set letterMotion(motion: CutInLetterMotion) {
+    this.write((layer) => (layer.letterMotion = isCutInLetterMotion(motion) ? motion : 'none'));
+  }
+
+  /** How far every other letter leans the other way, held within what still reads as a letter. */
+  get letterTiltDeg(): number {
+    return Math.round(this.layer()?.letterTiltDeg ?? 0);
+  }
+  set letterTiltDeg(degrees: number) {
+    const tilt = Number(degrees);
+    const held = Number.isFinite(tilt) ? Math.min(MAX_LETTER_TILT_DEG, Math.max(-MAX_LETTER_TILT_DEG, tilt)) : 0;
+    this.write((layer) => (layer.letterTiltDeg = held));
+  }
+
+  /** Puts the token for the launched character's name at the end of the text. */
+  protected insertCharacterName(): void {
+    if (!this.isEditable()) return;
+    this.write((layer) => (layer.text = `${layer.text}${CUT_IN_CHARACTER_TOKEN}`));
   }
 
   /** Whether the fill chosen repeats, and so has a size worth setting. */

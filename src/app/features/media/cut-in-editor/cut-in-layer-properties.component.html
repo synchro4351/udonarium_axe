@@ -99,6 +99,45 @@
         [placeholder]="'feature.media.cutInEditor.textPlaceholder' | transloco"
         [attr.disabled]="!isEditable() ? '' : null"
       ></textarea>
+      <div class="flex items-center gap-1">
+        <button
+          class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex cursor-pointer items-center gap-1 border border-solid bg-transparent px-1.5 py-0.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-50 [&_.material-icons]:text-[13px]!"
+          type="button"
+          data-testid="cut-in-layer-insert-character"
+          [disabled]="!isEditable()"
+          [title]="'feature.media.cutInEditor.insertCharacterHint' | transloco"
+          (click)="insertCharacterName()"
+        >
+          <i class="material-icons">person</i>{{ characterToken }}
+        </button>
+      </div>
+      <div class="grid grid-cols-[3.6rem_minmax(0,1fr)] items-center gap-x-1.5 gap-y-1">
+        <label class="text-ui-muted text-[11px]">{{ 'feature.media.cutInEditor.letterMotion' | transloco }}</label>
+        <select
+          class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm box-border w-full border border-solid p-1 text-[12px] outline-none disabled:opacity-50"
+          name="cut-in-layer-letter-motion"
+          data-testid="cut-in-layer-letter-motion"
+          [(ngModel)]="letterMotion"
+          [attr.disabled]="!isEditable() ? '' : null"
+        >
+          @for (motion of letterMotions; track motion) {
+            <option [value]="motion">{{ 'feature.media.cutInEditor.letterMotion_' + motion | transloco }}</option>
+          }
+        </select>
+        <label class="text-ui-muted text-[11px]">{{ 'feature.media.cutInEditor.letterTilt' | transloco }}</label>
+        <input
+          class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm box-border w-full border border-solid px-1.5 py-1 text-right text-[12px] outline-none disabled:opacity-50"
+          name="cut-in-layer-letter-tilt"
+          data-testid="cut-in-layer-letter-tilt"
+          type="number"
+          step="1"
+          [min]="-maxLetterTiltDeg"
+          [max]="maxLetterTiltDeg"
+          [title]="'feature.media.cutInEditor.letterTiltHint' | transloco"
+          [(ngModel)]="letterTiltDeg"
+          [attr.disabled]="!isEditable() ? '' : null"
+        />
+      </div>
       <div class="grid grid-cols-[3.6rem_minmax(0,1fr)] items-center gap-x-1.5 gap-y-1">
         <label class="text-ui-muted text-[11px]">{{ 'feature.media.cutInEditor.fontSize' | transloco }}</label>
         <input

@@ -9,6 +9,7 @@ import {
 import type { CutInTrackSet } from '@axe/domain/media/cut-in-keyframe';
 import { parseCutInTracks, sampleTrack } from '@axe/domain/media/cut-in-keyframe';
 import type { CutInLayerKind, CutInTextAlign } from '@axe/domain/media/cut-in-layer';
+import { resolveCharacterName } from '@axe/domain/media/cut-in-text';
 import { type CutInWipe, isCutInWipe } from '@axe/domain/media/cut-in-wipe';
 import type { ReplayObjectSnapshot } from '@axe/domain/replay/replay-keyframe';
 
@@ -230,7 +231,9 @@ function readLayer(attributes: Record<string, unknown>): ReplayCutInLayer {
     objectFit: text(attributes['objectFit']) || 'contain',
     objectPosX: number(attributes['objectPosX'], 50),
     objectPosY: number(attributes['objectPosY'], 50),
-    text: text(attributes['text']),
+    // The recording does not tie a playing to the launch that named its character, so the name
+    // shows as the stand-in a launch naming nobody shows, rather than as the token itself.
+    text: resolveCharacterName(text(attributes['text']), ''),
     fontSizePx: number(attributes['fontSizePx'], 32),
     fontWeight: number(attributes['fontWeight'], 700),
     color: text(attributes['color']) || '#ffffff',

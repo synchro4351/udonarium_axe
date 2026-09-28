@@ -2,7 +2,7 @@ import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
 import { ObjectNode } from '@axe/core/sync/object-node';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
-import { hasPortraitSlot } from '@axe/domain/media/cut-in-portrait';
+import { hasPortraitSlot, namesCharacter } from '@axe/domain/media/cut-in-portrait';
 import { type CutInSound, parseCutInSounds } from '@axe/domain/media/cut-in-sound';
 
 /**
@@ -56,6 +56,12 @@ export class CutInScene extends ObjectNode {
   /** Whether a layer of the scene shows the portrait a launch brings. */
   get hasPortraitSlot(): boolean {
     return hasPortraitSlot(this.layers);
+  }
+
+  /** Whether the scene shows a character at all: a portrait slot, or `{character}` in its text. */
+  get takesCharacter(): boolean {
+    const layers = this.layers;
+    return hasPortraitSlot(layers) || namesCharacter(layers);
   }
 
   /** How long the scene runs, never shorter than the layer that finishes last. */

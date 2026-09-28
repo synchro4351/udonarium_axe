@@ -17,6 +17,11 @@ const CHAT_TAIL_PATTERN = /\s(@?)(\S+)$/i;
 export interface CutInPortraitPick {
   characterIdentifier: string;
   imageIdentifier: string;
+  /**
+   * The name `{character}` shows. Left out, it is the named character's own name; a player
+   * speaking as themself gives the name they speak under.
+   */
+  characterName?: string;
 }
 
 /**
@@ -118,14 +123,24 @@ export class CutInService {
     return true;
   }
 
+  /** The name is read here, once, so every peer shows the one the character had at launch. */
   private snapshotOf(cutIn: CutIn, portrait: CutInPortraitPick | null): CutInPortraitSnapshot | null {
-    return makePortraitSnapshot(cutIn.scene, portrait?.characterIdentifier ?? '', portrait?.imageIdentifier ?? '');
+    const characterIdentifier = portrait?.characterIdentifier ?? '';
+    const character = characterIdentifier ? this.objectStore.get(characterIdentifier) : null;
+    const characterName =
+      portrait?.characterName ?? (character instanceof GameCharacter ? String(character.name ?? '') : '');
+    return makePortraitSnapshot(cutIn.scene, characterIdentifier, portrait?.imageIdentifier ?? '', characterName);
   }
 
-  /** The character a line was spoken as and the picture it was spoken with. A player speaking as themself brings none. */
+  /**
+   * The character a line was spoken as and the picture it was spoken with. A player speaking as
+   * themself brings no picture, only the name they spoke under.
+   */
   private speakerPortraitOf(message: ChatMessage): CutInPortraitPick | null {
     const speaker = this.objectStore.get(message.sendFrom ?? '');
-    if (!(speaker instanceof GameCharacter)) return null;
+    if (!(speaker instanceof GameCharacter)) {
+      return { characterIdentifier: '', imageIdentifier: '', characterName: message.name ?? '' };
+    }
     return { characterIdentifier: speaker.identifier, imageIdentifier: message.imageIdentifier ?? '' };
   }
 

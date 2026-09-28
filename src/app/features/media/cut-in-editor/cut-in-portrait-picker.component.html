@@ -1,0 +1,87 @@
+<div class="grid grid-cols-3 gap-1.5 text-[11px]">
+  <label class="text-ui-muted col-span-3 flex flex-col gap-1">
+    <span>{{ 'feature.media.cutIn.portraitCharacter' | transloco }}</span>
+    <select class="bg-ui-input text-ui-text rounded-ui-sm p-1" name="cut-in-portrait-character" [(ngModel)]="character">
+      <option value="">{{ 'feature.media.cutIn.portraitNone' | transloco }}</option>
+      @for (one of characters; track one.identifier) {
+        <option [value]="one.identifier">{{ one.name }}</option>
+      }
+    </select>
+  </label>
+  @if (character && fits()) {
+    <label class="text-ui-muted col-span-3 flex flex-col gap-1">
+      <span>{{ 'feature.media.cutIn.portraitImage' | transloco }}</span>
+      <select class="bg-ui-input text-ui-text rounded-ui-sm p-1" name="cut-in-portrait-image" [(ngModel)]="image">
+        <option value="">{{ 'feature.media.cutIn.portraitNone' | transloco }}</option>
+        @for (choice of images; track choice.index) {
+          <option [value]="choice.imageIdentifier">{{ choice.name || '#' + (choice.index + 1) }}</option>
+        }
+      </select>
+    </label>
+  }
+  @if (image && fits()) {
+    <div class="text-ui-muted col-span-3 flex items-center justify-between font-semibold">
+      <span>{{ 'feature.media.cutIn.portraitFit' | transloco }}</span>
+      <button
+        class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex cursor-pointer items-center border border-solid bg-transparent px-1.5 py-0.5 text-[10px] font-normal disabled:cursor-not-allowed disabled:opacity-50"
+        type="button"
+        data-testid="cut-in-portrait-reset"
+        [disabled]="!isEditable()"
+        (click)="resetFit()"
+      >
+        {{ 'feature.media.cutIn.portraitReset' | transloco }}
+      </button>
+    </div>
+    <input
+      class="col-span-3 w-full [accent-color:var(--ui-accent)]"
+      type="range"
+      step="0.05"
+      name="cut-in-portrait-zoom-slider"
+      data-testid="cut-in-portrait-zoom-slider"
+      [min]="minZoom"
+      [max]="maxZoom"
+      [attr.aria-label]="'feature.media.cutIn.portraitZoom' | transloco"
+      [(ngModel)]="zoom"
+      [disabled]="!isEditable()"
+    />
+    <label class="text-ui-muted flex min-w-0 flex-col gap-1">
+      <span>{{ 'feature.media.cutIn.portraitZoom' | transloco }}</span>
+      <input
+        class="bg-ui-input text-ui-text rounded-ui-sm box-border w-full p-1"
+        type="number"
+        step="0.1"
+        name="cut-in-portrait-zoom"
+        [min]="minZoom"
+        [max]="maxZoom"
+        [(ngModel)]="zoom"
+        [disabled]="!isEditable()"
+      />
+    </label>
+    <label class="text-ui-muted flex min-w-0 flex-col gap-1">
+      <span>{{ 'feature.media.cutIn.portraitX' | transloco }}</span>
+      <input
+        class="bg-ui-input text-ui-text rounded-ui-sm box-border w-full p-1"
+        type="number"
+        min="0"
+        max="100"
+        step="1"
+        name="cut-in-portrait-x"
+        [(ngModel)]="x"
+        [disabled]="!isEditable()"
+      />
+    </label>
+    <label class="text-ui-muted flex min-w-0 flex-col gap-1">
+      <span>{{ 'feature.media.cutIn.portraitY' | transloco }}</span>
+      <input
+        class="bg-ui-input text-ui-text rounded-ui-sm box-border w-full p-1"
+        type="number"
+        min="0"
+        max="100"
+        step="1"
+        name="cut-in-portrait-y"
+        [(ngModel)]="y"
+        [disabled]="!isEditable()"
+      />
+    </label>
+  }
+</div>

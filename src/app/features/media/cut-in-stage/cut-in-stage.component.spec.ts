@@ -293,4 +293,80 @@ describe('CutInStageComponent', () => {
     expect(fixture.componentInstance.fit()).toEqual({ scale: 1, offsetX: 0, offsetY: 0 });
     expect(fixture.componentInstance.sceneTransform()).toBe('translate(0px, 0px) scale(1)');
   });
+
+  describe('the name of the character a cut-in was launched for', () => {
+    function launchedFor(characterName: string) {
+      return { characterIdentifier: 'hero', imageIdentifier: '', fit: { zoom: 1, x: 50, y: 0 }, characterName };
+    }
+
+    it('shows the name the launch carried in place of the token', () => {
+      const scene = makeScene();
+      addLayer(scene, { kind: 'text', text: '{character}\n参戦！' });
+      fixture.componentRef.setInput('portrait', launchedFor('アリス'));
+
+      show(scene, false, 0);
+
+      const words = fixture.nativeElement.querySelector('.whitespace-pre-wrap') as HTMLElement;
+      expect(words.textContent).toBe('アリス\n参戦！');
+    });
+
+    it('shows the stand-in when the launch named nobody', () => {
+      const scene = makeScene();
+      addLayer(scene, { kind: 'text', text: '{character}参戦！' });
+
+      show(scene, false, 0);
+
+      expect((fixture.nativeElement.querySelector('.whitespace-pre-wrap') as HTMLElement).textContent).toBe(
+        '？？？参戦！'
+      );
+    });
+  });
+
+  describe('letters that move or lean on their own', () => {
+    it('draws each letter apart, keeping line breaks and joined emoji, and leans every other one', () => {
+      const scene = makeScene();
+      addLayer(scene, { kind: 'text', text: '{character}\n👍🏽!', letterTiltDeg: 10 });
+      fixture.componentRef.setInput('portrait', {
+        characterIdentifier: '',
+        imageIdentifier: '',
+        fit: { zoom: 1, x: 50, y: 0 },
+        characterName: 'Bo',
+      });
+
+      show(scene, false, 0);
+
+      const letters = [...fixture.nativeElement.querySelectorAll('[data-letter]')] as HTMLElement[];
+      expect(letters.map((letter) => letter.textContent)).toEqual(['B', 'o', '👍🏽', '!']);
+      expect(letters.map((letter) => letter.style.transform)).toEqual([
+        'rotate(-10deg)',
+        'rotate(10deg)',
+        'rotate(-10deg)',
+        'rotate(10deg)',
+      ]);
+      expect(fixture.nativeElement.querySelectorAll('[data-testid="cut-in-letters"] br')).toHaveLength(1);
+    });
+
+    it('sets each moving letter going on the scene clock, alongside its layer', () => {
+      const animate = stubAnimate();
+      const scene = makeScene(2000);
+      addLayer(scene, { kind: 'text', text: 'ABC', letterMotion: 'pop', startMs: 300 });
+
+      show(scene, true);
+
+      // One for the layer and one for each of its three letters, all over the scene's own length.
+      expect(animate).toHaveBeenCalledTimes(4);
+      for (const call of animate.mock.calls as unknown as [unknown, KeyframeAnimationOptions][]) {
+        expect(call[1].duration).toBe(2000);
+      }
+    });
+
+    it('keeps an ordinary text layer as one run of text', () => {
+      const scene = makeScene();
+      addLayer(scene, { kind: 'text', text: '一行目' });
+
+      show(scene, false, 0);
+
+      expect(fixture.nativeElement.querySelector('[data-letter]')).toBeNull();
+    });
+  });
 });

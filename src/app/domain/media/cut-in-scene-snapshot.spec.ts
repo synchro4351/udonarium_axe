@@ -159,6 +159,25 @@ describe('cut-in scene snapshots', () => {
       expect(scene.portraitFits).toBe(before.portraitFits);
     });
 
+    it('restores how the letters of a text layer move and lean, with the text kept whole', () => {
+      const scene = makeScene();
+      const layer = addLayer(scene, 'call');
+      layer.kind = 'text';
+      layer.text = '{character}\n参戦！';
+      layer.letterMotion = 'pop';
+      layer.letterTiltDeg = 8;
+      const before = snapshotScene(scene);
+
+      layer.letterMotion = 'none';
+      layer.letterTiltDeg = 0;
+      layer.text = '';
+      restoreScene(scene, before);
+
+      expect(layer.letterMotion).toBe('pop');
+      expect(layer.letterTiltDeg).toBe(8);
+      expect(layer.text).toBe('{character}\n参戦！');
+    });
+
     it('does nothing without a scene', () => {
       expect(() => restoreScene(null, snapshotScene(null))).not.toThrow();
     });

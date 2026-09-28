@@ -37,8 +37,26 @@
                   [style.align-items]="layer.vertical ? alignOf(layer) : 'center'"
                   [style.justify-content]="layer.vertical ? 'center' : alignOf(layer)"
                   [style.text-shadow]="textShadowOf(layer)"
-                  [textContent]="layer.text"
-                ></div>
+                >
+                  @if (lettersOf(layer); as letters) {
+                    <span data-testid="cut-in-letters">
+                      @for (letter of letters; track $index) {
+                        @if (letter.newline) {
+                          <br />
+                        } @else {
+                          <span
+                            class="inline-block origin-center"
+                            [attr.data-letter]="letter.index"
+                            [style.transform]="letter.rest"
+                            [textContent]="letter.text"
+                          ></span>
+                        }
+                      }
+                    </span>
+                  } @else {
+                    <span [textContent]="textOf(layer)"></span>
+                  }
+                </div>
               }
               @case ('fill') {
                 <div class="size-full" [style.background]="fillOf(layer)"></div>

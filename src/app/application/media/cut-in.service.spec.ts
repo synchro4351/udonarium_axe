@@ -244,8 +244,52 @@ describe('what a line arriving sets off', () => {
       characterIdentifier: hero.identifier,
       imageIdentifier: 'hero-smile',
       fit: { zoom: 2, x: 40, y: 10 },
+      characterName: 'hero',
     });
   });
+
+  it('carries the speaking character name for a scene that names them, even without a portrait slot', () => {
+    const cutIn = makeNamingScene('名乗り');
+    const hero = makeCharacter('勇者ロト');
+    const spy = vi.spyOn(launcher, 'startCutIn').mockImplementation(() => {});
+
+    tab.addMessage({
+      from: 'me',
+      name: '勇者ロト',
+      text: '参る 名乗り',
+      sendFrom: hero.identifier,
+      timestamp: Date.now(),
+    });
+    hero.name = '改名後';
+
+    expect(spy).toHaveBeenCalledWith(cutIn, '', expect.objectContaining({ characterName: '勇者ロト' }));
+  });
+
+  it('names the player who speaks as themself', () => {
+    const cutIn = makeNamingScene('名乗り');
+    const spy = vi.spyOn(launcher, 'startCutIn').mockImplementation(() => {});
+
+    tab.addMessage({ from: 'me', name: 'PL太郎', text: '参る 名乗り', timestamp: Date.now() });
+
+    expect(spy).toHaveBeenCalledWith(
+      cutIn,
+      '',
+      expect.objectContaining({ characterIdentifier: '', characterName: 'PL太郎' })
+    );
+  });
+
+  function makeNamingScene(name: string): CutIn {
+    const cutIn = makeCutIn(name);
+    const scene = new CutInScene();
+    scene.cutInIdentifier = cutIn.identifier;
+    scene.initialize();
+    const words = new CutInLayer();
+    words.kind = 'text';
+    words.text = '{character}';
+    words.initialize();
+    scene.appendChild(words);
+    return cutIn;
+  }
 
   it('keeps a direct line direct when it brings a portrait', () => {
     const cutIn = makeTemplate('名乗り');
@@ -303,10 +347,8 @@ describe('what a line arriving sets off', () => {
   }
 
   function makeCharacter(name: string): GameCharacter {
-    const character = new GameCharacter();
-    character.name = name;
-    character.initialize();
-    return character;
+    // Built the way the app builds one, so it has somewhere to keep its name.
+    return GameCharacter.create(name, 1, '');
   }
 
   it('leaves the backlog alone when somebody walks into the room', () => {

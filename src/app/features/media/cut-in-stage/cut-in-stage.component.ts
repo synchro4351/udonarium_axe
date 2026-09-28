@@ -29,6 +29,14 @@ import {
   toWebAnimationFrames,
   toWipeFrames,
 } from '@axe/domain/media/cut-in-scene-timeline';
+import {
+  drawsLetters,
+  isCutInLetterMotion,
+  letterFrames,
+  letterTiltOf,
+  resolveCharacterName,
+  splitLetters,
+} from '@axe/domain/media/cut-in-text';
 import { wipeCss } from '@axe/domain/media/cut-in-wipe';
 import { type StageFit, stageFit } from '@axe/features/media/cut-in-editor/cut-in-stage-geometry';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
@@ -80,12 +88,16 @@ export class CutInStageComponent {
     return { url: face.url, silhouette: face.silhouette, ...portraitFitCss(face.fit) };
   });
 
+  /** The name `{character}` shows, as the launch carried it. */
+  readonly characterName = computed(() => this.portrait()?.characterName ?? '');
+
   private readonly layerElements = viewChildren<ElementRef<HTMLElement>>('layerElement');
   private readonly wipeElements = viewChildren<ElementRef<HTMLElement>>('wipeElement');
   private readonly crumbleElements = viewChildren<ElementRef<HTMLElement>>('crumbleElement');
   private readonly handles = new Map<string, Animation>();
   private readonly wipeHandles = new Map<string, Animation>();
   private readonly crumbleHandles = new Map<string, Animation>();
+  private readonly letterHandles = new Map<string, Animation[]>();
   private readonly hostSize = signal({ width: 0, height: 0 });
 
   readonly layers = computed<CutInLayer[]>(() => {
@@ -146,6 +158,8 @@ export class CutInStageComponent {
       const startOffsetMs = this.startOffsetMs();
       // Every layer's own version, so a keyframe moved while the editor is open is picked up.
       for (const layer of layers) this.objectChange.versionOf(layer.identifier)();
+      // A different name is a different run of letters to set going.
+      this.characterName();
 
       this.build(layers, elements, this.wipeElements(), this.crumbleElements(), durationMs, loops, startOffsetMs);
       this.runTo(untracked(this.playing), untracked(this.playheadMs), layers, elements, durationMs, startOffsetMs);
@@ -206,6 +220,24 @@ export class CutInStageComponent {
     return fillCss(layer.fill);
   }
 
+  /** What a text layer says, with the launched character's name put in for `{character}`. */
+  protected textOf(layer: CutInLayer): string {
+    return resolveCharacterName(layer.text, this.characterName());
+  }
+
+  /**
+   * The words a letter at a time, for a layer whose letters move or lean on their own, with where
+   * each rests. Anything else is drawn as one run of text.
+   */
+  protected lettersOf(layer: CutInLayer): { text: string; newline: boolean; index: number; rest: string }[] | null {
+    this.objectChange.versionOf(layer.identifier)();
+    if (!drawsLetters(layer)) return null;
+    return splitLetters(this.textOf(layer)).map((letter) => ({
+      ...letter,
+      rest: letter.newline ? '' : `rotate(${letterTiltOf(letter.index, layer.letterTiltDeg)}deg)`,
+    }));
+  }
+
   protected textShadowOf(layer: CutInLayer): string | null {
     if (layer.strokeWidthPx <= 0 || layer.strokeColor.length < 1) return null;
     const width = layer.strokeWidthPx;
@@ -255,6 +287,27 @@ export class CutInStageComponent {
       if (crumbleFrames.length > 1 && crumbleElement) {
         this.crumbleHandles.set(layer.identifier, crumbleElement.animate(crumbleFrames, options));
       }
+
+      // Letters that move ride on the same clock as their layer, each on an animation of its own.
+      if (layer.kind === 'text' && isCutInLetterMotion(layer.letterMotion) && layer.letterMotion !== 'none') {
+        const letters = Array.from(element.querySelectorAll<HTMLElement>('[data-letter]'));
+        this.letterHandles.set(
+          layer.identifier,
+          letters.map((letter) =>
+            letter.animate(
+              letterFrames(
+                layer.letterMotion,
+                Number(letter.dataset['letter']) || 0,
+                layer.letterTiltDeg,
+                layer.fontSizePx,
+                layer.startMs,
+                durationMs
+              ),
+              options
+            )
+          )
+        );
+      }
     }
   }
 
@@ -277,7 +330,11 @@ export class CutInStageComponent {
         continue;
       }
 
-      const outlines = [this.wipeHandles.get(layer.identifier), this.crumbleHandles.get(layer.identifier)];
+      const outlines = [
+        this.wipeHandles.get(layer.identifier),
+        this.crumbleHandles.get(layer.identifier),
+        ...(this.letterHandles.get(layer.identifier) ?? []),
+      ];
       if (playing) {
         handle.play();
         for (const outline of outlines) outline?.play();
@@ -312,6 +369,8 @@ export class CutInStageComponent {
     this.wipeHandles.clear();
     for (const handle of this.crumbleHandles.values()) stopAnimation(handle);
     this.crumbleHandles.clear();
+    for (const handles of this.letterHandles.values()) for (const handle of handles) stopAnimation(handle);
+    this.letterHandles.clear();
   }
 
   private watchHostSize(): void {

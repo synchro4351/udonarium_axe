@@ -4,6 +4,7 @@ import type { CutInClip } from '@axe/domain/media/cut-in-clip';
 import type { CutInEffect } from '@axe/domain/media/cut-in-effect';
 import { type CutInFill, type CutInFillShape, DEFAULT_FILL_SCALE_PX } from '@axe/domain/media/cut-in-fill';
 import { type CutInTrackSet, lastKeyTime, parseCutInTracks } from '@axe/domain/media/cut-in-keyframe';
+import type { CutInLetterMotion } from '@axe/domain/media/cut-in-text';
 import type { CutInWipe } from '@axe/domain/media/cut-in-wipe';
 
 /**
@@ -98,6 +99,13 @@ export class CutInLayer extends ObjectNode {
   @SyncVar() lineHeight: number = 1.15;
   /** Whether the words run down the layer rather than across it. */
   @SyncVar() vertical: boolean = false;
+  /**
+   * How the letters move one at a time, while the text stays one string. `{character}` in the
+   * text is the name of the character the cut-in was launched for.
+   */
+  @SyncVar() letterMotion: CutInLetterMotion = 'none';
+  /** How far every other letter leans the other way, in degrees. 0 keeps them upright. */
+  @SyncVar() letterTiltDeg: number = 0;
 
   // kind: fill
   @SyncVar() fillShape: CutInFillShape = 'linear';

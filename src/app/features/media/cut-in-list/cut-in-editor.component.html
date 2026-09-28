@@ -76,79 +76,11 @@
           <span>{{ 'feature.media.cutIn.stop' | transloco }}</span>
         </button>
       </div>
-      @if (hasPortraitSlot) {
-        <div class="border-ui-border-panel rounded-ui-sm grid grid-cols-2 gap-1.5 border border-solid p-2 text-[11px]">
-          <label class="text-ui-muted col-span-2 flex flex-col gap-1">
-            <span>{{ 'feature.media.cutIn.portraitCharacter' | transloco }}</span>
-            <select
-              class="bg-ui-input text-ui-text rounded-ui-sm px-1 py-1"
-              name="cut-in-portrait-character"
-              [(ngModel)]="portraitCharacter"
-            >
-              <option value="">{{ 'feature.media.cutIn.portraitNone' | transloco }}</option>
-              @for (character of portraitCharacters; track character.identifier) {
-                <option [value]="character.identifier">{{ character.name }}</option>
-              }
-            </select>
-          </label>
-          @if (portraitCharacter) {
-            <label class="text-ui-muted col-span-2 flex flex-col gap-1">
-              <span>{{ 'feature.media.cutIn.portraitImage' | transloco }}</span>
-              <select
-                class="bg-ui-input text-ui-text rounded-ui-sm px-1 py-1"
-                name="cut-in-portrait-image"
-                [(ngModel)]="portraitImage"
-              >
-                <option value="">{{ 'feature.media.cutIn.portraitNone' | transloco }}</option>
-                @for (choice of portraitImages; track choice.index) {
-                  <option [value]="choice.imageIdentifier">{{ choice.name || '#' + (choice.index + 1) }}</option>
-                }
-              </select>
-            </label>
-          }
-          @if (portraitImage) {
-            <div class="text-ui-muted col-span-2 font-semibold">
-              {{ 'feature.media.cutIn.portraitFit' | transloco }}
-            </div>
-            <label class="text-ui-muted flex flex-col gap-1">
-              <span>{{ 'feature.media.cutIn.portraitZoom' | transloco }}</span>
-              <input
-                class="bg-ui-input text-ui-text rounded-ui-sm w-full px-1 py-1"
-                type="number"
-                min="0.5"
-                max="4"
-                step="0.1"
-                name="cut-in-portrait-zoom"
-                [(ngModel)]="portraitZoom"
-                [disabled]="!isEditable()"
-              />
-            </label>
-            <label class="text-ui-muted flex flex-col gap-1">
-              <span>{{ 'feature.media.cutIn.portraitX' | transloco }}</span>
-              <input
-                class="bg-ui-input text-ui-text rounded-ui-sm w-full px-1 py-1"
-                type="number"
-                min="0"
-                max="100"
-                step="1"
-                name="cut-in-portrait-x"
-                [(ngModel)]="portraitX"
-                [disabled]="!isEditable()"
-              />
-            </label>
-            <label class="text-ui-muted flex flex-col gap-1">
-              <span>{{ 'feature.media.cutIn.portraitY' | transloco }}</span>
-              <input
-                class="bg-ui-input text-ui-text rounded-ui-sm w-full px-1 py-1"
-                type="number"
-                min="0"
-                max="100"
-                step="1"
-                name="cut-in-portrait-y"
-                [(ngModel)]="portraitY"
-                [disabled]="!isEditable()"
-              />
-            </label>
+      @if (takesCharacter) {
+        <div class="border-ui-border-panel rounded-ui-sm flex flex-col gap-1 border border-solid p-2">
+          <cut-in-portrait-picker [cutIn]="cutIn()" [isEditable]="isEditable()" [fits]="hasPortraitSlot" />
+          @if (hasPortraitSlot) {
+            <span class="text-ui-dim text-[11px]">{{ 'feature.media.cutIn.portraitStageHint' | transloco }}</span>
           }
         </div>
       }

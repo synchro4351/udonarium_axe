@@ -8,7 +8,12 @@
  *
  * How each picture is fitted is kept on the template as JSON keyed by the picture's identifier, so
  * fitting it never touches the picture itself or the character that holds it.
+ *
+ * The same snapshot carries the character's name for `{character}` in a text layer, so a scene
+ * that names the character but has no portrait slot still sends one.
  */
+
+import { usesCharacterName } from '@axe/domain/media/cut-in-text';
 
 /** How a picture sits in a portrait slot: blown up around a focus point given as a percentage across and down. */
 export interface CutInPortraitFit {
@@ -24,6 +29,11 @@ export interface CutInPortraitSnapshot {
   /** The picture, by the identifier the image storage knows it by. Empty draws the silhouette. */
   imageIdentifier: string;
   fit: CutInPortraitFit;
+  /**
+   * The character's name as it was at launch, for `{character}` in a text layer. Empty shows the
+   * stand-in. A launch from an older copy of the app carries none.
+   */
+  characterName: string;
 }
 
 export const MIN_PORTRAIT_ZOOM = 0.5;
@@ -117,6 +127,7 @@ export function encodePortraitSnapshot(snapshot: CutInPortraitSnapshot | null): 
     c: snapshot.characterIdentifier,
     i: snapshot.imageIdentifier,
     f: normalizePortraitFit(snapshot.fit),
+    n: snapshot.characterName,
   });
 }
 
@@ -131,6 +142,7 @@ export function parsePortraitSnapshot(raw: string | null | undefined): CutInPort
       characterIdentifier: typeof source['c'] === 'string' ? source['c'] : '',
       imageIdentifier: typeof source['i'] === 'string' ? source['i'] : '',
       fit: normalizePortraitFit(source['f']),
+      characterName: typeof source['n'] === 'string' ? source['n'] : '',
     };
   } catch {
     return null;
@@ -141,6 +153,8 @@ export function parsePortraitSnapshot(raw: string | null | undefined): CutInPort
 export interface PortraitSlotLayer {
   kind: string;
   portraitSlot: boolean;
+  /** A text layer's words, which may name the character. */
+  text?: string;
 }
 
 /** Whether a layer takes the launched portrait rather than its own picture. */
@@ -153,22 +167,30 @@ export function hasPortraitSlot(layers: readonly PortraitSlotLayer[]): boolean {
   return layers.some(isPortraitSlot);
 }
 
+/** Whether a template shows the name of the character it is launched for somewhere in its text. */
+export function namesCharacter(layers: readonly PortraitSlotLayer[]): boolean {
+  return layers.some((layer) => layer.kind === 'text' && usesCharacterName(layer.text));
+}
+
 /**
  * The snapshot a launch carries, taken from the template and the chosen picture as they stand now.
  *
- * A template without a portrait slot carries none, so a cut-in that never had one plays exactly as
- * before. Without a picture the snapshot still goes, so every peer shows the silhouette.
+ * A template with neither a portrait slot nor the character's name in its text carries none, so a
+ * cut-in that never had either plays exactly as before. Without a picture or a name the snapshot
+ * still goes, so every peer shows the silhouette and the same stand-in for the name.
  */
 export function makePortraitSnapshot(
   template: { layers: readonly PortraitSlotLayer[]; portraitFits: string } | null,
   characterIdentifier: string,
-  imageIdentifier: string
+  imageIdentifier: string,
+  characterName = ''
 ): CutInPortraitSnapshot | null {
-  if (!template || !hasPortraitSlot(template.layers)) return null;
+  if (!template || !(hasPortraitSlot(template.layers) || namesCharacter(template.layers))) return null;
   return {
     characterIdentifier,
     imageIdentifier,
     fit: portraitFitFor(template.portraitFits, imageIdentifier),
+    characterName: characterName.trim(),
   };
 }
 
@@ -186,6 +208,28 @@ export function resolvePortrait(
   const url = snapshot?.imageIdentifier ? urlOf(snapshot.imageIdentifier) : '';
   if (url && snapshot) return { url, fit: snapshot.fit, silhouette: false };
   return { url: CUT_IN_PORTRAIT_SILHOUETTE_URL, fit: { ...SILHOUETTE_PORTRAIT_FIT }, silhouette: true };
+}
+
+/**
+ * A fit with the picture dragged across its slot, by a distance in the cut-in's own coordinates.
+ *
+ * The picture follows the pointer: dragging it right brings more of its left side into view. The
+ * further it is blown up, the less of it a drag of the same length covers.
+ */
+export function panPortraitFit(
+  fit: CutInPortraitFit,
+  dx: number,
+  dy: number,
+  slot: { width: number; height: number }
+): CutInPortraitFit {
+  const across = Math.max(1, slot.width) * fit.zoom;
+  const down = Math.max(1, slot.height) * fit.zoom;
+  return normalizePortraitFit({ zoom: fit.zoom, x: fit.x - (dx / across) * 100, y: fit.y - (dy / down) * 100 });
+}
+
+/** A fit with the picture blown up or shrunk by a factor, held to the range the slot can show. */
+export function zoomPortraitFit(fit: CutInPortraitFit, factor: number): CutInPortraitFit {
+  return normalizePortraitFit({ ...fit, zoom: Math.round(fit.zoom * factor * 100) / 100 });
 }
 
 /** The styles that put a picture into its slot the way the fit says. */

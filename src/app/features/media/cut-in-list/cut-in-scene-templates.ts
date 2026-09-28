@@ -5,6 +5,7 @@ import type { CutInFillShape } from '@axe/domain/media/cut-in-fill';
 import { type CutInTrackName, encodeCutInTracks, upsertKey } from '@axe/domain/media/cut-in-keyframe';
 import type { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import type { CutInScene } from '@axe/domain/media/cut-in-scene';
+import { CUT_IN_CHARACTER_TOKEN } from '@axe/domain/media/cut-in-text';
 import { addLayer, ensureScene } from '@axe/features/media/cut-in-editor/cut-in-editor-ops';
 import { CUT_IN_FONT_OPTIONS } from '@axe/features/media/cut-in-editor/cut-in-font-options';
 
@@ -714,44 +715,133 @@ const PLANS: Record<CutInSceneTemplate, TemplatePlan> = {
       });
     },
   },
+  // A fighter joining the fight: bars cut across at a slant, the challenger slides in over a
+  // burst, their name springs up a letter at a time and the call lands on top in a zigzag.
   portrait: {
-    stage: { width: 720, height: 300, durationMs: 2000 },
+    stage: { width: 800, height: 400, durationMs: 2600 },
     build(scene, stage, text) {
-      const base = band(scene, stage, 'band', {
-        x: 0,
-        y: 60,
-        width: 720,
-        height: 200,
-        opacity: 0.9,
+      const SLANT = -7;
+
+      const backdrop = band(scene, stage, 'backdrop', {
+        x: -40,
+        y: 56,
+        width: 880,
+        height: 290,
+        rotation: SLANT,
+        opacity: 0.92,
         clip: 'slant',
-        shape: 'speedlines',
-        from: '#23304a',
-        to: '#3d5a8a',
+        shape: 'linear',
+        from: '#12060c',
+        to: '#3b0a19',
+        angleDeg: 0,
       });
-      base.wipeShape = 'right';
-      arrive(base, 0, 260, { wipe: 0 });
-      leave(base, stage.durationMs, 220, { dx: 720, opacity: 0 });
+      backdrop.wipeShape = 'right';
+      arrive(backdrop, 0, 240, { wipe: 0 }, 'outCubic');
+      leave(backdrop, stage.durationMs, 260, { opacity: 0 });
+
+      const topBar = band(scene, stage, 'bar-top', {
+        x: -80,
+        y: 40,
+        width: 960,
+        height: 40,
+        rotation: SLANT,
+        skewXDeg: -24,
+        clip: 'none',
+        shape: 'speedlines',
+        from: '#ff2d3d',
+        to: '#ff9a1f',
+      });
+      arrive(topBar, 60, 240, { dx: -960 }, 'outCubic');
+      leave(topBar, stage.durationMs, 240, { dx: 960 });
+
+      const bottomBar = band(scene, stage, 'bar-bottom', {
+        x: -80,
+        y: 318,
+        width: 960,
+        height: 28,
+        rotation: SLANT,
+        skewXDeg: -24,
+        clip: 'none',
+        shape: 'linear',
+        from: '#ffd23f',
+        to: '#ff5a1f',
+        angleDeg: 0,
+      });
+      arrive(bottomBar, 120, 240, { dx: 960 }, 'outCubic');
+      leave(bottomBar, stage.durationMs, 240, { dx: -960 });
+
+      const burst = band(scene, stage, 'burst', {
+        x: 450,
+        y: 30,
+        width: 340,
+        height: 340,
+        opacity: 0.55,
+        clip: 'burst',
+        shape: 'conic',
+        from: '#ffd23f',
+        to: '#ff2d3d',
+      });
+      arrive(burst, 180, 260, { scale: 0 }, 'outBack');
+      tween(burst, 0, stage.durationMs, {}, { turn: 60 }, 'linear');
+      leave(burst, stage.durationMs, 260, { scale: 1.3, opacity: 0 });
 
       // The face and shoulders of whoever plays it, or the silhouette until someone does.
       const portrait = addLayer(scene, 'image', 'portrait', stage);
-      place(portrait, { x: 40, y: 0, width: 260, height: 300 });
+      place(portrait, { x: 440, y: 0, width: 340, height: 400 });
       portrait.portraitSlot = true;
       portrait.objectFit = 'cover';
       portrait.imageIdentifier = '';
       portrait.effect = 'shadow';
-      arrive(portrait, 80, 320, { dx: -160, opacity: 0 }, 'outBack');
-      leave(portrait, stage.durationMs, 220, { dx: -120, opacity: 0 });
+      arrive(portrait, 200, 340, { dx: 320, scale: 1.15, opacity: 0 }, 'outBack');
+      leave(portrait, stage.durationMs, 240, { dx: 200, opacity: 0 });
 
-      lettering(scene, stage, text, {
-        box: { x: 320, y: 110, width: 370, height: 100 },
-        sizePx: 72,
-        font: 'gothic',
-        weight: 900,
-        split: true,
-      }).forEach((letter, at) => {
-        arrive(letter, 260 + at * 60, 220, { dx: 80, opacity: 0 }, 'outBack');
-        leave(letter, stage.durationMs, 200, { dx: 200, opacity: 0 });
+      // One flash as the challenger arrives, which is what makes the arrival land.
+      const flash = band(scene, stage, 'flash', {
+        x: 0,
+        y: 0,
+        width: stage.width,
+        height: stage.height,
+        opacity: 0,
+        blendMode: 'screen',
+        clip: 'none',
+        shape: 'radial',
+        from: '#ffffff',
+        to: '#ffd23f',
       });
+      animate(flash, {
+        opacity: [
+          [0, 0],
+          [420, 0, 'outQuad'],
+          [480, 0.75, 'inQuad'],
+          [720, 0],
+        ],
+      });
+
+      const name = callout(scene, stage, CUT_IN_CHARACTER_TOKEN, {
+        box: { x: 30, y: 104, width: 470, height: 84 },
+        sizePx: 56,
+        color: '#ffffff',
+        stroke: '#12060c',
+        rotation: SLANT,
+      });
+      name.startMs = 460;
+      name.letterMotion = 'pop';
+      leave(name, stage.durationMs, 240, { dx: -300, opacity: 0 });
+
+      const call = callout(scene, stage, text, {
+        box: { x: 10, y: 180, width: 520, height: 150 },
+        sizePx: 128,
+        color: '#ffd23f',
+        stroke: '#8a0f1f',
+        rotation: SLANT,
+      });
+      call.startMs = 760;
+      call.letterMotion = 'pop';
+      call.letterTiltDeg = 8;
+      call.effect = 'glow';
+      call.effectColor = '#ff5a1f';
+      arrive(call, 760, 200, { scale: 1.6 }, 'outCubic');
+      leave(call, stage.durationMs, 240, { scale: 1.4, opacity: 0 });
     },
   },
 };
@@ -909,6 +999,36 @@ function lettering(scene: CutInScene, stage: Stage, text: string, look: LetterLo
     layer.letterSpacingPx = fragments.length > 1 ? 0 : (look.letterSpacingPx ?? 0);
     return layer;
   });
+}
+
+/**
+ * Bold slanted words as one layer, so the text stays one string to edit and its letters can move
+ * on their own. They are sized down to fit the box, however long the words turn out.
+ */
+function callout(
+  scene: CutInScene,
+  stage: Stage,
+  text: string,
+  look: { box: Box; sizePx: number; color: string; stroke: string; rotation: number }
+): CutInLayer {
+  const layer = addLayer(scene, 'text', text, stage);
+  place(layer, look.box);
+  // A name is not known until launch, so it is given the room of a name of a few letters.
+  const measured = text === CUT_IN_CHARACTER_TOKEN ? 6 : emWidth(text);
+  layer.text = text;
+  layer.fontSizePx = Math.max(
+    20,
+    Math.round(Math.min(look.sizePx, (look.box.width * 0.9) / measured, look.box.height * 0.85))
+  );
+  layer.fontFamily = CUT_IN_FONT_OPTIONS.find((option) => option.name === 'gothic')?.value ?? '';
+  layer.fontWeight = 900;
+  layer.color = look.color;
+  layer.strokeColor = look.stroke;
+  layer.strokeWidthPx = 4;
+  layer.rotation = look.rotation;
+  layer.skewXDeg = -12;
+  layer.lineHeight = 1;
+  return layer;
 }
 
 function place(layer: CutInLayer, box: Box): void {

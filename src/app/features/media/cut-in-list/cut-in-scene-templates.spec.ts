@@ -5,6 +5,7 @@ import type { CutIn } from '@axe/domain/media/cut-in';
 import { clipPoints } from '@axe/domain/media/cut-in-clip';
 import { type CutInKey, parseCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import type { CutInLayer } from '@axe/domain/media/cut-in-layer';
+import { CUT_IN_CHARACTER_TOKEN, usesCharacterName } from '@axe/domain/media/cut-in-text';
 import {
   createCutInSceneTemplate,
   CUT_IN_SCENE_TEMPLATES,
@@ -14,6 +15,11 @@ import {
 
 function layersOf(cutIn: CutIn, kind: CutInLayer['kind']): CutInLayer[] {
   return cutIn.scene!.layers.filter((layer) => layer.kind === kind);
+}
+
+/** The words the title was laid into, leaving out a name that is only filled in at launch. */
+function titleLayersOf(cutIn: CutIn): CutInLayer[] {
+  return layersOf(cutIn, 'text').filter((layer) => layer.text !== CUT_IN_CHARACTER_TOKEN);
 }
 
 function keysOf(layer: CutInLayer, track: 'x' | 'y' | 'scaleX' | 'rotation' | 'opacity'): CutInKey[] {
@@ -69,10 +75,41 @@ describe('cut-in scene examples', () => {
       expect(cutIn.scene?.layers[0].kind).toBe('fill');
       expect(cutIn.scene?.backgroundColor).toBe('');
 
-      const words = layersOf(cutIn, 'text');
+      const words = titleLayersOf(cutIn);
       expect(words.length).toBeGreaterThan(0);
       for (const layer of cutIn.scene!.layers) expect(layer.tracks).not.toBe('');
       expect(words.map((layer) => layer.text).join(' ')).toBe('Replace this title');
+    });
+  });
+
+  it('calls the portrait example 参戦！ in Japanese', () => {
+    expect(titleIn('ja', 'portrait')).toBe('参戦！');
+  });
+
+  it('builds the entrance from slanted bars, a portrait slot, the name and a zigzag call', () => {
+    withExample('portrait', '参戦！', (cutIn) => {
+      const scene = cutIn.scene!;
+      const bars = layersOf(cutIn, 'fill').filter((layer) => layer.name.startsWith('bar-'));
+      expect(bars).toHaveLength(2);
+      for (const bar of bars) {
+        expect(bar.rotation).not.toBe(0);
+        expect(bar.skewXDeg).not.toBe(0);
+      }
+
+      expect(layersOf(cutIn, 'image').filter((layer) => layer.portraitSlot)).toHaveLength(1);
+      expect(scene.hasPortraitSlot).toBe(true);
+      expect(scene.takesCharacter).toBe(true);
+
+      const [name] = layersOf(cutIn, 'text').filter((layer) => usesCharacterName(layer.text));
+      expect(name.text).toBe(CUT_IN_CHARACTER_TOKEN);
+      expect(name.letterMotion).toBe('pop');
+
+      const [call] = titleLayersOf(cutIn);
+      expect(call.text).toBe('参戦！');
+      expect(call.letterMotion).toBe('pop');
+      expect(call.letterTiltDeg).not.toBe(0);
+      // The call lands after the name, so the two read in order.
+      expect(call.startMs).toBeGreaterThan(name.startMs);
     });
   });
 
@@ -86,7 +123,7 @@ describe('cut-in scene examples', () => {
     const titles = [...LANGUAGES.map((language) => titleIn(language, kind)), ...(glyph ? [] : MORE_TITLES)];
     for (const title of titles) {
       withExample(kind, title, (cutIn) => {
-        const words = layersOf(cutIn, 'text');
+        const words = titleLayersOf(cutIn);
         for (const layer of words) {
           // A piece with no space in it has nowhere to break but between letters that run wider than its box.
           if (words.length > 1) expect(layer.text).not.toMatch(/\s/);

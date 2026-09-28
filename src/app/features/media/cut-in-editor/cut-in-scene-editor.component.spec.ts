@@ -1,9 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
+import { portraitFitFor } from '@axe/domain/media/cut-in-portrait';
 import { keysOf, valueAt } from '@axe/features/media/cut-in-editor/cut-in-keyframe-edit';
+import { CutInPortraitPickService } from '@axe/features/media/cut-in-editor/cut-in-portrait-pick.service';
 import { CutInSceneEditorComponent } from '@axe/features/media/cut-in-editor/cut-in-scene-editor.component';
 import { CutInTimelineComponent, type TimelineRow } from '@axe/features/media/cut-in-editor/cut-in-timeline.component';
 import { TIMELINE_HEAD_W_PX } from '@axe/features/media/cut-in-editor/cut-in-timeline-geometry';
@@ -977,6 +980,84 @@ describe('CutInSceneEditorComponent', () => {
       editor().nudgeSelected(10, 0);
 
       expect(layer.x).toBe(was);
+    });
+  });
+
+  describe('fitting a character picture into the portrait slot', () => {
+    type FitApi = {
+      toggleFittingPortrait(): void;
+      fittingPortrait(): boolean;
+      previewPortrait(): { imageIdentifier: string; characterName: string; fit: { zoom: number } } | null;
+      onStageWheel(event: WheelEvent): void;
+    };
+
+    function fitting(): FitApi {
+      return component as unknown as FitApi;
+    }
+
+    function withSlotAndHero(): { slot: CutInLayer; hero: GameCharacter } {
+      editor().addImageLayer();
+      const slot = component.layers()[0];
+      slot.portraitSlot = true;
+      slot.width = 200;
+      slot.height = 300;
+      editor().changed();
+      const hero = GameCharacter.create('Hero', 1, 'hero-face');
+      TestBed.inject(CutInPortraitPickService).choose(cutIn.identifier, {
+        characterIdentifier: hero.identifier,
+        imageIdentifier: 'hero-face',
+      });
+      fixture.detectChanges();
+      return { slot, hero };
+    }
+
+    it('shows the chosen character in the slot on the stage, with their name', () => {
+      withSlotAndHero();
+
+      const stage = fixture.debugElement.query(By.directive(CutInStageComponent))
+        .componentInstance as CutInStageComponent;
+      expect(stage.portrait()).toMatchObject({ imageIdentifier: 'hero-face', characterName: 'Hero' });
+      expect(fixture.nativeElement.querySelector('[data-testid="cut-in-portrait-preview"]')).not.toBeNull();
+    });
+
+    it('drags the picture inside its slot rather than moving the layer, as one change to take back', () => {
+      const { slot } = withSlotAndHero();
+      const wasX = slot.x;
+      fitting().toggleFittingPortrait();
+      expect(fitting().fittingPortrait()).toBe(true);
+
+      drag([100, 100], [140, 100]);
+
+      const fit = portraitFitFor(component.scene()!.portraitFits, 'hero-face');
+      expect(fit.x).toBeLessThan(50);
+      expect(slot.x).toBe(wasX);
+      expect(fitting().previewPortrait()?.fit).toEqual(fit);
+
+      editor().undo();
+      expect(portraitFitFor(component.scene()!.portraitFits, 'hero-face').x).toBe(50);
+      editor().redo();
+      expect(portraitFitFor(component.scene()!.portraitFits, 'hero-face')).toEqual(fit);
+    });
+
+    it('sizes the picture with the wheel while fitting', () => {
+      withSlotAndHero();
+      fitting().toggleFittingPortrait();
+      const wheel = { deltaY: -100, ctrlKey: false, metaKey: false, preventDefault: vi.fn() } as unknown as WheelEvent;
+
+      fitting().onStageWheel(wheel);
+
+      expect(portraitFitFor(component.scene()!.portraitFits, 'hero-face').zoom).toBeGreaterThan(1);
+      expect(wheel.preventDefault).toHaveBeenCalled();
+    });
+
+    it('offers no fitting without a picture to fit', () => {
+      editor().addImageLayer();
+      component.layers()[0].portraitSlot = true;
+      editor().changed();
+
+      fitting().toggleFittingPortrait();
+
+      expect(fitting().fittingPortrait()).toBe(false);
     });
   });
 });
