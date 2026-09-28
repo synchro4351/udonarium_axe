@@ -74,6 +74,16 @@ describe('CutInEventHandlerService', () => {
     expect(componentMock.startCutIn).toHaveBeenCalled();
   });
 
+  it('hands the launch portrait to the playing panel', () => {
+    const componentMock = { cutIn: null, portrait: null, forceNoLoop: true, startCutIn: vi.fn() };
+    panelStub.open.mockReturnValue(componentMock);
+    const portrait = { characterIdentifier: 'hero', imageIdentifier: 'face', fit: { zoom: 2, x: 40, y: 10 } };
+
+    emitStartCutIn({ cutIn: makeCutIn(), portrait });
+
+    expect(componentMock.portrait).toEqual(portrait);
+  });
+
   it('leaves room above a framed cut-in for the title bar', () => {
     emitStartCutIn({ cutIn: makeCutIn() });
 

@@ -25,6 +25,7 @@ import { CutIn, cutInPanelChrome } from '@axe/domain/media/cut-in';
 import { CutInLauncher } from '@axe/domain/media/cut-in-launcher';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import { cutInPlaybackMs } from '@axe/domain/media/cut-in-playback-window';
+import type { CutInPortraitSnapshot } from '@axe/domain/media/cut-in-portrait';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
 import { CutInStageComponent } from '@axe/features/media/cut-in-stage/cut-in-stage.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
@@ -186,6 +187,8 @@ export class CutInWindowComponent {
   protected readonly playbackStarted = signal(false);
 
   cutIn: CutIn | null = null;
+  /** The portrait the launch brought, fixed for the life of this window whatever becomes of the character. */
+  portrait: CutInPortraitSnapshot | null = null;
   playListId = '';
 
   private _naturalWidth = 0;

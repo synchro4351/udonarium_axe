@@ -143,6 +143,22 @@ describe('cut-in scene snapshots', () => {
       expect(layer.trackSet.x).toHaveLength(2);
     });
 
+    it('restores the portrait slot and its saved image fit', () => {
+      const scene = makeScene();
+      const layer = addLayer(scene, 'portrait');
+      layer.kind = 'image';
+      layer.portraitSlot = true;
+      scene.portraitFits = '{"image-1":{"zoom":2,"x":40,"y":10}}';
+      const before = snapshotScene(scene);
+
+      layer.portraitSlot = false;
+      scene.portraitFits = '';
+      restoreScene(scene, before);
+
+      expect(layer.portraitSlot).toBe(true);
+      expect(scene.portraitFits).toBe(before.portraitFits);
+    });
+
     it('does nothing without a scene', () => {
       expect(() => restoreScene(null, snapshotScene(null))).not.toThrow();
     });

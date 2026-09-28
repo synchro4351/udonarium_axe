@@ -257,6 +257,17 @@ export class CutInLayerPropertiesComponent {
     this.write((layer) => (layer.objectFit = crops ? 'cover' : 'contain'));
   }
 
+  /**
+   * Whether the layer shows the portrait a launch brings, or the silhouette without one, rather than
+   * its own picture.
+   */
+  get portraitSlot(): boolean {
+    return this.layer()?.portraitSlot === true;
+  }
+  set portraitSlot(slot: boolean) {
+    this.write((layer) => (layer.portraitSlot = slot === true));
+  }
+
   /** Which part of a cropped picture stays in view across, from 0 (left) to 100 (right). */
   get objectPosX(): number {
     return Math.round(this.layer()?.objectPosX ?? 50);

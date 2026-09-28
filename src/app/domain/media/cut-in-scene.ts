@@ -2,6 +2,7 @@ import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
 import { ObjectNode } from '@axe/core/sync/object-node';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
+import { hasPortraitSlot } from '@axe/domain/media/cut-in-portrait';
 import { type CutInSound, parseCutInSounds } from '@axe/domain/media/cut-in-sound';
 
 /**
@@ -31,6 +32,8 @@ export class CutInScene extends ObjectNode {
   @SyncVar() backgroundColor: string = '';
   /** The sounds dropped along the scene's own clock, as JSON. */
   @SyncVar() sounds: string = '';
+  /** How each character picture is fitted into the portrait slot, as JSON keyed by the picture. */
+  @SyncVar() portraitFits: string = '';
 
   private soundsRaw = '';
   private soundsParsed: CutInSound[] = [];
@@ -48,6 +51,11 @@ export class CutInScene extends ObjectNode {
   /** The scene's layers, in the order they are drawn, bottom first. */
   get layers(): CutInLayer[] {
     return this.children.filter((child): child is CutInLayer => child instanceof CutInLayer);
+  }
+
+  /** Whether a layer of the scene shows the portrait a launch brings. */
+  get hasPortraitSlot(): boolean {
+    return hasPortraitSlot(this.layers);
   }
 
   /** How long the scene runs, never shorter than the layer that finishes last. */

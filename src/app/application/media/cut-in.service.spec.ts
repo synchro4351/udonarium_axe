@@ -4,10 +4,14 @@ import { IPeerContext } from '@axe/core/network/peer-context';
 import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
 import { AudioFile } from '@axe/core/storage/audio-file';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { CutInLauncher } from '@axe/domain/media/cut-in-launcher';
+import { CutInLayer } from '@axe/domain/media/cut-in-layer';
+import { type CutInPortraitFit, withPortraitFit } from '@axe/domain/media/cut-in-portrait';
+import { CutInScene } from '@axe/domain/media/cut-in-scene';
 import { Jukebox } from '@axe/domain/media/jukebox';
 import { GameTable } from '@axe/domain/tabletop/game-table';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -50,7 +54,8 @@ describe('CutInService.activateFromChatText()', () => {
 
     service.activateFromChatText('演出 炎の剣', '');
 
-    expect(spy).toHaveBeenCalledWith(cutIn, '');
+    // A cut-in without a portrait slot carries no portrait, exactly as before.
+    expect(spy).toHaveBeenCalledWith(cutIn, '', null);
   });
 
   it('ignores a cut-in that chat is not allowed to start', () => {
@@ -147,7 +152,7 @@ describe('CutInService.launchForTable()', () => {
     const spy = vi.spyOn(launcher, 'startCutIn').mockImplementation(() => {});
 
     expect(service.launchForTable(table)).toBe(true);
-    expect(spy).toHaveBeenCalledWith(cutIn, '');
+    expect(spy).toHaveBeenCalledWith(cutIn, '', null);
   });
 
   it('draws the one the roll names when the table asks for several', () => {
@@ -158,7 +163,7 @@ describe('CutInService.launchForTable()', () => {
 
     service.launchForTable(table, () => 1);
 
-    expect(spy).toHaveBeenCalledWith(second, '');
+    expect(spy).toHaveBeenCalledWith(second, '', null);
   });
 
   it('plays nothing once the cut-in it names is gone', () => {
@@ -217,8 +222,92 @@ describe('what a line arriving sets off', () => {
 
     tab.addMessage({ from: 'me', name: '術者', text: '斬る 炎の剣', timestamp: Date.now() });
 
-    expect(spy).toHaveBeenCalledWith(cutIn, '');
+    expect(spy).toHaveBeenCalledWith(cutIn, '', null);
   });
+
+  it('brings the portrait the character spoke with into a template with a portrait slot', () => {
+    const cutIn = makeTemplate('名乗り');
+    setPortraitFit(cutIn, 'hero-smile', { zoom: 2, x: 40, y: 10 });
+    const hero = makeCharacter('hero');
+    const spy = vi.spyOn(launcher, 'startCutIn').mockImplementation(() => {});
+
+    tab.addMessage({
+      from: 'me',
+      name: '勇者',
+      text: '参る 名乗り',
+      sendFrom: hero.identifier,
+      imageIdentifier: 'hero-smile',
+      timestamp: Date.now(),
+    });
+
+    expect(spy).toHaveBeenCalledWith(cutIn, '', {
+      characterIdentifier: hero.identifier,
+      imageIdentifier: 'hero-smile',
+      fit: { zoom: 2, x: 40, y: 10 },
+    });
+  });
+
+  it('keeps a direct line direct when it brings a portrait', () => {
+    const cutIn = makeTemplate('名乗り');
+    const hero = makeCharacter('hero');
+    const spy = vi.spyOn(launcher, 'startCutIn').mockImplementation(() => {});
+
+    tab.addMessage({
+      from: 'me',
+      to: 'user-2',
+      name: '勇者',
+      text: '参る 名乗り',
+      sendFrom: hero.identifier,
+      imageIdentifier: 'hero-smile',
+      timestamp: Date.now(),
+    });
+
+    expect(spy).toHaveBeenCalledWith(cutIn, 'user-2', expect.objectContaining({ imageIdentifier: 'hero-smile' }));
+  });
+
+  it('brings the silhouette when a player speaks as themself', () => {
+    const cutIn = makeTemplate('名乗り');
+    const spy = vi.spyOn(launcher, 'startCutIn').mockImplementation(() => {});
+
+    tab.addMessage({
+      from: 'me',
+      name: 'PL',
+      text: '参る 名乗り',
+      imageIdentifier: 'player-icon',
+      timestamp: Date.now(),
+    });
+
+    expect(spy).toHaveBeenCalledWith(
+      cutIn,
+      '',
+      expect.objectContaining({ characterIdentifier: '', imageIdentifier: '' })
+    );
+  });
+
+  function makeTemplate(name: string): CutIn {
+    const cutIn = makeCutIn(name);
+    const scene = new CutInScene();
+    scene.cutInIdentifier = cutIn.identifier;
+    scene.initialize();
+    const slot = new CutInLayer();
+    slot.kind = 'image';
+    slot.portraitSlot = true;
+    slot.initialize();
+    scene.appendChild(slot);
+    return cutIn;
+  }
+
+  function setPortraitFit(cutIn: CutIn, imageIdentifier: string, fit: CutInPortraitFit): void {
+    const scene = cutIn.scene!;
+    scene.portraitFits = withPortraitFit(scene.portraitFits, imageIdentifier, fit);
+  }
+
+  function makeCharacter(name: string): GameCharacter {
+    const character = new GameCharacter();
+    character.name = name;
+    character.initialize();
+    return character;
+  }
 
   it('leaves the backlog alone when somebody walks into the room', () => {
     // Joining hands every line ever said to the same event a new line arrives on. Replaying

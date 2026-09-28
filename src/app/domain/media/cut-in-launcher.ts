@@ -4,6 +4,11 @@ import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
 import { GameObject, ObjectContext } from '@axe/core/sync/game-object';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { CutIn } from '@axe/domain/media/cut-in';
+import {
+  type CutInPortraitSnapshot,
+  encodePortraitSnapshot,
+  parsePortraitSnapshot,
+} from '@axe/domain/media/cut-in-portrait';
 
 @SyncObject('cut-in-launcher')
 export class CutInLauncher extends GameObject {
@@ -15,6 +20,11 @@ export class CutInLauncher extends GameObject {
   @SyncVar() sendTo: string = '';
   @SyncVar() soundOnlyCutInIdentifier: string = '';
   @SyncVar() soundOnlyTimeStamp: number = 0;
+  /**
+   * The portrait the last launch brought for a template's portrait slot, as JSON, or empty for a
+   * launch that brought none. Written with the launch, so it reaches every peer in the same update.
+   */
+  @SyncVar() launchPortrait: string = '';
 
   reloadDummy = 5;
   private isInitialSync = true;
@@ -40,26 +50,33 @@ export class CutInLauncher extends GameObject {
     this.startSelfSoundOnly();
   }
 
-  /** Shows a cut-in on this peer alone. The launch is still shared, but other peers do not act on it. */
-  startCutInMySelf(cutIn: CutIn) {
+  /**
+   * Shows a cut-in on this peer alone. The launch is still shared, but other peers do not act on it.
+   *
+   * A portrait given here fills the template's portrait slot.
+   */
+  startCutInMySelf(cutIn: CutIn, portrait: CutInPortraitSnapshot | null = null) {
     this.launchCutInIdentifier = cutIn.identifier;
     this.launchIsStart = true;
     this.launchTimeStamp = this.launchTimeStamp + 1;
     this.launchMySelf = true;
     this.sendTo = '';
+    this.launchPortrait = encodePortraitSnapshot(portrait);
     this.startSelfCutIn();
   }
 
   /**
    * Shows a cut-in here at once and on the other peers as the change arrives.
    *
-   * With `sendTo`, the other peers leave it to the one user whose id it names.
+   * With `sendTo`, the other peers leave it to the one user whose id it names. A portrait given here
+   * fills the template's portrait slot on every peer alike, whatever becomes of the character after.
    */
-  startCutIn(cutIn: CutIn, sendTo?: string) {
+  startCutIn(cutIn: CutIn, sendTo?: string, portrait: CutInPortraitSnapshot | null = null) {
     this.launchCutInIdentifier = cutIn.identifier;
     this.launchIsStart = true;
     this.launchTimeStamp = this.launchTimeStamp + 1;
     this.launchMySelf = false;
+    this.launchPortrait = encodePortraitSnapshot(portrait);
 
     if (sendTo) {
       this.sendTo = sendTo;
@@ -113,7 +130,7 @@ export class CutInLauncher extends GameObject {
   /** Shows the last launched cut-in on this peer only, by raising the start event. Nothing is shared. */
   startSelfCutIn() {
     const cutIn_ = ObjectStore.instance.get(this.launchCutInIdentifier);
-    emitStartCutIn({ cutIn: cutIn_ });
+    emitStartCutIn({ cutIn: cutIn_, portrait: parsePortraitSnapshot(this.launchPortrait) });
   }
 
   /** Plays the sound of the last sound-only launch on this peer only, by raising its event. Nothing is shared. */

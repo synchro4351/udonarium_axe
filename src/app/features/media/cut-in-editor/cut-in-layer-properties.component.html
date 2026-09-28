@@ -44,13 +44,28 @@
       >
         <input
           type="checkbox"
+          name="cut-in-layer-portrait-slot"
+          data-testid="cut-in-layer-portrait-slot"
+          [(ngModel)]="portraitSlot"
+          [attr.disabled]="!isEditable() ? '' : null"
+        />
+        {{ 'feature.media.cutInEditor.portraitSlot' | transloco }}
+      </label>
+      @if (portraitSlot) {
+        <span class="text-ui-dim text-[11px]">{{ 'feature.media.cutInEditor.portraitSlotHint' | transloco }}</span>
+      }
+      <label
+        class="text-ui-muted flex cursor-pointer items-center gap-1 py-0.5 text-[11px] select-none [&_input]:size-3.5 [&_input]:[accent-color:var(--ui-accent)]"
+      >
+        <input
+          type="checkbox"
           name="cut-in-layer-image-crops"
           [(ngModel)]="imageCrops"
           [attr.disabled]="!isEditable() ? '' : null"
         />
         {{ 'feature.media.cutInEditor.imageCrops' | transloco }}
       </label>
-      @if (imageCrops) {
+      @if (imageCrops && !portraitSlot) {
         <div class="grid grid-cols-[3.6rem_minmax(0,1fr)] items-center gap-x-1.5 gap-y-1">
           <label class="text-ui-muted text-[11px]">{{ 'feature.media.cutInEditor.objectPosX' | transloco }}</label>
           <input

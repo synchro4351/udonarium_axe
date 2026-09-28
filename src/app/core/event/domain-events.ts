@@ -46,6 +46,8 @@ export interface CardStackDecreasedEvent {
 
 export interface CutInEvent {
   cutIn: unknown;
+  /** The portrait the launch brought for a template's portrait slot, as the launcher read it. */
+  portrait?: unknown;
 }
 
 export interface VoteTally {

@@ -17,6 +17,7 @@ import { ImageStorage } from '@axe/core/storage/image-storage';
 import { clipCss } from '@axe/domain/media/cut-in-clip';
 import { fillCss } from '@axe/domain/media/cut-in-fill';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
+import { type CutInPortraitSnapshot, portraitFitCss, resolvePortrait } from '@axe/domain/media/cut-in-portrait';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
 import {
   layerFilter,
@@ -69,6 +70,15 @@ export class CutInStageComponent {
   readonly playheadMs = input(0);
   /** How far the stage is leaned into, past the scale that fits the scene in. */
   readonly zoom = input(1);
+  /** The portrait the launch brought for the portrait slots. None shows the silhouette. */
+  readonly portrait = input<CutInPortraitSnapshot | null>(null);
+
+  /** What the portrait slots show, read off the launch rather than off the character as it stands now. */
+  readonly portraitFace = computed(() => {
+    this.objectChange.fileVersion();
+    const face = resolvePortrait(this.portrait(), (identifier) => this.imageStorage.get(identifier)?.url ?? '');
+    return { url: face.url, silhouette: face.silhouette, ...portraitFitCss(face.fit) };
+  });
 
   private readonly layerElements = viewChildren<ElementRef<HTMLElement>>('layerElement');
   private readonly wipeElements = viewChildren<ElementRef<HTMLElement>>('wipeElement');

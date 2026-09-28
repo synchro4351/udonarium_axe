@@ -77,6 +77,11 @@ export class CutInLayer extends ObjectNode {
   /** Which part of the picture is kept when it is cropped, as a percentage across and down. */
   @SyncVar() objectPosX: number = 50;
   @SyncVar() objectPosY: number = 50;
+  /**
+   * Shows the portrait a launch brings instead of its own picture, or the silhouette when it brings
+   * none. Off unless turned on, so no layer made before it starts taking portraits.
+   */
+  @SyncVar() portraitSlot: boolean = false;
 
   // kind: text
   @SyncVar() text: string = '';

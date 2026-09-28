@@ -1,7 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
+import { CutInLayer } from '@axe/domain/media/cut-in-layer';
+import { CutInScene } from '@axe/domain/media/cut-in-scene';
 import { CutInEditorComponent } from '@axe/features/media/cut-in-list/cut-in-editor.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
@@ -47,5 +50,28 @@ describe('CutInEditorComponent', () => {
 
       expect(fixture.nativeElement.querySelector('img')).not.toBeNull();
     });
+  });
+
+  it('shows portrait controls only for a template and keeps an image fit on the scene', () => {
+    expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-character"]')).toBeNull();
+    const scene = new CutInScene();
+    scene.cutInIdentifier = cutIn.identifier;
+    scene.initialize();
+    const layer = new CutInLayer();
+    layer.kind = 'image';
+    layer.portraitSlot = true;
+    layer.initialize();
+    scene.appendChild(layer);
+    const character = GameCharacter.create('Hero', 1, 'hero-image');
+
+    component.portraitCharacter = character.identifier;
+    component.portraitZoom = 2;
+    component.portraitX = 40;
+    component.portraitY = 20;
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-character"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-image"]')).not.toBeNull();
+    expect(JSON.parse(scene.portraitFits)['hero-image']).toEqual({ zoom: 2, x: 40, y: 20 });
   });
 });

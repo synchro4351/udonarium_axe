@@ -99,6 +99,22 @@ describe('CutInLauncher', () => {
       launcher.startCutIn(cutIn, 'user-1');
       expect(launcher.sendTo).toBe('user-1');
     });
+
+    it('replaces the previous portrait when the next cut-in has none', () => {
+      const launcher = new CutInLauncher('CutInLauncher');
+      launcher.initialize();
+      const cutIn = new CutIn();
+      cutIn.initialize();
+
+      launcher.startCutIn(cutIn, '', {
+        characterIdentifier: 'hero',
+        imageIdentifier: 'face',
+        fit: { zoom: 2, x: 40, y: 10 },
+      });
+      expect(launcher.launchPortrait).toContain('face');
+      launcher.startCutIn(cutIn);
+      expect(launcher.launchPortrait).toBe('');
+    });
   });
 
   describe('sameTagCutIn()', () => {

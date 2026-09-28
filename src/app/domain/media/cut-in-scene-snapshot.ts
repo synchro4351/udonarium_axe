@@ -37,6 +37,7 @@ const LAYER_FIELDS = [
   'startMs',
   'endMs',
   'imageIdentifier',
+  'portraitSlot',
   'objectFit',
   'objectPosX',
   'objectPosY',
@@ -72,19 +73,21 @@ export interface CutInSceneSnapshot {
   sceneLoop: boolean;
   backgroundColor: string;
   sounds: string;
+  portraitFits: string;
   /** In the order they are drawn. */
   layers: CutInLayerSnapshot[];
 }
 
 /** Writes the scene and each of its layers down flat, in drawing order. No scene gives an empty snapshot. */
 export function snapshotScene(scene: CutInScene | null): CutInSceneSnapshot {
-  if (!scene) return { durationMs: 0, sceneLoop: false, backgroundColor: '', sounds: '', layers: [] };
+  if (!scene) return { durationMs: 0, sceneLoop: false, backgroundColor: '', sounds: '', portraitFits: '', layers: [] };
 
   return {
     durationMs: scene.durationMs,
     sceneLoop: scene.sceneLoop,
     backgroundColor: scene.backgroundColor,
     sounds: scene.sounds,
+    portraitFits: scene.portraitFits,
     layers: scene.layers.map((layer) => snapshotLayer(layer)),
   };
 }
@@ -102,6 +105,7 @@ export function restoreScene(scene: CutInScene | null, snapshot: CutInSceneSnaps
   if (scene.sceneLoop !== snapshot.sceneLoop) scene.sceneLoop = snapshot.sceneLoop;
   if (scene.backgroundColor !== snapshot.backgroundColor) scene.backgroundColor = snapshot.backgroundColor;
   if (scene.sounds !== snapshot.sounds) scene.sounds = snapshot.sounds;
+  if (scene.portraitFits !== snapshot.portraitFits) scene.portraitFits = snapshot.portraitFits;
 
   const standing = new Map(scene.layers.map((layer) => [layer.identifier, layer]));
   const wanted = new Set(snapshot.layers.map((layer) => layer.identifier));

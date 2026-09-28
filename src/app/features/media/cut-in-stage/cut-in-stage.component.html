@@ -44,7 +44,23 @@
                 <div class="size-full" [style.background]="fillOf(layer)"></div>
               }
               @default {
-                @if (imageUrl(layer); as url) {
+                @if (layer.portraitSlot) {
+                  @if (portraitFace(); as face) {
+                    <div class="size-full overflow-hidden" data-testid="cut-in-portrait-slot">
+                      <img
+                        class="size-full select-none"
+                        draggable="false"
+                        [src]="face.url | safe: 'resourceUrl'"
+                        [attr.data-silhouette]="face.silhouette ? '' : null"
+                        [style.object-fit]="face.silhouette ? 'contain' : layer.objectFit"
+                        [style.object-position]="face.objectPosition"
+                        [style.transform]="face.transform"
+                        [style.transform-origin]="face.origin"
+                        alt=""
+                      />
+                    </div>
+                  }
+                } @else if (imageUrl(layer); as url) {
                   <img
                     class="size-full select-none"
                     draggable="false"

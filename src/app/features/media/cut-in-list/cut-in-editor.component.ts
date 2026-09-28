@@ -1,14 +1,18 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
+import { type CutInPortraitPick, CutInService } from '@axe/application/media/cut-in.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { characterPortraitChoices, currentPortraitImageIdentifier } from '@axe/domain/character/character-portrait';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { CutInLauncher } from '@axe/domain/media/cut-in-launcher';
+import { portraitFitFor, withPortraitFit } from '@axe/domain/media/cut-in-portrait';
 import { Jukebox } from '@axe/domain/media/jukebox';
 import { CutInBgmComponent } from '@axe/features/media/cut-in-bgm/cut-in-bgm.component';
 import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
@@ -28,12 +32,88 @@ export class CutInEditorComponent {
   private readonly imageStorage = inject(ImageStorage);
   private readonly audioStorage = inject(AudioStorage);
   private readonly objectChange = inject(ObjectChangeService);
+  private readonly cutInService = inject(CutInService);
   private readonly t = inject(TRANSLATE_FN);
 
   readonly cutIn = input<CutIn | null>(null);
   readonly isEditable = input(false);
 
   readonly isYouTubeCutIn = signal(false);
+  private portraitCharacterIdentifier = '';
+  private portraitImageIdentifier = '';
+
+  /** Only a scene with a portrait slot asks who to show. */
+  get hasPortraitSlot(): boolean {
+    return this.c?.scene?.hasPortraitSlot ?? false;
+  }
+
+  get portraitCharacters(): GameCharacter[] {
+    this.objectChange.collectionOf(GameCharacter.aliasName)();
+    return this.objectStore.getObjects(GameCharacter);
+  }
+
+  get portraitCharacter(): string {
+    return this.portraitCharacterIdentifier;
+  }
+  set portraitCharacter(identifier: string) {
+    this.portraitCharacterIdentifier = identifier;
+    const character = this.objectStore.get<GameCharacter>(identifier);
+    this.portraitImageIdentifier = character ? currentPortraitImageIdentifier(character) : '';
+  }
+
+  get portraitImages(): ReturnType<typeof characterPortraitChoices> {
+    const character = this.objectStore.get<GameCharacter>(this.portraitCharacterIdentifier);
+    return character ? characterPortraitChoices(character) : [];
+  }
+
+  get portraitImage(): string {
+    return this.portraitImageIdentifier;
+  }
+  set portraitImage(identifier: string) {
+    this.portraitImageIdentifier = identifier;
+  }
+
+  private get portraitFit() {
+    return portraitFitFor(this.c?.scene?.portraitFits, this.portraitImageIdentifier);
+  }
+
+  private changePortraitFit(change: Partial<{ zoom: number; x: number; y: number }>): void {
+    const scene = this.c?.scene;
+    if (!this.editable || !scene || !this.portraitImageIdentifier) return;
+    scene.portraitFits = withPortraitFit(scene.portraitFits, this.portraitImageIdentifier, {
+      ...this.portraitFit,
+      ...change,
+    });
+  }
+
+  get portraitZoom(): number {
+    return this.portraitFit.zoom;
+  }
+  set portraitZoom(value: number) {
+    this.changePortraitFit({ zoom: Number(value) });
+  }
+
+  get portraitX(): number {
+    return this.portraitFit.x;
+  }
+  set portraitX(value: number) {
+    this.changePortraitFit({ x: Number(value) });
+  }
+
+  get portraitY(): number {
+    return this.portraitFit.y;
+  }
+  set portraitY(value: number) {
+    this.changePortraitFit({ y: Number(value) });
+  }
+
+  private get portraitPick(): CutInPortraitPick | null {
+    if (!this.hasPortraitSlot || !this.portraitCharacterIdentifier) return null;
+    return {
+      characterIdentifier: this.portraitCharacterIdentifier,
+      imageIdentifier: this.portraitImageIdentifier,
+    };
+  }
 
   _minSizeWidth = 10;
   _maxSizeWidth = 10;
@@ -399,7 +479,7 @@ export class CutInEditorComponent {
         this.c.height = this.originalImgHeight();
       }
     }
-    this.cutInLauncher.startCutInMySelf(this.c);
+    this.cutInService.launchForMyself(this.c, this.portraitPick);
   }
 
   /**
@@ -420,7 +500,7 @@ export class CutInEditorComponent {
     if (this.isCutInBgmUploaded() && this.cutInTagName === '') {
       this.jukebox.stop();
     }
-    this.cutInLauncher.startCutIn(this.c);
+    this.cutInService.launch(this.c, '', this.portraitPick);
   }
 
   /** Stops the cut-in for everyone in the room. */

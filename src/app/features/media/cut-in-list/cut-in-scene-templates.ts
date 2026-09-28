@@ -24,6 +24,7 @@ export const CUT_IN_SCENE_TEMPLATES = [
   'questClear',
   'rebuttal',
   'ending',
+  'portrait',
 ] as const;
 export type CutInSceneTemplate = (typeof CUT_IN_SCENE_TEMPLATES)[number];
 
@@ -710,6 +711,46 @@ const PLANS: Record<CutInSceneTemplate, TemplatePlan> = {
       }).forEach((letter, at) => {
         arrive(letter, 400 + at * 180, 1200, { dy: 10, blur: 6, opacity: 0 }, 'inOutQuad');
         leave(letter, stage.durationMs, 1400, { dy: -10, blur: 6, opacity: 0 }, 'inOutQuad');
+      });
+    },
+  },
+  portrait: {
+    stage: { width: 720, height: 300, durationMs: 2000 },
+    build(scene, stage, text) {
+      const base = band(scene, stage, 'band', {
+        x: 0,
+        y: 60,
+        width: 720,
+        height: 200,
+        opacity: 0.9,
+        clip: 'slant',
+        shape: 'speedlines',
+        from: '#23304a',
+        to: '#3d5a8a',
+      });
+      base.wipeShape = 'right';
+      arrive(base, 0, 260, { wipe: 0 });
+      leave(base, stage.durationMs, 220, { dx: 720, opacity: 0 });
+
+      // The face and shoulders of whoever plays it, or the silhouette until someone does.
+      const portrait = addLayer(scene, 'image', 'portrait', stage);
+      place(portrait, { x: 40, y: 0, width: 260, height: 300 });
+      portrait.portraitSlot = true;
+      portrait.objectFit = 'cover';
+      portrait.imageIdentifier = '';
+      portrait.effect = 'shadow';
+      arrive(portrait, 80, 320, { dx: -160, opacity: 0 }, 'outBack');
+      leave(portrait, stage.durationMs, 220, { dx: -120, opacity: 0 });
+
+      lettering(scene, stage, text, {
+        box: { x: 320, y: 110, width: 370, height: 100 },
+        sizePx: 72,
+        font: 'gothic',
+        weight: 900,
+        split: true,
+      }).forEach((letter, at) => {
+        arrive(letter, 260 + at * 60, 220, { dx: 80, opacity: 0 }, 'outBack');
+        leave(letter, stage.durationMs, 200, { dx: 200, opacity: 0 });
       });
     },
   },

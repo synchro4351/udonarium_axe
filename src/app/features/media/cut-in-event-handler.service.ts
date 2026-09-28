@@ -7,6 +7,7 @@ import { AudioPlayer, VolumeType } from '@axe/core/storage/audio-player';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
 import { AudioTag } from '@axe/domain/media/audio-tag';
 import { CutIn, cutInPanelChrome } from '@axe/domain/media/cut-in';
+import type { CutInPortraitSnapshot } from '@axe/domain/media/cut-in-portrait';
 import { asCutInMultiDirectionMode } from '@axe/domain/tabletop/cut-in-multi-direction';
 import { makeCutInMultiDirectionLayout } from '@axe/features/media/cut-in-multi-direction-layout';
 import { CutInWindowComponent } from '@axe/features/media/cut-in-window/cut-in-window.component';
@@ -26,7 +27,7 @@ export class CutInEventHandlerService {
 
   constructor() {
     this.objectChange.startCutIn$.subscribe((event) => {
-      this.openCutInPanel(event.cutIn as CutIn);
+      this.openCutInPanel(event.cutIn as CutIn, false, (event.portrait as CutInPortraitSnapshot | null) ?? null);
     }, this.destroyRef);
     this.objectChange.soundOnlyCutIn$.subscribe((event) => {
       const cutIn = event.cutIn as CutIn;
@@ -45,13 +46,13 @@ export class CutInEventHandlerService {
     }, this.destroyRef);
   }
 
-  private openCutInPanel(cutIn: CutIn, invisible = false): void {
+  private openCutInPanel(cutIn: CutIn, invisible = false, portrait: CutInPortraitSnapshot | null = null): void {
     if (!cutIn) return;
     const mode = this.tabletopService.mode2d()
       ? asCutInMultiDirectionMode(this.tabletopService.display().cutInMultiDirectionMode)
       : 'none';
     if (invisible || mode === 'none') {
-      this.openSingleCutInPanel(cutIn, invisible);
+      this.openSingleCutInPanel(cutIn, invisible, portrait);
       return;
     }
 
@@ -81,6 +82,7 @@ export class CutInEventHandlerService {
 
       const component = this.panelService.open(CutInWindowComponent, option);
       component.cutIn = cutIn;
+      component.portrait = portrait;
       component.audioEnabled = face.primary;
       component.panelLayout = face;
       panels.push({ component, primary: face.primary });
@@ -116,7 +118,7 @@ export class CutInEventHandlerService {
     });
   }
 
-  private openSingleCutInPanel(cutIn: CutIn, invisible: boolean): void {
+  private openSingleCutInPanel(cutIn: CutIn, invisible: boolean, portrait: CutInPortraitSnapshot | null = null): void {
     const chrome = cutInPanelChrome(cutIn);
     const marginW = Math.max(0, window.innerWidth - cutIn.width);
     const marginH = Math.max(0, window.innerHeight - cutIn.height - chrome);
@@ -135,6 +137,7 @@ export class CutInEventHandlerService {
 
     const component = this.panelService.open(CutInWindowComponent, option);
     component.cutIn = cutIn;
+    component.portrait = portrait;
     component.forceNoLoop = invisible;
     component.startCutIn();
   }
