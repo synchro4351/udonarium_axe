@@ -100,6 +100,8 @@
 
 反応エフェクトとカットインテンプレートの追加改善：[ccd1951a](https://github.com/synchro4351/udonarium_axe/commit/ccd1951a)（投げる演出の着地点を正立）、[9726a9cb](https://github.com/synchro4351/udonarium_axe/commit/9726a9cb)（立ち絵のGUI調整、発動者名の差し込み、文字単位の動き、「参戦！」見本）。`a8b9ef05`起点の[修正ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-feedback-20260929)。保存済みのカットインは変更しない。直接Vitestと`ng test`の両経路で953ファイル・13,250件成功、1件skip。カットイン操作E2E7件、型検査・lint・整形・本番ビルド成功。追加修正の実画面確認は未実施。録画の動画書き出しは新しい名前差し込みと文字単位の動きを再現しない。
 
+立ち絵の位置合わせをキャラクターへ移動：[db8bc580](https://github.com/synchro4351/udonarium_axe/commit/db8bc580)（保存・同期・旧値の読込）、[7780fe26](https://github.com/synchro4351/udonarium_axe/commit/7780fe26)（キャラクターシートの操作画面）。`9726a9cb`起点の[修正ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/character-portrait-fit)。キャラクター・画像・輪郭の種類ごとに調整値を保持し、同じ輪郭の別カットインで再利用する。旧シーン別値は新しい値がない時だけ使う。顔・肩の輪郭が最初の種類で、全身用は未実装。直接Vitestと`ng test`で955ファイル・13,283件成功、1件skip。型検査・lint・整形・本番ビルド、キャラクターとカットインのE2E12件成功。新しい画面の目視と実端末同期は未確認。
+
 ## 検証と制限
 
 - r4の固定ソース`a2999013`は、全体947ファイル／13,084件成功・1件skip、production build成功。r3の固定ソース`cf5edecf`は全体929ファイル／12,712件成功・1件skip、production build成功。r2の固定ソース`6e5668dd`は全体927ファイル／12,680件成功・1件skip、production build成功。
