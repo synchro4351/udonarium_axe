@@ -64,18 +64,27 @@
               @default {
                 @if (layer.portraitSlot) {
                   @if (portraitFace(); as face) {
-                    <div class="size-full overflow-hidden" data-testid="cut-in-portrait-slot">
-                      <img
-                        class="size-full select-none"
-                        draggable="false"
-                        [src]="face.url | safe: 'resourceUrl'"
-                        [attr.data-silhouette]="face.silhouette ? '' : null"
-                        [style.object-fit]="face.silhouette ? 'contain' : layer.objectFit"
-                        [style.object-position]="face.objectPosition"
-                        [style.transform]="face.transform"
-                        [style.transform-origin]="face.origin"
-                        alt=""
-                      />
+                    @let css = portraitCssOf(layer);
+                    <div class="relative size-full overflow-hidden" data-testid="cut-in-portrait-slot">
+                      <div
+                        class="absolute"
+                        [style.left.px]="css.box.left"
+                        [style.top.px]="css.box.top"
+                        [style.width.px]="css.box.width"
+                        [style.height.px]="css.box.height"
+                      >
+                        <img
+                          class="block size-full max-w-none select-none"
+                          draggable="false"
+                          [src]="face.url | safe: 'resourceUrl'"
+                          [attr.data-silhouette]="face.silhouette ? '' : null"
+                          [style.object-fit]="css.objectFit ?? layer.objectFit"
+                          [style.object-position]="css.objectPosition"
+                          [style.transform]="css.transform"
+                          [style.transform-origin]="css.origin"
+                          alt=""
+                        />
+                      </div>
                     </div>
                   }
                 } @else if (imageUrl(layer); as url) {

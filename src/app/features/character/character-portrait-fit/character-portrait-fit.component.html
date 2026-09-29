@@ -34,48 +34,61 @@
       </span>
     </div>
 
+    <p class="text-ui-dim m-0 text-[11px] leading-snug">
+      {{ 'feature.inventory.portraitFit.description' | transloco }}
+    </p>
+
+    <!-- The whole picture is shown; what falls outside the bright frame is dimmed and left out of the cut-in. -->
     <div
-      class="panel-no-drag border-ui-border-panel relative mx-auto w-full max-w-60 touch-none overflow-hidden rounded-sm border border-solid bg-[repeating-conic-gradient(rgba(255,255,255,0.06)_0%_25%,transparent_0%_50%)] bg-size-[16px_16px] select-none"
-      #frameArea
+      class="panel-no-drag border-ui-border-panel focus-visible:outline-ui-accent relative mx-auto box-border w-full max-w-64 touch-none overflow-hidden rounded-sm border border-solid bg-[repeating-conic-gradient(rgba(255,255,255,0.06)_0%_25%,transparent_0%_50%)] bg-size-[16px_16px] px-[14%] py-[10%] select-none focus-visible:outline-2"
       data-testid="portrait-fit-frame"
-      [style.aspect-ratio]="shape.aspectRatio"
-      [class.cursor-move]="canEdit()"
+      role="group"
+      [attr.tabindex]="canEdit() ? 0 : null"
+      [attr.aria-label]="'feature.inventory.portraitFit.frameLabel' | transloco"
+      [style.cursor]="canEdit() ? (grabbing() ? 'grabbing' : 'grab') : null"
       (pointerdown)="onPointerDown($event)"
       (pointermove)="onPointerMove($event)"
       (pointerup)="onPointerUp($event)"
       (pointercancel)="onPointerUp($event)"
       (wheel)="onWheel($event)"
+      (keydown)="onKeyDown($event)"
       (dragstart)="$event.preventDefault()"
     >
-      @if (imageUrl(); as url) {
-        <img
-          class="pointer-events-none size-full object-cover select-none"
-          draggable="false"
-          data-testid="portrait-fit-image"
-          [src]="url | safe: 'resourceUrl'"
-          [style.object-position]="fitCss().objectPosition"
-          [style.transform]="fitCss().transform"
-          [style.transform-origin]="fitCss().origin"
-          alt=""
-        />
-      }
-      <svg
-        class="pointer-events-none absolute inset-0 size-full"
-        viewBox="0 0 200 200"
-        preserveAspectRatio="xMidYMax meet"
-        aria-hidden="true"
-      >
-        <g fill="none" stroke-linejoin="round">
-          <g stroke="rgba(0,0,0,0.55)" stroke-width="3.5">
-            <circle [attr.cx]="shape.head.cx" [attr.cy]="shape.head.cy" [attr.r]="shape.head.r" />
-            <path [attr.d]="shape.shoulders" />
+      <div class="relative w-full" #frameBox [style.aspect-ratio]="shape.aspectRatio">
+        @if (imageUrl(); as url) {
+          <img
+            class="pointer-events-none absolute inset-0 size-full max-w-none object-contain select-none"
+            draggable="false"
+            data-testid="portrait-fit-image"
+            [src]="url | safe: 'resourceUrl'"
+            [style.transform]="fitCss().transform"
+            [style.transform-origin]="fitCss().origin"
+            (load)="onImageLoad($event)"
+            alt=""
+          />
+        }
+        <div
+          class="pointer-events-none absolute inset-0 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] outline-2 outline-white/90 outline-solid"
+          data-testid="portrait-fit-crop"
+        ></div>
+        <svg
+          class="pointer-events-none absolute inset-0 size-full"
+          viewBox="0 0 200 200"
+          preserveAspectRatio="xMidYMax meet"
+          aria-hidden="true"
+        >
+          <g fill="none" stroke-linejoin="round">
+            <g stroke="rgba(0,0,0,0.55)" stroke-width="3.5">
+              <circle [attr.cx]="shape.head.cx" [attr.cy]="shape.head.cy" [attr.r]="shape.head.r" />
+              <path [attr.d]="shape.shoulders" />
+            </g>
+            <g stroke="#ffffff" stroke-width="1.5" stroke-dasharray="5 4">
+              <circle [attr.cx]="shape.head.cx" [attr.cy]="shape.head.cy" [attr.r]="shape.head.r" />
+              <path [attr.d]="shape.shoulders" />
+            </g>
           </g>
-          <g stroke="#ffffff" stroke-width="1.5" stroke-dasharray="5 4">
-            <circle [attr.cx]="shape.head.cx" [attr.cy]="shape.head.cy" [attr.r]="shape.head.r" />
-            <path [attr.d]="shape.shoulders" />
-          </g>
-        </g>
-      </svg>
+        </svg>
+      </div>
     </div>
 
     @if (canEdit()) {
@@ -86,71 +99,36 @@
       </p>
     }
 
-    <div class="flex items-center gap-1.5">
+    <div class="flex items-center gap-1.5 text-[11px]">
       <button
         class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-7 shrink-0 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[16px]!"
         type="button"
         data-testid="portrait-fit-zoom-out"
-        [disabled]="!canEdit()"
+        [disabled]="!canEdit() || fit().scale <= minScale"
         [title]="'feature.inventory.portraitFit.zoomOut' | transloco"
+        [attr.aria-label]="'feature.inventory.portraitFit.zoomOut' | transloco"
         (click)="zoomOut()"
       >
         <i class="material-icons">remove</i>
       </button>
-      <input
-        class="min-w-0 flex-1 [accent-color:var(--ui-accent)]"
-        type="range"
-        step="0.01"
-        data-testid="portrait-fit-zoom"
-        [min]="minZoom"
-        [max]="maxZoom"
-        [value]="fit().zoom"
-        [disabled]="!canEdit()"
-        [attr.aria-label]="'feature.inventory.portraitFit.zoom' | transloco"
-        (input)="onZoomInput($event)"
-        (change)="onZoomChange($event)"
-      />
+      <span
+        class="text-ui-muted w-10 shrink-0 text-center tabular-nums"
+        data-testid="portrait-fit-scale"
+        [title]="'feature.inventory.portraitFit.zoom' | transloco"
+        >{{ scalePercent() }}%</span
+      >
       <button
         class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-7 shrink-0 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[16px]!"
         type="button"
         data-testid="portrait-fit-zoom-in"
-        [disabled]="!canEdit()"
+        [disabled]="!canEdit() || fit().scale >= maxScale"
         [title]="'feature.inventory.portraitFit.zoomIn' | transloco"
+        [attr.aria-label]="'feature.inventory.portraitFit.zoomIn' | transloco"
         (click)="zoomIn()"
       >
         <i class="material-icons">add</i>
       </button>
-    </div>
-
-    <div class="flex items-end gap-1.5 text-[11px]">
-      <label class="text-ui-muted flex min-w-0 flex-1 flex-col gap-0.5">
-        <span>{{ 'feature.inventory.portraitFit.x' | transloco }}</span>
-        <input
-          class="bg-ui-input border-ui-border-input text-ui-text rounded-ui-sm box-border w-full border border-solid p-1"
-          type="number"
-          min="0"
-          max="100"
-          step="1"
-          data-testid="portrait-fit-x"
-          [value]="shownAt().x"
-          [disabled]="!canEdit()"
-          (change)="onAxisChange('x', $event)"
-        />
-      </label>
-      <label class="text-ui-muted flex min-w-0 flex-1 flex-col gap-0.5">
-        <span>{{ 'feature.inventory.portraitFit.y' | transloco }}</span>
-        <input
-          class="bg-ui-input border-ui-border-input text-ui-text rounded-ui-sm box-border w-full border border-solid p-1"
-          type="number"
-          min="0"
-          max="100"
-          step="1"
-          data-testid="portrait-fit-y"
-          [value]="shownAt().y"
-          [disabled]="!canEdit()"
-          (change)="onAxisChange('y', $event)"
-        />
-      </label>
+      <span class="flex-1"></span>
       <button
         class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 border border-solid bg-transparent px-2 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[14px]!"
         type="button"

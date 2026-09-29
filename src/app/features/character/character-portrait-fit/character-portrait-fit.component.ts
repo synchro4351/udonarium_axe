@@ -16,42 +16,51 @@ import { characterPortraitChoices, currentPortraitImageIdentifier } from '@axe/d
 import { clearPortraitFitOf, portraitFitOf, setPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import {
+  currentPortraitFit,
   CUT_IN_PORTRAIT_FRAME_SHAPES,
   type CutInPortraitFit,
   type CutInPortraitFrame,
   DEFAULT_CUT_IN_PORTRAIT_FIT,
   DEFAULT_PORTRAIT_FRAME,
-  MAX_PORTRAIT_ZOOM,
-  MIN_PORTRAIT_ZOOM,
-  normalizePortraitFit,
+  MAX_PORTRAIT_SCALE,
+  MIN_PORTRAIT_SCALE,
   panPortraitFit,
+  PORTRAIT_FRAME_HEIGHT,
+  PORTRAIT_FRAME_WIDTH,
   portraitFitCss,
   zoomPortraitFit,
 } from '@axe/domain/media/cut-in-portrait';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
-/** How much one notch of the wheel, or one press of a size button, sizes the picture. */
-const ZOOM_STEP = 1.08;
+/** How much one press of a size button or key sizes the picture. */
+const ZOOM_STEP = 1.1;
+/** How far one press of an arrow key moves the picture, in frame pixels. */
+const NUDGE = 4;
+/** How long the wheel has to rest before what it did is written, so a spin sends one change. */
+const WHEEL_SETTLE_MS = 300;
 
 interface Point {
   x: number;
   y: number;
 }
 
-/** A gesture on the frame: one finger or the mouse pans, two fingers pinch to size. */
+/**
+ * A gesture on the frame: one finger or the mouse moves the picture, two fingers size it around
+ * where they are and move it as they move. Points are in frame pixels from the frame's centre.
+ */
 type Gesture =
-  | { kind: 'pan'; from: CutInPortraitFit; start: Point; slot: { width: number; height: number } }
-  | { kind: 'pinch'; from: CutInPortraitFit; distance: number };
+  | { kind: 'pan'; from: CutInPortraitFit; start: Point }
+  | { kind: 'pinch'; from: CutInPortraitFit; centre: Point; distance: number };
 
 /**
  * Lining a character's pictures up with a cut-in's portrait frame, from the character's sheet.
  *
- * The picture is shown in the frame the way a cut-in's portrait slot draws it, under the outline of
- * the frame. Dragging it, the wheel, a pinch, the slider or the size buttons change the fit, which
- * is kept on the character for that picture and frame, so every cut-in whose slot uses the frame
- * shows it the same way. A gesture shows its result as it goes and is written once it ends, so the
- * room receives one change rather than one per pointer move.
+ * The picture is shown whole, with what falls outside the frame dimmed, so it can be dragged well
+ * past the frame's edges and still be seen and caught. The fit is kept on the character for that
+ * picture and frame, so every cut-in whose slot uses the frame shows it the same way. A gesture
+ * shows its result as it goes and is written once it ends, so the room receives one change rather
+ * than one per pointer move.
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -66,20 +75,24 @@ export class CharacterPortraitFitComponent {
   private readonly rolePermission = inject(RolePermissionService);
   private readonly panelService = inject(PanelService);
 
-  private readonly frameArea = viewChild<ElementRef<HTMLElement>>('frameArea');
+  private readonly frameBox = viewChild<ElementRef<HTMLElement>>('frameBox');
 
   /** The character whose pictures are fitted. */
   readonly character = signal<GameCharacter | null>(null);
   readonly frame: CutInPortraitFrame = DEFAULT_PORTRAIT_FRAME;
   protected readonly shape = CUT_IN_PORTRAIT_FRAME_SHAPES[DEFAULT_PORTRAIT_FRAME];
-  protected readonly minZoom = MIN_PORTRAIT_ZOOM;
-  protected readonly maxZoom = MAX_PORTRAIT_ZOOM;
+  protected readonly minScale = MIN_PORTRAIT_SCALE;
+  protected readonly maxScale = MAX_PORTRAIT_SCALE;
 
   private readonly chosenImage = signal('');
+  /** The proportions of the picture as it loaded, which an older fit needs to be shown. */
+  private readonly loaded = signal<{ url: string; aspect: number } | null>(null);
   /** The fit a gesture has got to, shown before it is written. */
   private readonly draft = signal<CutInPortraitFit | null>(null);
   private readonly pointers = new Map<number, Point>();
   private gesture: Gesture | null = null;
+  protected readonly grabbing = signal(false);
+  private wheelTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Whether this user may change the character, as the rest of its sheet is judged. */
   readonly canEdit = computed(() => {
@@ -112,6 +125,12 @@ export class CharacterPortraitFitComponent {
     () => this.choices().find((choice) => choice.imageIdentifier === this.imageIdentifier())?.url ?? ''
   );
 
+  /** Width over height of the picture, taken as the frame's own until it has loaded. */
+  private readonly imageAspect = computed(() => {
+    const loaded = this.loaded();
+    return loaded && loaded.url === this.imageUrl() ? loaded.aspect : PORTRAIT_FRAME_WIDTH / PORTRAIT_FRAME_HEIGHT;
+  });
+
   /** The fit the character keeps for the picture, or none while it has never been fitted. */
   readonly savedFit = computed(() => {
     const character = this.watchedCharacter();
@@ -119,95 +138,113 @@ export class CharacterPortraitFitComponent {
     return character && image ? portraitFitOf(character, this.frame, image) : null;
   });
 
-  readonly fit = computed<CutInPortraitFit>(
-    () => this.draft() ?? this.savedFit() ?? { ...DEFAULT_CUT_IN_PORTRAIT_FIT }
-  );
+  /** The fit as shown, with one kept the old way turned into the current shape. */
+  readonly fit = computed<CutInPortraitFit>(() => {
+    const draft = this.draft();
+    if (draft) return draft;
+    const saved = this.savedFit();
+    return saved ? currentPortraitFit(saved, this.imageAspect()) : { ...DEFAULT_CUT_IN_PORTRAIT_FIT };
+  });
   readonly fitCss = computed(() => portraitFitCss(this.fit()));
-  /** The position as the number fields show it, to a tenth of a percent. */
-  protected readonly shownAt = computed(() => ({
-    x: Math.round(this.fit().x * 10) / 10,
-    y: Math.round(this.fit().y * 10) / 10,
-  }));
+  protected readonly scalePercent = computed(() => Math.round(this.fit().scale * 100));
 
   constructor() {
+    const destroyRef = inject(DestroyRef);
     this.objectChange.objectDeleted$.subscribe((event) => {
       if (event.identifier === this.character()?.identifier) this.panelService.close();
-    }, inject(DestroyRef));
+    }, destroyRef);
+    destroyRef.onDestroy(() => this.flushWheel());
   }
 
   /** Picks which picture to fit, as a thumbnail does. */
   selectImage(imageIdentifier: string): void {
+    this.flushWheel();
     this.endGesture();
     this.chosenImage.set(imageIdentifier);
+  }
+
+  protected onImageLoad(event: Event): void {
+    const image = event.target as HTMLImageElement | null;
+    if (!image || !(image.naturalWidth > 0) || !(image.naturalHeight > 0)) return;
+    this.loaded.set({ url: this.imageUrl(), aspect: image.naturalWidth / image.naturalHeight });
   }
 
   protected onPointerDown(event: PointerEvent): void {
     if (!this.canEdit() || !this.imageIdentifier()) return;
     event.preventDefault();
-    (event.target as HTMLElement | null)?.setPointerCapture?.(event.pointerId);
-    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    this.flushWheel();
+    (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(event.pointerId);
+    this.pointers.set(event.pointerId, this.framePoint(event));
     this.beginGesture();
   }
 
   protected onPointerMove(event: PointerEvent): void {
     if (!this.pointers.has(event.pointerId)) return;
-    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    this.pointers.set(event.pointerId, this.framePoint(event));
     const gesture = this.gesture;
     if (!gesture) return;
 
     if (gesture.kind === 'pinch') {
-      const distance = this.pinchDistance();
-      if (distance > 0 && gesture.distance > 0) {
-        const zoom = Math.round(gesture.from.zoom * (distance / gesture.distance) * 100) / 100;
-        this.draft.set(normalizePortraitFit({ ...gesture.from, zoom }));
-      }
+      const [a, b] = [...this.pointers.values()];
+      if (!a || !b || gesture.distance <= 0) return;
+      const centre = midpoint(a, b);
+      const sized = zoomPortraitFit(gesture.from, distance(a, b) / gesture.distance, gesture.centre);
+      this.draft.set(panPortraitFit(sized, centre.x - gesture.centre.x, centre.y - gesture.centre.y));
       return;
     }
     const at = this.pointers.values().next().value as Point;
-    this.draft.set(panPortraitFit(gesture.from, at.x - gesture.start.x, at.y - gesture.start.y, gesture.slot));
+    this.draft.set(panPortraitFit(gesture.from, at.x - gesture.start.x, at.y - gesture.start.y));
   }
 
   protected onPointerUp(event: PointerEvent): void {
     if (!this.pointers.has(event.pointerId)) return;
-    (event.target as HTMLElement | null)?.releasePointerCapture?.(event.pointerId);
+    (event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(event.pointerId);
     this.pointers.delete(event.pointerId);
-    // A finger lifted from a pinch leaves the other one panning from where the pinch got to.
+    // A finger lifted from a pinch leaves the other one moving from where the pinch got to.
     if (this.pointers.size > 0) this.beginGesture();
     else this.endGesture();
   }
 
+  /** The wheel, and a trackpad's pinch, size the picture around the pointer. */
   protected onWheel(event: WheelEvent): void {
     if (!this.canEdit() || !this.imageIdentifier()) return;
     event.preventDefault();
-    this.zoomBy(event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP);
+    const lines = event.deltaMode === 1 ? 33 : event.deltaMode === 2 ? 400 : 1;
+    const delta = Math.max(-100, Math.min(100, event.deltaY * lines));
+    this.draft.set(zoomPortraitFit(this.freshFit(), Math.exp(-delta * 0.002), this.framePoint(event)));
+    if (this.wheelTimer !== null) clearTimeout(this.wheelTimer);
+    this.wheelTimer = setTimeout(() => this.flushWheel(), WHEEL_SETTLE_MS);
+  }
+
+  /** Arrow keys move the picture and the plus and minus keys size it, for anyone not using a pointer. */
+  protected onKeyDown(event: KeyboardEvent): void {
+    if (!this.canEdit() || !this.imageIdentifier()) return;
+    const step = event.shiftKey ? NUDGE * 5 : NUDGE;
+    const moves: Record<string, Point> = {
+      ArrowLeft: { x: -step, y: 0 },
+      ArrowRight: { x: step, y: 0 },
+      ArrowUp: { x: 0, y: -step },
+      ArrowDown: { x: 0, y: step },
+    };
+    const move = moves[event.key];
+    if (move) this.write(panPortraitFit(this.freshFit(), move.x, move.y));
+    else if (event.key === '+' || event.key === '=') this.zoomIn();
+    else if (event.key === '-') this.zoomOut();
+    else return;
+    event.preventDefault();
   }
 
   protected zoomIn(): void {
-    this.zoomBy(ZOOM_STEP);
+    this.write(zoomPortraitFit(this.freshFit(), ZOOM_STEP));
   }
 
   protected zoomOut(): void {
-    this.zoomBy(1 / ZOOM_STEP);
+    this.write(zoomPortraitFit(this.freshFit(), 1 / ZOOM_STEP));
   }
 
-  /** The slider shows the size as it moves and writes it once let go. */
-  protected onZoomInput(event: Event): void {
-    const zoom = Number((event.target as HTMLInputElement).value);
-    if (Number.isFinite(zoom)) this.draft.set(normalizePortraitFit({ ...this.freshFit(), zoom }));
-  }
-
-  protected onZoomChange(event: Event): void {
-    const zoom = Number((event.target as HTMLInputElement).value);
-    if (Number.isFinite(zoom)) this.write({ ...this.freshFit(), zoom });
-  }
-
-  protected onAxisChange(axis: 'x' | 'y', event: Event): void {
-    const value = (event.target as HTMLInputElement).valueAsNumber;
-    if (Number.isFinite(value)) this.write({ ...this.freshFit(), [axis]: value });
-  }
-
-  /** Puts the picture back the way an unfitted one sits. */
+  /** Puts the picture back the way an unfitted one sits: whole and centred. */
   reset(): void {
+    this.cancelWheel();
     const character = this.character();
     const image = this.imageIdentifier();
     this.draft.set(null);
@@ -215,19 +252,17 @@ export class CharacterPortraitFitComponent {
     clearPortraitFitOf(character, this.frame, image);
   }
 
-  private zoomBy(factor: number): void {
-    this.write(zoomPortraitFit(this.freshFit(), factor));
-  }
-
   /**
    * The fit as it stands this moment, for a change to start from. The character is read directly,
    * since what it hears of its own last write reaches `fit` only once the change has gone round.
    */
   private freshFit(): CutInPortraitFit {
+    const draft = this.draft();
+    if (draft) return draft;
     const character = this.character();
     const image = this.imageIdentifier();
     const saved = character && image ? portraitFitOf(character, this.frame, image) : null;
-    return this.draft() ?? saved ?? { ...DEFAULT_CUT_IN_PORTRAIT_FIT };
+    return saved ? currentPortraitFit(saved, this.imageAspect()) : { ...DEFAULT_CUT_IN_PORTRAIT_FIT };
   }
 
   private write(fit: CutInPortraitFit): void {
@@ -240,18 +275,13 @@ export class CharacterPortraitFitComponent {
 
   private beginGesture(): void {
     const from = this.freshFit();
-    if (this.pointers.size >= 2) {
-      this.gesture = { kind: 'pinch', from, distance: this.pinchDistance() };
+    this.grabbing.set(true);
+    const [a, b] = [...this.pointers.values()];
+    if (a && b) {
+      this.gesture = { kind: 'pinch', from, centre: midpoint(a, b), distance: distance(a, b) };
       return;
     }
-    const start = this.pointers.values().next().value as Point;
-    const bounds = this.frameArea()?.nativeElement.getBoundingClientRect();
-    this.gesture = {
-      kind: 'pan',
-      from,
-      start,
-      slot: { width: bounds?.width ?? 0, height: bounds?.height ?? 0 },
-    };
+    this.gesture = { kind: 'pan', from, start: a };
   }
 
   /** Writes what a gesture got to, once, and lets go of it. */
@@ -259,14 +289,37 @@ export class CharacterPortraitFitComponent {
     this.pointers.clear();
     const wasGesturing = this.gesture !== null;
     this.gesture = null;
+    this.grabbing.set(false);
     const draft = this.draft();
     if (wasGesturing && draft) this.write(draft);
     else this.draft.set(null);
   }
 
-  private pinchDistance(): number {
-    const [a, b] = [...this.pointers.values()];
-    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  /** Writes what the wheel got to, if it is still waiting to be written. */
+  private flushWheel(): void {
+    if (this.wheelTimer === null) return;
+    this.cancelWheel();
+    const draft = this.draft();
+    if (draft) this.write(draft);
+  }
+
+  private cancelWheel(): void {
+    if (this.wheelTimer !== null) clearTimeout(this.wheelTimer);
+    this.wheelTimer = null;
+  }
+
+  /** Where a pointer is, in frame pixels from the frame's centre. */
+  private framePoint(event: { clientX: number; clientY: number }): Point {
+    const clientX = Number.isFinite(event.clientX) ? event.clientX : 0;
+    const clientY = Number.isFinite(event.clientY) ? event.clientY : 0;
+    const bounds = this.frameBox()?.nativeElement.getBoundingClientRect();
+    // Not laid out, as under test: screen pixels stand in for frame pixels.
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) return { x: clientX, y: clientY };
+    const unit = PORTRAIT_FRAME_WIDTH / bounds.width;
+    return {
+      x: (clientX - (bounds.left + bounds.width / 2)) * unit,
+      y: (clientY - (bounds.top + bounds.height / 2)) * unit,
+    };
   }
 
   private watchedCharacter(): GameCharacter | null {
@@ -274,4 +327,12 @@ export class CharacterPortraitFitComponent {
     if (character) this.objectChange.versionOf(character.identifier)();
     return character;
   }
+}
+
+function midpoint(a: Point, b: Point): Point {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+function distance(a: Point, b: Point): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }

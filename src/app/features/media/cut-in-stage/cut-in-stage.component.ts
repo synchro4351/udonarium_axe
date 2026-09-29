@@ -17,7 +17,12 @@ import { ImageStorage } from '@axe/core/storage/image-storage';
 import { clipCss } from '@axe/domain/media/cut-in-clip';
 import { fillCss } from '@axe/domain/media/cut-in-fill';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
-import { type CutInPortraitSnapshot, portraitFitCss, resolvePortrait } from '@axe/domain/media/cut-in-portrait';
+import {
+  type CutInPortraitSnapshot,
+  type PortraitSlotCss,
+  portraitSlotCss,
+  resolvePortrait,
+} from '@axe/domain/media/cut-in-portrait';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
 import {
   layerFilter,
@@ -84,8 +89,7 @@ export class CutInStageComponent {
   /** What the portrait slots show, read off the launch rather than off the character as it stands now. */
   readonly portraitFace = computed(() => {
     this.objectChange.fileVersion();
-    const face = resolvePortrait(this.portrait(), (identifier) => this.imageStorage.get(identifier)?.url ?? '');
-    return { url: face.url, silhouette: face.silhouette, ...portraitFitCss(face.fit) };
+    return resolvePortrait(this.portrait(), (identifier) => this.imageStorage.get(identifier)?.url ?? '');
   });
 
   /** The name `{character}` shows, as the launch carried it. */
@@ -208,6 +212,12 @@ export class CutInStageComponent {
     this.objectChange.versionOf(layer.identifier)();
     if (layer.crumbleShape === 'none') return null;
     return wipeCss(layer.crumbleShape, sampleLayerAt(layer, this.playheadMs(), this.durationMs()).crumble) || null;
+  }
+
+  /** How a portrait slot of this layer's size draws the launched picture. */
+  protected portraitCssOf(layer: CutInLayer): PortraitSlotCss {
+    this.objectChange.versionOf(layer.identifier)();
+    return portraitSlotCss(this.portraitFace().fit, { width: layer.width, height: layer.height });
   }
 
   protected imageUrl(layer: CutInLayer): string {

@@ -3,7 +3,7 @@ import { RolePermissionService } from '@axe/application/permission/role-permissi
 import { portraitFitOf, setPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DataElement } from '@axe/domain/data/data-element';
-import { DEFAULT_CUT_IN_PORTRAIT_FIT } from '@axe/domain/media/cut-in-portrait';
+import { type CutInPortraitFit, DEFAULT_CUT_IN_PORTRAIT_FIT } from '@axe/domain/media/cut-in-portrait';
 import { CharacterPortraitFitComponent } from '@axe/features/character/character-portrait-fit/character-portrait-fit.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
@@ -18,14 +18,17 @@ describe('CharacterPortraitFitComponent', () => {
     onPointerMove(event: PointerEvent): void;
     onPointerUp(event: PointerEvent): void;
     onWheel(event: WheelEvent): void;
+    onKeyDown(event: KeyboardEvent): void;
+    onImageLoad(event: Event): void;
     zoomIn(): void;
-    onZoomInput(event: Event): void;
-    onZoomChange(event: Event): void;
-    onAxisChange(axis: 'x' | 'y', event: Event): void;
   };
 
   function api(): Api {
     return component as unknown as Api;
+  }
+
+  function scaleOf(character: GameCharacter, image: string): number | undefined {
+    return (portraitFitOf(character, 'bust', image) as CutInPortraitFit | null)?.scale;
   }
 
   function makeCharacter(name: string, images: string[]): GameCharacter {
@@ -93,9 +96,20 @@ describe('CharacterPortraitFitComponent', () => {
     api().zoomIn();
     await fixture.whenStable();
 
-    expect(portraitFitOf(character, 'bust', 'angry')?.zoom).toBeGreaterThan(1);
+    expect(scaleOf(character, 'angry')).toBeGreaterThan(1);
     expect(portraitFitOf(character, 'bust', 'smile')).toBeNull();
     expect(component.savedFit()).toEqual(portraitFitOf(character, 'bust', 'angry'));
+  });
+
+  it('leaves positions to dragging, with no slider or number fields to fill in', () => {
+    const character = makeCharacter('勇者', ['smile']);
+    component.character.set(character);
+    fixture.detectChanges();
+
+    expect(query('portrait-fit-frame')).not.toBeNull();
+    expect(query('portrait-fit-crop')).not.toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('input')).toBeNull();
+    expect(query('portrait-fit-scale')?.textContent?.trim()).toBe('100%');
   });
 
   it('follows the character when its fit changes from elsewhere, as another peer changing it would', async () => {
@@ -103,10 +117,10 @@ describe('CharacterPortraitFitComponent', () => {
     component.character.set(character);
     fixture.detectChanges();
 
-    setPortraitFitOf(character, 'bust', 'smile', { zoom: 1.5, x: 20, y: 30 });
+    setPortraitFitOf(character, 'bust', 'smile', { scale: 1.5, x: 20, y: 30 });
     await fixture.whenStable();
 
-    expect(component.fit()).toEqual({ zoom: 1.5, x: 20, y: 30 });
+    expect(component.fit()).toEqual({ scale: 1.5, x: 20, y: 30 });
   });
 
   it('shows a drag as it goes and writes it to the character once, when it ends', async () => {
@@ -118,7 +132,7 @@ describe('CharacterPortraitFitComponent', () => {
     api().onPointerMove(pointer('pointermove', 1, 140, 100));
     api().onPointerMove(pointer('pointermove', 1, 160, 100));
 
-    expect(component.fit().x).toBeLessThan(50);
+    expect(component.fit()).toEqual({ scale: 1, x: 60, y: 0 });
     expect(character.portraitFits).toBe('');
 
     const shown = component.fit();
@@ -129,7 +143,24 @@ describe('CharacterPortraitFitComponent', () => {
     expect(component.fit()).toEqual(shown);
   });
 
-  it('sizes the picture with two fingers apart', () => {
+  it('moves a shrunk picture with the pointer, and past the edges of the frame', () => {
+    const character = makeCharacter('勇者', ['smile']);
+    setPortraitFitOf(character, 'bust', 'smile', { scale: 0.5, x: 0, y: 0 });
+    component.character.set(character);
+    fixture.detectChanges();
+
+    api().onPointerDown(pointer('pointerdown', 1, 100, 100));
+    api().onPointerMove(pointer('pointermove', 1, 30, 100));
+    expect(component.fit()).toEqual({ scale: 0.5, x: -70, y: 0 });
+
+    api().onPointerMove(pointer('pointermove', 1, -100, 300));
+    api().onPointerUp(pointer('pointerup', 1, -100, 300));
+
+    // Half the frame across, and more than half of it down: well past where the old fit stopped.
+    expect(portraitFitOf(character, 'bust', 'smile')).toEqual({ scale: 0.5, x: -200, y: 200 });
+  });
+
+  it('sizes the picture with two fingers around where they are, and moves it as they move', () => {
     const character = makeCharacter('勇者', ['smile']);
     component.character.set(character);
     fixture.detectChanges();
@@ -140,30 +171,63 @@ describe('CharacterPortraitFitComponent', () => {
     api().onPointerUp(pointer('pointerup', 2, 300, 100));
     api().onPointerUp(pointer('pointerup', 1, 100, 100));
 
-    expect(portraitFitOf(character, 'bust', 'smile')?.zoom).toBe(2);
+    // Twice as far apart around their first middle (150, 100), which then moved 50 to the right.
+    expect(portraitFitOf(character, 'bust', 'smile')).toEqual({ scale: 2, x: -100, y: -100 });
   });
 
-  it('sizes the picture with the wheel, the slider and the number fields', () => {
+  it('sizes the picture with the wheel and writes it once the wheel rests', () => {
+    vi.useFakeTimers();
+    try {
+      const character = makeCharacter('勇者', ['smile']);
+      component.character.set(character);
+      fixture.detectChanges();
+      const wheel = { deltaY: -100, deltaMode: 0, clientX: 0, clientY: 0, preventDefault: vi.fn() };
+
+      api().onWheel(wheel as unknown as WheelEvent);
+      api().onWheel(wheel as unknown as WheelEvent);
+
+      const shown = component.fit().scale;
+      expect(wheel.preventDefault).toHaveBeenCalled();
+      expect(shown).toBeGreaterThan(1.4);
+      expect(character.portraitFits).toBe('');
+
+      vi.advanceTimersByTime(1000);
+      expect(scaleOf(character, 'smile')).toBe(shown);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('moves and sizes the picture from the keyboard', () => {
     const character = makeCharacter('勇者', ['smile']);
     component.character.set(character);
     fixture.detectChanges();
-    const wheel = { deltaY: -100, preventDefault: vi.fn() } as unknown as WheelEvent;
+    const key = (name: string) => ({ key: name, shiftKey: false, preventDefault: vi.fn() }) as unknown as KeyboardEvent;
 
-    api().onWheel(wheel);
-    expect(wheel.preventDefault).toHaveBeenCalled();
-    expect(portraitFitOf(character, 'bust', 'smile')?.zoom).toBeGreaterThan(1);
+    api().onKeyDown(key('ArrowRight'));
+    api().onKeyDown(key('ArrowUp'));
+    api().onKeyDown(key('+'));
 
-    api().onZoomInput({ target: { value: '2.5' } } as never);
-    expect(component.fit().zoom).toBe(2.5);
-    api().onZoomChange({ target: { value: '2.5' } } as never);
-    api().onAxisChange('y', { target: { valueAsNumber: 30 } } as never);
+    expect(portraitFitOf(character, 'bust', 'smile')).toEqual({ scale: 1.1, x: 4.4, y: -4.4 });
+  });
 
-    expect(portraitFitOf(character, 'bust', 'smile')).toMatchObject({ zoom: 2.5, y: 30 });
+  it('turns a fit kept the old way into the same picture on screen, and keeps it the new way once changed', () => {
+    const character = makeCharacter('勇者', ['smile']);
+    setPortraitFitOf(character, 'bust', 'smile', { zoom: 1, x: 50, y: 0 });
+    component.character.set(character);
+    fixture.detectChanges();
+
+    // A picture half as wide as high covered the frame's width, top aligned.
+    api().onImageLoad({ target: { naturalWidth: 200, naturalHeight: 400 } } as never);
+    expect(component.fit()).toEqual({ scale: 1.7, x: 0, y: 140 });
+
+    api().onKeyDown({ key: 'ArrowDown', shiftKey: false, preventDefault: vi.fn() } as never);
+    expect(portraitFitOf(character, 'bust', 'smile')).toEqual({ scale: 1.7, x: 0, y: 144 });
   });
 
   it('puts the picture back the way an unfitted one sits', async () => {
     const character = makeCharacter('勇者', ['smile']);
-    setPortraitFitOf(character, 'bust', 'smile', { zoom: 2, x: 10, y: 10 });
+    setPortraitFitOf(character, 'bust', 'smile', { scale: 2, x: 10, y: 10 });
     component.character.set(character);
     fixture.detectChanges();
 
@@ -177,14 +241,14 @@ describe('CharacterPortraitFitComponent', () => {
   it('keeps two characters that share a picture apart', () => {
     const hero = makeCharacter('勇者', ['shared']);
     const rival = makeCharacter('宿敵', ['shared']);
-    setPortraitFitOf(rival, 'bust', 'shared', { zoom: 3, x: 90, y: 90 });
+    setPortraitFitOf(rival, 'bust', 'shared', { scale: 3, x: 90, y: 90 });
     component.character.set(hero);
     fixture.detectChanges();
 
     api().zoomIn();
 
-    expect(portraitFitOf(rival, 'bust', 'shared')).toEqual({ zoom: 3, x: 90, y: 90 });
-    expect(portraitFitOf(hero, 'bust', 'shared')?.zoom).toBeCloseTo(1.08);
+    expect(portraitFitOf(rival, 'bust', 'shared')).toEqual({ scale: 3, x: 90, y: 90 });
+    expect(scaleOf(hero, 'shared')).toBeCloseTo(1.1);
   });
 
   it('shows the fit but changes nothing for a user who may not change the table', () => {
@@ -198,9 +262,10 @@ describe('CharacterPortraitFitComponent', () => {
     api().onPointerUp(pointer('pointerup', 1, 160, 100));
     api().zoomIn();
     api().onWheel({ deltaY: -100, preventDefault: vi.fn() } as never);
+    api().onKeyDown({ key: 'ArrowLeft', preventDefault: vi.fn() } as never);
 
     expect(character.portraitFits).toBe('');
     expect(query('portrait-fit-read-only')).not.toBeNull();
-    expect((query('portrait-fit-zoom') as HTMLInputElement).disabled).toBe(true);
+    expect((query('portrait-fit-zoom-in') as HTMLButtonElement).disabled).toBe(true);
   });
 });

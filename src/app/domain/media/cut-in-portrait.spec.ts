@@ -1,16 +1,23 @@
 import {
   characterPortraitFitIn,
+  currentPortraitFit,
   CUT_IN_PORTRAIT_SILHOUETTE_URL,
   DEFAULT_CUT_IN_PORTRAIT_FIT,
   encodePortraitSnapshot,
   launchPortraitFit,
   legacyScenePortraitFit,
   makePortraitSnapshot,
+  MAX_PORTRAIT_SCALE,
+  MIN_PORTRAIT_SCALE,
   namesCharacter,
+  normalizePortraitFit,
   panPortraitFit,
   parseCharacterPortraitFits,
   parsePortraitSnapshot,
+  portraitFitCss,
+  portraitFitFromLegacy,
   portraitFrameOf,
+  portraitSlotCss,
   resolvePortrait,
   withCharacterPortraitFit,
   zoomPortraitFit,
@@ -68,16 +75,110 @@ describe('cut-in portrait binding', () => {
     expect(namesCharacter([{ kind: 'image', portraitSlot: false, text: '{character}' }])).toBe(false);
   });
 
-  it('moves the picture with the pointer and sizes it within the range the slot shows', () => {
-    const fit = { zoom: 2, x: 50, y: 50 };
-    const dragged = panPortraitFit(fit, 40, -20, { width: 200, height: 400 });
+  it('shows the whole picture, centred, until someone fits it', () => {
+    expect(DEFAULT_CUT_IN_PORTRAIT_FIT).toEqual({ scale: 1, x: 0, y: 0 });
+    expect(portraitFitCss(DEFAULT_CUT_IN_PORTRAIT_FIT)).toEqual({
+      transform: 'translate(0%, 0%) scale(1)',
+      origin: '50% 50%',
+    });
+  });
 
-    // Dragged right and up, the picture shows more of its left side and its bottom.
-    expect(dragged.x).toBeCloseTo(40);
-    expect(dragged.y).toBeCloseTo(52.5);
-    expect(panPortraitFit(fit, -10_000, 0, { width: 200, height: 400 }).x).toBe(100);
-    expect(zoomPortraitFit(fit, 1.5).zoom).toBe(3);
-    expect(zoomPortraitFit(fit, 10).zoom).toBe(4);
+  it('carries a fit kept the old way to every peer unchanged', () => {
+    const sent = makePortraitSnapshot(template, 'c', 'i', '', { zoom: 2, x: 30, y: 10 });
+
+    expect(parsePortraitSnapshot(encodePortraitSnapshot(sent))?.fit).toEqual({ zoom: 2, x: 30, y: 10 });
+  });
+});
+
+describe('moving and sizing a portrait', () => {
+  it('moves the picture exactly as far as the pointer, the same way at any size', () => {
+    for (const scale of [0.4, 1, 3]) {
+      const dragged = panPortraitFit({ scale, x: 0, y: 0 }, 40, -20);
+      expect(dragged).toEqual({ scale, x: 40, y: -20 });
+    }
+  });
+
+  it('lets the picture be taken past the edges of the frame', () => {
+    // Half the frame's width to the left puts the whole picture's centre on the frame's left edge.
+    expect(panPortraitFit({ scale: 1, x: 0, y: 0 }, -170, 250)).toEqual({ scale: 1, x: -170, y: 250 });
+    // Only a picture dragged wholly off the frame is held back, with its edge still on the frame's.
+    expect(panPortraitFit({ scale: 1, x: 0, y: 0 }, -10_000, 0).x).toBe(-340);
+  });
+
+  it('sizes the picture around a point, keeping what is under it in place', () => {
+    const fit = { scale: 1, x: 20, y: 0 };
+    const at = { x: 100, y: -50 };
+    const sized = zoomPortraitFit(fit, 2, at);
+
+    expect(sized.scale).toBe(2);
+    // The picture's point under `at` was (at - centre) / scale away from its centre, and still is under `at`.
+    const before = { x: (at.x - fit.x) / fit.scale, y: (at.y - fit.y) / fit.scale };
+    expect(sized.x + before.x * sized.scale).toBeCloseTo(at.x);
+    expect(sized.y + before.y * sized.scale).toBeCloseTo(at.y);
+    // Around the frame's centre by default, and within the sizes a slot can show.
+    expect(zoomPortraitFit({ scale: 1, x: 10, y: 0 }, 0.5)).toEqual({ scale: 0.5, x: 5, y: 0 });
+    expect(zoomPortraitFit(fit, 1000).scale).toBe(MAX_PORTRAIT_SCALE);
+    expect(zoomPortraitFit(fit, 0.001).scale).toBe(MIN_PORTRAIT_SCALE);
+  });
+
+  it('puts the picture where an old fit put it, for any proportions', () => {
+    // The old default: covering the frame, top and centre.
+    expect(portraitFitFromLegacy({ zoom: 1, x: 50, y: 0 }, 340 / 400)).toEqual({ scale: 1, x: 0, y: 0 });
+
+    // A tall picture, half as wide as high, covered the frame's width: 340 by 680, top aligned.
+    // Drawn whole it is 200 by 400, so it was 1.7 times that, with its centre 140 below the frame's.
+    expect(portraitFitFromLegacy({ zoom: 1, x: 50, y: 0 }, 0.5)).toEqual({ scale: 1.7, x: 0, y: 140 });
+
+    // Blown up twice around the frame's bottom-left corner: the picture's centre, 170 across and 340
+    // up from that corner, goes twice as far, to 340 across and 680 up.
+    expect(portraitFitFromLegacy({ zoom: 2, x: 0, y: 100 }, 0.5)).toEqual({ scale: 3.4, x: 170, y: -480 });
+  });
+
+  it('reads an old fit and a current one each as what it is', () => {
+    expect(normalizePortraitFit({ zoom: 2, x: 30, y: 10 })).toEqual({ zoom: 2, x: 30, y: 10 });
+    expect(normalizePortraitFit({ scale: 2, x: -30, y: 10 })).toEqual({ scale: 2, x: -30, y: 10 });
+    expect(normalizePortraitFit({ scale: 'x', zoom: 3 })).toEqual({ scale: 1, x: 0, y: 0 });
+    expect(normalizePortraitFit(null)).toEqual(DEFAULT_CUT_IN_PORTRAIT_FIT);
+    expect(currentPortraitFit({ scale: 2, x: 1, y: 2 }, 0.5)).toEqual({ scale: 2, x: 1, y: 2 });
+    expect(currentPortraitFit({ zoom: 1, x: 50, y: 0 }, 0.5)).toEqual({ scale: 1.7, x: 0, y: 140 });
+  });
+});
+
+describe('drawing a portrait slot', () => {
+  it('draws the picture whole in the frame, moved by a share of the frame', () => {
+    expect(portraitSlotCss({ scale: 0.5, x: -170, y: 40 }, { width: 340, height: 400 })).toEqual({
+      box: { left: 0, top: 0, width: 340, height: 400 },
+      objectFit: 'contain',
+      objectPosition: '50% 50%',
+      transform: 'translate(-50%, 10%) scale(0.5)',
+      origin: '50% 50%',
+    });
+  });
+
+  it('covers a slot of another shape with the frame, centred', () => {
+    expect(portraitSlotCss(DEFAULT_CUT_IN_PORTRAIT_FIT, { width: 340, height: 800 }).box).toEqual({
+      left: -170,
+      top: 0,
+      width: 680,
+      height: 800,
+    });
+  });
+
+  it('draws an old fit the way it always was', () => {
+    expect(portraitSlotCss({ zoom: 2, x: 30, y: 10 }, { width: 340, height: 400 })).toEqual({
+      box: { left: 0, top: 0, width: 340, height: 400 },
+      objectFit: null,
+      objectPosition: '30% 10%',
+      transform: 'scale(2)',
+      origin: '30% 10%',
+    });
+  });
+
+  it('stands the silhouette on the bottom of the frame', () => {
+    const face = resolvePortrait(null, () => '');
+
+    // Its square drawing fills the frame's 340 across, leaving 60 of the 400 down to drop it by.
+    expect(face.fit).toEqual({ scale: 1, x: 0, y: 30 });
   });
 });
 
