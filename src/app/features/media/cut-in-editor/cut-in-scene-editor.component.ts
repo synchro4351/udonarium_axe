@@ -379,12 +379,7 @@ export class CutInSceneEditorComponent {
     if (choice.characterIdentifier) this.objectChange.versionOf(choice.characterIdentifier)();
     const found = this.objectStore.get(choice.characterIdentifier);
     const character = found instanceof GameCharacter ? found : null;
-    const fit = launchPortraitFitOf(
-      character,
-      scene.portraitFits,
-      portraitFrameOf(scene.layers),
-      choice.imageIdentifier
-    );
+    const fit = launchPortraitFitOf(character, portraitFrameOf(scene.layers), choice.imageIdentifier);
     return makePortraitSnapshot(
       scene,
       choice.characterIdentifier,

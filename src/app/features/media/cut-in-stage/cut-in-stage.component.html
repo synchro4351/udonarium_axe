@@ -74,12 +74,10 @@
                         [style.height.px]="css.box.height"
                       >
                         <img
-                          class="block size-full max-w-none select-none"
+                          class="block size-full max-w-none object-contain select-none"
                           draggable="false"
                           [src]="face.url | safe: 'resourceUrl'"
                           [attr.data-silhouette]="face.silhouette ? '' : null"
-                          [style.object-fit]="css.objectFit ?? layer.objectFit"
-                          [style.object-position]="css.objectPosition"
                           [style.transform]="css.transform"
                           [style.transform-origin]="css.origin"
                           alt=""

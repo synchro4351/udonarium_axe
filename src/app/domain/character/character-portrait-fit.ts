@@ -1,9 +1,9 @@
 import { GameCharacter } from '@axe/domain/character/game-character';
 import {
   characterPortraitFitIn,
+  type CutInPortraitFit,
   type CutInPortraitFrame,
   launchPortraitFit,
-  type StoredPortraitFit,
   withCharacterPortraitFit,
 } from '@axe/domain/media/cut-in-portrait';
 
@@ -15,7 +15,7 @@ export function portraitFitOf(
   character: GameCharacter,
   frame: CutInPortraitFrame,
   imageIdentifier: string
-): StoredPortraitFit | null {
+): CutInPortraitFit | null {
   return characterPortraitFitIn(character.portraitFits, frame, imageIdentifier);
 }
 
@@ -24,7 +24,7 @@ export function setPortraitFitOf(
   character: GameCharacter,
   frame: CutInPortraitFrame,
   imageIdentifier: string,
-  fit: StoredPortraitFit
+  fit: CutInPortraitFit
 ): void {
   if (!imageIdentifier) return;
   character.portraitFits = withCharacterPortraitFit(character.portraitFits, frame, imageIdentifier, fit);
@@ -37,15 +37,11 @@ export function clearPortraitFitOf(character: GameCharacter, frame: CutInPortrai
   if (next !== character.portraitFits) character.portraitFits = next;
 }
 
-/**
- * The fit a cut-in launched for a character's picture carries: the character's own, else what an
- * older scene kept for the picture, else the default.
- */
+/** The fit a cut-in launched for a character's picture carries: the character's own, else the default. */
 export function launchPortraitFitOf(
   character: GameCharacter | null,
-  legacySceneFits: string | null | undefined,
   frame: CutInPortraitFrame,
   imageIdentifier: string
-): StoredPortraitFit {
-  return launchPortraitFit(character?.portraitFits, legacySceneFits, frame, imageIdentifier);
+): CutInPortraitFit {
+  return launchPortraitFit(character?.portraitFits, frame, imageIdentifier);
 }

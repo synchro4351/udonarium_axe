@@ -16,7 +16,6 @@ import { characterPortraitChoices, currentPortraitImageIdentifier } from '@axe/d
 import { clearPortraitFitOf, portraitFitOf, setPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import {
-  currentPortraitFit,
   CUT_IN_PORTRAIT_FRAME_SHAPES,
   type CutInPortraitFit,
   type CutInPortraitFrame,
@@ -25,7 +24,6 @@ import {
   MAX_PORTRAIT_SCALE,
   MIN_PORTRAIT_SCALE,
   panPortraitFit,
-  PORTRAIT_FRAME_HEIGHT,
   PORTRAIT_FRAME_WIDTH,
   portraitFitCss,
   zoomPortraitFit,
@@ -85,8 +83,6 @@ export class CharacterPortraitFitComponent {
   protected readonly maxScale = MAX_PORTRAIT_SCALE;
 
   private readonly chosenImage = signal('');
-  /** The proportions of the picture as it loaded, which an older fit needs to be shown. */
-  private readonly loaded = signal<{ url: string; aspect: number } | null>(null);
   /** The fit a gesture has got to, shown before it is written. */
   private readonly draft = signal<CutInPortraitFit | null>(null);
   private readonly pointers = new Map<number, Point>();
@@ -125,12 +121,6 @@ export class CharacterPortraitFitComponent {
     () => this.choices().find((choice) => choice.imageIdentifier === this.imageIdentifier())?.url ?? ''
   );
 
-  /** Width over height of the picture, taken as the frame's own until it has loaded. */
-  private readonly imageAspect = computed(() => {
-    const loaded = this.loaded();
-    return loaded && loaded.url === this.imageUrl() ? loaded.aspect : PORTRAIT_FRAME_WIDTH / PORTRAIT_FRAME_HEIGHT;
-  });
-
   /** The fit the character keeps for the picture, or none while it has never been fitted. */
   readonly savedFit = computed(() => {
     const character = this.watchedCharacter();
@@ -138,13 +128,10 @@ export class CharacterPortraitFitComponent {
     return character && image ? portraitFitOf(character, this.frame, image) : null;
   });
 
-  /** The fit as shown, with one kept the old way turned into the current shape. */
-  readonly fit = computed<CutInPortraitFit>(() => {
-    const draft = this.draft();
-    if (draft) return draft;
-    const saved = this.savedFit();
-    return saved ? currentPortraitFit(saved, this.imageAspect()) : { ...DEFAULT_CUT_IN_PORTRAIT_FIT };
-  });
+  /** The fit as shown: a gesture's while one is under way, else the saved one, else the default. */
+  readonly fit = computed<CutInPortraitFit>(
+    () => this.draft() ?? this.savedFit() ?? { ...DEFAULT_CUT_IN_PORTRAIT_FIT }
+  );
   readonly fitCss = computed(() => portraitFitCss(this.fit()));
   protected readonly scalePercent = computed(() => Math.round(this.fit().scale * 100));
 
@@ -161,12 +148,6 @@ export class CharacterPortraitFitComponent {
     this.flushWheel();
     this.endGesture();
     this.chosenImage.set(imageIdentifier);
-  }
-
-  protected onImageLoad(event: Event): void {
-    const image = event.target as HTMLImageElement | null;
-    if (!image || !(image.naturalWidth > 0) || !(image.naturalHeight > 0)) return;
-    this.loaded.set({ url: this.imageUrl(), aspect: image.naturalWidth / image.naturalHeight });
   }
 
   protected onPointerDown(event: PointerEvent): void {
@@ -262,7 +243,7 @@ export class CharacterPortraitFitComponent {
     const character = this.character();
     const image = this.imageIdentifier();
     const saved = character && image ? portraitFitOf(character, this.frame, image) : null;
-    return saved ? currentPortraitFit(saved, this.imageAspect()) : { ...DEFAULT_CUT_IN_PORTRAIT_FIT };
+    return saved ?? { ...DEFAULT_CUT_IN_PORTRAIT_FIT };
   }
 
   private write(fit: CutInPortraitFit): void {

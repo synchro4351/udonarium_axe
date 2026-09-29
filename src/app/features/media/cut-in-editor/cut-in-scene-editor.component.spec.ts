@@ -1023,18 +1023,10 @@ describe('CutInSceneEditorComponent', () => {
       const { hero } = withSlotAndHero();
       expect(fitting().previewPortrait()?.fit).toEqual(DEFAULT_CUT_IN_PORTRAIT_FIT);
 
-      setPortraitFitOf(hero, 'bust', 'hero-face', { zoom: 2, x: 30, y: 15 });
+      setPortraitFitOf(hero, 'bust', 'hero-face', { scale: 2, x: 30, y: 15 });
       await fixture.whenStable();
 
-      expect(fitting().previewPortrait()?.fit).toEqual({ zoom: 2, x: 30, y: 15 });
-    });
-
-    it('previews the fit an older scene kept until the character fits the picture', async () => {
-      withSlotAndHero();
-      component.scene()!.portraitFits = '{"hero-face":{"zoom":2.5,"x":45,"y":5}}';
-      await fixture.whenStable();
-
-      expect(fitting().previewPortrait()?.fit).toEqual({ zoom: 2.5, x: 45, y: 5 });
+      expect(fitting().previewPortrait()?.fit).toEqual({ scale: 2, x: 30, y: 15 });
     });
 
     it('never writes a fit, whether the stage is dragged or wheeled', () => {
@@ -1044,7 +1036,6 @@ describe('CutInSceneEditorComponent', () => {
       fitting().onStageWheel({ deltaY: -100, ctrlKey: false, metaKey: false, preventDefault: vi.fn() } as never);
 
       expect(hero.portraitFits).toBe('');
-      expect(component.scene()!.portraitFits).toBe('');
     });
   });
 });

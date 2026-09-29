@@ -109,7 +109,7 @@ describe('CutInLauncher', () => {
       launcher.startCutIn(cutIn, '', {
         characterIdentifier: 'hero',
         imageIdentifier: 'face',
-        fit: { zoom: 2, x: 40, y: 10 },
+        fit: { scale: 2, x: 40, y: 10 },
         characterName: 'Hero',
       });
       expect(launcher.launchPortrait).toContain('face');

@@ -57,7 +57,7 @@ describe('CutInEditorComponent', () => {
     });
   });
 
-  it('shows portrait choices only for a template, and never writes a fit onto the scene', () => {
+  it('shows portrait choices only for a template, and leaves fitting to the character sheet', () => {
     expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-character"]')).toBeNull();
     const scene = new CutInScene();
     scene.cutInIdentifier = cutIn.identifier;
@@ -79,7 +79,7 @@ describe('CutInEditorComponent', () => {
     expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-image"]')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-zoom"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="cut-in-portrait-fit-note"]')).not.toBeNull();
-    expect(scene.portraitFits).toBe('');
+    expect(character.portraitFits).toBe('');
   });
 
   it('launches a portrait template with the fit the chosen character keeps', () => {
@@ -92,7 +92,7 @@ describe('CutInEditorComponent', () => {
     layer.initialize();
     scene.appendChild(layer);
     const character = GameCharacter.create('Hero', 1, 'hero-image');
-    setPortraitFitOf(character, 'bust', 'hero-image', { zoom: 2, x: 40, y: 20 });
+    setPortraitFitOf(character, 'bust', 'hero-image', { scale: 2, x: 40, y: 20 });
     TestBed.inject(CutInPortraitPickService).choose(cutIn.identifier, {
       characterIdentifier: character.identifier,
       imageIdentifier: 'hero-image',
@@ -108,7 +108,7 @@ describe('CutInEditorComponent', () => {
     expect(spy).toHaveBeenCalledWith(
       cutIn,
       '',
-      expect.objectContaining({ imageIdentifier: 'hero-image', fit: { zoom: 2, x: 40, y: 20 } })
+      expect.objectContaining({ imageIdentifier: 'hero-image', fit: { scale: 2, x: 40, y: 20 } })
     );
   });
 
