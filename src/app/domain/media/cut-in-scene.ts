@@ -32,7 +32,10 @@ export class CutInScene extends ObjectNode {
   @SyncVar() backgroundColor: string = '';
   /** The sounds dropped along the scene's own clock, as JSON. */
   @SyncVar() sounds: string = '';
-  /** How each character picture is fitted into the portrait slot, as JSON keyed by the picture. */
+  /**
+   * How a scene saved before fits moved to the character had each picture fitted, as JSON keyed by
+   * the picture. Only read now, for a picture its character has not fitted yet.
+   */
   @SyncVar() portraitFits: string = '';
 
   private soundsRaw = '';

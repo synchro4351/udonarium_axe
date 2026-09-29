@@ -19,20 +19,12 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { ModalService } from '@axe/application/ui/modal.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { EditHistory } from '@axe/core/util/edit-history';
+import { launchPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { KEY_TOLERANCE_MS } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer, type CutInLayerKind } from '@axe/domain/media/cut-in-layer';
-import {
-  type CutInPortraitFit,
-  type CutInPortraitSnapshot,
-  isPortraitSlot,
-  makePortraitSnapshot,
-  panPortraitFit,
-  portraitFitFor,
-  withPortraitFit,
-  zoomPortraitFit,
-} from '@axe/domain/media/cut-in-portrait';
+import { type CutInPortraitSnapshot, makePortraitSnapshot, portraitFrameOf } from '@axe/domain/media/cut-in-portrait';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
 import {
   cloneSceneSnapshot,
@@ -122,10 +114,6 @@ import { TranslocoModule } from '@jsverse/transloco';
 
 /** How often a drag reaches the model, which is how often it reaches everyone else. */
 const DRAG_FLUSH_MS = 66;
-/** How much one notch of the wheel sizes the picture being fitted. */
-const PORTRAIT_WHEEL_STEP = 1.08;
-/** How long the wheel has to rest before the sizing it did is one change to take back. */
-const PORTRAIT_WHEEL_SETTLE_MS = 400;
 
 interface Drag {
   layer: CutInLayer;
@@ -223,16 +211,6 @@ export class CutInSceneEditorComponent {
   protected readonly historyVersion = signal(0);
   private pending: { layer: CutInLayer; box: LayerBox | null; rotation: number | null } | null = null;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
-  /** A drag of the chosen picture inside its slot, rather than of a layer. */
-  private fitDrag: {
-    from: CutInPortraitFit;
-    fromX: number;
-    fromY: number;
-    slot: { width: number; height: number };
-  } | null = null;
-  private pendingFit: CutInPortraitFit | null = null;
-  private fitFlushTimer: ReturnType<typeof setTimeout> | null = null;
-  private fitCommitTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly scene = computed<CutInScene | null>(() => {
     const cutIn = this.cutIn();
@@ -316,11 +294,6 @@ export class CutInSceneEditorComponent {
   }
 
   protected onStageWheel(event: WheelEvent): void {
-    if (this.isFittingPortrait && !event.ctrlKey && !event.metaKey) {
-      event.preventDefault();
-      this.zoomPortraitBy(event.deltaY < 0 ? PORTRAIT_WHEEL_STEP : 1 / PORTRAIT_WHEEL_STEP);
-      return;
-    }
     if (!event.ctrlKey && !event.metaKey) return;
     event.preventDefault();
     if (event.deltaY < 0) this.stageZoomIn();
@@ -392,8 +365,10 @@ export class CutInSceneEditorComponent {
 
   /**
    * The character chosen to try the scene with, drawn into the stage the way a launch would draw
-   * them, with the fit the scene keeps for the picture. With nobody chosen the stage shows what a
-   * launch naming nobody shows.
+   * them, with the fit the character keeps for the picture. With nobody chosen the stage shows what
+   * a launch naming nobody shows.
+   *
+   * The fit is only read here. It is the character's, and is set on the character's sheet.
    */
   protected readonly previewPortrait = computed<CutInPortraitSnapshot | null>(() => {
     const scene = this.scene();
@@ -401,27 +376,23 @@ export class CutInSceneEditorComponent {
     this.objectChange.versionOf(scene.identifier)();
     this.bumped();
     const choice = this.portraitChoice();
-    const character = this.objectStore.get(choice.characterIdentifier);
-    const name = character instanceof GameCharacter ? String(character.name ?? '') : '';
-    return makePortraitSnapshot(scene, choice.characterIdentifier, choice.imageIdentifier, name);
+    if (choice.characterIdentifier) this.objectChange.versionOf(choice.characterIdentifier)();
+    const found = this.objectStore.get(choice.characterIdentifier);
+    const character = found instanceof GameCharacter ? found : null;
+    const fit = launchPortraitFitOf(
+      character,
+      scene.portraitFits,
+      portraitFrameOf(scene.layers),
+      choice.imageIdentifier
+    );
+    return makePortraitSnapshot(
+      scene,
+      choice.characterIdentifier,
+      choice.imageIdentifier,
+      String(character?.name ?? ''),
+      fit
+    );
   });
-
-  /** While on, dragging the stage moves the chosen picture inside its slot and the wheel sizes it. */
-  protected readonly fittingPortrait = signal(false);
-
-  /** Whether there is a picture to fit, and leave to fit it. */
-  protected readonly canFitPortrait = computed(
-    () => this.isEditable() && this.hasPortraitSlot() && this.portraitChoice().imageIdentifier.length > 0
-  );
-
-  protected toggleFittingPortrait(): void {
-    this.fittingPortrait.set(!this.fittingPortrait() && this.canFitPortrait());
-    if (this.fittingPortrait()) this.selectedIdentifier.set('');
-  }
-
-  private get isFittingPortrait(): boolean {
-    return this.fittingPortrait() && this.canFitPortrait();
-  }
 
   constructor() {
     // The stack is started from the scene as it stands, before anything is changed, so the
@@ -440,12 +411,6 @@ export class CutInSceneEditorComponent {
     });
     this.destroyRef.onDestroy(() => {
       this.flushDrag();
-      this.flushFit();
-      if (this.fitCommitTimer !== null) {
-        clearTimeout(this.fitCommitTimer);
-        this.fitCommitTimer = null;
-        this.changed();
-      }
       this.pause();
     });
   }
@@ -523,10 +488,6 @@ export class CutInSceneEditorComponent {
 
   protected onPointerDown(event: PointerEvent): void {
     if (!this.isEditable()) return;
-    if (this.isFittingPortrait) {
-      this.startFitDrag(event);
-      return;
-    }
 
     const point = this.pointAt(event);
     const layer = this.layerAt(point);
@@ -557,11 +518,6 @@ export class CutInSceneEditorComponent {
   }
 
   protected onPointerMove(event: PointerEvent): void {
-    if (this.fitDrag) {
-      if (event.buttons === 0) this.finishFitDrag();
-      else this.moveFitDrag(event);
-      return;
-    }
     if (!this.drag) return;
 
     // A pointer that has already been let go of, or one taken away by something the
@@ -597,12 +553,6 @@ export class CutInSceneEditorComponent {
   }
 
   protected onPointerUp(event: PointerEvent): void {
-    if (this.fitDrag) {
-      (event.target as HTMLElement | null)?.releasePointerCapture?.(event.pointerId);
-      if (event.type === 'pointerup') this.moveFitDrag(event);
-      this.finishFitDrag();
-      return;
-    }
     if (!this.drag) return;
     (event.target as HTMLElement | null)?.releasePointerCapture?.(event.pointerId);
 
@@ -1001,83 +951,6 @@ export class CutInSceneEditorComponent {
       this.flushTimer = null;
       this.flushDrag();
     }, DRAG_FLUSH_MS);
-  }
-
-  /** The picture's fit as the scene keeps it for the chosen picture. */
-  private currentFit(): CutInPortraitFit {
-    return portraitFitFor(this.scene()?.portraitFits, this.portraitChoice().imageIdentifier);
-  }
-
-  /** The slot the picture is being fitted to, as big as it is drawn at the scrubber. */
-  private portraitSlotSize(): { width: number; height: number } {
-    const slot = [...this.layers()].reverse().find((layer) => isPortraitSlot(layer) && !layer.hidden);
-    if (!slot) return { width: this.sceneWidth(), height: this.sceneHeight() };
-    const ms = this.playheadMs();
-    return {
-      width: slot.width * Math.abs(valueAt(slot, 'scaleX', ms) || 1),
-      height: slot.height * Math.abs(valueAt(slot, 'scaleY', ms) || 1),
-    };
-  }
-
-  private startFitDrag(event: PointerEvent): void {
-    (event.target as HTMLElement | null)?.setPointerCapture?.(event.pointerId);
-    this.fitDrag = {
-      from: this.currentFit(),
-      fromX: event.clientX,
-      fromY: event.clientY,
-      slot: this.portraitSlotSize(),
-    };
-  }
-
-  private moveFitDrag(event: PointerEvent): void {
-    const drag = this.fitDrag;
-    if (!drag) return;
-    const moved = stageDeltaToScene(event.clientX - drag.fromX, event.clientY - drag.fromY, this.fit());
-    this.pendingFit = panPortraitFit(drag.from, moved.x, moved.y, drag.slot);
-    if (this.fitFlushTimer !== null) return;
-    this.fitFlushTimer = setTimeout(() => {
-      this.fitFlushTimer = null;
-      this.flushFit();
-    }, DRAG_FLUSH_MS);
-  }
-
-  /** Writes down where the picture was dragged to, as one change to take back. */
-  private finishFitDrag(): void {
-    if (!this.fitDrag) return;
-    this.fitDrag = null;
-    this.flushFit();
-    this.changed();
-  }
-
-  private flushFit(): void {
-    if (this.fitFlushTimer !== null) {
-      clearTimeout(this.fitFlushTimer);
-      this.fitFlushTimer = null;
-    }
-    const fit = this.pendingFit;
-    this.pendingFit = null;
-    if (fit) this.writeFit(fit);
-  }
-
-  private writeFit(fit: CutInPortraitFit): void {
-    const scene = this.scene();
-    const imageIdentifier = this.portraitChoice().imageIdentifier;
-    if (!scene || !imageIdentifier || !this.isEditable()) return;
-    scene.portraitFits = withPortraitFit(scene.portraitFits, imageIdentifier, fit);
-    this.bumped.update((count) => count + 1);
-  }
-
-  /**
-   * Sizes the picture a wheel notch at a time. The notches of one turn of the wheel are taken back
-   * together, once the wheel has stopped.
-   */
-  private zoomPortraitBy(factor: number): void {
-    this.writeFit(zoomPortraitFit(this.currentFit(), factor));
-    if (this.fitCommitTimer !== null) clearTimeout(this.fitCommitTimer);
-    this.fitCommitTimer = setTimeout(() => {
-      this.fitCommitTimer = null;
-      this.changed();
-    }, PORTRAIT_WHEEL_SETTLE_MS);
   }
 
   private flushDrag(): void {

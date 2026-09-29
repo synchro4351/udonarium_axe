@@ -587,12 +587,7 @@
         "portraitCharacter": "Character to show",
         "portraitNone": "No image (silhouette)",
         "portraitImage": "Portrait",
-        "portraitFit": "Portrait fit",
-        "portraitZoom": "Zoom",
-        "portraitX": "Horizontal position %",
-        "portraitY": "Vertical position %",
-        "portraitReset": "Reset",
-        "portraitStageHint": "On the Scene tab you can drag the portrait into place while you watch it."
+        "portraitFitOnSheet": "How the portrait sits in the slot is set per character, with \"Cut-in fit\" on the character sheet."
       },
       "cutInEditor": {
         "portraitSlot": "Use character portrait at playback",
@@ -660,8 +655,6 @@
         "letterTilt": "Letter tilt °",
         "letterTiltHint": "Tilts every other letter the opposite way",
         "portraitPreview": "Preview with character",
-        "portraitFitOnStage": "Fit on stage",
-        "portraitFitHint": "Drag to move, scroll to zoom",
         "clipnone": "Its own box",
         "clipslant": "Leaning",
         "clipslantBack": "Leaning back",
@@ -1506,7 +1499,24 @@
         "defaultSectionName": "Section",
         "defaultGroupName": "Group",
         "defaultTagName": "Tag",
-        "portraitClickHintTouch": "Tap to replace the image"
+        "portraitClickHintTouch": "Tap to replace the image",
+        "cutInFit": "Cut-in fit",
+        "cutInFitTitle": "Line up each portrait for cut-ins that show the character",
+        "cutInFitPanelTitle": "Cut-in fit: {{name}}"
+      },
+      "portraitFit": {
+        "frameBust": "Head and shoulders",
+        "hint": "Drag the picture onto the outline. Scroll, pinch or use the slider to size it.",
+        "zoom": "Size",
+        "zoomIn": "Larger",
+        "zoomOut": "Smaller",
+        "x": "Across %",
+        "y": "Down %",
+        "reset": "Reset",
+        "unfitted": "Not fitted yet: cut-ins use the default",
+        "fitted": "Fitted: every cut-in with this frame uses it",
+        "noImages": "Add a portrait to the character first.",
+        "readOnly": "You can view this fit but not change it."
       },
       "settingsTab": {
         "inventorySetting": "Inventory settings",

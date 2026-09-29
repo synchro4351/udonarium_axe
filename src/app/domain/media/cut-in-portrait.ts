@@ -2,18 +2,55 @@
  * The character portrait a cut-in template shows in its portrait slot.
  *
  * A template marks one or more image layers as a portrait slot. At play time the sender picks a
- * character's picture, looks up how that picture was fitted to the template, and sends both along
- * with the launch as a snapshot. Every peer draws the slot from that snapshot rather than from the
- * character as it stands later. The image itself is still resolved from room media storage.
+ * character's picture, looks up how that character fitted the picture to the slot's frame, and
+ * sends both along with the launch as a snapshot. Every peer draws the slot from that snapshot
+ * rather than from the character as it stands later. The image itself is still resolved from room
+ * media storage.
  *
- * How each picture is fitted is kept on the template as JSON keyed by the picture's identifier, so
- * fitting it never touches the picture itself or the character that holds it.
+ * A fit belongs to the character, per picture and per frame, so one fit serves every cut-in whose
+ * slot uses that frame, and two characters sharing a picture fit it each their own way. It is kept
+ * on the character as JSON: `{ [frame]: { [imageIdentifier]: fit } }`.
+ *
+ * Scenes saved before fits moved to the character keep theirs as JSON keyed by the picture. Those
+ * are only read, as the fit for a picture its character has not fitted yet.
  *
  * The same snapshot carries the character's name for `{character}` in a text layer, so a scene
  * that names the character but has no portrait slot still sends one.
  */
 
 import { usesCharacterName } from '@axe/domain/media/cut-in-text';
+
+/**
+ * The shapes a portrait slot can be fitted to. Head and shoulders is the first; a frame added later,
+ * such as a full-length one, keeps its fits beside these rather than over them.
+ */
+export const CUT_IN_PORTRAIT_FRAMES = ['bust'] as const;
+export type CutInPortraitFrame = (typeof CUT_IN_PORTRAIT_FRAMES)[number];
+
+export const DEFAULT_PORTRAIT_FRAME: CutInPortraitFrame = 'bust';
+
+/** What a frame looks like: its proportions, and the outline a picture is lined up against. */
+export interface CutInPortraitFrameShape {
+  /** Width over height of the slot the frame stands for. */
+  aspectRatio: number;
+  /** The outline, drawn standing on the bottom of the slot, in a 200 by 200 box. */
+  head: { cx: number; cy: number; r: number };
+  shoulders: string;
+}
+
+export const CUT_IN_PORTRAIT_FRAME_SHAPES: Readonly<Record<CutInPortraitFrame, CutInPortraitFrameShape>> =
+  Object.freeze({
+    bust: {
+      aspectRatio: 340 / 400,
+      head: { cx: 100, cy: 76, r: 40 },
+      shoulders: 'M24 200 C24 150 58 122 100 122 C142 122 176 150 176 200 Z',
+    },
+  });
+
+/** Whether a value names a frame this copy of the app knows. */
+export function isPortraitFrame(value: unknown): value is CutInPortraitFrame {
+  return typeof value === 'string' && (CUT_IN_PORTRAIT_FRAMES as readonly string[]).includes(value);
+}
 
 /** How a picture sits in a portrait slot: blown up around a focus point given as a percentage across and down. */
 export interface CutInPortraitFit {
@@ -47,6 +84,8 @@ export const SILHOUETTE_PORTRAIT_FIT: Readonly<CutInPortraitFit> = Object.freeze
 
 const MAX_FITS = 64;
 
+const BUST = CUT_IN_PORTRAIT_FRAME_SHAPES.bust;
+
 /**
  * A plain head-and-shoulders shape, drawn in the slot while no picture is given or the picture is
  * missing. It is built in rather than stored, so it needs no file in a saved room and no network.
@@ -56,8 +95,8 @@ export const CUT_IN_PORTRAIT_SILHOUETTE_URL =
   encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">' +
       '<g fill="#8b93a3" fill-opacity="0.85">' +
-      '<circle cx="100" cy="76" r="40"/>' +
-      '<path d="M24 200 C24 150 58 122 100 122 C142 122 176 150 176 200 Z"/>' +
+      `<circle cx="${BUST.head.cx}" cy="${BUST.head.cy}" r="${BUST.head.r}"/>` +
+      `<path d="${BUST.shoulders}"/>` +
       '</g></svg>'
   );
 
@@ -72,52 +111,91 @@ export function normalizePortraitFit(value: unknown): CutInPortraitFit {
   };
 }
 
-/** Reads the fits a template keeps, by picture. Anything unreadable comes back as none. */
-export function parsePortraitFits(raw: string | null | undefined): Record<string, CutInPortraitFit> {
-  if (!raw || raw.trim().length < 1) return {};
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
-    const fits: Record<string, CutInPortraitFit> = {};
-    for (const [identifier, fit] of Object.entries(parsed as Record<string, unknown>).slice(0, MAX_FITS)) {
-      if (identifier.length > 0) fits[identifier] = normalizePortraitFit(fit);
-    }
-    return fits;
-  } catch {
-    return {};
+/** Reads fits kept by picture. Anything unreadable comes back as none. */
+export function parsePortraitFits(raw: unknown): Record<string, CutInPortraitFit> {
+  const parsed = typeof raw === 'string' ? parseJsonObject(raw) : isPlainObject(raw) ? raw : null;
+  if (!parsed) return {};
+  const fits: Record<string, CutInPortraitFit> = {};
+  for (const [identifier, fit] of Object.entries(parsed).slice(0, MAX_FITS)) {
+    if (identifier.length > 0) fits[identifier] = normalizePortraitFit(fit);
   }
-}
-
-/** How the template has a picture fitted, or the default when it was never fitted. */
-export function portraitFitFor(raw: string | null | undefined, imageIdentifier: string): CutInPortraitFit {
-  if (!imageIdentifier) return { ...DEFAULT_CUT_IN_PORTRAIT_FIT };
-  return parsePortraitFits(raw)[imageIdentifier] ?? { ...DEFAULT_CUT_IN_PORTRAIT_FIT };
+  return fits;
 }
 
 /**
- * The template's fits with one picture's fit written in, as the JSON it stores.
- *
- * The most recent fit is kept last, and the oldest are dropped past 64, so a template used with many
- * characters does not grow without end.
+ * How a scene saved before fits moved to the character had a picture fitted, or none. Such fits are
+ * only ever read now, never written.
  */
-export function withPortraitFit(
+export function legacyScenePortraitFit(
   raw: string | null | undefined,
-  imageIdentifier: string,
-  fit: CutInPortraitFit
-): string {
-  const fits = parsePortraitFits(raw);
-  if (!imageIdentifier) return encodeFits(fits);
-  delete fits[imageIdentifier];
-  fits[imageIdentifier] = normalizePortraitFit(fit);
-  const entries = Object.entries(fits);
-  return encodeFits(Object.fromEntries(entries.slice(Math.max(0, entries.length - MAX_FITS))));
+  imageIdentifier: string
+): CutInPortraitFit | null {
+  if (!imageIdentifier) return null;
+  return parsePortraitFits(raw)[imageIdentifier] ?? null;
 }
 
-/** The template's fits without one picture's, as the JSON it stores. */
-export function withoutPortraitFit(raw: string | null | undefined, imageIdentifier: string): string {
-  const fits = parsePortraitFits(raw);
+/** Reads the fits a character keeps, by frame and then by picture. Anything unreadable comes back as none. */
+export function parseCharacterPortraitFits(
+  raw: string | null | undefined
+): Partial<Record<CutInPortraitFrame, Record<string, CutInPortraitFit>>> {
+  const parsed = parseJsonObject(raw);
+  if (!parsed) return {};
+  const byFrame: Partial<Record<CutInPortraitFrame, Record<string, CutInPortraitFit>>> = {};
+  for (const frame of CUT_IN_PORTRAIT_FRAMES) {
+    const fits = parsePortraitFits(parsed[frame]);
+    if (Object.keys(fits).length > 0) byFrame[frame] = fits;
+  }
+  return byFrame;
+}
+
+/** How the character fitted a picture to a frame, or none when it never did. */
+export function characterPortraitFitIn(
+  raw: string | null | undefined,
+  frame: CutInPortraitFrame,
+  imageIdentifier: string
+): CutInPortraitFit | null {
+  if (!imageIdentifier) return null;
+  return parseCharacterPortraitFits(raw)[frame]?.[imageIdentifier] ?? null;
+}
+
+/**
+ * The character's fits with one picture's fit to a frame written in, or taken out for none, as the
+ * JSON it stores.
+ *
+ * The most recent fit is kept last in its frame, and the oldest are dropped past 64, so a character
+ * whose pictures are swapped often does not grow without end.
+ */
+export function withCharacterPortraitFit(
+  raw: string | null | undefined,
+  frame: CutInPortraitFrame,
+  imageIdentifier: string,
+  fit: CutInPortraitFit | null
+): string {
+  const byFrame = parseCharacterPortraitFits(raw);
+  if (!imageIdentifier) return encodeFits(byFrame);
+  const fits = { ...byFrame[frame] };
   delete fits[imageIdentifier];
-  return encodeFits(fits);
+  if (fit) fits[imageIdentifier] = normalizePortraitFit(fit);
+  const entries = Object.entries(fits);
+  if (entries.length > 0) byFrame[frame] = Object.fromEntries(entries.slice(Math.max(0, entries.length - MAX_FITS)));
+  else delete byFrame[frame];
+  return encodeFits(byFrame);
+}
+
+/**
+ * The fit a launch carries for a picture: the character's own, else the one an older scene kept for
+ * the picture, else the default.
+ */
+export function launchPortraitFit(
+  characterFits: string | null | undefined,
+  legacySceneFits: string | null | undefined,
+  frame: CutInPortraitFrame,
+  imageIdentifier: string
+): CutInPortraitFit {
+  return (
+    characterPortraitFitIn(characterFits, frame, imageIdentifier) ??
+    legacyScenePortraitFit(legacySceneFits, imageIdentifier) ?? { ...DEFAULT_CUT_IN_PORTRAIT_FIT }
+  );
 }
 
 /** Writes a launch snapshot for the launcher to carry. None writes as empty. */
@@ -173,23 +251,34 @@ export function namesCharacter(layers: readonly PortraitSlotLayer[]): boolean {
 }
 
 /**
- * The snapshot a launch carries, taken from the template and the chosen picture as they stand now.
+ * The frame a template's portrait slots are fitted to. Every slot is head and shoulders for now; a
+ * later frame would be read off the slot here.
+ */
+export function portraitFrameOf(layers: readonly PortraitSlotLayer[]): CutInPortraitFrame {
+  void layers;
+  return DEFAULT_PORTRAIT_FRAME;
+}
+
+/**
+ * The snapshot a launch carries, taken from the template, the chosen picture and its fit as they
+ * stand now.
  *
  * A template with neither a portrait slot nor the character's name in its text carries none, so a
  * cut-in that never had either plays exactly as before. Without a picture or a name the snapshot
  * still goes, so every peer shows the silhouette and the same stand-in for the name.
  */
 export function makePortraitSnapshot(
-  template: { layers: readonly PortraitSlotLayer[]; portraitFits: string } | null,
+  template: { layers: readonly PortraitSlotLayer[] } | null,
   characterIdentifier: string,
   imageIdentifier: string,
-  characterName = ''
+  characterName = '',
+  fit: CutInPortraitFit = DEFAULT_CUT_IN_PORTRAIT_FIT
 ): CutInPortraitSnapshot | null {
   if (!template || !(hasPortraitSlot(template.layers) || namesCharacter(template.layers))) return null;
   return {
     characterIdentifier,
     imageIdentifier,
-    fit: portraitFitFor(template.portraitFits, imageIdentifier),
+    fit: normalizePortraitFit(fit),
     characterName: characterName.trim(),
   };
 }
@@ -238,8 +327,22 @@ export function portraitFitCss(fit: CutInPortraitFit): { objectPosition: string;
   return { objectPosition: at, transform: `scale(${fit.zoom})`, origin: at };
 }
 
-function encodeFits(fits: Record<string, CutInPortraitFit>): string {
+function encodeFits(fits: object): string {
   return Object.keys(fits).length > 0 ? JSON.stringify(fits) : '';
+}
+
+function parseJsonObject(raw: string | null | undefined): Record<string, unknown> | null {
+  if (!raw || raw.trim().length < 1) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isPlainObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function readNumber(value: unknown, fallback: number): number {

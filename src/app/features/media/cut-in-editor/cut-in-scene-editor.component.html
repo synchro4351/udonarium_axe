@@ -182,7 +182,6 @@
       class="panel-no-drag relative min-h-0 min-w-0 touch-none overflow-hidden bg-[repeating-conic-gradient(rgba(255,255,255,0.06)_0%_25%,transparent_0%_50%)] bg-size-[16px_16px] select-none"
       #stageArea
       data-stage
-      [class.cursor-move]="fittingPortrait() && canFitPortrait()"
       (pointerdown)="onPointerDown($event)"
       (pointermove)="onPointerMove($event)"
       (pointerup)="onPointerUp($event)"
@@ -231,15 +230,6 @@
           [zoom]="stageZoom()"
           [portrait]="previewPortrait()"
         />
-      }
-
-      @if (fittingPortrait() && canFitPortrait()) {
-        <div
-          class="bg-ui-panel/85 text-ui-text rounded-ui-sm pointer-events-none absolute bottom-1 left-1 z-2 px-1.5 py-0.5 text-[11px]"
-          data-testid="cut-in-portrait-fit-hint"
-        >
-          {{ 'feature.media.cutInEditor.portraitFitHint' | transloco }}
-        </div>
       }
 
       <div
@@ -293,27 +283,7 @@
           <div class="text-ui-muted text-[11px] font-semibold">
             {{ 'feature.media.cutInEditor.portraitPreview' | transloco }}
           </div>
-          <cut-in-portrait-picker
-            [cutIn]="cutIn()"
-            [isEditable]="isEditable()"
-            [fits]="hasPortraitSlot()"
-            (commit)="changed()"
-          />
-          @if (hasPortraitSlot()) {
-            <button
-              class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex cursor-pointer items-center justify-center gap-1 border border-solid bg-transparent px-2 py-1 text-[11px] disabled:cursor-not-allowed disabled:opacity-50 [&_.material-icons]:text-[14px]!"
-              type="button"
-              data-testid="cut-in-portrait-fit-toggle"
-              [class.border-ui-accent!]="fittingPortrait() && canFitPortrait()"
-              [class.text-ui-accent!]="fittingPortrait() && canFitPortrait()"
-              [attr.aria-pressed]="fittingPortrait() && canFitPortrait()"
-              [disabled]="!canFitPortrait()"
-              [title]="'feature.media.cutInEditor.portraitFitHint' | transloco"
-              (click)="toggleFittingPortrait()"
-            >
-              <i class="material-icons">open_with</i>{{ 'feature.media.cutInEditor.portraitFitOnStage' | transloco }}
-            </button>
-          }
+          <cut-in-portrait-picker [cutIn]="cutIn()" [showsImage]="hasPortraitSlot()" />
         </div>
       }
       <cut-in-layer-properties

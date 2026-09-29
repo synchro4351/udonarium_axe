@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { setPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { CutInLauncher } from '@axe/domain/media/cut-in-launcher';
@@ -56,7 +57,7 @@ describe('CutInEditorComponent', () => {
     });
   });
 
-  it('shows portrait controls only for a template and keeps an image fit on the scene', () => {
+  it('shows portrait choices only for a template, and never writes a fit onto the scene', () => {
     expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-character"]')).toBeNull();
     const scene = new CutInScene();
     scene.cutInIdentifier = cutIn.identifier;
@@ -72,14 +73,43 @@ describe('CutInEditorComponent', () => {
     const picker = fixture.debugElement.query(By.directive(CutInPortraitPickerComponent))
       .componentInstance as CutInPortraitPickerComponent;
     picker.character = character.identifier;
-    picker.zoom = 2;
-    picker.x = 40;
-    picker.y = 20;
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-character"]')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-image"]')).not.toBeNull();
-    expect(JSON.parse(scene.portraitFits)['hero-image']).toEqual({ zoom: 2, x: 40, y: 20 });
+    expect(fixture.nativeElement.querySelector('[name="cut-in-portrait-zoom"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="cut-in-portrait-fit-note"]')).not.toBeNull();
+    expect(scene.portraitFits).toBe('');
+  });
+
+  it('launches a portrait template with the fit the chosen character keeps', () => {
+    const scene = new CutInScene();
+    scene.cutInIdentifier = cutIn.identifier;
+    scene.initialize();
+    const layer = new CutInLayer();
+    layer.kind = 'image';
+    layer.portraitSlot = true;
+    layer.initialize();
+    scene.appendChild(layer);
+    const character = GameCharacter.create('Hero', 1, 'hero-image');
+    setPortraitFitOf(character, 'bust', 'hero-image', { zoom: 2, x: 40, y: 20 });
+    TestBed.inject(CutInPortraitPickService).choose(cutIn.identifier, {
+      characterIdentifier: character.identifier,
+      imageIdentifier: 'hero-image',
+    });
+    const launcher = new CutInLauncher('CutInLauncher');
+    launcher.initialize();
+    TestBed.inject(ObjectStore).add(launcher);
+    const spy = vi.spyOn(launcher, 'startCutIn').mockImplementation(() => {});
+    fixture.detectChanges();
+
+    component.playCutIn();
+
+    expect(spy).toHaveBeenCalledWith(
+      cutIn,
+      '',
+      expect.objectContaining({ imageIdentifier: 'hero-image', fit: { zoom: 2, x: 40, y: 20 } })
+    );
   });
 
   it('launches with the character chosen on either tab, and their name for a scene that names them', () => {

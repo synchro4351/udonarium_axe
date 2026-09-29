@@ -1,10 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { setPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
-import { portraitFitFor } from '@axe/domain/media/cut-in-portrait';
+import { type CutInPortraitFit, DEFAULT_CUT_IN_PORTRAIT_FIT } from '@axe/domain/media/cut-in-portrait';
 import { keysOf, valueAt } from '@axe/features/media/cut-in-editor/cut-in-keyframe-edit';
 import { CutInPortraitPickService } from '@axe/features/media/cut-in-editor/cut-in-portrait-pick.service';
 import { CutInSceneEditorComponent } from '@axe/features/media/cut-in-editor/cut-in-scene-editor.component';
@@ -983,11 +984,9 @@ describe('CutInSceneEditorComponent', () => {
     });
   });
 
-  describe('fitting a character picture into the portrait slot', () => {
+  describe('previewing a character picture in the portrait slot', () => {
     type FitApi = {
-      toggleFittingPortrait(): void;
-      fittingPortrait(): boolean;
-      previewPortrait(): { imageIdentifier: string; characterName: string; fit: { zoom: number } } | null;
+      previewPortrait(): { imageIdentifier: string; characterName: string; fit: CutInPortraitFit } | null;
       onStageWheel(event: WheelEvent): void;
     };
 
@@ -1020,44 +1019,32 @@ describe('CutInSceneEditorComponent', () => {
       expect(fixture.nativeElement.querySelector('[data-testid="cut-in-portrait-preview"]')).not.toBeNull();
     });
 
-    it('drags the picture inside its slot rather than moving the layer, as one change to take back', () => {
-      const { slot } = withSlotAndHero();
-      const wasX = slot.x;
-      fitting().toggleFittingPortrait();
-      expect(fitting().fittingPortrait()).toBe(true);
+    it('previews the fit the character keeps, and follows it when the sheet changes it', async () => {
+      const { hero } = withSlotAndHero();
+      expect(fitting().previewPortrait()?.fit).toEqual(DEFAULT_CUT_IN_PORTRAIT_FIT);
+
+      setPortraitFitOf(hero, 'bust', 'hero-face', { zoom: 2, x: 30, y: 15 });
+      await fixture.whenStable();
+
+      expect(fitting().previewPortrait()?.fit).toEqual({ zoom: 2, x: 30, y: 15 });
+    });
+
+    it('previews the fit an older scene kept until the character fits the picture', async () => {
+      withSlotAndHero();
+      component.scene()!.portraitFits = '{"hero-face":{"zoom":2.5,"x":45,"y":5}}';
+      await fixture.whenStable();
+
+      expect(fitting().previewPortrait()?.fit).toEqual({ zoom: 2.5, x: 45, y: 5 });
+    });
+
+    it('never writes a fit, whether the stage is dragged or wheeled', () => {
+      const { hero } = withSlotAndHero();
 
       drag([100, 100], [140, 100]);
+      fitting().onStageWheel({ deltaY: -100, ctrlKey: false, metaKey: false, preventDefault: vi.fn() } as never);
 
-      const fit = portraitFitFor(component.scene()!.portraitFits, 'hero-face');
-      expect(fit.x).toBeLessThan(50);
-      expect(slot.x).toBe(wasX);
-      expect(fitting().previewPortrait()?.fit).toEqual(fit);
-
-      editor().undo();
-      expect(portraitFitFor(component.scene()!.portraitFits, 'hero-face').x).toBe(50);
-      editor().redo();
-      expect(portraitFitFor(component.scene()!.portraitFits, 'hero-face')).toEqual(fit);
-    });
-
-    it('sizes the picture with the wheel while fitting', () => {
-      withSlotAndHero();
-      fitting().toggleFittingPortrait();
-      const wheel = { deltaY: -100, ctrlKey: false, metaKey: false, preventDefault: vi.fn() } as unknown as WheelEvent;
-
-      fitting().onStageWheel(wheel);
-
-      expect(portraitFitFor(component.scene()!.portraitFits, 'hero-face').zoom).toBeGreaterThan(1);
-      expect(wheel.preventDefault).toHaveBeenCalled();
-    });
-
-    it('offers no fitting without a picture to fit', () => {
-      editor().addImageLayer();
-      component.layers()[0].portraitSlot = true;
-      editor().changed();
-
-      fitting().toggleFittingPortrait();
-
-      expect(fitting().fittingPortrait()).toBe(false);
+      expect(hero.portraitFits).toBe('');
+      expect(component.scene()!.portraitFits).toBe('');
     });
   });
 });

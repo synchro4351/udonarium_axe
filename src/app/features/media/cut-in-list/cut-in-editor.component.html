@@ -78,10 +78,7 @@
       </div>
       @if (takesCharacter) {
         <div class="border-ui-border-panel rounded-ui-sm flex flex-col gap-1 border border-solid p-2">
-          <cut-in-portrait-picker [cutIn]="cutIn()" [isEditable]="isEditable()" [fits]="hasPortraitSlot" />
-          @if (hasPortraitSlot) {
-            <span class="text-ui-dim text-[11px]">{{ 'feature.media.cutIn.portraitStageHint' | transloco }}</span>
-          }
+          <cut-in-portrait-picker [cutIn]="cutIn()" [showsImage]="hasPortraitSlot" />
         </div>
       }
     </div>

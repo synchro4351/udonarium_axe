@@ -4,13 +4,13 @@ import { IPeerContext } from '@axe/core/network/peer-context';
 import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
 import { AudioFile } from '@axe/core/storage/audio-file';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
+import { setPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { CutInLauncher } from '@axe/domain/media/cut-in-launcher';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
-import { type CutInPortraitFit, withPortraitFit } from '@axe/domain/media/cut-in-portrait';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
 import { Jukebox } from '@axe/domain/media/jukebox';
 import { GameTable } from '@axe/domain/tabletop/game-table';
@@ -225,10 +225,10 @@ describe('what a line arriving sets off', () => {
     expect(spy).toHaveBeenCalledWith(cutIn, '', null);
   });
 
-  it('brings the portrait the character spoke with into a template with a portrait slot', () => {
+  it('brings the portrait the character spoke with, fitted the way the character fitted it', () => {
     const cutIn = makeTemplate('名乗り');
-    setPortraitFit(cutIn, 'hero-smile', { zoom: 2, x: 40, y: 10 });
     const hero = makeCharacter('hero');
+    setPortraitFitOf(hero, 'bust', 'hero-smile', { zoom: 2, x: 40, y: 10 });
     const spy = vi.spyOn(launcher, 'startCutIn').mockImplementation(() => {});
 
     tab.addMessage({
@@ -341,15 +341,76 @@ describe('what a line arriving sets off', () => {
     return cutIn;
   }
 
-  function setPortraitFit(cutIn: CutIn, imageIdentifier: string, fit: CutInPortraitFit): void {
-    const scene = cutIn.scene!;
-    scene.portraitFits = withPortraitFit(scene.portraitFits, imageIdentifier, fit);
-  }
-
   function makeCharacter(name: string): GameCharacter {
     // Built the way the app builds one, so it has somewhere to keep its name.
     return GameCharacter.create(name, 1, '');
   }
+
+  function launchedFit(spy: { mock: { calls: unknown[][] } }, call = 0): unknown {
+    return (spy.mock.calls[call][2] as { fit: unknown } | null)?.fit;
+  }
+
+  describe('whose fit a launch carries', () => {
+    let service: CutInService;
+
+    beforeEach(() => {
+      service = TestBed.inject(CutInService);
+    });
+
+    it('fits one picture once for every cut-in whose slot is head and shoulders', () => {
+      const first = makeTemplate('名乗り');
+      const second = makeTemplate('参戦');
+      const hero = makeCharacter('hero');
+      setPortraitFitOf(hero, 'bust', 'shared-face', { zoom: 1.8, x: 30, y: 12 });
+      const spy = vi.spyOn(launcher, 'startCutIn').mockImplementation(() => {});
+
+      service.launch(first, '', { characterIdentifier: hero.identifier, imageIdentifier: 'shared-face' });
+      service.launch(second, '', { characterIdentifier: hero.identifier, imageIdentifier: 'shared-face' });
+
+      expect(launchedFit(spy, 0)).toEqual({ zoom: 1.8, x: 30, y: 12 });
+      expect(launchedFit(spy, 1)).toEqual({ zoom: 1.8, x: 30, y: 12 });
+    });
+
+    it('keeps two characters that share a picture fitted each their own way', () => {
+      const cutIn = makeTemplate('名乗り');
+      const hero = makeCharacter('hero');
+      const rival = makeCharacter('rival');
+      setPortraitFitOf(hero, 'bust', 'shared-face', { zoom: 2, x: 20, y: 0 });
+      setPortraitFitOf(rival, 'bust', 'shared-face', { zoom: 1.2, x: 80, y: 40 });
+      const spy = vi.spyOn(launcher, 'startCutIn').mockImplementation(() => {});
+
+      service.launch(cutIn, '', { characterIdentifier: hero.identifier, imageIdentifier: 'shared-face' });
+      service.launch(cutIn, '', { characterIdentifier: rival.identifier, imageIdentifier: 'shared-face' });
+
+      expect(launchedFit(spy, 0)).toEqual({ zoom: 2, x: 20, y: 0 });
+      expect(launchedFit(spy, 1)).toEqual({ zoom: 1.2, x: 80, y: 40 });
+    });
+
+    it('falls back to the fit an older scene kept until the character fits the picture', () => {
+      const cutIn = makeTemplate('名乗り');
+      cutIn.scene!.portraitFits = '{"hero-smile":{"zoom":2.5,"x":45,"y":5}}';
+      const hero = makeCharacter('hero');
+      const spy = vi.spyOn(launcher, 'startCutIn').mockImplementation(() => {});
+
+      service.launch(cutIn, '', { characterIdentifier: hero.identifier, imageIdentifier: 'hero-smile' });
+      setPortraitFitOf(hero, 'bust', 'hero-smile', { zoom: 1.1, x: 50, y: 20 });
+      service.launch(cutIn, '', { characterIdentifier: hero.identifier, imageIdentifier: 'hero-smile' });
+
+      expect(launchedFit(spy, 0)).toEqual({ zoom: 2.5, x: 45, y: 5 });
+      expect(launchedFit(spy, 1)).toEqual({ zoom: 1.1, x: 50, y: 20 });
+    });
+
+    it('previews on this screen with the character fit as well', () => {
+      const cutIn = makeTemplate('名乗り');
+      const hero = makeCharacter('hero');
+      setPortraitFitOf(hero, 'bust', 'hero-smile', { zoom: 2, x: 40, y: 10 });
+      const spy = vi.spyOn(launcher, 'startCutInMySelf').mockImplementation(() => {});
+
+      service.launchForMyself(cutIn, { characterIdentifier: hero.identifier, imageIdentifier: 'hero-smile' });
+
+      expect(spy).toHaveBeenCalledWith(cutIn, expect.objectContaining({ fit: { zoom: 2, x: 40, y: 10 } }));
+    });
+  });
 
   it('leaves the backlog alone when somebody walks into the room', () => {
     // Joining hands every line ever said to the same event a new line arrives on. Replaying

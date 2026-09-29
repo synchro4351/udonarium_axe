@@ -587,12 +587,7 @@
         "portraitCharacter": "표시할 캐릭터",
         "portraitNone": "이미지 없음 (실루엣)",
         "portraitImage": "초상화",
-        "portraitFit": "초상화 위치 조정",
-        "portraitZoom": "확대율",
-        "portraitX": "가로 위치 %",
-        "portraitY": "세로 위치 %",
-        "portraitReset": "초기화",
-        "portraitStageHint": "'장면' 탭에서는 초상화를 보면서 드래그로 위치를 맞출 수 있습니다."
+        "portraitFitOnSheet": "틀 안에서 초상화의 위치는 캐릭터 시트의 '컷인 위치 조정'에서 캐릭터별로 정합니다."
       },
       "cutInEditor": {
         "portraitSlot": "재생할 때 캐릭터 초상화 사용",
@@ -660,8 +655,6 @@
         "letterTilt": "글자 기울기 °",
         "letterTiltHint": "글자마다 번갈아 반대로 기울입니다",
         "portraitPreview": "미리 볼 캐릭터",
-        "portraitFitOnStage": "스테이지에서 위치 조정",
-        "portraitFitHint": "드래그로 위치, 휠로 확대율을 바꿉니다",
         "clipnone": "없음",
         "clipslant": "평행사변형",
         "clipslantBack": "평행사변형(역방향)",
@@ -1506,7 +1499,24 @@
         "defaultGroupName": "그룹",
         "defaultTagName": "태그",
         "imageCopyTitle": "{{name}}에 이미지 복제",
-        "portraitClickHintTouch": "탭해서 이미지 교체"
+        "portraitClickHintTouch": "탭해서 이미지 교체",
+        "cutInFit": "컷인 위치 조정",
+        "cutInFitTitle": "캐릭터를 보여 주는 컷인에 맞춰 초상화마다 위치를 조정합니다",
+        "cutInFitPanelTitle": "컷인 위치 조정: {{name}}"
+      },
+      "portraitFit": {
+        "frameBust": "상반신",
+        "hint": "이미지를 드래그해 윤곽선에 맞춥니다. 크기는 휠, 핀치, 슬라이더로 바꿀 수 있습니다.",
+        "zoom": "크기",
+        "zoomIn": "크게",
+        "zoomOut": "작게",
+        "x": "가로 %",
+        "y": "세로 %",
+        "reset": "초기화",
+        "unfitted": "아직 조정하지 않음: 컷인에서는 기본 위치로 표시합니다",
+        "fitted": "조정됨: 이 틀을 쓰는 모든 컷인에 적용됩니다",
+        "noImages": "먼저 캐릭터에 초상화를 추가하세요.",
+        "readOnly": "볼 수만 있고 바꿀 수는 없습니다."
       },
       "settingsTab": {
         "inventorySetting": "인벤토리 설정",

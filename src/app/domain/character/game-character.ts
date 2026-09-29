@@ -45,6 +45,11 @@ export class GameCharacter extends OwnedTabletopObject {
   @SyncVar() partyIdentifier: string = '';
   @SyncVar() folderName: string = '';
   @SyncVar() vnPortraitPos: number = VN_PORTRAIT_POS_UNSET;
+  /**
+   * How each of the character's pictures is fitted into a cut-in's portrait slot, per slot frame,
+   * as JSON. Read and written through `character-portrait-fit`.
+   */
+  @SyncVar() portraitFits: string = '';
   private static readonly MAX_DETAIL_GROUP_DEPTH = 2;
 
   constructor(identifier: string = generateUuid()) {

@@ -2,11 +2,12 @@ import { DestroyRef, inject, Injectable } from '@angular/core';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { launchPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { CutInLauncher } from '@axe/domain/media/cut-in-launcher';
-import { type CutInPortraitSnapshot, makePortraitSnapshot } from '@axe/domain/media/cut-in-portrait';
+import { type CutInPortraitSnapshot, makePortraitSnapshot, portraitFrameOf } from '@axe/domain/media/cut-in-portrait';
 import { Jukebox } from '@axe/domain/media/jukebox';
 import { parseCutInIdentifiers, pickCutInIdentifier, rollCutIn } from '@axe/domain/media/table-cut-in';
 import { GameTable } from '@axe/domain/tabletop/game-table';
@@ -101,7 +102,7 @@ export class CutInService {
    * Plays a cut-in for everyone, handling the music the same way a chat-started one does.
    *
    * A template with a portrait slot shows the picked portrait, or the silhouette without one. The
-   * picture and its fit are read here, once, and travel with the launch.
+   * picture and the character's fit for it are read here, once, and travel with the launch.
    */
   launch(cutIn: CutIn, sendTo = '', portrait: CutInPortraitPick | null = null): boolean {
     const launcher = this.objectStore.get<CutInLauncher>('CutInLauncher');
@@ -123,13 +124,21 @@ export class CutInService {
     return true;
   }
 
-  /** The name is read here, once, so every peer shows the one the character had at launch. */
+  /**
+   * The name and the fit are read here, once, so every peer shows what the character had at launch.
+   * The fit is the character's own for the picture and the slot's frame.
+   */
   private snapshotOf(cutIn: CutIn, portrait: CutInPortraitPick | null): CutInPortraitSnapshot | null {
+    const scene = cutIn.scene;
     const characterIdentifier = portrait?.characterIdentifier ?? '';
-    const character = characterIdentifier ? this.objectStore.get(characterIdentifier) : null;
-    const characterName =
-      portrait?.characterName ?? (character instanceof GameCharacter ? String(character.name ?? '') : '');
-    return makePortraitSnapshot(cutIn.scene, characterIdentifier, portrait?.imageIdentifier ?? '', characterName);
+    const found = characterIdentifier ? this.objectStore.get(characterIdentifier) : null;
+    const character = found instanceof GameCharacter ? found : null;
+    const characterName = portrait?.characterName ?? String(character?.name ?? '');
+    const imageIdentifier = portrait?.imageIdentifier ?? '';
+    const fit = scene
+      ? launchPortraitFitOf(character, scene.portraitFits, portraitFrameOf(scene.layers), imageIdentifier)
+      : undefined;
+    return makePortraitSnapshot(scene, characterIdentifier, imageIdentifier, characterName, fit);
   }
 
   /**
