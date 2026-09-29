@@ -168,6 +168,17 @@
                 <i class="material-icons">file_copy</i>{{ 'feature.inventory.sheet.import' | transloco }}
               </button>
             </div>
+            @if (portraitImages().length) {
+              <button
+                class="border-ui-accent bg-ui-accent-bg text-ui-accent hover:bg-ui-accent-glow rounded-ui-sm inline-flex w-full cursor-pointer items-center justify-center gap-1 border border-solid px-2 py-1 text-[0.78em] leading-[1.4] whitespace-nowrap transition-[background] [&_.material-icons]:text-[14px]!"
+                type="button"
+                data-testid="open-portrait-fit"
+                [title]="'feature.inventory.sheet.cutInFitTitle' | transloco"
+                (click)="openPortraitFit()"
+              >
+                <i class="material-icons">center_focus_strong</i>{{ 'feature.inventory.sheet.cutInFit' | transloco }}
+              </button>
+            }
 
             <div class="border-ui-border-panel mt-0.5 flex flex-col gap-1.25 border-t border-solid pt-1.5">
               <div

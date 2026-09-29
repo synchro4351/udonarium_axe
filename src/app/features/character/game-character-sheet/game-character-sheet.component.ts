@@ -43,6 +43,7 @@ import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
 import { Terrain, TERRAIN_FACES, TerrainFace } from '@axe/domain/tabletop/terrain';
 import { TextNote } from '@axe/domain/tabletop/text-note';
 import { CardStackCardListComponent } from '@axe/features/card/card-stack-card-list/card-stack-card-list.component';
+import { CharacterPortraitFitComponent } from '@axe/features/character/character-portrait-fit/character-portrait-fit.component';
 import { cloneTabletopObject } from '@axe/features/character/game-character-sheet/character-sheet-target-helpers';
 import {
   canReorderDetailElement,
@@ -875,6 +876,27 @@ export class GameCharacterSheetComponent {
     });
     const component = this.panelService.open<ImportCharacterImgComponent>(ImportCharacterImgComponent, option);
     component.tabletopObject = obj as GameCharacter;
+  }
+
+  /**
+   * Opens a panel by the pointer for lining the character's portraits up with cut-in portrait
+   * frames, starting on the portrait the sheet shows. Only a user who may edit the table opens it,
+   * as with the rest of the sheet.
+   */
+  openPortraitFit(): void {
+    const char = this.character;
+    if (!char || this.isReadOnly()) return;
+    const coordinate = this.pointerDeviceService.pointers[0];
+    const option: PanelOption = {
+      left: coordinate.x - 160,
+      top: coordinate.y - 280,
+      width: 320,
+      height: 560,
+      title: this.translateFn('feature.inventory.sheet.cutInFitPanelTitle', { name: char.name }),
+    };
+    const component = this.panelService.open<CharacterPortraitFitComponent>(CharacterPortraitFitComponent, option);
+    component.character.set(char);
+    component.selectImage(String(portraitElementAt(char, this.readKomaIndex(char))?.value ?? ''));
   }
 
   /** Does nothing; the checkbox it is bound to changes the range area through its own binding. */
