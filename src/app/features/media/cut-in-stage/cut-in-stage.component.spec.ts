@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ImageStorage } from '@axe/core/storage/image-storage';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
@@ -292,6 +293,67 @@ describe('CutInStageComponent', () => {
 
     expect(fixture.componentInstance.fit()).toEqual({ scale: 1, offsetX: 0, offsetY: 0 });
     expect(fixture.componentInstance.sceneTransform()).toBe('translate(0px, 0px) scale(1)');
+  });
+
+  describe('the portrait a cut-in was launched with', () => {
+    const face = 'https://example.test/stage-portrait.png';
+
+    beforeEach(() => TestBed.inject(ImageStorage).add(face));
+    afterEach(() => TestBed.inject(ImageStorage).delete(face));
+
+    function slot(): { box: HTMLElement; image: HTMLImageElement } {
+      const found = fixture.nativeElement.querySelector('[data-testid="cut-in-portrait-slot"]') as HTMLElement;
+      return { box: found.firstElementChild as HTMLElement, image: found.querySelector('img') as HTMLImageElement };
+    }
+
+    function launch(fit: object) {
+      fixture.componentRef.setInput('portrait', {
+        characterIdentifier: 'hero',
+        imageIdentifier: face,
+        fit,
+        characterName: '',
+      });
+    }
+
+    it('draws the whole picture in the frame, moved and sized the way the fit says', () => {
+      const scene = makeScene();
+      addLayer(scene, { kind: 'image', portraitSlot: true, objectFit: 'cover', width: 340, height: 400 });
+      launch({ scale: 0.5, x: -170, y: 40 });
+
+      show(scene, false, 0);
+
+      const { box, image } = slot();
+      expect(box.style.width).toBe('340px');
+      expect(box.style.height).toBe('400px');
+      expect(image.style.objectFit).toBe('contain');
+      expect(image.style.transform).toBe('translate(-50%, 10%) scale(0.5)');
+    });
+
+    it('covers a slot of another shape with the frame, centred', () => {
+      const scene = makeScene();
+      addLayer(scene, { kind: 'image', portraitSlot: true, width: 680, height: 400 });
+      launch({ scale: 1, x: 0, y: 0 });
+
+      show(scene, false, 0);
+
+      const { box } = slot();
+      expect(box.style.width).toBe('680px');
+      expect(box.style.height).toBe('800px');
+      expect(box.style.top).toBe('-200px');
+    });
+
+    it('draws a fit kept the old way just as it was drawn before', () => {
+      const scene = makeScene();
+      addLayer(scene, { kind: 'image', portraitSlot: true, objectFit: 'cover', width: 340, height: 400 });
+      launch({ zoom: 2, x: 30, y: 10 });
+
+      show(scene, false, 0);
+
+      const { image } = slot();
+      expect(image.style.objectFit).toBe('cover');
+      expect(image.style.objectPosition).toBe('30% 10%');
+      expect(image.style.transform).toBe('scale(2)');
+    });
   });
 
   describe('the name of the character a cut-in was launched for', () => {
