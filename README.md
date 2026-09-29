@@ -6,7 +6,7 @@
 
 ## バージョンとソース
 
-- **固定版：tyoitashi r4／Axe v1.57.1** — [ソース `a2999013`](https://github.com/synchro4351/udonarium_axe/tree/a2999013624afe5ce18ed1ed4b46c4c17180758f)
+- **固定版：tyoitashi r5／Axe v1.57.1** — [ソース `7033c85e`](https://github.com/synchro4351/udonarium_axe/tree/7033c85eed2cacd9c7ea44689e11ef9686b781f8)
 - **開発版** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)。固定版以降の変更はこちらへ順に取り込みます。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
@@ -14,9 +14,16 @@
 
 ## 非公式デモ
 
-[試用サイト](https://udonarium-trial.synwork.work/)で固定版`tyoitashi r4`を試せます。個人用の卓とは別の試用環境です。実験的な機能を含むため、動作が不安定な場合があります。大切な卓データは手元へ保存してください。デモのソースは上記の固定コミット`a2999013`です。
+[試用サイト](https://udonarium-trial.synwork.work/)で固定版`tyoitashi r5`を試せます。個人用の卓とは別の試用環境です。実験的な機能を含むため、動作が不安定な場合があります。大切な卓データは手元へ保存してください。デモのソースは上記の固定コミット`7033c85e`です。
 
 ## 公式Axe v1.57.1との違い
+
+**r5で追加した変更：**
+
+- 画像一覧へクリップボードから貼り付けるほか、1枚の画像を選択・ドロップして確認後に登録できます。スポイトで選んだ背景色に近い部分を透過でき、次の画像を取り込む際は確認中の画像を先に追加します。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/clipboard-media-image)で変更を確認できます。
+- 既存のエフェクトへ、絵文字・短い文字・卓の画像を使う短時間の反応演出を追加しました。対象へぽんと出す、投げる、降らせる動きを選び、ホットバーからも実行できます。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/emoji-effects)で変更を確認できます。
+- カットインにキャラクター画像を差し込めるテンプレートを追加しました。再生時のキャラクターや立ち絵を選べます。画像未設定時は内蔵シルエットを表示します。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-character-template)で変更を確認できます。
+- キャラクターシートで、立ち絵をカットイン用の顔・肩の輪郭に合わせられます。画像全体と表示枠を見ながら直接ドラッグし、ホイールやピンチで拡大縮小できます。調整値は立ち絵ごとに保存し、同じ輪郭のカットインで再利用します。文字レイヤーには発動者名の差し込みと文字ごとの動き・傾き、「参戦！」見本も追加しました。[調整ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/character-portrait-fit)、[操作改善ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/portrait-fit-ui)、[保存形式整理ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/portrait-fit-format-cleanup)で変更を確認できます。
 
 **r4で追加した変更：**
 
@@ -56,13 +63,6 @@
 - 「全員の手札」で相手のカードを自分の欄へドラッグして引けます。非公開のカードは裏向きのまま運ばれ、部屋の「他人の手札から引く」設定に従います。従来の専用画面はなくしました。
 - カットインの文字位置を修正し、見本の花束・ハート・雨・星・矢印・閃光と「成功！」の光の動きを調整しました。「Level UP」の矢印を低くして文字を境目に配置しました。保存済みのカットインの内容は変えません。
 - 手札メニューに、星付きのカードを重ねた独自アイコンをPC・モバイルで表示します。
-
-### 開発版で追加中
-
-- 画像一覧へクリップボードから貼り付けるほか、1枚の画像を選択・ドロップして確認後に登録できます。スポイトで選んだ背景色に近い部分を透過でき、次の画像を取り込む際は確認中の画像を先に追加します。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/clipboard-media-image)で変更を確認できます。試用サイトの固定版r4には未収録です。
-- 既存のエフェクトへ、絵文字・短い文字・卓の画像を使う短時間の反応演出を追加しました。対象へぽんと出す、投げる、降らせる動きを選び、ホットバーからも実行できます。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/emoji-effects)で変更を確認できます。試用サイトの固定版r4には未収録です。
-- カットインにキャラクター画像を差し込めるテンプレートを追加しました。再生時のキャラクターや立ち絵を選べます。画像未設定時は内蔵シルエットを表示します。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-character-template)で変更を確認できます。試用サイトの固定版r4には未収録です。
-- キャラクターシートで、立ち絵をカットイン用の顔・肩の輪郭に合わせられます。画像全体と表示枠を見ながら直接ドラッグし、ホイールやピンチで拡大縮小できます。調整値は立ち絵ごとに保存し、同じ輪郭のカットインで再利用します。[調整ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/character-portrait-fit)、[操作改善ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/portrait-fit-ui)で変更を確認できます。文字レイヤーには発動者名の差し込みと文字ごとの動き・傾き、「参戦！」見本も追加しました。試用サイトの固定版r4には未収録です。
 
 ### 読み上げを足した理由
 

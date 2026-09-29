@@ -102,7 +102,9 @@
 
 立ち絵の位置合わせをキャラクターへ移動：[db8bc580](https://github.com/synchro4351/udonarium_axe/commit/db8bc580)（保存・同期・旧値の読込）、[7780fe26](https://github.com/synchro4351/udonarium_axe/commit/7780fe26)（キャラクターシートの操作画面）。`9726a9cb`起点の[修正ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/character-portrait-fit)。キャラクター・画像・輪郭の種類ごとに調整値を保持し、同じ輪郭の別カットインで再利用する。旧シーン別値は新しい値がない時だけ使う。顔・肩の輪郭が最初の種類で、全身用は未実装。直接Vitestと`ng test`で955ファイル・13,283件成功、1件skip。型検査・lint・整形・本番ビルド、キャラクターとカットインのE2E12件成功。新しい画面の目視と実端末同期は未確認。
 
-立ち絵位置合わせの操作改善：[32f00d02](https://github.com/synchro4351/udonarium_axe/commit/32f00d02)（本流取り込み`5692865a`）。`7780fe26`起点の[操作改善ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/portrait-fit-ui)。ドラッグ位置を340×400枠の絶対座標で保持し、縮小時も指と同じ方向に動かせる。画像全体と表示枠を見せ、数値欄・スライダーを除いた。旧形式の値は保持して旧表示で再生し、再調整時に新形式へ変換する。全955ファイル・13,300件成功、1件skip、lint・整形・本番ビルド成功。実画面の操作は未確認。
+立ち絵位置合わせの操作改善：[32f00d02](https://github.com/synchro4351/udonarium_axe/commit/32f00d02)（本流取り込み`5692865a`）。`7780fe26`起点の[操作改善ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/portrait-fit-ui)。ドラッグ位置を340×400枠の絶対座標で保持し、縮小時も指と同じ方向に動かせる。画像全体と表示枠を見せ、数値欄・スライダーを除いた。この時点では旧形式の値を保持して再生していたが、後続のr5では削除した。全955ファイル・13,300件成功、1件skip、lint・整形・本番ビルド成功。利用者は新しい操作画面を確認済み。
+
+位置合わせの旧試験形式を削除：[ca139aef](https://github.com/synchro4351/udonarium_axe/commit/ca139aef)（本流取り込み`7033c85e`）。`5692865a`起点の[整理ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/portrait-fit-format-cleanup)。旧`{zoom,x,y}`の変換・再生分岐とシーン別の試験用調整値を除き、キャラクターに保存する`{scale,x,y}`に一本化した。旧試験値は既定表示となる。全955ファイル・13,299件成功、1件skip、型検査・lint・整形・本番ビルド成功。利用者は操作改善のローカル画面を確認済み。`7033c85e`はtyoitashi r5として個人版・デモ版に同じアーカイブで配備済み。
 
 ## 検証と制限
 
