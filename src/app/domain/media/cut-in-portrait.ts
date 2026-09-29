@@ -11,9 +11,6 @@
  * slot uses that frame, and two characters sharing a picture fit it each their own way. It is kept
  * on the character as JSON: `{ [frame]: { [imageIdentifier]: fit } }`.
  *
- * Scenes saved before fits moved to the character keep theirs as JSON keyed by the picture. Those
- * are only read, as the fit for a picture its character has not fitted yet.
- *
  * The same snapshot carries the character's name for `{character}` in a text layer, so a scene
  * that names the character but has no portrait slot still sends one.
  */
@@ -58,7 +55,6 @@ export function isPortraitFrame(value: unknown): value is CutInPortraitFrame {
  */
 export const PORTRAIT_FRAME_WIDTH = 340;
 export const PORTRAIT_FRAME_HEIGHT = 400;
-const FRAME_ASPECT = PORTRAIT_FRAME_WIDTH / PORTRAIT_FRAME_HEIGHT;
 
 /**
  * How a picture sits in a portrait slot. At scale 1 and no offset the whole picture is shown,
@@ -71,27 +67,13 @@ export interface CutInPortraitFit {
   y: number;
 }
 
-/**
- * How fits were kept before: the picture covering the slot, blown up around a focus point given as
- * a percentage across and down. Still read and drawn as it was, and turned into a
- * {@link CutInPortraitFit} once someone fits the picture again.
- */
-export interface LegacyCutInPortraitFit {
-  zoom: number;
-  x: number;
-  y: number;
-}
-
-/** A fit as it may be kept or carried: either shape. */
-export type StoredPortraitFit = CutInPortraitFit | LegacyCutInPortraitFit;
-
 /** What a launch carries so every peer draws the same portrait. */
 export interface CutInPortraitSnapshot {
   /** The character the portrait came from, kept only to say whose it was. Empty for none. */
   characterIdentifier: string;
   /** The picture, by the identifier the image storage knows it by. Empty draws the silhouette. */
   imageIdentifier: string;
-  fit: StoredPortraitFit;
+  fit: CutInPortraitFit;
   /**
    * The character's name as it was at launch, for `{character}` in a text layer. Empty shows the
    * stand-in. A launch from an older copy of the app carries none.
@@ -101,9 +83,6 @@ export interface CutInPortraitSnapshot {
 
 export const MIN_PORTRAIT_SCALE = 0.25;
 export const MAX_PORTRAIT_SCALE = 12;
-
-const LEGACY_MIN_ZOOM = 0.5;
-const LEGACY_MAX_ZOOM = 4;
 
 /** The whole picture, centred, so nothing is cut off before someone fits it. */
 export const DEFAULT_CUT_IN_PORTRAIT_FIT: Readonly<CutInPortraitFit> = Object.freeze({ scale: 1, x: 0, y: 0 });
@@ -136,29 +115,18 @@ export const CUT_IN_PORTRAIT_SILHOUETTE_URL =
       '</g></svg>'
   );
 
-/** Whether a fit is kept the way fits were before, and so drawn the way they were. */
-export function isLegacyPortraitFit(fit: StoredPortraitFit): fit is LegacyCutInPortraitFit {
-  return 'zoom' in fit;
-}
-
 /**
- * A fit, of either shape, held to the range the slot can show. A fit with a `scale` is the current
- * shape; one with only a `zoom` is kept as it was. Anything unreadable falls back to the default.
+ * A fit held to the range the slot can show. Anything without a readable `scale` is not a fit and
+ * falls back to the default; an offset that is missing or unreadable is taken as none.
  */
-export function normalizePortraitFit(value: unknown): StoredPortraitFit {
-  if (typeof value !== 'object' || value === null) return { ...DEFAULT_CUT_IN_PORTRAIT_FIT };
-  const source = value as Record<string, unknown>;
-  if (!('scale' in source) && 'zoom' in source) {
-    return {
-      zoom: clamp(readNumber(source['zoom'], 1), LEGACY_MIN_ZOOM, LEGACY_MAX_ZOOM),
-      x: clamp(readNumber(source['x'], 50), 0, 100),
-      y: clamp(readNumber(source['y'], 0), 0, 100),
-    };
-  }
+export function normalizePortraitFit(value: unknown): CutInPortraitFit {
+  if (!isPlainObject(value)) return { ...DEFAULT_CUT_IN_PORTRAIT_FIT };
+  const scale = readNumber(value['scale'], Number.NaN);
+  if (!Number.isFinite(scale)) return { ...DEFAULT_CUT_IN_PORTRAIT_FIT };
   return clampPortraitFit({
-    scale: readNumber(source['scale'], DEFAULT_CUT_IN_PORTRAIT_FIT.scale),
-    x: readNumber(source['x'], DEFAULT_CUT_IN_PORTRAIT_FIT.x),
-    y: readNumber(source['y'], DEFAULT_CUT_IN_PORTRAIT_FIT.y),
+    scale,
+    x: readNumber(value['x'], DEFAULT_CUT_IN_PORTRAIT_FIT.x),
+    y: readNumber(value['y'], DEFAULT_CUT_IN_PORTRAIT_FIT.y),
   });
 }
 
@@ -177,67 +145,15 @@ export function clampPortraitFit(fit: CutInPortraitFit): CutInPortraitFit {
   };
 }
 
-/**
- * The current fit that draws a picture exactly where an older fit drew it in a frame-sized slot.
- * The old fit covered the slot, so where it put the picture depends on the picture's proportions,
- * given as width over height.
- */
-export function portraitFitFromLegacy(legacy: LegacyCutInPortraitFit, imageAspect: number): CutInPortraitFit {
-  const aspect = Number.isFinite(imageAspect) && imageAspect > 0 ? imageAspect : FRAME_ASPECT;
-  const width = PORTRAIT_FRAME_WIDTH;
-  const height = PORTRAIT_FRAME_HEIGHT;
-  // The picture at a height of 1, blown up to cover the frame and to fit in it.
-  const cover = Math.max(width / aspect, height);
-  const contain = Math.min(width / aspect, height);
-  const centreOn = (frame: number, drawn: number, percent: number): number => {
-    const focus = (frame * percent) / 100;
-    const start = ((frame - drawn) * percent) / 100;
-    return focus + legacy.zoom * (start + drawn / 2 - focus) - frame / 2;
-  };
-  return clampPortraitFit({
-    scale: (legacy.zoom * cover) / contain,
-    x: centreOn(width, aspect * cover, legacy.x),
-    y: centreOn(height, cover, legacy.y),
-  });
-}
-
-/** Any fit as the current shape, turning an older one with the picture's proportions. */
-export function currentPortraitFit(fit: StoredPortraitFit, imageAspect: number): CutInPortraitFit {
-  return isLegacyPortraitFit(fit) ? portraitFitFromLegacy(fit, imageAspect) : clampPortraitFit(fit);
-}
-
-/** Reads fits kept by picture. Anything unreadable comes back as none. */
-export function parsePortraitFits(raw: unknown): Record<string, StoredPortraitFit> {
-  const parsed = typeof raw === 'string' ? parseJsonObject(raw) : isPlainObject(raw) ? raw : null;
-  if (!parsed) return {};
-  const fits: Record<string, StoredPortraitFit> = {};
-  for (const [identifier, fit] of Object.entries(parsed).slice(0, MAX_FITS)) {
-    if (identifier.length > 0) fits[identifier] = normalizePortraitFit(fit);
-  }
-  return fits;
-}
-
-/**
- * How a scene saved before fits moved to the character had a picture fitted, or none. Such fits are
- * only ever read now, never written.
- */
-export function legacyScenePortraitFit(
-  raw: string | null | undefined,
-  imageIdentifier: string
-): StoredPortraitFit | null {
-  if (!imageIdentifier) return null;
-  return parsePortraitFits(raw)[imageIdentifier] ?? null;
-}
-
 /** Reads the fits a character keeps, by frame and then by picture. Anything unreadable comes back as none. */
 export function parseCharacterPortraitFits(
   raw: string | null | undefined
-): Partial<Record<CutInPortraitFrame, Record<string, StoredPortraitFit>>> {
+): Partial<Record<CutInPortraitFrame, Record<string, CutInPortraitFit>>> {
   const parsed = parseJsonObject(raw);
   if (!parsed) return {};
-  const byFrame: Partial<Record<CutInPortraitFrame, Record<string, StoredPortraitFit>>> = {};
+  const byFrame: Partial<Record<CutInPortraitFrame, Record<string, CutInPortraitFit>>> = {};
   for (const frame of CUT_IN_PORTRAIT_FRAMES) {
-    const fits = parsePortraitFits(parsed[frame]);
+    const fits = readFits(parsed[frame]);
     if (Object.keys(fits).length > 0) byFrame[frame] = fits;
   }
   return byFrame;
@@ -248,7 +164,7 @@ export function characterPortraitFitIn(
   raw: string | null | undefined,
   frame: CutInPortraitFrame,
   imageIdentifier: string
-): StoredPortraitFit | null {
+): CutInPortraitFit | null {
   if (!imageIdentifier) return null;
   return parseCharacterPortraitFits(raw)[frame]?.[imageIdentifier] ?? null;
 }
@@ -264,7 +180,7 @@ export function withCharacterPortraitFit(
   raw: string | null | undefined,
   frame: CutInPortraitFrame,
   imageIdentifier: string,
-  fit: StoredPortraitFit | null
+  fit: CutInPortraitFit | null
 ): string {
   const byFrame = parseCharacterPortraitFits(raw);
   if (!imageIdentifier) return encodeFits(byFrame);
@@ -277,20 +193,13 @@ export function withCharacterPortraitFit(
   return encodeFits(byFrame);
 }
 
-/**
- * The fit a launch carries for a picture: the character's own, else the one an older scene kept for
- * the picture, else the default.
- */
+/** The fit a launch carries for a picture: the character's own, else the default. */
 export function launchPortraitFit(
   characterFits: string | null | undefined,
-  legacySceneFits: string | null | undefined,
   frame: CutInPortraitFrame,
   imageIdentifier: string
-): StoredPortraitFit {
-  return (
-    characterPortraitFitIn(characterFits, frame, imageIdentifier) ??
-    legacyScenePortraitFit(legacySceneFits, imageIdentifier) ?? { ...DEFAULT_CUT_IN_PORTRAIT_FIT }
-  );
+): CutInPortraitFit {
+  return characterPortraitFitIn(characterFits, frame, imageIdentifier) ?? { ...DEFAULT_CUT_IN_PORTRAIT_FIT };
 }
 
 /** Writes a launch snapshot for the launcher to carry. None writes as empty. */
@@ -367,7 +276,7 @@ export function makePortraitSnapshot(
   characterIdentifier: string,
   imageIdentifier: string,
   characterName = '',
-  fit: StoredPortraitFit = DEFAULT_CUT_IN_PORTRAIT_FIT
+  fit: CutInPortraitFit = DEFAULT_CUT_IN_PORTRAIT_FIT
 ): CutInPortraitSnapshot | null {
   if (!template || !(hasPortraitSlot(template.layers) || namesCharacter(template.layers))) return null;
   return {
@@ -381,7 +290,7 @@ export function makePortraitSnapshot(
 /** The picture a slot shows and how, falling back to the silhouette when the picture is not to be had. */
 export interface ResolvedPortrait {
   url: string;
-  fit: StoredPortraitFit;
+  fit: CutInPortraitFit;
   silhouette: boolean;
 }
 
@@ -433,44 +342,41 @@ export function portraitFitCss(fit: CutInPortraitFit): { transform: string; orig
   return { transform: `translate(${across}%, ${down}%) scale(${fit.scale})`, origin: '50% 50%' };
 }
 
-/** How a portrait slot draws its picture. */
+/**
+ * How a portrait slot draws its picture: whole in a frame-shaped box (`object-fit: contain`), then
+ * moved and sized.
+ */
 export interface PortraitSlotCss {
   /** The box the picture is fitted in, in the slot's own pixels. */
   box: { left: number; top: number; width: number; height: number };
-  /** How the picture fills the box. None leaves it to the slot's own setting. */
-  objectFit: 'contain' | null;
-  objectPosition: string;
   transform: string;
   origin: string;
 }
 
 /**
  * How a portrait slot of a given size draws a picture with a fit. The frame is scaled to cover the
- * slot and centred in it, so a slot the frame's size shows just what the fitting showed. An older
- * fit is drawn the way it always was, across the slot itself.
+ * slot and centred in it, so a slot the frame's size shows just what the fitting showed.
  */
-export function portraitSlotCss(fit: StoredPortraitFit, slot: { width: number; height: number }): PortraitSlotCss {
+export function portraitSlotCss(fit: CutInPortraitFit, slot: { width: number; height: number }): PortraitSlotCss {
   const width = Math.max(0, slot.width);
   const height = Math.max(0, slot.height);
-  if (isLegacyPortraitFit(fit)) {
-    const at = `${fit.x}% ${fit.y}%`;
-    return {
-      box: { left: 0, top: 0, width, height },
-      objectFit: null,
-      objectPosition: at,
-      transform: `scale(${fit.zoom})`,
-      origin: at,
-    };
-  }
   const cover = Math.max(width / PORTRAIT_FRAME_WIDTH, height / PORTRAIT_FRAME_HEIGHT);
   const boxWidth = PORTRAIT_FRAME_WIDTH * cover;
   const boxHeight = PORTRAIT_FRAME_HEIGHT * cover;
   return {
     box: { left: (width - boxWidth) / 2, top: (height - boxHeight) / 2, width: boxWidth, height: boxHeight },
-    objectFit: 'contain',
-    objectPosition: '50% 50%',
     ...portraitFitCss(fit),
   };
+}
+
+/** Reads the fits of one frame, by picture. Anything unreadable comes back as none. */
+function readFits(value: unknown): Record<string, CutInPortraitFit> {
+  if (!isPlainObject(value)) return {};
+  const fits: Record<string, CutInPortraitFit> = {};
+  for (const [identifier, fit] of Object.entries(value).slice(0, MAX_FITS)) {
+    if (identifier.length > 0) fits[identifier] = normalizePortraitFit(fit);
+  }
+  return fits;
 }
 
 function encodeFits(fits: object): string {

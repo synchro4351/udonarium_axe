@@ -325,7 +325,7 @@ describe('CutInStageComponent', () => {
       const { box, image } = slot();
       expect(box.style.width).toBe('340px');
       expect(box.style.height).toBe('400px');
-      expect(image.style.objectFit).toBe('contain');
+      expect(image.classList).toContain('object-contain');
       expect(image.style.transform).toBe('translate(-50%, 10%) scale(0.5)');
     });
 
@@ -341,24 +341,11 @@ describe('CutInStageComponent', () => {
       expect(box.style.height).toBe('800px');
       expect(box.style.top).toBe('-200px');
     });
-
-    it('draws a fit kept the old way just as it was drawn before', () => {
-      const scene = makeScene();
-      addLayer(scene, { kind: 'image', portraitSlot: true, objectFit: 'cover', width: 340, height: 400 });
-      launch({ zoom: 2, x: 30, y: 10 });
-
-      show(scene, false, 0);
-
-      const { image } = slot();
-      expect(image.style.objectFit).toBe('cover');
-      expect(image.style.objectPosition).toBe('30% 10%');
-      expect(image.style.transform).toBe('scale(2)');
-    });
   });
 
   describe('the name of the character a cut-in was launched for', () => {
     function launchedFor(characterName: string) {
-      return { characterIdentifier: 'hero', imageIdentifier: '', fit: { zoom: 1, x: 50, y: 0 }, characterName };
+      return { characterIdentifier: 'hero', imageIdentifier: '', fit: { scale: 1, x: 0, y: 0 }, characterName };
     }
 
     it('shows the name the launch carried in place of the token', () => {
@@ -391,7 +378,7 @@ describe('CutInStageComponent', () => {
       fixture.componentRef.setInput('portrait', {
         characterIdentifier: '',
         imageIdentifier: '',
-        fit: { zoom: 1, x: 50, y: 0 },
+        fit: { scale: 1, x: 0, y: 0 },
         characterName: 'Bo',
       });
 

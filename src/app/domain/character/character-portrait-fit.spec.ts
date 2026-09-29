@@ -24,9 +24,9 @@ describe('character portrait fits', () => {
   it('keeps a fit on the character for its picture', () => {
     const hero = makeCharacter('勇者');
 
-    setPortraitFitOf(hero, 'bust', 'shared-face', { zoom: 2, x: 40, y: 10 });
+    setPortraitFitOf(hero, 'bust', 'shared-face', { scale: 2, x: 40, y: 10 });
 
-    expect(portraitFitOf(hero, 'bust', 'shared-face')).toEqual({ zoom: 2, x: 40, y: 10 });
+    expect(portraitFitOf(hero, 'bust', 'shared-face')).toEqual({ scale: 2, x: 40, y: 10 });
     expect(portraitFitOf(hero, 'bust', 'other-face')).toBeNull();
   });
 
@@ -34,36 +34,36 @@ describe('character portrait fits', () => {
     const hero = makeCharacter('勇者');
     const rival = makeCharacter('宿敵');
 
-    setPortraitFitOf(hero, 'bust', 'shared-face', { zoom: 2, x: 40, y: 10 });
-    setPortraitFitOf(rival, 'bust', 'shared-face', { zoom: 1.3, x: 70, y: 30 });
+    setPortraitFitOf(hero, 'bust', 'shared-face', { scale: 2, x: 40, y: 10 });
+    setPortraitFitOf(rival, 'bust', 'shared-face', { scale: 1.3, x: 70, y: 30 });
 
-    expect(portraitFitOf(hero, 'bust', 'shared-face')).toEqual({ zoom: 2, x: 40, y: 10 });
-    expect(portraitFitOf(rival, 'bust', 'shared-face')).toEqual({ zoom: 1.3, x: 70, y: 30 });
+    expect(portraitFitOf(hero, 'bust', 'shared-face')).toEqual({ scale: 2, x: 40, y: 10 });
+    expect(portraitFitOf(rival, 'bust', 'shared-face')).toEqual({ scale: 1.3, x: 70, y: 30 });
   });
 
   it('puts a picture back to the default on reset', () => {
     const hero = makeCharacter('勇者');
-    setPortraitFitOf(hero, 'bust', 'shared-face', { zoom: 2, x: 40, y: 10 });
+    setPortraitFitOf(hero, 'bust', 'shared-face', { scale: 2, x: 40, y: 10 });
 
     clearPortraitFitOf(hero, 'bust', 'shared-face');
 
     expect(portraitFitOf(hero, 'bust', 'shared-face')).toBeNull();
-    expect(launchPortraitFitOf(hero, '', 'bust', 'shared-face')).toEqual(DEFAULT_CUT_IN_PORTRAIT_FIT);
+    expect(launchPortraitFitOf(hero, 'bust', 'shared-face')).toEqual(DEFAULT_CUT_IN_PORTRAIT_FIT);
   });
 
-  it('prefers its own fit over an older scene one, and falls back to the scene one until then', () => {
+  it('launches with its own fit once it has one, and with the default until then', () => {
     const hero = makeCharacter('勇者');
-    const legacy = '{"shared-face":{"zoom":3,"x":10,"y":20}}';
 
-    expect(launchPortraitFitOf(hero, legacy, 'bust', 'shared-face')).toEqual({ zoom: 3, x: 10, y: 20 });
-    setPortraitFitOf(hero, 'bust', 'shared-face', { zoom: 2, x: 40, y: 10 });
-    expect(launchPortraitFitOf(hero, legacy, 'bust', 'shared-face')).toEqual({ zoom: 2, x: 40, y: 10 });
+    expect(launchPortraitFitOf(hero, 'bust', 'shared-face')).toEqual(DEFAULT_CUT_IN_PORTRAIT_FIT);
+    expect(launchPortraitFitOf(null, 'bust', 'shared-face')).toEqual(DEFAULT_CUT_IN_PORTRAIT_FIT);
+    setPortraitFitOf(hero, 'bust', 'shared-face', { scale: 2, x: 40, y: 10 });
+    expect(launchPortraitFitOf(hero, 'bust', 'shared-face')).toEqual({ scale: 2, x: 40, y: 10 });
   });
 
   it('travels with the character in its save data and comes back on load', () => {
     // A saved room, an exported character and a peer joining late all read the character from this.
     const hero = makeCharacter('勇者');
-    setPortraitFitOf(hero, 'bust', 'shared-face', { zoom: 2, x: 40, y: 10 });
+    setPortraitFitOf(hero, 'bust', 'shared-face', { scale: 2, x: 40, y: 10 });
 
     // The whole sheet is more than the test DOM's XML parser takes, so the attribute the save
     // writes is read back on its own, the way a load reads it.
@@ -73,18 +73,18 @@ describe('character portrait fits', () => {
 
     expect(written).not.toBe('');
     expect(restored).toBeInstanceOf(GameCharacter);
-    expect(portraitFitOf(restored, 'bust', 'shared-face')).toEqual({ zoom: 2, x: 40, y: 10 });
+    expect(portraitFitOf(restored, 'bust', 'shared-face')).toEqual({ scale: 2, x: 40, y: 10 });
   });
 
   it('travels to other peers as part of what the character syncs', () => {
     const hero = makeCharacter('勇者');
-    setPortraitFitOf(hero, 'bust', 'shared-face', { zoom: 2, x: 40, y: 10 });
+    setPortraitFitOf(hero, 'bust', 'shared-face', { scale: 2, x: 40, y: 10 });
 
     const copy = new GameCharacter('peer-copy');
     made.push(copy);
     copy.apply({ ...hero.toContext(), identifier: 'peer-copy' });
 
-    expect(portraitFitOf(copy, 'bust', 'shared-face')).toEqual({ zoom: 2, x: 40, y: 10 });
+    expect(portraitFitOf(copy, 'bust', 'shared-face')).toEqual({ scale: 2, x: 40, y: 10 });
   });
 
   it('loads a character saved before fits existed with none', () => {

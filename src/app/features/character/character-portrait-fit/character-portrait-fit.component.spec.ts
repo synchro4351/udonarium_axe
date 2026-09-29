@@ -3,7 +3,7 @@ import { RolePermissionService } from '@axe/application/permission/role-permissi
 import { portraitFitOf, setPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DataElement } from '@axe/domain/data/data-element';
-import { type CutInPortraitFit, DEFAULT_CUT_IN_PORTRAIT_FIT } from '@axe/domain/media/cut-in-portrait';
+import { DEFAULT_CUT_IN_PORTRAIT_FIT } from '@axe/domain/media/cut-in-portrait';
 import { CharacterPortraitFitComponent } from '@axe/features/character/character-portrait-fit/character-portrait-fit.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
@@ -19,7 +19,6 @@ describe('CharacterPortraitFitComponent', () => {
     onPointerUp(event: PointerEvent): void;
     onWheel(event: WheelEvent): void;
     onKeyDown(event: KeyboardEvent): void;
-    onImageLoad(event: Event): void;
     zoomIn(): void;
   };
 
@@ -28,7 +27,7 @@ describe('CharacterPortraitFitComponent', () => {
   }
 
   function scaleOf(character: GameCharacter, image: string): number | undefined {
-    return (portraitFitOf(character, 'bust', image) as CutInPortraitFit | null)?.scale;
+    return portraitFitOf(character, 'bust', image)?.scale;
   }
 
   function makeCharacter(name: string, images: string[]): GameCharacter {
@@ -156,7 +155,7 @@ describe('CharacterPortraitFitComponent', () => {
     api().onPointerMove(pointer('pointermove', 1, -100, 300));
     api().onPointerUp(pointer('pointerup', 1, -100, 300));
 
-    // Half the frame across, and more than half of it down: well past where the old fit stopped.
+    // Half the frame across, and more than half of it down.
     expect(portraitFitOf(character, 'bust', 'smile')).toEqual({ scale: 0.5, x: -200, y: 200 });
   });
 
@@ -211,18 +210,16 @@ describe('CharacterPortraitFitComponent', () => {
     expect(portraitFitOf(character, 'bust', 'smile')).toEqual({ scale: 1.1, x: 4.4, y: -4.4 });
   });
 
-  it('turns a fit kept the old way into the same picture on screen, and keeps it the new way once changed', () => {
+  it('shows a kept fit it cannot make sense of as the default, and replaces it once changed', () => {
     const character = makeCharacter('勇者', ['smile']);
-    setPortraitFitOf(character, 'bust', 'smile', { zoom: 1, x: 50, y: 0 });
+    character.portraitFits = '{"bust":{"smile":{"x":"left"}}}';
     component.character.set(character);
     fixture.detectChanges();
 
-    // A picture half as wide as high covered the frame's width, top aligned.
-    api().onImageLoad({ target: { naturalWidth: 200, naturalHeight: 400 } } as never);
-    expect(component.fit()).toEqual({ scale: 1.7, x: 0, y: 140 });
+    expect(component.fit()).toEqual(DEFAULT_CUT_IN_PORTRAIT_FIT);
 
     api().onKeyDown({ key: 'ArrowDown', shiftKey: false, preventDefault: vi.fn() } as never);
-    expect(portraitFitOf(character, 'bust', 'smile')).toEqual({ scale: 1.7, x: 0, y: 144 });
+    expect(JSON.parse(character.portraitFits)).toEqual({ bust: { smile: { scale: 1, x: 0, y: 4 } } });
   });
 
   it('puts the picture back the way an unfitted one sits', async () => {

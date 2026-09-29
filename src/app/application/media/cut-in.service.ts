@@ -135,9 +135,7 @@ export class CutInService {
     const character = found instanceof GameCharacter ? found : null;
     const characterName = portrait?.characterName ?? String(character?.name ?? '');
     const imageIdentifier = portrait?.imageIdentifier ?? '';
-    const fit = scene
-      ? launchPortraitFitOf(character, scene.portraitFits, portraitFrameOf(scene.layers), imageIdentifier)
-      : undefined;
+    const fit = scene ? launchPortraitFitOf(character, portraitFrameOf(scene.layers), imageIdentifier) : undefined;
     return makePortraitSnapshot(scene, characterIdentifier, imageIdentifier, characterName, fit);
   }
 
