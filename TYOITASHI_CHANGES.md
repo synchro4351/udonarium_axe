@@ -98,6 +98,8 @@
 
 キャラクター画像を差し込むカットイン：[4665bea5](https://github.com/synchro4351/udonarium_axe/commit/4665bea5)（実装）、[a8b9ef05](https://github.com/synchro4351/udonarium_axe/commit/a8b9ef05)（表示文言）。`5e5dd408`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-character-template)。発動時のキャラクター・画像IDと画像ごとの調整値を同期し、未設定時は内蔵シルエットを表示。既存の固定画像カットインは変更しない。型検査2経路、対象84件、コミット時の全13,219件成功・1件skip、lint・整形・ビルド成功。実画面・複数端末は未確認。録画からの動画書き出しは立ち絵差し込みに未対応。
 
+反応エフェクトとカットインテンプレートの追加改善：[ccd1951a](https://github.com/synchro4351/udonarium_axe/commit/ccd1951a)（投げる演出の着地点を正立）、[9726a9cb](https://github.com/synchro4351/udonarium_axe/commit/9726a9cb)（立ち絵のGUI調整、発動者名の差し込み、文字単位の動き、「参戦！」見本）。`a8b9ef05`起点の[修正ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-feedback-20260929)。保存済みのカットインは変更しない。直接Vitestと`ng test`の両経路で953ファイル・13,250件成功、1件skip。カットイン操作E2E7件、型検査・lint・整形・本番ビルド成功。追加修正の実画面確認は未実施。録画の動画書き出しは新しい名前差し込みと文字単位の動きを再現しない。
+
 ## 検証と制限
 
 - r4の固定ソース`a2999013`は、全体947ファイル／13,084件成功・1件skip、production build成功。r3の固定ソース`cf5edecf`は全体929ファイル／12,712件成功・1件skip、production build成功。r2の固定ソース`6e5668dd`は全体927ファイル／12,680件成功・1件skip、production build成功。
