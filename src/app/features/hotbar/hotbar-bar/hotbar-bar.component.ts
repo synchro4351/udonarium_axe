@@ -6,6 +6,7 @@ import {
   ElementRef,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { ChatSpeakerService } from '@axe/application/chat/chat-speaker.service';
@@ -156,6 +157,10 @@ export class HotbarBarComponent {
       if (!element) return;
       element.style.left = '0px';
       element.style.top = `${Math.max(0, window.innerHeight * this.mobile.tableRatio() - element.offsetHeight - 8)}px`;
+    });
+    // A reader met for the first time finds a few samples the first time the bar is brought out.
+    effect(() => {
+      if (this.shows()) untracked(() => this.hotbarStore.offerStarter());
     });
   }
 

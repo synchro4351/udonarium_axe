@@ -1,10 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChatSpeakerService } from '@axe/application/chat/chat-speaker.service';
 import { SaveDataService } from '@axe/application/file/save-data.service';
-import { HotbarStoreService } from '@axe/application/hotbar/hotbar-store.service';
+import { HOTBAR_STARTER_KEY, HotbarStoreService } from '@axe/application/hotbar/hotbar-store.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { HotbarPreferenceService } from '@axe/application/ui/hotbar-preference.service';
 import { PanelService } from '@axe/application/ui/panel.service';
+import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { WidgetVisibilityService } from '@axe/application/ui/widget-visibility.service';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { Hotbar } from '@axe/domain/hotbar/hotbar';
@@ -76,6 +77,9 @@ describe('HotbarBarComponent', () => {
     PeerCursor.createMyCursor();
     PeerCursor.myCursor.userId = 'me';
     PeerCursor.myCursor.role = PeerRole.Player;
+    // The first test in the file names the reader afresh; the samples owed for that are tried on their own below.
+    TestBed.inject(HotbarStoreService);
+    localStorage.removeItem(HOTBAR_STARTER_KEY);
 
     fixture = TestBed.createComponent(HotbarBarComponent);
     widgets.hotbar.set(true);
@@ -87,6 +91,7 @@ describe('HotbarBarComponent', () => {
     PeerCursor.myCursor = null!;
     localStorage.removeItem('ui-widgets');
     localStorage.removeItem('ui-hotbar');
+    localStorage.removeItem(HOTBAR_STARTER_KEY);
   });
 
   it('stays out of the way until it is asked for', () => {
@@ -111,6 +116,27 @@ describe('HotbarBarComponent', () => {
       '9',
       '0',
     ]);
+  });
+
+  it('brings a first-time reader samples that only write into the chat box, with nobody to act as', async () => {
+    widgets.hotbar.set(false);
+    fixture.detectChanges();
+    localStorage.setItem(HOTBAR_STARTER_KEY, 'due');
+
+    widgets.hotbar.set(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(slots().map((slot) => slot.dataset.filled)).toEqual([
+      ...Array.from({ length: 7 }, () => 'false'),
+      'true',
+      'true',
+      'true',
+    ]);
+    const prefill = vi.spyOn(TestBed.inject(UiSignalService), 'requestChatInputText');
+    slots()[7].click();
+    expect(prefill).toHaveBeenCalledWith('1D100');
   });
 
   it('shows what a filled slot holds, and marks the rest empty', () => {

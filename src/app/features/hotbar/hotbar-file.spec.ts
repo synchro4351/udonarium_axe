@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { HotbarStoreService } from '@axe/application/hotbar/hotbar-store.service';
+import { HOTBAR_STARTER_KEY, HotbarStoreService } from '@axe/application/hotbar/hotbar-store.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { FileArchiver } from '@axe/core/storage/file-archiver';
 import { ObjectSerializer } from '@axe/core/sync/object-serializer';
@@ -30,6 +30,7 @@ describe('reading a saved bar back in from its file', () => {
 
   afterEach(() => {
     localStorage.removeItem('ui-hotbar-owner');
+    localStorage.removeItem(HOTBAR_STARTER_KEY);
   });
 
   it('lands the slots of the file in the reader own bar', async () => {
@@ -48,6 +49,26 @@ describe('reading a saved bar back in from its file', () => {
     expect(mine?.ownerUserId).toBe(hotbarStore.ownerId);
     expect(mine?.slotAt(1, 4)?.argument).toBe('2d6+3 攻撃');
     expect(mine?.slotAt(1, 4)?.label).toBe('全力攻撃');
+  });
+
+  it('keeps a bar read in before the first look at it exactly as the file had it', async () => {
+    const donor = new Hotbar('Hotbar_donor');
+    donor.initialize();
+    const carried = emptyHotbarSlotDraft('chat');
+    carried.value = '持ち込んだマクロ';
+    donor.put(0, 9, carried);
+    const xml = ObjectSerializer.instance.toXml(HotbarSet.of(donor));
+
+    expect(localStorage.getItem(HOTBAR_STARTER_KEY)).toBe('due');
+
+    await TestBed.inject(FileArchiver).load([await archiveOf(xml)]);
+
+    expect(hotbarStore.offerStarter()).toBeNull();
+    const mine = hotbarStore.own()!;
+    expect(mine.slots.map((slot) => [slot.pageNo, slot.slotNo, slot.argument])).toEqual([[0, 9, '持ち込んだマクロ']]);
+    expect(mine.hasDisplaced).toBe(true);
+    mine.restoreDisplaced();
+    expect(mine.slots).toHaveLength(0);
   });
 
   it('keeps what it displaced, so a file dropped by mistake can be taken back', async () => {
