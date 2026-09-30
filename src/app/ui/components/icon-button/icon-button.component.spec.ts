@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HAND_CARDS_ICON } from '@axe/domain/ui/custom-icon';
 import { UiIconButtonComponent } from '@axe/ui/components/icon-button/icon-button.component';
 
 describe('UiIconButtonComponent', () => {
@@ -41,5 +42,17 @@ describe('UiIconButtonComponent', () => {
     expect(button().classList.contains('text-ui-dim')).toBe(true);
     expect(button().classList.contains('opacity-45')).toBe(true);
     expect(button().getAttribute('data-testid')).toBe('probe');
+  });
+
+  it('draws the hand icon itself and marks news waiting, so the hand works on a toolbar too', () => {
+    expect(button().querySelector('.bg-red-500')).toBeNull();
+
+    fixture.componentRef.setInput('icon', HAND_CARDS_ICON);
+    fixture.componentRef.setInput('badge', true);
+    fixture.detectChanges();
+
+    expect(button().querySelector('i')).toBeNull();
+    expect(button().querySelector('ui-hand-cards-icon svg')).not.toBeNull();
+    expect(button().querySelector('.bg-red-500')).not.toBeNull();
   });
 });
