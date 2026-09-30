@@ -6,6 +6,12 @@
 
 この番号は2026-09-24から導入した、固定コミットに対する私家版の識別名です。GitHub Release・Gitタグ・アプリ内のバージョン表示とは別であり、現時点では公式由来のpackage.jsonや配布ZIP名を変更していません。どの版かを厳密に確認する場合はコミットを参照してください。
 
+## 開発版／Axe v1.58.0 — 2026-09-30
+
+- 開発ソース：[18043e6d](https://github.com/synchro4351/udonarium_axe/tree/18043e6d3f4050dc7b3fdfa1f9730b94bf0b5f58)。固定版番号はまだ付けていません。個人版・デモ版の配備済みソースはr5のままです。
+- [公式v1.58.0](https://github.com/Xelltis/udonarium_axe/releases/tag/v1.58.0)を[私家版へ統合](https://github.com/synchro4351/udonarium_axe/commit/d8b27baa1b80b1fccc0703f2bf903a9d12caedd1)し、メニューに私家版の入口と手札更新印を移しました。[初期ホットバー見本](https://github.com/synchro4351/udonarium_axe/commit/18043e6d3f4050dc7b3fdfa1f9730b94bf0b5f58)は新規利用者だけに表示します。
+- 統合時に直接Vitest 13,854件、Angular経由 13,854件成功・1件skip。見本追加後は両経路 13,866件成功・1件skip、lint・ビルド成功。利用者の目視確認はこれからです。
+
 ## tyoitashi r5／Axe v1.57.1 — 2026-09-29
 
 - 固定ソース：[7033c85e](https://github.com/synchro4351/udonarium_axe/tree/7033c85eed2cacd9c7ea44689e11ef9686b781f8)
