@@ -8,9 +8,10 @@
 
 ## 開発版／Axe v1.58.0 — 2026-09-30
 
-- 開発ソース：[18043e6d](https://github.com/synchro4351/udonarium_axe/tree/18043e6d3f4050dc7b3fdfa1f9730b94bf0b5f58)。固定版番号はまだ付けていません。個人版・デモ版の配備済みソースはr5のままです。
+- 開発ソース：[b12d2400](https://github.com/synchro4351/udonarium_axe/tree/b12d240072044f952ee27b815734fb80b622de43)（2026-10-01更新）。固定版番号はまだ付けていません。個人版・デモ版の配備済みソースはr5のままです。
 - [公式v1.58.0](https://github.com/Xelltis/udonarium_axe/releases/tag/v1.58.0)を[私家版へ統合](https://github.com/synchro4351/udonarium_axe/commit/d8b27baa1b80b1fccc0703f2bf903a9d12caedd1)し、メニューに私家版の入口と手札更新印を移しました。[初期ホットバー見本](https://github.com/synchro4351/udonarium_axe/commit/18043e6d3f4050dc7b3fdfa1f9730b94bf0b5f58)は新規利用者だけに表示します。
 - 統合時に直接Vitest 13,854件、Angular経由 13,854件成功・1件skip。見本追加後は両経路 13,866件成功・1件skip、lint・ビルド成功。利用者の目視確認はこれからです。
+- [見本の用途を分散する修正](https://github.com/synchro4351/udonarium_axe/commit/b12d240072044f952ee27b815734fb80b622de43)で、ダイス入力・シート開閉・コマへの視点移動を試せるようにしました。既に旧見本を受け取ったバーは自動変更しません。キャラクター未選択時の案内も実際の発言者・「誰として」指定に合わせています。ホットバー20ファイル・234件は両経路成功、関連47ファイル・1,266件のコミットフックも成功。
 
 ## tyoitashi r5／Axe v1.57.1 — 2026-09-29
 

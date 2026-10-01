@@ -8,6 +8,7 @@ r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は�
 
 - [d8b27baa](https://github.com/synchro4351/udonarium_axe/commit/d8b27baa1b80b1fccc0703f2bf903a9d12caedd1)：r5を基点に公式v1.58.0を一度merge。私家版スタンプと手札メニュー入口・更新印を新メニュー構造へ接続。公式のメニュー配置は端末ローカル保存です。
 - [18043e6d](https://github.com/synchro4351/udonarium_axe/commit/18043e6d3f4050dc7b3fdfa1f9730b94bf0b5f58)：新規利用者のホットバー初回表示に、送信しない入力見本を3つ配置。既存・読み込み済みのバーは変更しません。
+- [b12d2400](https://github.com/synchro4351/udonarium_axe/commit/b12d240072044f952ee27b815734fb80b622de43)：上記を基点に、見本をダイス入力・キャラクターシート・視点移動の3種類へ変更。初回配置の条件は維持し、動かすキャラクターの指定がない場合の案内を修正しました。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hotbar-discovery-samples)。
 
 ## 機能別の入口
 

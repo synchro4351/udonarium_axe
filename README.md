@@ -7,7 +7,7 @@
 ## バージョンとソース
 
 - **固定版：tyoitashi r5／Axe v1.57.1** — [ソース `7033c85e`](https://github.com/synchro4351/udonarium_axe/tree/7033c85eed2cacd9c7ea44689e11ef9686b781f8)
-- **開発版：Axe v1.58.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`18043e6d`](https://github.com/synchro4351/udonarium_axe/tree/18043e6d3f4050dc7b3fdfa1f9730b94bf0b5f58)。公式のメニューカスタマイズを取り込み、私家版のスタンプ・手札入口を接続しました。新規利用者のホットバーには安全な入力見本を3つ置きます。
+- **開発版：Axe v1.58.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`b12d2400`](https://github.com/synchro4351/udonarium_axe/tree/b12d240072044f952ee27b815734fb80b622de43)。公式のメニューカスタマイズを取り込み、私家版のスタンプ・手札入口を接続しました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
@@ -19,7 +19,7 @@
 ## 開発版で追加した変更（Axe v1.58.0）
 
 - 公式v1.58.0のメニューカスタマイズに追従しました。メニュー配置は各端末に保存され、部屋ZIPでは共有されません。私家版のスタンプと手札の入口・更新印も新しい構造へ移しています。
-- 新しい利用者のホットバー初回表示には`1D100`、`2D6`、`choice[A,B,C]`の入力見本を置きます。押すとチャット入力欄へ記入するだけで送信しません。既存のホットバーは変更しません。
+- 新しい利用者のホットバー初回表示には、`1D100`をチャットに記入する、キャラクターシートを開閉する、コマへ視点を移す、の3つの見本を置きます。後ろ2つはチャットの発言者にしたキャラクターを使います。見本は編集・削除でき、既存のホットバーは変更しません。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hotbar-discovery-samples)で変更を確認できます。
 
 ## 固定版と公式Axe v1.57.1との違い
 
