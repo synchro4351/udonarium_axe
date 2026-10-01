@@ -10,6 +10,7 @@ import {
   Injector,
   input,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -54,6 +55,7 @@ import {
   cutInEditorKeyDown,
   isTypingTarget,
 } from '@axe/features/media/cut-in-editor/cut-in-editor-shortcut';
+import { CutInFreshSceneService } from '@axe/features/media/cut-in-editor/cut-in-fresh-scene.service';
 import {
   moveLayerKeys,
   removeLayerKeys,
@@ -70,6 +72,7 @@ import { CutInLayerListComponent } from '@axe/features/media/cut-in-editor/cut-i
 import { CutInLayerPropertiesComponent } from '@axe/features/media/cut-in-editor/cut-in-layer-properties.component';
 import { CutInPortraitPickService } from '@axe/features/media/cut-in-editor/cut-in-portrait-pick.service';
 import { CutInPortraitPickerComponent } from '@axe/features/media/cut-in-editor/cut-in-portrait-picker.component';
+import { posterFrameMs } from '@axe/features/media/cut-in-editor/cut-in-poster-frame';
 import {
   angleFromCentre,
   applyResize,
@@ -162,6 +165,7 @@ export class CutInSceneEditorComponent {
   private readonly t = inject(TRANSLATE_FN);
   private readonly objectStore = inject(ObjectStore);
   private readonly portraitPick = inject(CutInPortraitPickService);
+  private readonly freshScenes = inject(CutInFreshSceneService);
 
   readonly cutIn = input<CutIn | null>(null);
   readonly isEditable = input(false);
@@ -172,6 +176,8 @@ export class CutInSceneEditorComponent {
   protected readonly selectedIdentifier = signal<string>('');
   protected readonly playing = signal(false);
   protected readonly playheadMs = signal(0);
+  /** Where a template just made was opened, so playing from there untouched still plays it from the start. */
+  private posterMs: number | null = null;
 
   /** The heads beside the timeline start below its ruler and its sound row. */
   protected readonly timelineHeadOffsetPx = TIMELINE_HEAD_OFFSET_PX;
@@ -398,6 +404,12 @@ export class CutInSceneEditorComponent {
       this.history = cutIn ? new EditHistory(snapshotScene(cutIn.scene), cloneSceneSnapshot) : null;
       this.selectedIdentifier.set('');
       this.historyVersion.update((count) => count + 1);
+      this.posterMs = null;
+      // A template just made would open on an empty stage, so it opens at its fullest moment instead.
+      if (cutIn && untracked(() => this.freshScenes.take(cutIn.identifier))) {
+        this.posterMs = untracked(() => posterFrameMs(cutIn.scene));
+        this.playheadMs.set(this.posterMs);
+      }
     });
 
     afterNextRender(() => {
@@ -669,7 +681,9 @@ export class CutInSceneEditorComponent {
     if (durationMs < 1) return;
 
     this.playing.set(true);
-    const from = this.playheadMs() >= durationMs ? 0 : this.playheadMs();
+    const fromPoster = this.posterMs !== null && this.playheadMs() === this.posterMs;
+    this.posterMs = null;
+    const from = fromPoster || this.playheadMs() >= durationMs ? 0 : this.playheadMs();
     const startedAt = performance.now() - from;
     this.sceneSound?.stop();
     this.sceneSound = this.cutInSound.play(this.scene(), from, this.sceneLoop);

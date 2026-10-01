@@ -1,16 +1,20 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { CutInSoundService } from '@axe/application/media/cut-in-sound.service';
 import { setPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import { type CutInPortraitFit, DEFAULT_CUT_IN_PORTRAIT_FIT } from '@axe/domain/media/cut-in-portrait';
+import { CutInFreshSceneService } from '@axe/features/media/cut-in-editor/cut-in-fresh-scene.service';
 import { keysOf, valueAt } from '@axe/features/media/cut-in-editor/cut-in-keyframe-edit';
 import { CutInPortraitPickService } from '@axe/features/media/cut-in-editor/cut-in-portrait-pick.service';
+import { posterFrameMs } from '@axe/features/media/cut-in-editor/cut-in-poster-frame';
 import { CutInSceneEditorComponent } from '@axe/features/media/cut-in-editor/cut-in-scene-editor.component';
 import { CutInTimelineComponent, type TimelineRow } from '@axe/features/media/cut-in-editor/cut-in-timeline.component';
 import { TIMELINE_HEAD_W_PX } from '@axe/features/media/cut-in-editor/cut-in-timeline-geometry';
+import { createCutInSceneTemplate } from '@axe/features/media/cut-in-list/cut-in-scene-templates';
 import { CutInStageComponent } from '@axe/features/media/cut-in-stage/cut-in-stage.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
@@ -1036,6 +1040,55 @@ describe('CutInSceneEditorComponent', () => {
       fitting().onStageWheel({ deltaY: -100, ctrlKey: false, metaKey: false, preventDefault: vi.fn() } as never);
 
       expect(hero.portraitFits).toBe('');
+    });
+  });
+
+  describe('a template just made', () => {
+    it('opens once at its fullest moment, and leaves the playhead alone after that', () => {
+      const made = createCutInSceneTemplate('battle', '戦闘開始');
+      TestBed.inject(CutInFreshSceneService).mark(made.identifier);
+
+      fixture.componentRef.setInput('cutIn', made);
+      fixture.detectChanges();
+
+      const opened = editor().playheadMs();
+      expect(opened).toBeGreaterThan(0);
+      expect(opened).toBe(posterFrameMs(made.scene));
+
+      editor().onSeek(0);
+      fixture.componentRef.setInput('cutIn', cutIn);
+      fixture.detectChanges();
+      fixture.componentRef.setInput('cutIn', made);
+      fixture.detectChanges();
+
+      expect(editor().playheadMs()).toBe(0);
+    });
+
+    it('still plays from the start when played from where it opened', () => {
+      const play = vi.spyOn(TestBed.inject(CutInSoundService), 'play').mockReturnValue({ stop: vi.fn() } as never);
+      const made = createCutInSceneTemplate('battle', '戦闘開始');
+      TestBed.inject(CutInFreshSceneService).mark(made.identifier);
+      fixture.componentRef.setInput('cutIn', made);
+      fixture.detectChanges();
+      const toggle = () => (component as unknown as { togglePlaying(): void }).togglePlaying();
+
+      toggle();
+      expect(play.mock.calls[0][1]).toBe(0);
+      toggle();
+
+      editor().onSeek(300);
+      toggle();
+      expect(play.mock.calls[1][1]).toBe(300);
+      toggle();
+    });
+
+    it('leaves the playhead where it is for a cut-in that was not just made', () => {
+      const other = createCutInSceneTemplate('success', '成功！');
+
+      fixture.componentRef.setInput('cutIn', other);
+      fixture.detectChanges();
+
+      expect(editor().playheadMs()).toBe(0);
     });
   });
 });

@@ -14,6 +14,7 @@ import {
   CUT_IN_MULTI_DIRECTION_MODES,
   CutInMultiDirectionMode,
 } from '@axe/domain/tabletop/cut-in-multi-direction';
+import { CutInFreshSceneService } from '@axe/features/media/cut-in-editor/cut-in-fresh-scene.service';
 import { CutInSceneEditorComponent } from '@axe/features/media/cut-in-editor/cut-in-scene-editor.component';
 import { CutInEditorComponent } from '@axe/features/media/cut-in-list/cut-in-editor.component';
 import {
@@ -37,6 +38,7 @@ export class CutInListComponent {
   private readonly rolePermission = inject(RolePermissionService);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly t = inject(TRANSLATE_FN);
+  private readonly freshScenes = inject(CutInFreshSceneService);
 
   selectedCutIn: CutIn | null = null;
 
@@ -140,6 +142,7 @@ export class CutInListComponent {
     if (!this.canEditCutIns || !this.sceneTemplates.some((template) => template === kind)) return;
     const title = this.t(`feature.media.cutIn.sceneTemplate_${kind}`);
     const cutIn = createCutInSceneTemplate(kind as CutInSceneTemplate, title);
+    this.freshScenes.mark(cutIn.identifier);
     this.selectCutIn(cutIn.identifier);
     this.activeTab.set('Scene');
   }
