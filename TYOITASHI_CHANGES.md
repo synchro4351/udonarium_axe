@@ -10,6 +10,13 @@ r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は�
 - [18043e6d](https://github.com/synchro4351/udonarium_axe/commit/18043e6d3f4050dc7b3fdfa1f9730b94bf0b5f58)：新規利用者のホットバー初回表示に、送信しない入力見本を3つ配置。既存・読み込み済みのバーは変更しません。
 - [b12d2400](https://github.com/synchro4351/udonarium_axe/commit/b12d240072044f952ee27b815734fb80b622de43)：上記を基点に、見本をダイス入力・キャラクターシート・視点移動の3種類へ変更。初回配置の条件は維持し、動かすキャラクターの指定がない場合の案内を修正しました。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hotbar-discovery-samples)。
 
+## 入口UIと新規カットインのプレビュー
+
+- 基点：[b12d2400](https://github.com/synchro4351/udonarium_axe/commit/b12d240072044f952ee27b815734fb80b622de43)。公式v1.58.0を取り込んだ私家版本流が前提です。
+- [e56b7688](https://github.com/synchro4351/udonarium_axe/commit/e56b768820ae83b73a4dc89145c0afb9fdb5d5de)：未配置時のホットバー・手札をチャットの横または上へ配置し、手札一覧をバーの近くへ開きます。手札ヘッダー、画像の追加領域、スタンプ管理とキャラクター画像関連の操作名を整理。操作権限・画像取り込み処理・保存形式は維持します。
+- [9ca3489a](https://github.com/synchro4351/udonarium_axe/commit/9ca3489a9cee64bcc4ff08aaea2f87a903afc270)：上記を基点に、新規見本カットインの初期プレビューを素材と文字が出揃う時刻へ変更。本人画面の作成直後のみで、シーンの保存データや再生開始時刻は変更しません。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/ui-entry-cleanup)。
+- 関連の直接VitestとAngular経由テスト、通常コミットフック、画像パネルのChromium E2E、1440px・1024pxの初期配置と保存済みホットバー位置を確認。幅390pxは既存モバイル配置を維持。手札とホットバー同士の自動整列や、移動済みチャットへの追従は含めません。
+
 ## 機能別の入口
 
 以下のコミットは、特記のない限りこのフォークの履歴です。古い機能ブランチを丸ごと最新公式へmergeすることを推奨する表ではありません。
