@@ -36,33 +36,38 @@
     }
   </div>
 
-  <label
-    class="border-ui-border-panel text-ui-dim hover:bg-ui-accent-bg hover:border-ui-accent hover:text-ui-text rounded-ui-sm mt-3 flex cursor-pointer flex-col items-center gap-1 border-2 border-dashed p-4 text-center transition-[background,border-color,color]"
-  >
-    <i class="material-icons text-[40px]! opacity-55">add_photo_alternate</i>
-    <span class="text-[14px] font-medium">{{ 'feature.file.fileStorage.dropHere' | transloco }}</span>
-    <span class="text-[12px] opacity-70">{{
-      (isCompact() ? 'feature.file.fileStorage.clickToSelectTouch' : 'feature.file.fileStorage.clickToSelect')
-        | transloco
-    }}</span>
-    <input type="file" class="hidden" (change)="handleFileSelect($event)" multiple accept="image/*" />
-    <span class="mt-0.5 text-[11px] opacity-50">{{ 'feature.file.fileStorage.maxSize' | transloco }}</span>
-  </label>
-
   <div
     #pasteBox
-    class="border-ui-border-panel text-ui-dim focus-within:border-ui-accent rounded-ui-sm focus:bg-ui-accent-bg mt-2 flex flex-col gap-2 border border-dashed p-2 text-[12px] transition-[background,border-color] outline-none"
+    class="border-ui-border-panel text-ui-muted focus-within:border-ui-accent hover:border-ui-accent rounded-ui-sm focus:bg-ui-accent-bg mt-3 flex flex-col gap-2 border-2 border-dashed px-2.5 py-2 text-[12px] transition-[background,border-color] outline-none"
     tabindex="0"
     role="group"
     data-testid="paste-box"
     [attr.aria-label]="'feature.file.fileStorage.paste.boxLabel' | transloco"
     (paste)="onPaste($event)"
   >
-    <div class="flex flex-wrap items-center gap-2">
-      <i class="material-icons text-[18px]! opacity-55" aria-hidden="true">content_paste</i>
-      <span class="min-w-0 flex-1">{{ 'feature.file.fileStorage.paste.hint' | transloco }}</span>
+    <div class="flex items-center gap-2">
+      <i class="material-icons text-ui-accent text-[26px]! opacity-80" aria-hidden="true">add_photo_alternate</i>
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span class="text-ui-text text-[13px] font-medium">{{ 'feature.file.fileStorage.addImage' | transloco }}</span>
+        <span class="leading-snug">{{
+          (isCompact() ? 'feature.file.fileStorage.addImageHintTouch' : 'feature.file.fileStorage.paste.hint')
+            | transloco
+        }}</span>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-1.5">
+      <input #fileInput type="file" class="hidden" (change)="handleFileSelect($event)" multiple accept="image/*" />
       <button
-        class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+        class="bg-ui-elevated border-ui-border-panel text-ui-text rounded-ui-sm hover:bg-ui-hover hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+        type="button"
+        data-testid="file-choose"
+        (click)="fileInput.click()"
+      >
+        <i class="material-icons" aria-hidden="true">folder_open</i>
+        {{ 'feature.file.fileStorage.chooseFile' | transloco }}
+      </button>
+      <button
+        class="bg-ui-elevated border-ui-border-panel text-ui-text rounded-ui-sm hover:bg-ui-hover hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
         type="button"
         [disabled]="pendingAdding()"
         (click)="readFromClipboard()"
@@ -70,6 +75,7 @@
         <i class="material-icons" aria-hidden="true">content_paste_go</i>
         {{ 'feature.file.fileStorage.paste.read' | transloco }}
       </button>
+      <span class="ml-auto text-[11px]">{{ 'feature.file.fileStorage.maxSize' | transloco }}</span>
     </div>
   </div>
 

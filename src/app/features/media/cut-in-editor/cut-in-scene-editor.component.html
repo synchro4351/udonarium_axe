@@ -280,9 +280,6 @@
           class="border-ui-border-panel flex flex-col gap-1.5 border-b border-solid p-2"
           data-testid="cut-in-portrait-preview"
         >
-          <div class="text-ui-muted text-[11px] font-semibold">
-            {{ 'feature.media.cutInEditor.portraitPreview' | transloco }}
-          </div>
           <cut-in-portrait-picker [cutIn]="cutIn()" [showsImage]="hasPortraitSlot()" />
         </div>
       }

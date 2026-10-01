@@ -19,6 +19,7 @@ import { HotbarPreferenceService } from '@axe/application/ui/hotbar-preference.s
 import { MobileLayoutService } from '@axe/application/ui/mobile-layout.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { transientSignal } from '@axe/application/ui/transient-signal';
+import { ViewportService } from '@axe/application/ui/viewport.service';
 import { WidgetLayoutService } from '@axe/application/ui/widget-layout.service';
 import { WIDGET_HOTBAR } from '@axe/application/ui/widget-place';
 import { WidgetVisibilityService } from '@axe/application/ui/widget-visibility.service';
@@ -50,7 +51,7 @@ import { selectControllableCharacters } from '@axe/features/pl-tools/owned-chara
 import { VisualNovelModeService } from '@axe/features/visual-novel/visual-novel-mode.service';
 import { DraggableDirective } from '@axe/ui/directives/draggable.directive';
 import { WidgetPlaceDirective } from '@axe/ui/directives/widget-place.directive';
-import { spotBeside } from '@axe/ui/panel-spot';
+import { leftClearOfFirstChat, spotBeside, topClearOfFirstChat } from '@axe/ui/panel-spot';
 import { hotbarPanelLayer, Z_CONTEXT_MENU_PINNED, Z_HOTBAR, Z_HOTBAR_MOBILE, Z_HOTBAR_PINNED } from '@axe/ui/z-layers';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -75,11 +76,18 @@ export class HotbarBarComponent {
   private readonly activeCharacter = inject(ActiveCharacterService);
   private readonly runner = inject(HotbarRunnerService);
   private readonly layout = inject(WidgetLayoutService);
+  private readonly viewport = inject(ViewportService);
   protected readonly widgetName = WIDGET_HOTBAR;
-  protected readonly fallback = (el: HTMLElement) => ({
-    left: Math.max(8, (window.innerWidth - el.offsetWidth) / 2),
-    top: Math.max(8, window.innerHeight - el.offsetHeight - 16),
-  });
+  /** Where a bar never put anywhere starts: along the bottom, and clear of the chat window where one opens. */
+  protected readonly fallback = (el: HTMLElement) => {
+    const centred = Math.max(8, (window.innerWidth - el.offsetWidth) / 2);
+    const left = this.viewport.isCompact() ? centred : leftClearOfFirstChat(centred, el.offsetWidth, window.innerWidth);
+    const top = Math.max(8, window.innerHeight - el.offsetHeight - 16);
+    return {
+      left,
+      top: this.viewport.isCompact() ? top : topClearOfFirstChat(left, top, el.offsetHeight, window.innerHeight),
+    };
+  };
   private readonly panelService = inject(PanelService);
   private readonly contextMenuService = inject(ContextMenuService);
   private readonly hotbarService = inject(HotbarService);
@@ -397,8 +405,9 @@ export class HotbarBarComponent {
     this.layout.forget(WIDGET_HOTBAR);
     const element = this.barRef()?.nativeElement;
     if (!element) return;
-    element.style.left = `${Math.max(8, (window.innerWidth - element.offsetWidth) / 2)}px`;
-    element.style.top = `${Math.max(8, window.innerHeight - element.offsetHeight - 16)}px`;
+    const spot = this.fallback(element);
+    element.style.left = `${spot.left}px`;
+    element.style.top = `${spot.top}px`;
     this.place()?.remember();
   }
 

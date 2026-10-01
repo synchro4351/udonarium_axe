@@ -223,6 +223,18 @@ describe('FileStorageComponent', () => {
       vi.restoreAllMocks();
     });
 
+    it('gathers choosing a file and reading the clipboard into the one box a paste lands in', () => {
+      const box = pasteBox();
+      const input = box.querySelector('input[type="file"]') as HTMLInputElement;
+      const opened = vi.spyOn(input, 'click').mockImplementation(() => {});
+
+      (box.querySelector('[data-testid="file-choose"]') as HTMLButtonElement).click();
+
+      expect(opened).toHaveBeenCalledTimes(1);
+      expect(buttonsOf(box)).toEqual(['folder_open', 'content_paste_go']);
+      expect(fixture.nativeElement.querySelectorAll('input[type="file"]')).toHaveLength(1);
+    });
+
     it('holds a picture pasted into the box for confirmation, storing nothing yet', () => {
       const event = pasteEvent(screenshot());
       pasteBox().dispatchEvent(event);

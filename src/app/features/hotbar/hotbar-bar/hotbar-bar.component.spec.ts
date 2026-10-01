@@ -21,6 +21,7 @@ import { HotbarRunnerService } from '@axe/features/hotbar/hotbar-runner.service'
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { ActiveCharacterService } from '@axe/features/pl-tools/active-character.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
+import { FIRST_CHAT_WINDOW } from '@axe/ui/panel-spot';
 import { Z_CONTEXT_MENU_PINNED, Z_HOTBAR } from '@axe/ui/z-layers';
 
 describe('HotbarBarComponent', () => {
@@ -728,5 +729,20 @@ describe('HotbarBarComponent', () => {
     fixture.detectChanges();
 
     expect(bar()).toBeNull();
+  });
+
+  it('starts clear of where the chat window first opens when it was never put anywhere', () => {
+    const width = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true });
+    try {
+      const element = document.createElement('div');
+      Object.defineProperty(element, 'offsetWidth', { value: 560 });
+      const fallback = (fixture.componentInstance as unknown as { fallback: (el: HTMLElement) => { left: number } })
+        .fallback;
+
+      expect(fallback(element).left).toBeGreaterThanOrEqual(FIRST_CHAT_WINDOW.left + FIRST_CHAT_WINDOW.width);
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });
+    }
   });
 });

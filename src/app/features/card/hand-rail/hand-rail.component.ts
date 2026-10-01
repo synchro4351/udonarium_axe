@@ -52,9 +52,11 @@ import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { CardFacePreviewComponent } from '@axe/ui/components/card-face-preview/card-face-preview.component';
 import { DraggableDirective } from '@axe/ui/directives/draggable.directive';
 import { TooltipDirective } from '@axe/ui/directives/tooltip.directive';
+import { leftClearOfFirstChat, spotBeside, topClearOfFirstChat } from '@axe/ui/panel-spot';
 import { TranslocoModule } from '@jsverse/transloco';
 
 const HAND_AUTO_SORT_KEY = 'ui-hand-auto-sort';
+const HAND_OVERVIEW_SIZE = { width: 460, height: 420 };
 
 function storedAutoSort(): boolean {
   try {
@@ -128,9 +130,13 @@ export class HandRailComponent {
           el.style.top = this.savedTop;
           return;
         }
-        const centered = (viewportWidth - el.offsetWidth) / 2;
-        el.style.left = `${Math.max(0, Math.min(centered, viewportWidth - el.offsetWidth))}px`;
-        el.style.top = `${Math.max(8, bottom - el.offsetHeight - 8)}px`;
+        const centered = Math.max(0, Math.min((viewportWidth - el.offsetWidth) / 2, viewportWidth - el.offsetWidth));
+        // Never put anywhere yet, it keeps clear of where the chat window first opens beside it.
+        const left =
+          isMobile || this.isCompact() ? centered : leftClearOfFirstChat(centered, el.offsetWidth, viewportWidth);
+        el.style.left = `${left}px`;
+        const top = Math.max(8, bottom - el.offsetHeight - 8);
+        el.style.top = `${isMobile || this.isCompact() ? top : topClearOfFirstChat(left, top, el.offsetHeight, viewportHeight)}px`;
       };
 
       place();
@@ -316,11 +322,15 @@ export class HandRailComponent {
 
   protected readonly pairCount = computed(() => findTrumpPairs(this.cards()).length);
 
+  /** Opens everyone's hands beside the rail, rather than in the corner where the menu button stands. */
   protected openHandOverview(): void {
+    const rail = this.railRef()?.nativeElement.getBoundingClientRect();
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const anchor = rail ?? { left: 0, top: viewport.height, right: viewport.width, bottom: viewport.height };
     this.panelService.open(HandOverviewPanelComponent, {
       title: this.t('feature.card.hand.viewPublicHands'),
-      width: 460,
-      height: 420,
+      ...HAND_OVERVIEW_SIZE,
+      ...spotBeside(anchor, HAND_OVERVIEW_SIZE, viewport),
     });
   }
 

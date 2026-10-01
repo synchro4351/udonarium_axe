@@ -118,6 +118,7 @@ import {
   FabSubmenuAnchor,
   fabSubmenuAnchor,
 } from '@axe/ui/fab-drawer';
+import { FIRST_CHAT_WINDOW } from '@axe/ui/panel-spot';
 import { TranslocoModule } from '@jsverse/transloco';
 import { version as APP_VERSION } from '@pkg';
 
@@ -395,12 +396,12 @@ export class AppComponent {
       this.roomPanels.open('peerMenu', { left: 80, top: 10 });
       if (this.viewport.isCompact()) return;
 
-      const chatHeight = 460;
+      const chat = FIRST_CHAT_WINDOW;
       this.roomPanels.open('chatWindow', {
-        width: 660,
-        height: chatHeight,
-        left: 80,
-        top: Math.max(10, window.innerHeight - chatHeight - 20),
+        width: chat.width,
+        height: chat.height,
+        left: chat.left,
+        top: Math.max(10, window.innerHeight - chat.height - chat.bottomGap),
       });
     });
   }

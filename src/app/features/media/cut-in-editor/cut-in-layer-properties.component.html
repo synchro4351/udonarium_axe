@@ -108,7 +108,8 @@
           [title]="'feature.media.cutInEditor.insertCharacterHint' | transloco"
           (click)="insertCharacterName()"
         >
-          <i class="material-icons">person</i>{{ characterToken }}
+          <i class="material-icons">person</i>{{ 'feature.media.cutInEditor.insertCharacter' | transloco }}
+          <code class="text-ui-dim font-mono text-[10px]">{{ characterToken }}</code>
         </button>
       </div>
       <div class="grid grid-cols-[3.6rem_minmax(0,1fr)] items-center gap-x-1.5 gap-y-1">

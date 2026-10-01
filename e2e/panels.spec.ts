@@ -16,7 +16,7 @@ test.describe('左メニューからパネルを開く', () => {
   test('画像管理パネルを開けること', async ({ page }) => {
     await openPanel(page, '画像');
     await expect(page.locator('file-storage')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('file-storage').getByText('ここに画像をドロップ')).toBeVisible();
+    await expect(page.locator('file-storage').getByText('画像を追加', { exact: true })).toBeVisible();
   });
 
   test('音楽パネル(Jukebox)を開けること', async ({ page }) => {
@@ -142,8 +142,8 @@ test.describe('画像管理パネル', () => {
 
   test('ドロップゾーンが表示されること', async ({ page }) => {
     const storage = page.locator('file-storage');
-    await expect(storage.getByText('ここに画像をドロップ')).toBeVisible();
-    await expect(storage.getByText('またはここをクリックして選択')).toBeVisible();
+    await expect(storage.getByText('画像を追加', { exact: true })).toBeVisible();
+    await expect(storage.getByRole('button', { name: 'ファイルを選ぶ' })).toBeVisible();
   });
 
   test('ファイル入力が存在すること', async ({ page }) => {

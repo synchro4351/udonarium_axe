@@ -5,6 +5,7 @@ import { CoordinateService } from '@axe/application/input/coordinate.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
+import { PanelService } from '@axe/application/ui/panel.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
 import { IPeerContext } from '@axe/core/network/peer-context';
@@ -124,6 +125,49 @@ describe('HandRailComponent', () => {
     await fixture.whenStable();
 
     expect(fixture.nativeElement.querySelector('card-face-preview')).toBeTruthy();
+  });
+
+  it('offers to discard pairs only while the hand holds one', async () => {
+    const trump = (code: string) => {
+      const card = Card.create('カード', `./assets/images/trump/${code}.webp`, './assets/images/trump/z01.webp');
+      card.location.name = handLocationOf('me');
+      return card;
+    };
+    TestBed.inject(HandRailService).open();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const discard = () => fixture.nativeElement.querySelector('[data-testid="hand-discard-pairs"]');
+    expect(discard()).toBeNull();
+
+    trump('s07');
+    trump('h07');
+    TestBed.inject(ObjectChangeService).notifyChanged(Card.aliasName);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(discard()).not.toBeNull();
+  });
+
+  it('opens everyone’s hands from a labelled button beside the rail rather than in the corner', async () => {
+    const open = vi.spyOn(TestBed.inject(PanelService), 'open').mockReturnValue(undefined as never);
+    TestBed.inject(HandRailService).open();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const rail = fixture.nativeElement.querySelector('.hand-rail') as HTMLElement;
+    vi.spyOn(rail, 'getBoundingClientRect').mockReturnValue({
+      left: 760,
+      top: 600,
+      right: 1240,
+      bottom: 840,
+    } as DOMRect);
+    const button = fixture.nativeElement.querySelector('[data-testid="hand-overview-open"]') as HTMLButtonElement;
+
+    expect(button.textContent).toContain('全員');
+    button.click();
+
+    const option = open.mock.calls[0][1] as { left: number; top: number };
+    expect(option.left).toBeGreaterThan(100);
+    expect(option.top).toBeGreaterThan(100);
   });
 
   it('requires a second explicit action to open the hand and hides it immediately', () => {
