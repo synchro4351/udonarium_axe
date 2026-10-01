@@ -33,12 +33,14 @@ describe('HotbarStoreService', () => {
 
       expect(hotbar).toBe(service.own());
       expect(hotbar?.ownerUserId).toBe(service.ownerId);
-      const expected = hotbarStarterSlots();
+      const expected = hotbarStarterSlots({ sheet: 'シート', focus: 'コマへ' });
       expect(hotbar?.slots).toHaveLength(expected.length);
       for (const { cell, draft } of expected) {
         const slot = hotbar?.slotAt(cell.page, cell.slotIndex);
-        expect(slot?.slotKind).toBe('prefill');
+        expect(slot?.slotKind).toBe(draft.kind);
         expect(slot?.argument).toBe(draft.value);
+        expect(slot?.label).toBe(draft.label);
+        expect(slot?.options).toEqual(draft.payload);
       }
     });
 

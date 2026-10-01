@@ -6,27 +6,37 @@ export interface HotbarStarterSlot {
   draft: HotbarSlotDraft;
 }
 
-/** The lines the samples write into the chat box: two common rolls and a pick from a list. */
-const STARTER_LINES: readonly { value: string; icon: string }[] = [
-  { value: '1D100', icon: 'casino' },
-  { value: '2D6', icon: 'casino' },
-  { value: 'choice[A,B,C]', icon: 'shuffle' },
-];
+/** The words the samples that act as a character go by, in the reader's own language. */
+export interface HotbarStarterLabels {
+  sheet: string;
+  focus: string;
+}
 
 /**
- * The few slots a reader's first bar starts with, to show what a slot is for.
+ * The few slots a reader's first bar starts with, each a different kind, to show how much one
+ * slot can hold.
  *
- * Each one only writes a line into the chat box and sends nothing, so pressing one by accident
- * does no harm, and none of them needs a character or a GM to work. They sit at the end of
- * the first page, leaving the first keys and the first free slots to what the reader puts
- * there, and are ordinary slots to edit or clear.
+ * One writes a roll into the chat box, one opens the character sheet, and one brings the view to
+ * the piece. None of them sends a word to the room or changes the table, so pressing one by
+ * accident does no harm. The last two name nobody and act as whoever the chat speaks as, which is
+ * how the bar already says a character is wanted: they stay dimmed until the chat speaks as one,
+ * and say so when pressed before then. They sit at the end of the first page, leaving the first
+ * keys and the first free slots to what the reader puts there, and are ordinary slots to edit or
+ * clear.
  */
-export function hotbarStarterSlots(): HotbarStarterSlot[] {
-  const first = HOTBAR_SLOTS_PER_PAGE - STARTER_LINES.length;
-  return STARTER_LINES.map(({ value, icon }, order) => {
-    const draft = emptyHotbarSlotDraft('prefill');
-    draft.value = value;
-    draft.icon = icon;
-    return { cell: { page: 0, slotIndex: first + order }, draft };
-  });
+export function hotbarStarterSlots(labels: HotbarStarterLabels): HotbarStarterSlot[] {
+  const roll = emptyHotbarSlotDraft('prefill');
+  roll.value = '1D100';
+  roll.icon = 'casino';
+
+  const sheet = emptyHotbarSlotDraft('panel');
+  sheet.payload = { kind: 'panel', panel: 'sheet' };
+  sheet.label = labels.sheet;
+
+  const focus = emptyHotbarSlotDraft('focus');
+  focus.label = labels.focus;
+
+  const drafts = [roll, sheet, focus];
+  const first = HOTBAR_SLOTS_PER_PAGE - drafts.length;
+  return drafts.map((draft, order) => ({ cell: { page: 0, slotIndex: first + order }, draft }));
 }

@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChatSpeakerService } from '@axe/application/chat/chat-speaker.service';
 import { SaveDataService } from '@axe/application/file/save-data.service';
 import { HOTBAR_STARTER_KEY, HotbarStoreService } from '@axe/application/hotbar/hotbar-store.service';
+import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { HotbarPreferenceService } from '@axe/application/ui/hotbar-preference.service';
 import { PanelService } from '@axe/application/ui/panel.service';
@@ -17,6 +18,7 @@ import { PeerRole } from '@axe/domain/peer/peer-role';
 import { HotbarService } from '@axe/features/hotbar/hotbar.service';
 import { HotbarBarComponent } from '@axe/features/hotbar/hotbar-bar/hotbar-bar.component';
 import { HotbarRunnerService } from '@axe/features/hotbar/hotbar-runner.service';
+import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { ActiveCharacterService } from '@axe/features/pl-tools/active-character.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 import { Z_CONTEXT_MENU_PINNED, Z_HOTBAR } from '@axe/ui/z-layers';
@@ -118,25 +120,81 @@ describe('HotbarBarComponent', () => {
     ]);
   });
 
-  it('brings a first-time reader samples that only write into the chat box, with nobody to act as', async () => {
-    widgets.hotbar.set(false);
-    fixture.detectChanges();
-    localStorage.setItem(HOTBAR_STARTER_KEY, 'due');
+  describe('the samples a first-time reader finds', () => {
+    async function bringOutFirstBar(): Promise<void> {
+      widgets.hotbar.set(false);
+      fixture.detectChanges();
+      localStorage.setItem(HOTBAR_STARTER_KEY, 'due');
 
-    widgets.hotbar.set(true);
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
+      widgets.hotbar.set(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
 
-    expect(slots().map((slot) => slot.dataset.filled)).toEqual([
-      ...Array.from({ length: 7 }, () => 'false'),
-      'true',
-      'true',
-      'true',
-    ]);
-    const prefill = vi.spyOn(TestBed.inject(UiSignalService), 'requestChatInputText');
-    slots()[7].click();
-    expect(prefill).toHaveBeenCalledWith('1D100');
+    function reason(): string {
+      return root().querySelector('[data-testid="hotbar-reason"]')?.textContent?.trim() ?? '';
+    }
+
+    it('fills the last three keys of the first page, each labelled', async () => {
+      await bringOutFirstBar();
+
+      expect(slots().map((slot) => slot.dataset.filled)).toEqual([
+        ...Array.from({ length: 7 }, () => 'false'),
+        'true',
+        'true',
+        'true',
+      ]);
+      expect(slots()[7].textContent).toContain('1D100');
+      expect(slots()[8].textContent).toContain('シート');
+      expect(slots()[9].textContent).toContain('コマへ');
+    });
+
+    it('drafts the roll into the chat box with nobody to act as', async () => {
+      await bringOutFirstBar();
+      const prefill = vi.spyOn(TestBed.inject(UiSignalService), 'requestChatInputText');
+
+      slots()[7].click();
+
+      expect(prefill).toHaveBeenCalledWith('1D100');
+      expect(slots()[7].className).not.toContain('opacity-45');
+    });
+
+    it('dims the sheet and the view until the chat speaks as a piece, and says why when pressed', async () => {
+      TestBed.inject(ChatSpeakerService).set(PeerCursor.myCursor.identifier);
+      await bringOutFirstBar();
+      const openSheet = vi.spyOn(TestBed.inject(ObjectPanelService), 'openCharacterSheet');
+      const focusOn = vi.spyOn(TestBed.inject(TableFocusService), 'focusOn');
+
+      expect(slots()[8].className).toContain('opacity-45');
+      expect(slots()[9].className).toContain('opacity-45');
+
+      slots()[8].click();
+      slots()[9].click();
+      fixture.detectChanges();
+
+      expect(openSheet).not.toHaveBeenCalled();
+      expect(focusOn).not.toHaveBeenCalled();
+      expect(reason()).toBe('動かせるキャラがいません（発言者か「誰として」を確認）');
+    });
+
+    it('opens the sheet of, and looks at, whoever the chat speaks as', async () => {
+      const speaking = GameCharacter.create('発言者', 1, '');
+      speaking.setLocation('table');
+      TestBed.inject(ChatSpeakerService).set(speaking.identifier);
+      await bringOutFirstBar();
+      const openSheet = vi
+        .spyOn(TestBed.inject(ObjectPanelService), 'openCharacterSheet')
+        .mockImplementation(() => undefined);
+      const focusOn = vi.spyOn(TestBed.inject(TableFocusService), 'focusOn').mockImplementation(() => undefined);
+
+      expect(slots()[8].className).not.toContain('opacity-45');
+      slots()[8].click();
+      slots()[9].click();
+
+      expect(openSheet.mock.calls[0][0]).toBe(speaking);
+      expect(focusOn).toHaveBeenCalledWith(speaking);
+    });
   });
 
   it('shows what a filled slot holds, and marks the rest empty', () => {

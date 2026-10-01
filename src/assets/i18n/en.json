@@ -206,7 +206,7 @@
     },
     "hotbar": {
       "failure": {
-        "noCharacter": "No character is being controlled",
+        "noCharacter": "No character to act as (check the chat speaker or “Acts as”)",
         "notFound": "What this slot points at is gone",
         "noTab": "There is no chat tab to speak into",
         "empty": "This slot is empty",
@@ -330,6 +330,10 @@
         "appearance": "Swaps the piece's picture, the portrait it speaks with, and its size. Put beside an effect in a multi-action, it is a transformation."
       },
       "lock": "Hold it where it stands",
+      "starter": {
+        "sheet": "Sheet",
+        "focus": "Focus"
+      },
       "pageTitle": "Page {{page}}",
       "shortcutHint": "1–0 fires a slot · shift and a number picks a page · [ ] turns the page"
     },

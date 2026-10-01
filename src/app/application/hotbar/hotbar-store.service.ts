@@ -1,7 +1,8 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
+import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { generateUuid } from '@axe/core/util/uuid';
 import { Hotbar } from '@axe/domain/hotbar/hotbar';
-import { hotbarStarterSlots } from '@axe/domain/hotbar/hotbar-starter';
+import { HotbarStarterLabels, hotbarStarterSlots } from '@axe/domain/hotbar/hotbar-starter';
 
 const OWNER_KEY = 'ui-hotbar-owner';
 /** Present only while a reader named for the first time is still owed the sample slots. */
@@ -17,6 +18,7 @@ const STARTER_DUE = 'due';
  */
 @Injectable({ providedIn: 'root' })
 export class HotbarStoreService {
+  private readonly t = inject(TRANSLATE_FN);
   readonly ownerId = readOwnerId();
 
   constructor() {
@@ -50,8 +52,18 @@ export class HotbarStoreService {
 
     const hotbar = this.ensureOwn();
     if (!hotbar) return null;
-    for (const { cell, draft } of hotbarStarterSlots()) hotbar.put(cell.page, cell.slotIndex, draft);
+    for (const { cell, draft } of hotbarStarterSlots(this.starterLabels())) {
+      hotbar.put(cell.page, cell.slotIndex, draft);
+    }
     return hotbar;
+  }
+
+  /** Written onto the slots as they are made, so they read in the language the reader met them in. */
+  private starterLabels(): HotbarStarterLabels {
+    return {
+      sheet: this.t('feature.hotbar.starter.sheet'),
+      focus: this.t('feature.hotbar.starter.focus'),
+    };
   }
 }
 
