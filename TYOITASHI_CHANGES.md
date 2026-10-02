@@ -4,6 +4,11 @@
 
 r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は公式v1.58.0（46707582）とv1.59.0（19e9d1c7）を取り込んでいます。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1〜r4の固定ソースと併せて確認してください。
 
+## カットイン詳細の折り畳み（開発版）
+
+- [a06b80e8](https://github.com/synchro4351/udonarium_axe/commit/a06b80e8)：シーンの基本操作とレイヤー一覧を残し、タイムライン・レイヤーの詳細・多方向表示を折り畳むUI変更。基点は17ba32be。開閉はUI内だけの状態で、保存・同期形式は増やしません。閲覧専用入力のdisabled状態もフォームへ揃えました。
+- [34140927](https://github.com/synchro4351/udonarium_axe/commit/3414092749630e99a008273ab50a0b9f4ef0da14)：[利用方法と再利用時の注意](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-ui-disclosure/docs/TYOITASHI_CUTIN_DISCLOSURE.md)。共有メモ機能を含む基点ですが、折り畳みの処理は共有メモに依存しません。既存の私家版シーン編集へ加えたため、公式の項目に合わせた適用が必要です。
+
 ## 共有メモの部分Markdown（開発版）
 
 - [441f4a13](https://github.com/synchro4351/udonarium_axe/commit/441f4a13)：通常／整形の選択、制限したMarkdown、編集プレビューと記号挿入、卓上・ホバー表示。基点は公式v1.59.0統合済みのf42e153b。属性`textFormat`を既存の保存・同期へ追加し、欠落・未知の値は通常表示にします。Marked 15.0.12を実行時依存に追加します。
