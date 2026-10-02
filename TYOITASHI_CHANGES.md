@@ -4,6 +4,11 @@
 
 r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は公式v1.58.0（46707582）とv1.59.0（19e9d1c7）を取り込んでいます。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1〜r4の固定ソースと併せて確認してください。
 
+## 初期カットインと任意の見本素材（開発版）
+
+- [fbf64463](https://github.com/synchro4351/udonarium_axe/commit/fbf64463)：読み込みなどでカットインが増減した時の一覧更新を、既存のコレクション通知へ接続する小修正。基点は34140927。素材集の機能には依存しません。
+- [e4e903e8](https://github.com/synchro4351/udonarium_axe/commit/e4e903e8)：Sample_Templateを初期登録し、演出見本16個を通常のXML・ZIP素材として整理。キャラクター画像テンプレートと既存のシーン・レイヤー・見本作成処理を使います。新しい保存形式はありません。
+- [75b16b3a](https://github.com/synchro4351/udonarium_axe/commit/75b16b3a52adfe214953e9b995872b6d1096f18e)：[使い方・依存関係・素材の再生成](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-sample-library/docs/TYOITASHI_CUTIN_SAMPLE_LIBRARY.md)。画像差し込みと発動者名の既存私家機能が前提です。公式へ移す時は単純な見本登録・ZIP素材と、テンプレートに必要な機能を分けて検討できます。
 ## カットイン詳細の折り畳み（開発版）
 
 - [a06b80e8](https://github.com/synchro4351/udonarium_axe/commit/a06b80e8)：シーンの基本操作とレイヤー一覧を残し、タイムライン・レイヤーの詳細・多方向表示を折り畳むUI変更。基点は17ba32be。開閉はUI内だけの状態で、保存・同期形式は増やしません。閲覧専用入力のdisabled状態もフォームへ揃えました。

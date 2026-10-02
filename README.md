@@ -7,7 +7,7 @@
 ## バージョンとソース
 
 - **固定版：tyoitashi r5／Axe v1.57.1** — [ソース `7033c85e`](https://github.com/synchro4351/udonarium_axe/tree/7033c85eed2cacd9c7ea44689e11ef9686b781f8)
-- **開発版：Axe v1.59.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`34140927`](https://github.com/synchro4351/udonarium_axe/tree/3414092749630e99a008273ab50a0b9f4ef0da14)。公式のスイッチ・コンパス・ボタン名ガイドを取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
+- **開発版：Axe v1.59.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`75b16b3a`](https://github.com/synchro4351/udonarium_axe/tree/75b16b3a52adfe214953e9b995872b6d1096f18e)。公式のスイッチ・コンパス・ボタン名ガイドを取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
@@ -17,6 +17,8 @@
 [試用サイト](https://udonarium-trial.synwork.work/)で固定版`tyoitashi r5`を試せます。個人用の卓とは別の試用環境です。実験的な機能を含むため、動作が不安定な場合があります。大切な卓データは手元へ保存してください。デモのソースは上記の固定コミット`7033c85e`です。
 
 ## 開発版で追加した変更（Axe v1.59.0）
+
+- 新しい卓では公式のSample1・Sample2と、キャラクター画像を使うSample_Templateから始めます。短い演出見本は必要なものを1個ずつ追加するか、16個の素材ZIPを通常の読み込みで取り込めます。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-sample-library) · [素材と仕様](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-sample-library/docs/TYOITASHI_CUTIN_SAMPLE_LIBRARY.md)。
 
 - カットインのシーン編集は、基本操作とレイヤー一覧を残して詳細を折り畳みます。タイムライン、位置・動き・効果、表示の向きは必要な時に開けます。既存の演出・保存形式は変わりません。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-ui-disclosure) · [変更範囲](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-ui-disclosure/docs/TYOITASHI_CUTIN_DISCLOSURE.md)。
 
