@@ -4,6 +4,16 @@
 
 r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は公式v1.58.0（46707582）とv1.59.0（19e9d1c7）を取り込んでいます。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1〜r4の固定ソースと併せて確認してください。
 
+## XML属性の改行・タブ保持（開発版）
+
+- [8b1dc63c](https://github.com/synchro4351/udonarium_axe/commit/8b1dc63c)（本流では[dd3119c4](https://github.com/synchro4351/udonarium_axe/commit/dd3119c4)）：属性値にあるLF・CR・タブを数値文字参照で保存し、XMLの正規化で空白になるのを防ぎます。基点75b16b3a。変更はObjectSerializerとテストだけで、文字アニメーションに依存しません。形式・読み込み側・本文・P2P同期は維持します。
+- [c398bd44](https://github.com/synchro4351/udonarium_axe/commit/c398bd44)（本流[be4b77f4](https://github.com/synchro4351/udonarium_axe/commit/be4b77f4)）：[仕様と既存の制限](https://github.com/synchro4351/udonarium_axe/blob/codex/xml-attribute-line-breaks/docs/TYOITASHI_XML_ATTRIBUTE_WHITESPACE.md)。文字制御の機能枝で記録した改行消失は、この別修正を含む本流では解消しています。以前に空白へ変わった改行は復元できません。
+
+## カットイン文字の詳細制御（開発版）
+
+- [b5270141](https://github.com/synchro4351/udonarium_axe/commit/b5270141)：文字の出現順・間隔・長さ・方向・傾け方・退場、簡単な見本ボタンと折り畳んだ詳細欄。基点は75b16b3a。既存の文字レイヤー・書記素分割・ステージのWeb Animations APIに依存し、同期属性を7つ追加します。取り消し用のスナップショットも対象です。
+- [26b6eb5b](https://github.com/synchro4351/udonarium_axe/commit/26b6eb5b84ab713de02a2bf2e00903b8aa94d684)：[仕様・保存と同期・制限](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-letter-animation-controls/docs/TYOITASHI_CUTIN_LETTER_CONTROLS.md)。公式へ移す場合は、既存の私家版の文字単位描画を前提としている点を確認してください。リプレイの動画書き出しでは行単位の描画が続きます。保存XMLの改行消失は既存の別問題として記録しています。
+
 ## 初期カットインと任意の見本素材（開発版）
 
 - [fbf64463](https://github.com/synchro4351/udonarium_axe/commit/fbf64463)：読み込みなどでカットインが増減した時の一覧更新を、既存のコレクション通知へ接続する小修正。基点は34140927。素材集の機能には依存しません。

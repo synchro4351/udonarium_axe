@@ -7,7 +7,7 @@
 ## バージョンとソース
 
 - **固定版：tyoitashi r5／Axe v1.57.1** — [ソース `7033c85e`](https://github.com/synchro4351/udonarium_axe/tree/7033c85eed2cacd9c7ea44689e11ef9686b781f8)
-- **開発版：Axe v1.59.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`75b16b3a`](https://github.com/synchro4351/udonarium_axe/tree/75b16b3a52adfe214953e9b995872b6d1096f18e)。公式のスイッチ・コンパス・ボタン名ガイドを取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
+- **開発版：Axe v1.59.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`be4b77f4`](https://github.com/synchro4351/udonarium_axe/tree/be4b77f460a902aafbede0858b5edcdcd9141124)。公式のスイッチ・コンパス・ボタン名ガイドを取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
@@ -17,6 +17,10 @@
 [試用サイト](https://udonarium-trial.synwork.work/)で固定版`tyoitashi r5`を試せます。個人用の卓とは別の試用環境です。実験的な機能を含むため、動作が不安定な場合があります。大切な卓データは手元へ保存してください。デモのソースは上記の固定コミット`7033c85e`です。
 
 ## 開発版で追加した変更（Axe v1.59.0）
+
+- カットインの複数行テキストなどが、複製と保存・読み込みのあとも改行を保つように、XML属性の書き出しを修正しました。保存形式や同期の追加はありません。[単独の修正](https://github.com/synchro4351/udonarium_axe/tree/codex/xml-attribute-line-breaks) · [仕様](https://github.com/synchro4351/udonarium_axe/blob/codex/xml-attribute-line-breaks/docs/TYOITASHI_XML_ATTRIBUTE_WHITESPACE.md)。
+
+- カットインの文字を一つの文章のまま、1字ずつ動かせます。見本ボタンから始め、詳細で順番・間隔・方向・傾き・退場を調整します。動きに効かない項目は無効になり、保存・同期・取り消しにも対応します。リプレイの動画書き出しには文字ごとの動きが入りません。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-letter-animation-controls) · [仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-letter-animation-controls/docs/TYOITASHI_CUTIN_LETTER_CONTROLS.md)。
 
 - 新しい卓では公式のSample1・Sample2と、キャラクター画像を使うSample_Templateから始めます。短い演出見本は必要なものを1個ずつ追加するか、16個の素材ZIPを通常の読み込みで取り込めます。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-sample-library) · [素材と仕様](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-sample-library/docs/TYOITASHI_CUTIN_SAMPLE_LIBRARY.md)。
 
