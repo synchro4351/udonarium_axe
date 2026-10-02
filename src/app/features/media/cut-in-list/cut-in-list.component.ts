@@ -107,6 +107,7 @@ export class CutInListComponent {
 
   /** Every cut-in in the room, for the list. */
   getCutIns(): CutIn[] {
+    this.objectChange.collectionOf('cut-in')();
     return this.objectStore.getObjects(CutIn);
   }
 

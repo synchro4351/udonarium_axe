@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TabletopDisplayPreferenceService } from '@axe/application/ui/tabletop-display-preference.service';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
+import { CutIn } from '@axe/domain/media/cut-in';
 import { GameTable } from '@axe/domain/tabletop/game-table';
 import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
 import { CutInListComponent } from '@axe/features/media/cut-in-list/cut-in-list.component';
@@ -32,6 +33,22 @@ describe('CutInListComponent', () => {
 
   it('should be created', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('updates an open list when cut-ins arrive and leave outside the editor', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const imported = new CutIn();
+    imported.name = 'Imported scene';
+    imported.initialize();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('Imported scene');
+    imported.destroy();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await fixture.whenStable();
+    expect(root.querySelectorAll('aside li')).toHaveLength(0);
   });
 
   it('creates new cut-ins without a frame', () => {
