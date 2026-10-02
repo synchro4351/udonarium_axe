@@ -101,7 +101,7 @@ describe('renderChatLogText', () => {
   });
 
   it('writes ruby notation as base and reading, without the bar', () => {
-    const text = renderChatLogText('tab', [tab('メイン', [line({ text: '|漢字《かんじ》と｜熟語《じゅくご》' })])], {
+    const text = renderChatLogText('tab', [tab('メイン', [line({ text: '|漢字<かんじ>と｜熟語《じゅくご》' })])], {
       userId: 'reader',
     });
 

@@ -32,7 +32,7 @@ function applied(text: string, start: number, end: number, id: string): string {
 describe('chatSyntaxSnippets', () => {
   it('writes each out as the chat reads it', () => {
     expect(snippets.map(chatSyntaxExample)).toEqual([
-      '|漢字《かんじ》',
+      '|漢字<かんじ>',
       'S2d6',
       '> ',
       ':HP-1',
@@ -48,12 +48,12 @@ describe('chatSyntaxSnippets', () => {
 describe('applyChatSyntax', () => {
   describe('at the caret', () => {
     it('picks out the first placeholder when nothing was picked out', () => {
-      expect(applied('ab', 1, 1, 'ruby')).toBe('a|[漢字]《かんじ》b');
+      expect(applied('ab', 1, 1, 'ruby')).toBe('a|[漢字]<かんじ>b');
       expect(applied('', 0, 0, 'effect')).toBe('《[演出名]》');
     });
 
     it('puts the words picked out in the first place, and picks out the second', () => {
-      expect(applied('今日は晴天です', 3, 5, 'ruby')).toBe('今日は|晴天《[かんじ]》です');
+      expect(applied('今日は晴天です', 3, 5, 'ruby')).toBe('今日は|晴天<[かんじ]>です');
       expect(applied('MP', 0, 2, 'resource')).toBe(':MP-[1]');
     });
 

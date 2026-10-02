@@ -7,6 +7,7 @@ import {
 } from '@axe/domain/chat/chat-log-exporter';
 import { ChatLogLabels, ChatLogScope, DEFAULT_CHAT_LOG_LABELS } from '@axe/domain/chat/chat-log-rich';
 import { formatReactionSummary } from '@axe/domain/chat/chat-reaction';
+import { replaceRubyNotation } from '@axe/domain/chat/ruby-notation';
 import { vnBodyOf } from '@axe/domain/visual-novel/vn-emote';
 
 export interface ChatLogTextLabels extends Pick<
@@ -37,7 +38,6 @@ export interface ChatLogTextOptions {
 }
 
 const INDENT = '    ';
-const RUBY_NOTATION = /[|｜]([^|｜\s]+?)《(.+?)》/g;
 // Control characters other than the tab and line feed have no place in a text file.
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u0008\u000b-\u001f\u007f]/g;
@@ -50,7 +50,7 @@ const CONTROL = /[\u0000-\u0008\u000b-\u001f\u007f]/g;
  * without its words, what it quotes or its reactions. Each entry opens with its time, its tab when
  * several are merged, and the speaker; further lines of the text, a quoted or replied-to line,
  * attached pictures and reaction counts follow indented. Pictures are named, never embedded, and
- * ruby notation is written `base《reading》`.
+ * ruby notation in either form is written `base《reading》`.
  */
 export function renderChatLogText(
   scope: ChatLogScope,
@@ -166,7 +166,10 @@ function textLines(text: string): string[] {
 
 /** Text with ruby notation written `base《reading》`, line breaks as `\n` and no control characters. */
 function plainText(text: string): string {
-  return text.replace(/\r\n?/g, '\n').replace(CONTROL, '').replace(RUBY_NOTATION, '$1《$2》');
+  return replaceRubyNotation(
+    text.replace(/\r\n?/g, '\n').replace(CONTROL, ''),
+    (base, reading) => `${base}《${reading}》`
+  );
 }
 
 function singleLine(text: string): string {

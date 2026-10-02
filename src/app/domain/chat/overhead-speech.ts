@@ -1,4 +1,5 @@
 import { largeEmojiCountOf } from '@axe/domain/chat/emoji-only-text';
+import { replaceRubyNotation } from '@axe/domain/chat/ruby-notation';
 
 /** What a bubble over a speaking piece says: words, a stamp's picture, or a few emoji. */
 export type OverheadSpeech =
@@ -11,8 +12,6 @@ export const MAX_OVERHEAD_SPEECH_CHARS = 80;
 
 /** Each pair of marks a spoken line may be wrapped in, and nothing else. */
 const QUOTED = /「([^「」]*)」|“([^“”]*)”|"([^"\n]*)"/g;
-/** Ruby written as `|base《reading》` shows its base alone. */
-const RUBY = /[|｜]([^|｜\s]+?)《.+?》/g;
 
 /**
  * The quoted parts of a line, in order: what is inside 「…」, “…” or "…", with the marks taken off.
@@ -23,7 +22,8 @@ const RUBY = /[|｜]([^|｜\s]+?)《.+?》/g;
 export function quotedSegmentsOf(text: string | null | undefined): string[] {
   const segments: string[] = [];
   for (const match of (text ?? '').matchAll(QUOTED)) {
-    const inner = (match[1] ?? match[2] ?? match[3] ?? '').replace(RUBY, '$1').trim();
+    // Ruby shows its base alone.
+    const inner = replaceRubyNotation(match[1] ?? match[2] ?? match[3] ?? '', (base) => base).trim();
     if (inner.length > 0) segments.push(inner);
   }
   return segments;

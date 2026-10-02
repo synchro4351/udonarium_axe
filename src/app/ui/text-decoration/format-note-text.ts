@@ -4,7 +4,7 @@
    automatic links are switched off and stay as literal text. Every piece of text goes through
    escapeHtml, and the ruby notation is applied to ordinary text only, never inside code. */
 
-import { applyRubyMarkup, decorateChatStyleText, escapeHtml } from '@axe/ui/text-decoration/decorate-chat-text';
+import { decorateChatStyleText, escapeHtml, escapeHtmlWithRuby } from '@axe/ui/text-decoration/decorate-chat-text';
 import { Marked, Tokenizer, type Tokens } from 'marked';
 
 const HEADING_START = /^ {0,3}#{1,3}[ \t]/;
@@ -31,7 +31,7 @@ function leadingLines(src: string, keep: (line: string) => boolean): string {
 
 /** Escapes plain note text, applies the ruby notation, and keeps each line break. */
 function decoratePlainText(text: string): string {
-  return applyRubyMarkup(escapeHtml(text)).split('\n').join('<br>');
+  return escapeHtmlWithRuby(text).split('\n').join('<br>');
 }
 
 const noteMarked = new Marked({
@@ -97,8 +97,8 @@ const noteMarked = new Marked({
  * Turns a note's body into HTML for the "formatted" display.
  *
  * Reads headings, `-` and `1.` lists, `>` quotes and inline or fenced code; every other mark is
- * shown as typed. Line breaks are kept, and the ruby notation (`|word《reading》`) applies outside
- * code. Should the parser fail, the text is shown the normal way instead.
+ * shown as typed. Line breaks are kept, and the ruby notation (`|word<reading>` or `|word《reading》`)
+ * applies outside code. Should the parser fail, the text is shown the normal way instead.
  */
 export function formatNoteText(text: string): string {
   try {

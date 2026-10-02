@@ -651,7 +651,7 @@ describe('ChatInputComponent', () => {
         find<HTMLButtonElement>('[data-testid="chat-syntax-choice"][data-syntax="ruby"]')!.click();
         await settle();
 
-        expect(component.text).toBe('今日は|晴天《かんじ》です');
+        expect(component.text).toBe('今日は|晴天<かんじ>です');
         expect(textBox().value.slice(textBox().selectionStart, textBox().selectionEnd)).toBe('かんじ');
         expect(component.isStampPickerOpen()).toBe(false);
         expect(stamps).toEqual([]);

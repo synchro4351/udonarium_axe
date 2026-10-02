@@ -1,8 +1,8 @@
 import {
-  applyRubyMarkup,
   decorateChatStyleText,
   decorateQuoteLines,
   escapeHtml,
+  escapeHtmlWithRuby,
   splitRubyNotation,
 } from '@axe/ui/text-decoration/decorate-chat-text';
 
@@ -18,15 +18,50 @@ describe('decorate-chat-text', () => {
     });
   });
 
-  describe('applyRubyMarkup', () => {
+  describe('escapeHtmlWithRuby', () => {
     it('turns the ruby notation into a ruby element', () => {
-      const result = applyRubyMarkup('|漢字《かんじ》');
+      const result = escapeHtmlWithRuby('|漢字《かんじ》');
       expect(result).toBe('<ruby class="chat-ruby"><rb>漢字</rb><rt>かんじ</rt></ruby>');
     });
 
     it('accepts the full-width pipe too', () => {
-      const result = applyRubyMarkup('｜熟語《じゅくご》');
+      const result = escapeHtmlWithRuby('｜熟語《じゅくご》');
       expect(result).toBe('<ruby class="chat-ruby"><rb>熟語</rb><rt>じゅくご</rt></ruby>');
+    });
+
+    it('reads the angle-bracket form beside the double-bracket one', () => {
+      expect(escapeHtmlWithRuby('|漢字<かんじ>と｜熟語《じゅくご》')).toBe(
+        '<ruby class="chat-ruby"><rb>漢字</rb><rt>かんじ</rt></ruby>と' +
+          '<ruby class="chat-ruby"><rb>熟語</rb><rt>じゅくご</rt></ruby>'
+      );
+    });
+
+    it('escapes the words and the reading once each, so markup and entities stay text', () => {
+      expect(escapeHtmlWithRuby('|&amp;<"x">')).toBe(
+        '<ruby class="chat-ruby"><rb>&amp;amp;</rb><rt>&quot;x&quot;</rt></ruby>'
+      );
+      expect(escapeHtmlWithRuby('|a<script>alert(1)</script>')).toBe(
+        '<ruby class="chat-ruby"><rb>a</rb><rt>script</rt></ruby>alert(1)&lt;/script&gt;'
+      );
+      expect(escapeHtmlWithRuby('｜<b>《<i>》')).toBe(
+        '<ruby class="chat-ruby"><rb>&lt;b&gt;</rb><rt>&lt;i&gt;</rt></ruby>'
+      );
+    });
+
+    it('does not read escaped angle brackets typed as entities', () => {
+      expect(escapeHtmlWithRuby('|漢字&lt;かんじ&gt;')).toBe('|漢字&amp;lt;かんじ&amp;gt;');
+    });
+
+    it('leaves comparisons and markup without a ruby bar as escaped text', () => {
+      expect(escapeHtmlWithRuby('a<b>c |x|<3> <img src=x onerror=alert(1)>')).toBe(
+        'a&lt;b&gt;c |x|&lt;3&gt; &lt;img src=x onerror=alert(1)&gt;'
+      );
+    });
+
+    it('turns "\\s" into a space inside and outside the ruby', () => {
+      expect(escapeHtmlWithRuby('一\\s|二\\s三<に\\sさん>')).toBe(
+        '一 <ruby class="chat-ruby"><rb>二 三</rb><rt>に さん</rt></ruby>'
+      );
     });
   });
 
@@ -49,6 +84,13 @@ describe('decorate-chat-text', () => {
       ]);
     });
 
+    it('cuts out the angle-bracket form too, so a line typed out gets its reading', () => {
+      expect(splitRubyNotation('|天気<てんき>は 《晴れ》')).toEqual([
+        { text: '天気', reading: 'てんき' },
+        { text: 'は 《晴れ》', reading: '' },
+      ]);
+    });
+
     it('leaves the text as it is written rather than escaping it', () => {
       expect(splitRubyNotation('<b>|&《アンド》')).toEqual([
         { text: '<b>', reading: '' },
@@ -63,6 +105,7 @@ describe('decorate-chat-text', () => {
         '|漢字《》',
         '||漢字《かんじ》',
         '一\\s二|三《さん》',
+        '|漢字<かんじ>と|熟語《じゅくご》',
       ]) {
         const html = splitRubyNotation(line)
           .map((part) =>
@@ -71,7 +114,7 @@ describe('decorate-chat-text', () => {
               : part.text
           )
           .join('');
-        expect(html).toBe(applyRubyMarkup(line));
+        expect(html).toBe(escapeHtmlWithRuby(line));
       }
     });
   });
@@ -104,6 +147,13 @@ describe('decorate-chat-text', () => {
     it('escapes html-looking input inside a quote before decorating it', () => {
       const result = decorateChatStyleText('> <b>not bold</b>');
       expect(result).toBe('<span class="chat-quote">&lt;b&gt;not bold&lt;/b&gt;</span>');
+    });
+
+    it('quotes a line holding the angle-bracket ruby', () => {
+      expect(decorateChatStyleText('> |世界<せかい>\n|a<b>')).toBe(
+        '<span class="chat-quote"><ruby class="chat-ruby"><rb>世界</rb><rt>せかい</rt></ruby></span>\n' +
+          '<ruby class="chat-ruby"><rb>a</rb><rt>b</rt></ruby>'
+      );
     });
   });
 });

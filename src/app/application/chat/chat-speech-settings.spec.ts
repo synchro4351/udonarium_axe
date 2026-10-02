@@ -36,6 +36,7 @@ describe('chat speech settings', () => {
 
   it('removes markup, links and ruby syntax from spoken text', () => {
     expect(speechText('｜名前《なまえ》 <b>hello</b> https://example.test/x')).toBe('なまえ hello');
+    expect(speechText('|名前<なまえ>と｜魔法《まほう》')).toBe('なまえとまほう');
   });
 
   it('reads a stamp sent without words by its name, its first search word', () => {

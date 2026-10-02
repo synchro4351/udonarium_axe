@@ -2,6 +2,7 @@ import type { ImageFile } from '@axe/core/storage/image-file';
 import type { ChatMessage } from '@axe/domain/chat/chat-message';
 import { formatReactionSummary } from '@axe/domain/chat/chat-reaction';
 import { previewTextOf } from '@axe/domain/chat/chat-stamp-text';
+import { replaceRubyNotation } from '@axe/domain/chat/ruby-notation';
 import { vnBodyOf } from '@axe/domain/visual-novel/vn-emote';
 
 export type ChatLogLine = Pick<
@@ -83,7 +84,8 @@ export class ChatLogExporter {
     '.rx{display:block;margin-top:2px;color:#666;font-size:.85em}' +
     '</style>\n';
   /**
-   * Escapes a value for html and turns ruby markup, `|base《reading》`, into `<ruby>` tags.
+   * Escapes a value for html and turns ruby markup, `|base<reading>` or `|base《reading》`, into
+   * `<ruby>` tags.
    *
    * Every whitespace character, line breaks included, becomes a plain space. A value that is not a
    * string is turned into text as it is, without escaping.
@@ -92,8 +94,12 @@ export class ChatLogExporter {
     if (typeof value !== 'string') {
       return String(value);
     }
-    const escaped = value.replace(/[&'`"<>]/g, (match) => HTML_ESCAPE_MAP[match] ?? match);
-    return escaped.replace(/[|｜]([^|｜\s]+?)《(.+?)》/g, '<ruby>$1<rt>$2</rt></ruby>').replace(/\s/g, ' ');
+    const escape = ChatLogExporter.escapeAttribute;
+    return replaceRubyNotation(
+      value,
+      (base, reading) => `<ruby>${escape(base)}<rt>${escape(reading)}</rt></ruby>`,
+      escape
+    ).replace(/\s/g, ' ');
   }
 
   /**

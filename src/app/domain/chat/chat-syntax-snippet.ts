@@ -43,7 +43,8 @@ export interface ChatSyntaxEdit {
  */
 export function chatSyntaxSnippets(words: ChatSyntaxPlaceholders): ChatSyntaxSnippet[] {
   return [
-    { id: 'ruby', before: '|', fill: words.rubyBase, middle: '《', second: words.rubyReading, after: '》' },
+    // Ruby is offered in the form typed on any keyboard; `|word《reading》` is still read.
+    { id: 'ruby', before: '|', fill: words.rubyBase, middle: '<', second: words.rubyReading, after: '>' },
     { id: 'secretDice', before: 'S', fill: '2d6', place: 'lineStart' },
     { id: 'quote', before: '> ', fill: '', place: 'lineStart' },
     { id: 'resource', before: ':', fill: words.resource, middle: '-', second: '1' },

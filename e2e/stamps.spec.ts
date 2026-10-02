@@ -26,7 +26,7 @@ test('stamp panel and chat behave in a real browser', async ({ page }) => {
   await picker.getByRole('tab', { name: /特殊記法/ }).click();
   await picker.locator('[data-syntax="ruby"]').click();
   const textarea = page.locator('textarea.chat-input');
-  await expect(textarea).toHaveValue('|漢字《かんじ》');
+  await expect(textarea).toHaveValue('|漢字<かんじ>');
 
   // A saved word typed without a colon is offered, and only sent when chosen.
   await textarea.fill('ドンマイ');

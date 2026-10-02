@@ -65,6 +65,8 @@ describe('ChatLogExporter', () => {
     it('turns the ruby notation into ruby markup', () => {
       const result = ChatLogExporter.escapeHtml('|漢字《かんじ》');
       expect(result).toContain('<ruby>漢字<rt>かんじ</rt></ruby>');
+      expect(ChatLogExporter.escapeHtml('|漢字<かんじ>')).toBe('<ruby>漢字<rt>かんじ</rt></ruby>');
+      expect(ChatLogExporter.escapeHtml('|a<&amp;>')).toBe('<ruby>a<rt>&amp;amp;</rt></ruby>');
     });
 
     it('reads a full-width bar in that notation too', () => {

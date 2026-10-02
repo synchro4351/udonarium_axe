@@ -127,6 +127,30 @@ describe('formatNoteText', () => {
       );
     });
 
+    it('applies the angle-bracket ruby to text, headings, list items and quotes', () => {
+      expect(format('|漢字<かんじ>')).toBe(`<p>${RUBY}</p>`);
+      expect(format('## 第一章 |漢字<かんじ>')).toBe(`<h2>第一章 ${RUBY}</h2>`);
+      expect(format('- |漢字<かんじ>\n1. ｜漢字<かんじ>')).toBe(`<ul><li>${RUBY}</li></ul><ol><li>${RUBY}</li></ol>`);
+      expect(format('> |漢字<かんじ>')).toBe(`<blockquote><p>${RUBY}</p></blockquote>`);
+      expect(format('前|漢字<かんじ>後と|漢字《かんじ》')).toBe(`<p>前${RUBY}後と${RUBY}</p>`);
+    });
+
+    it('keeps the angle-bracket ruby literal inside code', () => {
+      expect(format('`|漢字<かんじ>`')).toBe('<p><code>|漢字&lt;かんじ&gt;</code></p>');
+      expect(format('```\n|漢字<かんじ>\n```')).toBe('<pre><code>|漢字&lt;かんじ&gt;</code></pre>');
+    });
+
+    it('leaves comparisons and incomplete notation as escaped text', () => {
+      expect(format('1 < 2 > 0 と |x|<3> と |漢字<かんじ')).toBe(
+        '<p>1 &lt; 2 &gt; 0 と |x|&lt;3&gt; と |漢字&lt;かんじ</p>'
+      );
+      expect(format('|漢字<かん\nじ>')).toBe('<p>|漢字&lt;かん<br>じ&gt;</p>');
+    });
+
+    it('lets a backslash before the bracket keep the angle-bracket notation as text', () => {
+      expect(format('|漢字\\<かんじ>')).toBe('<p>|漢字&lt;かんじ&gt;</p>');
+    });
+
     it('turns "\\s" into a space as the normal display does', () => {
       expect(format('a\\sb')).toBe('<p>a b</p>');
     });
@@ -196,6 +220,7 @@ describe('formatNoteText', () => {
           '| 表 |',
           '**強調**',
           '- [x] 済み',
+          '|<b>太字</b> と |a<script>alert(1)</script> と |b<img src=x onerror=alert(1)>',
         ].join('\n')
       );
       const tags = [...html.matchAll(/<\/?([a-z0-9]+)/g)].map((match) => match[1]);

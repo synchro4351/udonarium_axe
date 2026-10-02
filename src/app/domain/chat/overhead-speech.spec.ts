@@ -27,6 +27,7 @@ describe('quotedSegmentsOf()', () => {
 
   it('shows the base of ruby notation rather than its markup', () => {
     expect(quotedSegmentsOf('「|魔法《まほう》だ」')).toEqual(['魔法だ']);
+    expect(quotedSegmentsOf('「|魔法<まほう>だ」')).toEqual(['魔法だ']);
   });
 
   it('does not pair straight quotes across lines', () => {

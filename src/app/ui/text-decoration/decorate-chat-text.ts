@@ -1,6 +1,8 @@
-/* Text decoration shared by the chat and the shared notes.
-   生のテキスト文字列を受け取り、HTML エスケープ → ルビ → 引用ブロック装飾を順に適用した HTML を返す。
-   ChatMessageComponent (live chat) と TextNoteComponent (非編集モード) が同じ見た目で描画するために使う。 */
+/* Decoration shared by chat and shared notes. Ruby is parsed from raw text, then every run
+   is HTML-escaped before quotation styling is applied. Live chat and non-editing notes use
+   the same rendering path. */
+
+import { replaceRubyNotation, rubyNotationRuns } from '@axe/domain/chat/ruby-notation';
 
 const HTML_ESCAPE_MAP: Readonly<Record<string, string>> = {
   '&': '&amp;',
@@ -20,20 +22,26 @@ export function escapeHtml(text: unknown): string {
   return text.replace(/[&'`"<>]/g, (match) => HTML_ESCAPE_MAP[match] ?? match);
 }
 
-const RUBY_NOTATION = /[|｜]([^|｜\s]+?)《(.+?)》/g;
-
 const ESCAPED_SPACE = /\\s/g;
 
+/** Escapes text and turns `\s` into a space. */
+function escapeRun(text: string): string {
+  return escapeHtml(text).replace(ESCAPED_SPACE, ' ');
+}
+
 /**
- * Turns the ruby notation (`|word《reading》`, with a half- or full-width bar) into `<ruby>`
- * markup, and `\s` into a space.
+ * Escapes text as {@link escapeHtml} does, turns the ruby notation (`|word<reading>` or
+ * `|word《reading》`, with a half- or full-width bar) into `<ruby>` markup, and `\s` into a space.
  *
- * Expects text that has already been escaped.
+ * Takes the text as it was typed: the notation is read before anything is escaped, and the words
+ * and the reading are escaped on their own, so markup typed into either stays text.
  */
-export function applyRubyMarkup(escapedHtml: string): string {
-  return escapedHtml
-    .replace(RUBY_NOTATION, '<ruby class="chat-ruby"><rb>$1</rb><rt>$2</rt></ruby>')
-    .replace(ESCAPED_SPACE, ' ');
+export function escapeHtmlWithRuby(text: string): string {
+  return replaceRubyNotation(
+    text,
+    (base, reading) => `<ruby class="chat-ruby"><rb>${escapeRun(base)}</rb><rt>${escapeRun(reading)}</rt></ruby>`,
+    escapeRun
+  );
 }
 
 /** A run of a line: plain text, or text with a reading written over it. */
@@ -44,24 +52,16 @@ export interface RubyPart {
 }
 
 /**
- * Cuts a line at the ruby notation (`|word《reading》`), the same way {@link applyRubyMarkup} reads it.
+ * Cuts a line at the ruby notation, the same way {@link escapeHtmlWithRuby} reads it.
  *
  * The runs stay text rather than becoming html, for a place that shows a line a little at a time
  * and so cannot hand over a finished piece of markup.
  */
 export function splitRubyNotation(text: string): RubyPart[] {
-  const parts: RubyPart[] = [];
-  const plain = (from: number, to: number) => {
-    if (to > from) parts.push({ text: text.slice(from, to).replace(ESCAPED_SPACE, ' '), reading: '' });
-  };
-  let at = 0;
-  for (const match of text.matchAll(RUBY_NOTATION)) {
-    plain(at, match.index);
-    parts.push({ text: match[1].replace(ESCAPED_SPACE, ' '), reading: match[2].replace(ESCAPED_SPACE, ' ') });
-    at = match.index + match[0].length;
-  }
-  plain(at, text.length);
-  return parts;
+  return rubyNotationRuns(text).map((run) => ({
+    text: run.text.replace(ESCAPED_SPACE, ' '),
+    reading: run.reading.replace(ESCAPED_SPACE, ' '),
+  }));
 }
 
 /**
@@ -93,7 +93,7 @@ export function decorateQuoteLines(html: string): string {
   return parts.join('\n');
 }
 
-/** Escapes html, then applies the ruby notation (`|word《reading》`), then quoted lines (`> ...`) */
+/** Escapes html and applies the ruby notation, then quoted lines (`> ...`) */
 export function decorateChatStyleText(text: string): string {
-  return decorateQuoteLines(applyRubyMarkup(escapeHtml(text)));
+  return decorateQuoteLines(escapeHtmlWithRuby(text));
 }
