@@ -44,3 +44,16 @@ describe('buildEffectChatToken()', () => {
     expect(parseEffectChatToken(buildEffectChatToken('爆炎'))?.name).toBe('爆炎');
   });
 });
+
+describe('ruby and effect commands together', () => {
+  it('never treats a reading as a command and keeps a real following command', () => {
+    expect(parseEffectChatToken('|技《爆炎》')).toBeNull();
+    expect(parseEffectChatToken('|技<爆炎>')).toBeNull();
+    expect(parseEffectChatToken('|技《爆炎》 《斬撃》')).toEqual({ name: '斬撃', text: '|技《爆炎》' });
+    expect(parseEffectChatToken('|技<爆炎> 《斬撃》')).toEqual({ name: '斬撃', text: '|技<爆炎>' });
+  });
+  it('preserves spaces within ruby while removing commands from surrounding text', () => {
+    expect(stripEffectChatTokens('  |東京<とう  きょう>   《斬撃》  ')).toBe('|東京<とう  きょう>');
+    expect(stripEffectChatTokens('|東京《とう  きょう》 《斬撃》')).toBe('|東京《とう  きょう》');
+  });
+});

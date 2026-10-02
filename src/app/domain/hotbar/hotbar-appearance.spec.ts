@@ -14,6 +14,11 @@ describe('how a hotbar slot shows itself', () => {
       expect(hotbarSlotIcon('chat', 'こんばんは')).toBe('chat_bubble');
     });
 
+    it('does not take the reading of a ruby for an effect', () => {
+      expect(hotbarSlotIcon('chat', '|魔法《まほう》を唱える')).toBe('chat_bubble');
+      expect(hotbarSlotIcon('chat', '|魔法《まほう》《炎》')).toBe('auto_awesome');
+    });
+
     it('goes by the kind for everything else', () => {
       expect(hotbarSlotIcon('sound', 'dice-roll')).toBe('volume_up');
       expect(hotbarSlotIcon('range', 'LINE')).toBe('radar');
