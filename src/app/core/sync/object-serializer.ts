@@ -41,7 +41,7 @@ export class ObjectSerializer {
 
     let attrStr = '';
     for (const name of Object.keys(attributes)) {
-      const attribute = encodeEntityReference(`${attributes[name]}`);
+      const attribute = encodeAttributeValue(`${attributes[name]}`);
       if (attribute == null) continue;
       attrStr += ` ${name}="${attribute}"`;
     }
@@ -191,6 +191,16 @@ export class ObjectSerializer {
     }
     return { obj, key };
   }
+}
+
+/**
+ * Escapes a value for an attribute, writing tabs and line breaks as character references.
+ *
+ * A parser turns a tab or line break it meets as it is inside an attribute into a space, so
+ * multiline text would come back on one line. A reference survives as the character itself.
+ */
+function encodeAttributeValue(value: string): string {
+  return encodeEntityReference(value).replace(/[\t\n\r]/g, (char) => `&#${char.charCodeAt(0)};`);
 }
 
 /**

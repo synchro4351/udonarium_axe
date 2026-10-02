@@ -3,6 +3,7 @@ import { GameObject } from '@axe/core/sync/game-object';
 import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DataElement } from '@axe/domain/data/data-element';
+import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 
 describe('ObjectSerializer', () => {
   let serializer: ObjectSerializer;
@@ -185,6 +186,91 @@ describe('ObjectSerializer', () => {
 
       expect(restored).toBeTruthy();
       expect(restored.aliasName).toBe(original.aliasName);
+    });
+  });
+
+  describe('tabs and line breaks in an attribute', () => {
+    function roundTrip(value: string): string {
+      const original = DataElement.create('note', '', { memo: value });
+      const restored = serializer.parseXml(serializer.toXml(original)) as DataElement;
+      try {
+        return restored.getAttribute('memo');
+      } finally {
+        original.destroy();
+        restored.destroy();
+      }
+    }
+
+    it('writes them as character references rather than as they are', () => {
+      const xml = serializer.toXml(DataElement.create('note', '', { memo: 'a\r\nb\tc\nd\re' }));
+
+      expect(xml).toContain('memo="a&#13;&#10;b&#9;c&#10;d&#13;e"');
+      expect(xml).not.toMatch(/[\t\n\r]/);
+    });
+
+    it('leaves an ordinary attribute exactly as it was written before', () => {
+      const xml = serializer.toXml(DataElement.create('HP', 10, { type: 'numberResource', currentValue: 8 }));
+
+      expect(xml).toContain('type="numberResource"');
+      expect(xml).toContain('currentValue="8"');
+      expect(xml).toContain('name="HP"');
+      expect(xml).not.toContain('&#');
+    });
+
+    it('leaves the line breaks in the element body as they are', () => {
+      const xml = serializer.toXml(DataElement.create('note', 'first\nsecond\tthird', {}));
+
+      expect(xml).toContain('>first\nsecond\tthird</data>');
+    });
+
+    it.each([
+      ['a line feed', 'first\nsecond'],
+      ['a carriage return', 'first\rsecond'],
+      ['a CRLF', 'first\r\nsecond'],
+      ['a tab', 'first\tsecond'],
+      ['breaks at both ends', '\n\tmiddle\r\n'],
+      ['quotes and ampersands', `say "hi" & 'bye' <now>`],
+      ['Unicode', '日本語の台詞🎲\n二行目'],
+    ])('reads %s back as it was written', (_label, value) => {
+      expect(roundTrip(value)).toBe(value);
+    });
+
+    it('reads a line break in an older save as the space it always became', () => {
+      const restored = serializer.parseXml('<data name="note" memo="first\nsecond"></data>') as DataElement;
+
+      expect(restored.getAttribute('memo')).toBe('first second');
+      restored.destroy();
+    });
+  });
+
+  describe('a cut-in text layer', () => {
+    it('keeps the lines of its words through a clone', () => {
+      const layer = new CutInLayer();
+      layer.initialize();
+      layer.kind = 'text';
+      layer.text = '一行目\n二行目\r\nthird\tline';
+
+      const copy = layer.clone();
+
+      expect(copy).not.toBe(layer);
+      expect(copy.kind).toBe('text');
+      expect(copy.text).toBe('一行目\n二行目\r\nthird\tline');
+      layer.destroy();
+      copy.destroy();
+    });
+
+    it('reads a single-line layer saved before the change as it always did', () => {
+      const layer = serializer.parseXml(
+        '<cut-in-layer name="title" kind="text" text="決戦 &amp; &quot;開幕&quot;" fontSizePx="48" vertical="true">' +
+          '</cut-in-layer>'
+      ) as CutInLayer;
+
+      expect(layer).toBeInstanceOf(CutInLayer);
+      expect(layer.name).toBe('title');
+      expect(layer.text).toBe('決戦 & "開幕"');
+      expect(layer.fontSizePx).toBe(48);
+      expect(layer.vertical).toBe(true);
+      layer.destroy();
     });
   });
 });
