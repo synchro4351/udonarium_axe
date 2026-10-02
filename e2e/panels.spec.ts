@@ -254,8 +254,8 @@ test.describe('キャラ取り込み (FAB のセーブ&ロード)', () => {
     await peerPanel.getByRole('button', { name: /^\s*見学\s*$/ }).click();
 
     const menu = await openSaveLoad(page);
-    await expect(menu.getByTestId('save-load-load')).toBeDisabled();
-    await expect(menu.getByTestId('save-load-import-character')).toBeDisabled();
+    await expect(menu.getByTestId('save-load-load')).toHaveCount(0);
+    await expect(menu.getByTestId('save-load-import-character')).toHaveCount(0);
     await expect(menu.getByTestId('save-load-save')).toBeEnabled();
   });
 });
