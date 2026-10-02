@@ -3,6 +3,17 @@ import { DataElement, DataElementType } from '@axe/domain/data/data-element';
 import { OwnedTabletopObject } from '@axe/domain/tabletop/owned-tabletop-object';
 import { moveToTopmost } from '@axe/domain/tabletop/tabletop-object-util';
 
+/**
+ * How a note's body is shown: `normal` shows the text as typed, `formatted` reads a small set of
+ * Markdown-style marks (headings, lists, quotes and code).
+ */
+export type TextNoteFormat = 'normal' | 'formatted';
+
+/** Reads a stored or received format, taking anything other than `formatted` as `normal`. */
+export function toTextNoteFormat(value: unknown): TextNoteFormat {
+  return value === 'formatted' ? 'formatted' : 'normal';
+}
+
 @SyncObject('text-note')
 export class TextNote extends OwnedTabletopObject {
   @SyncVar() owner: string = '';
@@ -18,6 +29,17 @@ export class TextNote extends OwnedTabletopObject {
   @SyncVar() limitHeight: boolean = false;
   @SyncVar() overViewWidth: number = 250;
   @SyncVar() overViewMaxHeight: number = 250;
+
+  /** The body's display format as saved and synced; read it through {@link format}. */
+  @SyncVar() textFormat: string = 'normal';
+
+  /** How the body is shown; an unknown stored value counts as `normal`. */
+  get format(): TextNoteFormat {
+    return toTextNoteFormat(this.textFormat);
+  }
+  set format(format: TextNoteFormat) {
+    this.textFormat = toTextNoteFormat(format);
+  }
 
   /** How many grid cells wide the note is, kept in its common data. */
   get width(): number {

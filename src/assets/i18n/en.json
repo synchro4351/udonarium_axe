@@ -910,6 +910,29 @@
         "height": "Height",
         "fontSize": "Font size",
         "altitude": "Altitude"
+      },
+      "format": {
+        "label": "Display",
+        "normal": "Plain",
+        "formatted": "Formatted",
+        "helpNormal": "Shown exactly as typed. Switch to Formatted to show headings and lists.",
+        "helpFormatted": "Start a line with \"# \", \"## \" or \"### \" for a heading, \"- \" for a bullet, \"1. \" for a numbered item or \"> \" for a quote. Text wrapped in ` is shown as typed. Emphasis with * or _, tables, links and HTML are not used.",
+        "preview": "Preview",
+        "insertLabel": "Insert marks",
+        "insert": {
+          "heading": "Heading",
+          "bullet": "Bullet",
+          "numbered": "Numbered",
+          "quote": "Quote",
+          "code": "Code"
+        },
+        "insertTitle": {
+          "heading": "Start the selected lines with \"## \" to make them headings",
+          "bullet": "Start the selected lines with \"- \"",
+          "numbered": "Start the selected lines with \"1. \"",
+          "quote": "Start the selected lines with \"> \"",
+          "code": "Wrap the selection in `, or in ``` when it spans lines"
+        }
       }
     },
     "cardStack": {

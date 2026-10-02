@@ -1133,15 +1133,77 @@
               (change)="setTextNoteTitle(note, $event)"
             />
           </label>
+          <div class="flex flex-wrap items-center gap-2 text-[0.78em]">
+            <span class="text-ui-muted">{{ 'feature.textNote.format.label' | transloco }}</span>
+            <div
+              class="border-ui-border-panel rounded-ui-sm inline-flex overflow-hidden border border-solid"
+              role="radiogroup"
+              [attr.aria-label]="'feature.textNote.format.label' | transloco"
+            >
+              @for (format of textNoteFormats; track format) {
+                <button
+                  class="text-ui-muted hover:bg-ui-hover hover:text-ui-text cursor-pointer border-none bg-transparent px-2.5 py-0.75 leading-[1.4] whitespace-nowrap transition-[background,color]"
+                  [class.bg-ui-accent-bg!]="textNoteFormat(note) === format"
+                  [class.text-ui-accent!]="textNoteFormat(note) === format"
+                  [class.font-semibold]="textNoteFormat(note) === format"
+                  type="button"
+                  role="radio"
+                  [attr.aria-checked]="textNoteFormat(note) === format"
+                  (click)="setTextNoteFormat(note, format)"
+                >
+                  {{ 'feature.textNote.format.' + format | transloco }}
+                </button>
+              }
+            </div>
+            @if (textNoteFormat(note) === 'formatted') {
+              <div
+                class="flex flex-wrap items-center gap-1"
+                role="toolbar"
+                [attr.aria-label]="'feature.textNote.format.insertLabel' | transloco"
+              >
+                @for (entry of textNoteFormatMarks; track entry.mark) {
+                  <button
+                    class="bg-ui-elevated border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex cursor-pointer items-center gap-0.75 border border-solid px-1.5 py-0.5 leading-[1.4] whitespace-nowrap transition-[background,color] [&_.material-icons]:text-[13px]!"
+                    type="button"
+                    [title]="'feature.textNote.format.insertTitle.' + entry.mark | transloco"
+                    (mousedown)="$event.preventDefault()"
+                    (click)="insertTextNoteFormatMark(note, noteBody, entry.mark)"
+                  >
+                    <i class="material-icons">{{ entry.icon }}</i>
+                    {{ 'feature.textNote.format.insert.' + entry.mark | transloco }}
+                  </button>
+                }
+              </div>
+            }
+          </div>
           <label class="flex flex-col gap-1 text-[0.78em]">
             <span class="text-ui-muted">{{ 'feature.textNote.field.body' | transloco }}</span>
             <textarea
+              #noteBody
               class="border-ui-border-panel bg-ui-input text-ui-text rounded-ui-sm focus:border-ui-accent min-h-48 w-full resize-y border border-solid px-3 py-2 font-sans text-sm/relaxed whitespace-pre-wrap transition-colors outline-none [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-xs [&::-webkit-scrollbar-thumb]:bg-(--ui-panel-border) [&::-webkit-scrollbar-track]:bg-transparent"
               [value]="textNoteText(note)"
               (input)="setTextNoteText(note, $event)"
               spellcheck="false"
             ></textarea>
           </label>
+          <p class="text-ui-muted m-0 text-[0.74em] leading-normal">
+            {{
+              (textNoteFormat(note) === 'formatted'
+                ? 'feature.textNote.format.helpFormatted'
+                : 'feature.textNote.format.helpNormal'
+              ) | transloco
+            }}
+          </p>
+          @if (textNoteFormat(note) === 'formatted') {
+            <div class="flex flex-col gap-1 text-[0.78em]">
+              <span class="text-ui-muted">{{ 'feature.textNote.format.preview' | transloco }}</span>
+              <div
+                class="note-formatted border-ui-border-panel text-ui-text rounded-ui-sm max-h-64 min-h-10 overflow-y-auto border border-dashed px-3 py-2 font-sans text-sm/relaxed wrap-anywhere [word-break:break-word]"
+                data-testid="text-note-format-preview"
+                [innerHTML]="textNotePreviewHtml() | safe"
+              ></div>
+            </div>
+          }
         </section>
 
         <section class="bg-ui-panel border-ui-border-panel rounded-ui-sm flex flex-col gap-2.5 border border-solid p-3">

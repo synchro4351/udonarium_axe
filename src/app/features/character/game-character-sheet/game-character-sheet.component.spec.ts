@@ -11,6 +11,7 @@ import { DataElement, DataElementAttribute, DataElementRole } from '@axe/domain/
 import { DiceSymbol } from '@axe/domain/dice/dice-symbol';
 import { Config } from '@axe/domain/peer/config';
 import { Terrain } from '@axe/domain/tabletop/terrain';
+import { TextNote } from '@axe/domain/tabletop/text-note';
 import { CharacterPortraitFitComponent } from '@axe/features/character/character-portrait-fit/character-portrait-fit.component';
 import { GameCharacterSheetComponent } from '@axe/features/character/game-character-sheet/game-character-sheet.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -671,6 +672,69 @@ describe('GameCharacterSheetComponent', () => {
       } finally {
         character.destroy();
       }
+    });
+  });
+
+  describe('note display format', () => {
+    let note: TextNote;
+
+    beforeEach(() => {
+      note = TextNote.create('メモ', '# 見出し\n- 項目');
+      component.tabletopObject = note;
+    });
+
+    afterEach(() => {
+      note.destroy();
+    });
+
+    function host(): HTMLElement {
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    function formatButton(label: string): HTMLButtonElement {
+      const buttons = Array.from(host().querySelectorAll<HTMLButtonElement>('[role="radio"]'));
+      return buttons.find((button) => button.textContent?.trim() === label)!;
+    }
+
+    it('shows the switch on normal, with no preview or mark buttons', () => {
+      fixture.detectChanges();
+
+      expect(formatButton('通常').getAttribute('aria-checked')).toBe('true');
+      expect(formatButton('整形').getAttribute('aria-checked')).toBe('false');
+      expect(host().querySelector('[data-testid="text-note-format-preview"]')).toBeNull();
+      expect(host().querySelector('[role="toolbar"]')).toBeNull();
+    });
+
+    it('switches the note to formatted and previews the body', async () => {
+      fixture.detectChanges();
+      formatButton('整形').click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(note.textFormat).toBe('formatted');
+      const preview = host().querySelector('[data-testid="text-note-format-preview"]')!;
+      expect(preview.innerHTML).toContain('<h1>見出し</h1>');
+      expect(preview.innerHTML).toContain('<li>項目</li>');
+      expect(host().querySelectorAll('[role="toolbar"] button')).toHaveLength(5);
+    });
+
+    it('puts a mark at the start of the line in the body and keeps the text area focused', async () => {
+      note.format = 'formatted';
+      note.text = '剣';
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const textArea = host().querySelector('textarea')!;
+      textArea.setSelectionRange(1, 1);
+
+      const bullet = Array.from(host().querySelectorAll<HTMLButtonElement>('[role="toolbar"] button')).find((button) =>
+        button.textContent?.includes('箇条書き')
+      )!;
+      bullet.click();
+
+      expect(note.text).toBe('- 剣');
+      expect(textArea.value).toBe('- 剣');
+      expect(textArea.selectionStart).toBe(3);
     });
   });
 });

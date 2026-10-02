@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { DisclosureService } from '@axe/application/permission/disclosure.service';
 import { IPeerContext } from '@axe/core/network/peer-context';
 import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
 import { ImageFile } from '@axe/core/storage/image-file';
@@ -16,6 +17,7 @@ import {
 } from '@axe/domain/data/data-element';
 import { DiceSymbol } from '@axe/domain/dice/dice-symbol';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
+import { TextNote } from '@axe/domain/tabletop/text-note';
 import { OverviewPanelComponent } from '@axe/features/inventory/overview-panel/overview-panel.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 import { DraggableDirective } from '@axe/ui/directives/draggable.directive';
@@ -63,6 +65,90 @@ describe('OverviewPanelComponent', () => {
     const panel = fixture.nativeElement.querySelector('[data-tooltip-rotation]') as HTMLElement;
     expect(panel.dataset['tooltipRotation']).toBe('90');
     expect(panel.style.transform).toBe('rotateZ(90deg)');
+  });
+
+  describe('a text note', () => {
+    const SOURCE = '# 見出し\n- 項目\n`|漢字《かんじ》`\n<b>太字</b> https://example.com';
+    let note: TextNote;
+
+    beforeEach(() => {
+      note = TextNote.create('整形メモ', SOURCE);
+      component.tabletopObject = note;
+    });
+
+    afterEach(() => {
+      note.destroy();
+    });
+
+    async function render(): Promise<HTMLElement> {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    async function settle(): Promise<HTMLElement> {
+      await Promise.resolve();
+      await fixture.whenStable();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    const formatted = (host: HTMLElement) => host.querySelector<HTMLElement>('[data-testid="overview-note-formatted"]');
+
+    it('keeps a normal note in its editable text area, as typed', async () => {
+      const host = await render();
+
+      expect(host.querySelector('textarea')?.value).toBe(SOURCE);
+      expect(formatted(host)).toBeNull();
+      expect(host.querySelector('h1')).toBeNull();
+    });
+
+    it('shows a formatted note formatted, in place of the text area', async () => {
+      note.format = 'formatted';
+      const host = await render();
+      const shown = formatted(host)!;
+
+      expect(host.querySelector('textarea')).toBeNull();
+      expect(shown.classList).toContain('note-formatted');
+      expect(shown.querySelector('h1')?.textContent).toBe('見出し');
+      expect(shown.querySelector('ul li')?.textContent).toBe('項目');
+      expect(shown.querySelector('code')?.textContent).toBe('|漢字《かんじ》');
+      expect(shown.querySelector('ruby')).toBeNull();
+      expect(shown.querySelector('b')).toBeNull();
+      expect(shown.querySelector('a')).toBeNull();
+      expect(shown.textContent).toContain('<b>太字</b> https://example.com');
+    });
+
+    it('follows the note as its format and body change', async () => {
+      let host = await render();
+      expect(formatted(host)).toBeNull();
+
+      note.format = 'formatted';
+      host = await settle();
+      expect(formatted(host)?.querySelector('h1')?.textContent).toBe('見出し');
+
+      note.text = '## 次の見出し';
+      host = await settle();
+      expect(formatted(host)?.querySelector('h1')).toBeNull();
+      expect(formatted(host)?.querySelector('h2')?.textContent).toBe('次の見出し');
+
+      note.format = 'normal';
+      host = await settle();
+      expect(formatted(host)).toBeNull();
+      expect(host.querySelector('textarea')?.value).toBe('## 次の見出し');
+    });
+
+    it('shows neither the source nor the formatted body to someone it is kept from', async () => {
+      note.format = 'formatted';
+      vi.spyOn(TestBed.inject(DisclosureService), 'canView').mockReturnValue(false);
+      const host = await render();
+
+      expect(host.querySelector('textarea')).toBeNull();
+      expect(formatted(host)).toBeNull();
+      expect(host.textContent).not.toContain('見出し');
+      expect(host.textContent).not.toContain('項目');
+      expect(host.textContent).toContain('lock');
+    });
   });
 
   describe('a detail pinned to a screen edge', () => {

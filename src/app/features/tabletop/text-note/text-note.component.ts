@@ -41,6 +41,7 @@ import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { setupInputHandler, setupMovableRotableForPiece } from '@axe/ui/tabletop/setup-tabletop-piece';
 import { translateZCss, Z_OFFSET_TABLETOP_OBJECT_PX } from '@axe/ui/tabletop/z-offset';
 import { decorateChatStyleText } from '@axe/ui/text-decoration/decorate-chat-text';
+import { formatNoteText } from '@axe/ui/text-decoration/format-note-text';
 
 @Component({
   selector: 'text-note',
@@ -131,6 +132,14 @@ export class TextNoteComponent {
     this.objectChange.versionOf(note.identifier)();
     return decorateChatStyleText(this._text());
   });
+  /** Whether the note is set to show its body formatted rather than as typed. */
+  readonly isFormatted = computed(() => {
+    const note = this.textNote();
+    this.objectChange.versionOf(note.identifier)();
+    return note.format === 'formatted';
+  });
+  /** The body as formatted HTML. Unlike {@link decoratedHtml} it is not linkified. */
+  readonly formattedHtml = computed(() => formatNoteText(this._text()));
   readonly maskedHtml = computed(() => {
     const note = this.textNote();
     this.objectChange.versionOf(note.identifier)();

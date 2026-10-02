@@ -383,6 +383,79 @@ ruby.chat-ruby rt {
   white-space: pre-wrap;
 }
 
+/* The "formatted" display of a shared note. formatNoteText writes headings, lists, quotes and code
+   for innerHTML; Preflight strips their default look, so the minimum is put back here. Shared by the
+   note on the table, the preview in its sheet and its hover overview. */
+.note-formatted {
+  white-space: normal;
+}
+.note-formatted :is(p, ul, ol, pre, blockquote) {
+  margin: 0.35em 0;
+}
+.note-formatted :is(h1, h2, h3) {
+  margin: 0.55em 0 0.25em;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.note-formatted h1 {
+  font-size: 1.4em;
+}
+.note-formatted h2 {
+  font-size: 1.2em;
+}
+.note-formatted h3 {
+  font-size: 1.05em;
+}
+.note-formatted > :first-child {
+  margin-top: 0;
+}
+.note-formatted > :last-child {
+  margin-bottom: 0;
+}
+.note-formatted ul {
+  padding-left: 1.4em;
+  list-style: disc;
+}
+.note-formatted ol {
+  padding-left: 1.6em;
+  list-style: decimal;
+}
+.note-formatted li :is(ul, ol) {
+  margin: 0;
+}
+.note-formatted blockquote {
+  padding: 5px 10px;
+  border-left: 3px solid var(--ui-quote-border);
+  border-radius: 0 4px 4px 0;
+  background: var(--ui-quote-bg);
+  color: var(--ui-quote-text);
+  font-weight: 500;
+}
+.note-formatted blockquote > :first-child {
+  margin-top: 0;
+}
+.note-formatted blockquote > :last-child {
+  margin-bottom: 0;
+}
+.note-formatted code {
+  padding: 0 0.25em;
+  border-radius: 3px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.9em;
+}
+.note-formatted pre {
+  padding: 0.45em 0.7em;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.note-formatted pre code {
+  padding: 0;
+  background: none;
+}
+
 /* ChatMessageComponent.jumpEffect が要素を [class.chat-message-highlight] でトグルしたとき、
    accent カラーで一瞬光らせる。`animation:` ショートハンドは Tailwind の animate-chat-* と衝突して
    解除時にスライドインを再生してしまうので、background-color + box-shadow + transition で表現する。 */

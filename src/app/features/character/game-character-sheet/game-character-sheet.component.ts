@@ -41,7 +41,7 @@ import { CharacterSheetTarget } from '@axe/domain/tabletop/character-sheet-targe
 import { RangeArea } from '@axe/domain/tabletop/range';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
 import { Terrain, TERRAIN_FACES, TerrainFace } from '@axe/domain/tabletop/terrain';
-import { TextNote } from '@axe/domain/tabletop/text-note';
+import { TextNote, TextNoteFormat } from '@axe/domain/tabletop/text-note';
 import { CardStackCardListComponent } from '@axe/features/card/card-stack-card-list/card-stack-card-list.component';
 import { CharacterPortraitFitComponent } from '@axe/features/character/character-portrait-fit/character-portrait-fit.component';
 import { cloneTabletopObject } from '@axe/features/character/game-character-sheet/character-sheet-target-helpers';
@@ -55,8 +55,14 @@ import { clampInRange, roundOr } from '@axe/features/character/game-character-sh
 import { ImportCharacterImgComponent } from '@axe/features/character/import-character-img/import-character-img.component';
 import { GameDataElementComponent } from '@axe/features/data-element/game-data-element/game-data-element.component';
 import { DisclosureControlComponent } from '@axe/features/disclosure/disclosure-control/disclosure-control.component';
+import {
+  applyTextNoteFormatMark,
+  TEXT_NOTE_FORMAT_MARKS,
+  TextNoteFormatMark,
+} from '@axe/features/tabletop/text-note/text-note-format-marks';
 import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
+import { formatNoteText } from '@axe/ui/text-decoration/format-note-text';
 import { TranslocoModule } from '@jsverse/transloco';
 
 @Component({
@@ -439,6 +445,35 @@ export class GameCharacterSheetComponent {
   setTextNoteText(note: TextNote, event: Event): void {
     note.text = (event.target as HTMLTextAreaElement).value;
   }
+  protected readonly textNoteFormats: readonly TextNoteFormat[] = ['normal', 'formatted'];
+  protected readonly textNoteFormatMarks = TEXT_NOTE_FORMAT_MARKS;
+  /** The note's display format, for the format switch. */
+  textNoteFormat(note: TextNote): TextNoteFormat {
+    this.objectChange.versionOf(note.identifier)();
+    return note.format;
+  }
+  /** Switches how the note's body is shown, for everyone at the table. */
+  setTextNoteFormat(note: TextNote, format: TextNoteFormat): void {
+    note.format = format;
+  }
+  /**
+   * Puts a formatting mark into the note's body at the text area's selection, then gives the text
+   * area back its focus with the marked text still selected.
+   */
+  insertTextNoteFormatMark(note: TextNote, textArea: HTMLTextAreaElement, mark: TextNoteFormatMark): void {
+    const edit = applyTextNoteFormatMark(textArea.value, textArea.selectionStart, textArea.selectionEnd, mark);
+    textArea.value = edit.text;
+    note.text = edit.text;
+    textArea.focus();
+    textArea.setSelectionRange(edit.selectionStart, edit.selectionEnd);
+  }
+  /** The open note's body as the formatted display shows it, or empty while the note is normal. */
+  readonly textNotePreviewHtml = computed(() => {
+    const note = this._tabletopObject();
+    if (!(note instanceof TextNote)) return '';
+    this.objectChange.versionOf(note.identifier)();
+    return note.format === 'formatted' ? formatNoteText(note.text) : '';
+  });
   /** The note's width, for its width field. */
   textNoteWidth(note: TextNote): number {
     this.objectChange.versionOf(note.identifier)();

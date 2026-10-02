@@ -54,6 +54,7 @@ import { DraggableDirective } from '@axe/ui/directives/draggable.directive';
 import { LinkifyPipe } from '@axe/ui/pipes/linkify.pipe';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { edgeDetailAnchor, EdgeDetailSeat } from '@axe/ui/tabletop/edge-detail-layout';
+import { formatNoteText } from '@axe/ui/text-decoration/format-note-text';
 import { TranslocoModule } from '@jsverse/transloco';
 
 @Component({
@@ -164,6 +165,18 @@ export class OverviewPanelComponent {
     if (this.tabletopObject.detailDataElement)
       trackChildren(this.tabletopObject.detailDataElement.children as DataElement[]);
     return version;
+  });
+
+  /**
+   * A formatted note's body as the formatted display shows it, or null for a normal note and
+   * anything that is not a note, which keep the text area. The source stays editable from the
+   * note's edit sheet.
+   */
+  readonly noteFormattedHtml = computed(() => {
+    this.objectVersion();
+    const note = this.tabletopObject;
+    if (!(note instanceof TextNote) || note.format !== 'formatted') return null;
+    return formatNoteText(note.text);
   });
 
   /**
