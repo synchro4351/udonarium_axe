@@ -7,7 +7,7 @@
 ## バージョンとソース
 
 - **固定版：tyoitashi r5／Axe v1.57.1** — [ソース `7033c85e`](https://github.com/synchro4351/udonarium_axe/tree/7033c85eed2cacd9c7ea44689e11ef9686b781f8)
-- **開発版：Axe v1.59.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`cebe7468`](https://github.com/synchro4351/udonarium_axe/tree/cebe7468)。公式のスイッチ・コンパス・ボタン名ガイドを取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
+- **開発版：Axe v1.59.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`70fbd8b1`](https://github.com/synchro4351/udonarium_axe/tree/70fbd8b1)。公式のスイッチ・コンパス・ボタン名ガイドを取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
@@ -17,6 +17,8 @@
 [試用サイト](https://udonarium-trial.synwork.work/)で固定版`tyoitashi r5`を試せます。個人用の卓とは別の試用環境です。実験的な機能を含むため、動作が不安定な場合があります。大切な卓データは手元へ保存してください。デモのソースは上記の固定コミット`7033c85e`です。
 
 ## 開発版で追加した変更（Axe v1.59.0）
+
+- 登録した画像を囲み、部位ごとのキャラクターコマを作れます。元画像を残し、HP・名前・移動は各コマで独立。通常の卓データとして保存できます。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/multipart-character-tokens) · [仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-character-tokens/docs/TYOITASHI_MULTIPART_CHARACTER_TOKENS.md)。
 
 - ルビを `|漢字<かんじ>` と半角で入力できます。従来表記も使え、表示・読み上げ・ログ・吹き出しを揃えました。読み仮名をエフェクト命令と誤認する問題も修正しました。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/ascii-ruby) · [仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/ascii-ruby/docs/TYOITASHI_ASCII_RUBY.md)。
 

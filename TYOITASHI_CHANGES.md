@@ -4,6 +4,11 @@
 
 r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は公式v1.58.0（46707582）とv1.59.0（19e9d1c7）を取り込んでいます。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1〜r4の固定ソースと併せて確認してください。
 
+## 画像から部位ごとのコマ（開発版）
+
+- [c44fb960](https://github.com/synchro4351/udonarium_axe/commit/c44fb960)：画像一覧から範囲選択を開き、正方形の透明余白付き画像と標準キャラクターを作成。基点cebe7468。最大20部位、独立HP、全画像の準備後に権限・元画像・テーブル・画面の状態を再確認します。
+- [70fbd8b1](https://github.com/synchro4351/udonarium_axe/commit/70fbd8b1)：[利用方法・保存と同期・制限](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-character-tokens/docs/TYOITASHI_MULTIPART_CHARACTER_TOKENS.md)。画像選択と秘匿表示、TabletopActionServiceの標準作成、通常のImageStorageに依存。ルビ・カットイン・共有メモの整形には依存せず、新形式・追加の同期属性・連動移動はありません。
+
 ## 半角山括弧のルビ（開発版）
 
 - [4048c900](https://github.com/synchro4351/udonarium_axe/commit/4048c900)：共通のルビ読み取り処理と、表示・段階表示・読み上げ・ログ・吹き出しへの接続。基点be4b77f4。従来記法を保ち、入力した文字列を保存・同期します。新しい依存パッケージや保存属性はありません。
