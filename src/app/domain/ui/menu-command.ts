@@ -37,6 +37,7 @@ export const MENU_TOGGLES = [
   'widgetPlToolbar',
   'widgetGmToolbar',
   'widgetClock',
+  'widgetCompass',
   'widgetRecording',
   'widgetConnectionQuality',
   'widgetMiniPlayer',
@@ -59,6 +60,7 @@ export const MENU_ACTS = [
   'turnNext',
   'turnPrev',
   'releaseOwnership',
+  'buttonGuide',
 ] as const;
 
 export type MenuActName = (typeof MENU_ACTS)[number];
@@ -208,6 +210,7 @@ export const MENU_COMMANDS: readonly MenuCommand[] = [
     testId: 'seat-widget-gmToolbar',
   }),
   toggle('widgetClock', 'schedule', 'app.fab.clock', { testId: 'seat-widget-clock' }),
+  toggle('widgetCompass', 'explore', 'app.fab.compass', { testId: 'seat-widget-compass' }),
   toggle('widgetRecording', 'radio_button_checked', 'app.fab.recording', {
     testId: 'seat-widget-recording',
   }),
@@ -237,6 +240,7 @@ export const MENU_COMMANDS: readonly MenuCommand[] = [
   act('turnNext', 'chevron_right', 'feature.turnOrder.next', { audience: 'gameMaster' }),
   act('turnPrev', 'chevron_left', 'feature.turnOrder.prev', { audience: 'gameMaster' }),
   act('releaseOwnership', 'key_off', 'app.fab.releaseOwnership', { audience: 'gameMaster' }),
+  act('buttonGuide', 'help_outline', 'app.fab.buttonGuide'),
 
   custom('turnIndicator', 'hourglass_top', 'feature.turnOrder.title', { surfaces: TOOLBARS }),
   custom('persona', 'visibility', 'feature.gmTools.persona.title', {
