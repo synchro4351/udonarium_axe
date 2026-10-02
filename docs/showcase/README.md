@@ -1,175 +1,173 @@
 # 卓の操作を、ちょい足し。
 
-Udonarium Axe tyoitashiは、Axeの基本操作に、カード・チャット・画像・演出の使いやすさを足した非公式フォークです。
+Udonarium Axe tyoitashiは、オンライン卓ツールUdonarium Axeの基本操作に、カード・チャット・画像・演出の使いやすさを足した、非公式の派生版です。
 
-[非公式デモ](https://udonarium-trial.synwork.work/) · [ソースと変更一覧](https://github.com/synchro4351/udonarium_axe) · [公式の使い方](https://xelltis.github.io/udonarium_axe/)
+[非公式デモ](https://udonarium-trial.synwork.work/) · [公式の使い方](https://xelltis.github.io/udonarium_axe/)
 
-試用サイトは固定版r5（Axe v1.57.1）。「開発版」の機能はまだ試用サイトに入っていません。写真は公開用の架空サンプルを使い、機能ごとに撮影したソースを記録しています。
+デモで試せるのは固定版r5（Axe v1.57.1）です。「開発版」と書いた機能は、まだデモに入っていません。画面写真には、公開用の架空のサンプルを使っています。
 
 ## カードをまとめて扱う
 
-**r5で利用可** — 自分と全員の手札を一覧に。ドラッグで渡す・引く操作ができ、公開は確認してから行います。部屋ごとに操作を制限し、不在者の手札はGMが引き継がせられます。
+**デモ（r5）で試せます**
 
-![自分の手札。公開状態と渡し主をカードの外に表示。](hand-cards.png)
+自分の手札と全員の手札を、それぞれ一覧で見られます。カードはドラッグで人に渡したり、引いたりできます。手札を公開するときは確認が出るので、うっかり見せてしまうのを防げます。部屋ごとにできる操作を制限でき、席にいない人の手札はGMが別の人に引き継がせられます。
 
-自分の手札。公開状態と渡し主をカードの外に表示。 [撮影ソース 17ba32be](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)
+![自分の手札です。公開しているかどうかと、誰から渡されたカードかが、カードの外に出ます。](hand-cards.png)
 
-![全員の手札。公開中は表面、非公開は裏面。](all-hands.png)
+自分の手札です。公開しているかどうかと、誰から渡されたカードかが、カードの外に出ます。
 
-全員の手札。公開中は表面、非公開は裏面。 [撮影ソース 17ba32be](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)
+![全員の手札です。公開中のカードは表、非公開のカードは裏が見えます。](all-hands.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/card-hand-visibility-sort-provenance)
+全員の手札です。公開中のカードは表、非公開のカードは裏が見えます。
 
 ## スタンプと絵文字で返す
 
-**r5で利用可** — 短い言葉からスタンプを候補表示。絵文字だけの発言は大きく、各発言には絵文字リアクションを付けられます。スタンプはセットで保存でき、キャラクターの頭上にも表示できます。
+**デモ（r5）で試せます**
 
-![プリセット、絵文字、特殊記法を選ぶ。](stamps-picker.png)
+短い言葉を打つと、合いそうなスタンプが候補に出ます。絵文字だけの発言は大きく表示され、どの発言にも絵文字でリアクションを付けられます。スタンプはセットにして保存でき、キャラクターの頭上にも出せます。
 
-プリセット、絵文字、特殊記法を選ぶ。 [撮影ソース 17ba32be](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)
+![プリセット、絵文字、特殊な書き方の中から選びます。](stamps-picker.png)
 
-![入力した言葉に合うスタンプを候補表示。](chat-stamps-suggestions.png)
+プリセット、絵文字、特殊な書き方の中から選びます。
 
-入力した言葉に合うスタンプを候補表示。 [撮影ソース 17ba32be](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)
+![打った言葉に合うスタンプが、候補に出ます。](chat-stamps-suggestions.png)
 
-![絵文字だけの発言は大きく表示。](chat-emoji.png)
+打った言葉に合うスタンプが、候補に出ます。
 
-絵文字だけの発言は大きく表示。 [撮影ソース 17ba32be](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)
+![絵文字だけの発言は、大きく表示されます。](chat-emoji.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-stamps)
+絵文字だけの発言は、大きく表示されます。
 
 ## 聞く・読み返す方法を選ぶ
 
-**r5で利用可** — ブラウザの音声合成でチャットを読み上げ、声や速度は端末ごとに設定します。ログは装飾付きHTMLと、文字だけのテキストを選んで保存できます。読めない発言は出力しません。
+**デモ（r5）で試せます**
 
-![チャットタブ設定から文字ログを保存。](chat-text-log.png)
+チャットをブラウザの音声合成で読み上げられます。声の種類や速さは、自分の端末で好みに合わせられます。ログは、装飾つきのHTMLと、文字だけのテキストから選んで保存できます。自分に見えない発言（ほかの人あての秘話など）は、保存したログに入りません。
 
-チャットタブ設定から文字ログを保存。 [撮影ソース 75b16b3a](https://github.com/synchro4351/udonarium_axe/tree/75b16b3a52adfe214953e9b995872b6d1096f18e)
+![チャットタブの設定から、文字だけのログを保存します。](chat-text-log.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-stamps)
+チャットタブの設定から、文字だけのログを保存します。
 
 ## 画像を貼って、背景を透かす
 
-**r5で利用可** — ファイル、ドロップ、クリップボードから画像を追加。1枚なら確認画面で背景色を選んで透過できます。卓の画像とスタンプで共通の画像一覧を使います。
+**デモ（r5）で試せます**
 
-![画像の入口を一つに整理した開発版の画面。](media-images.png)
+ファイルを選ぶ、ドロップする、クリップボードから貼るのどれでも、画像を追加できます。1枚だけのときは確認画面が開き、背景の色を選んで透明にできます。卓に置く画像とスタンプは、同じ画像一覧を使います。
 
-画像の入口を一つに整理した開発版の画面。 [撮影ソース 17ba32be](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)
+![画像を追加する入口です。写真は新しい開発版の画面ですが、画像の追加はデモでも使えます。](media-images.png)
 
-![スポイトで背景色を選び、透過結果を確認。](image-transparency.png)
+画像を追加する入口です。写真は新しい開発版の画面ですが、画像の追加はデモでも使えます。
 
-スポイトで背景色を選び、透過結果を確認。 [撮影ソース 17ba32be](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)
+![スポイトで背景の色を選び、透明になった結果を確かめます。](image-transparency.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/clipboard-media-image)
+スポイトで背景の色を選び、透明になった結果を確かめます。
 
 ## キャラクターが参戦する
 
-**r5で利用可** — カットインへキャラクターの画像と名前を差し込みます。立ち絵を輪郭へドラッグで合わせれば、同じ輪郭を使う演出で再利用できます。画像がない時はシルエットを表示します。
+**デモ（r5）で試せます**
 
-![画像と文字を重ねた「参戦！」の見本。](cutin-template.png)
+カットインに、キャラクターの画像と名前を差し込めます。立ち絵をドラッグして輪郭に合わせると、同じ輪郭を使う別の演出にも使い回せます。画像がないときは、シルエットが出ます。
 
-画像と文字を重ねた「参戦！」の見本。 [撮影ソース 17ba32be](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)
+![画像と文字を重ねた「参戦！」の見本です。](cutin-template.png)
 
-![キャラクターシートから立ち絵を輪郭に合わせる。](character-portrait-fit.png)
+画像と文字を重ねた「参戦！」の見本です。
 
-キャラクターシートから立ち絵を輪郭に合わせる。 [撮影ソース 75b16b3a](https://github.com/synchro4351/udonarium_axe/tree/75b16b3a52adfe214953e9b995872b6d1096f18e)
+![キャラクターシートから、立ち絵を輪郭に合わせます。](character-portrait-fit.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/character-portrait-fit)
+キャラクターシートから、立ち絵を輪郭に合わせます。
 
 ## 小さな反応を、さっと送る
 
-**r5で利用可** — 絵文字、短い文字列、卓の画像を素材にするエフェクト。対象へぽんと出す、投げる、降らせる動きを短時間で再生し、ホットバーにも登録できます。
+**デモ（r5）で試せます**
 
-![エフェクト一覧から反応演出を選ぶ。](reaction-effects.png)
+絵文字、短い文字列、卓の画像を素材にした、反応用のエフェクトです。対象へぽんと出す、投げる、降らせるといった動きが短く再生されます。ホットバーにも登録できます。
 
-エフェクト一覧から反応演出を選ぶ。 [撮影ソース 75b16b3a](https://github.com/synchro4351/udonarium_axe/tree/75b16b3a52adfe214953e9b995872b6d1096f18e)
+![エフェクトの一覧から、反応の演出を選びます。](reaction-effects.png)
 
-![反応の素材と動きを編集する。](reaction-effect-material.png)
+エフェクトの一覧から、反応の演出を選びます。
 
-反応の素材と動きを編集する。 [撮影ソース 75b16b3a](https://github.com/synchro4351/udonarium_axe/tree/75b16b3a52adfe214953e9b995872b6d1096f18e)
+![反応の素材と動きを編集します。](reaction-effect-material.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/emoji-effects)
+反応の素材と動きを編集します。
 
 ## 3つの見本から試す
 
-**開発版** — 初回のホットバーに、1D100の入力、キャラクターシートの開閉、コマへの視点移動を用意。異なる用途の操作を試し、そのまま編集・削除できます。既存のバーは変更しません。
+**開発版（デモにはまだありません）**
 
-![新規利用者向けの3つの見本。](hotbar-starters.png)
+はじめてホットバーを開くと、1D100をチャットに入力する・キャラクターシートを開く・コマへ視点を移す、の3つの見本が入っています。そのまま使っても、書き換えたり消したりしてもかまいません。いま使っているホットバーは変わりません。
 
-新規利用者向けの3つの見本。 [撮影ソース 17ba32be](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)
+![新しく使い始める人向けの、3つの見本です。](hotbar-starters.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/hotbar-discovery-samples)
+新しく使い始める人向けの、3つの見本です。
 
 ## 長い共有メモを読みやすく
 
-**開発版** — 必要なメモだけ「整形」にして、見出し・箇条書き・引用・コードを使います。数式のアスタリスクは文字のまま。既存のメモは通常表示を保ち、チャットはMarkdown化しません。
+**開発版（デモにはまだありません）**
 
-![編集しながら見出しと箇条書きを確認。](shared-note-formatting.png)
+長い共有メモだけ「整形」に切り替えると、見出し・箇条書き・引用・コードで読みやすくなります。`2*3` のような * はそのまま表示されます。これまでのメモの見た目は変わりません。チャットの見た目も変わりません。
 
-編集しながら見出しと箇条書きを確認。 [撮影ソース 17ba32be](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)
+![編集しながら、見出しと箇条書きを確かめます。](shared-note-formatting.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/shared-note-formatting)
+編集しながら、見出しと箇条書きを確かめます。
 
-## 基本から始め、詳細へ進む
+## カットインを手軽に作る
 
-**開発版** — カットイン編集のタイムラインや変形設定は、必要な時に開きます。折り畳んでもすべてのレイヤーを選べるので、画像と文字から始めて細かな演出へ進めます。
+**開発版（デモにはまだありません）**
 
-![基本操作とレイヤー一覧を残した初期画面。](cutin-simple-editor.png)
+カットインの編集では、タイムラインや変形の設定を、必要なときだけ開きます。閉じていても、すべてのレイヤーを選べます。まず画像と文字だけで作り、そこから細かい演出へ進めます。
 
-基本操作とレイヤー一覧を残した初期画面。 [撮影ソース 34140927](https://github.com/synchro4351/udonarium_axe/tree/3414092749630e99a008273ab50a0b9f4ef0da14)
+![基本の操作とレイヤー一覧だけが出ている、最初の画面です。](cutin-simple-editor.png)
 
-![タイムラインと詳細を開いた画面。](cutin-detailed-editor.png)
+基本の操作とレイヤー一覧だけが出ている、最初の画面です。
 
-タイムラインと詳細を開いた画面。 [撮影ソース 34140927](https://github.com/synchro4351/udonarium_axe/tree/3414092749630e99a008273ab50a0b9f4ef0da14)
+![タイムラインと詳細設定を開いた画面です。](cutin-detailed-editor.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-ui-disclosure)
+タイムラインと詳細設定を開いた画面です。
 
-## テンプレートと素材集を分ける
+## 演出の見本を選ぶ
 
-**開発版** — 新しい卓はSample1・Sample2・Sample_Templateから。短い演出見本は必要なものだけ追加するか、16個の素材ZIPを通常の読み込みで取り込めます。
+**開発版（デモにはまだありません）**
 
-![キャラクター画像と名前を差し込む簡単なテンプレート。](cutin-sample-template.png)
+新しい卓は、Sample1・Sample2・Sample_Template から始めます。短い演出の見本は16個あり、使いたいものだけ1つずつ追加できます。まとめて使うときは、16個入りのZIPをいつもの読み込みで取り込めます。
 
-キャラクター画像と名前を差し込む簡単なテンプレート。 [撮影ソース 75b16b3a](https://github.com/synchro4351/udonarium_axe/tree/75b16b3a52adfe214953e9b995872b6d1096f18e)
+![キャラクターの画像と名前を差し込むだけの、簡単なテンプレートです。](cutin-sample-template.png)
 
-![追加で読み込む演出見本の素材集。](cutin-example-library.png)
+キャラクターの画像と名前を差し込むだけの、簡単なテンプレートです。
 
-追加で読み込む演出見本の素材集。 [撮影ソース 75b16b3a](https://github.com/synchro4351/udonarium_axe/tree/75b16b3a52adfe214953e9b995872b6d1096f18e)
+![追加で読み込める、演出見本の素材集です。](cutin-example-library.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-sample-library)
+追加で読み込める、演出見本の素材集です。
 
-## 一つの文字列に、字ごとの動き
+## 文字を一つずつ動かす
 
-**開発版** — 文章は一つのまま、字が現れる順番・間隔・方向・傾き・退場を選べます。簡単な見本ボタンから始め、細かな設定は必要な時に開きます。
+**開発版（デモにはまだありません）**
 
-![中央から出現し、上へ退場する設定の例。](cutin-letter-controls.png)
+文章は一つのまま、文字ごとに、現れる順番・間隔・方向・傾き・退場を選べます。まず簡単な見本ボタンから始められ、細かい設定は必要なときに開きます。
 
-中央から出現し、上へ退場する設定の例。 [撮影ソース 26b6eb5b](https://github.com/synchro4351/udonarium_axe/tree/26b6eb5b84ab713de02a2bf2e00903b8aa94d684)
+![中央から現れて、上へ退場する設定の例です。](cutin-letter-controls.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-letter-animation-controls)
+中央から現れて、上へ退場する設定の例です。
 
-## ルビを半角で入力
+## ルビを手軽に入力
 
-**開発版** — |漢字<かんじ> と半角で入力できます。従来表記も残し、読み上げ・ログ・吹き出しでの読み方を揃えます。
+**開発版（デモにはまだありません）**
 
-![新旧の記法を同じチャットで使った例。](ascii-ruby-chat.png)
+`|漢字<かんじ>` と半角で打つだけで、ルビが付きます。これまでの `|漢字《かんじ》` もそのまま使えます。読み上げはふりがなで読み、HTMLログにもルビが残ります。
 
-新旧の記法を同じチャットで使った例。 [撮影ソース cebe7468](https://github.com/synchro4351/udonarium_axe/tree/cebe74686438b29ee4a3eb2d927621963d22154d)
+![新しい書き方とこれまでの書き方を、同じチャットで使った例です。](ascii-ruby-chat.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/ascii-ruby)
+新しい書き方とこれまでの書き方を、同じチャットで使った例です。
 
 ## 一枚の絵から、部位ごとのコマ
 
-**開発版** — 画像をドラッグで囲み、部位ごとの名前を付けて作成します。HPや移動は各コマで独立し、元画像も残ります。通常の卓データとして保存できます。
+**開発版（デモにはまだありません）**
 
-![頭部と胴体を囲み、別々のキャラクターコマにする例。](multipart-selection.png)
+画像をドラッグで囲み、部位ごとに名前を付けて作ります。HPや移動はコマごとに別々で、元の画像も残ります。通常の卓データとして保存できます。
 
-頭部と胴体を囲み、別々のキャラクターコマにする例。 [撮影ソース 70fbd8b1](https://github.com/synchro4351/udonarium_axe/tree/70fbd8b1028be73806b83a367d0f7a7caf259176)
+![頭部と胴体を囲んで、別々のキャラクターコマにした例です。](multipart-selection.png)
 
-[機能のソース](https://github.com/synchro4351/udonarium_axe/tree/codex/multipart-character-tokens)
+頭部と胴体を囲んで、別々のキャラクターコマにした例です。
 
 ## 素材と利用条件
 
-画面は本フォークと公式Axeの公開サンプル、独自の検証素材で撮影しています。実卓・参加者の私的情報や、持ち込みの第三者スタンプ素材は含めていません。ソースと同梱素材の条件はリポジトリのLICENSEを参照してください。絵文字の形は端末のフォントで変わります。 [LICENSE](https://github.com/synchro4351/udonarium_axe/blob/main/LICENSE)。
-
-スクリーンショットは動きを静止した紹介です。操作・保存・同期の検証結果は[変更一覧](https://github.com/synchro4351/udonarium_axe/blob/main/TYOITASHI_CHANGES.md)と各機能文書を参照してください。
+画面写真は動きを止めたものです。ソースと同梱素材の条件は、リポジトリの[LICENSE](https://github.com/synchro4351/udonarium_axe/blob/main/LICENSE)を見てください。くわしい確認結果は[開発者向け資料](DEVELOPER_REFERENCE.md)にあります。
