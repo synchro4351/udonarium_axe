@@ -1723,6 +1723,22 @@
           "missed": "Click on the image itself",
           "failed": "The background couldn’t be made transparent"
         }
+      },
+      "multipart": {
+        "title": "Create part tokens",
+        "hint": "Drag to outline each part, then give it a name. Each token has independent HP.",
+        "select": "Select a part region",
+        "part": "Part {{number}}",
+        "count": "{{count}} / {{limit}} parts",
+        "clear": "Clear all",
+        "name": "Part name",
+        "remove": "Remove this part",
+        "cancel": "Cancel",
+        "create": "Create tokens",
+        "preparing": "Preparing…",
+        "unavailable": "Image unavailable. Check that it is loaded and you can edit the table.",
+        "failed": "Could not create tokens. Check the regions and image, then try again.",
+        "oversized": "A cropped image exceeds 2 MB. Select a smaller region."
       }
     },
     "character": {

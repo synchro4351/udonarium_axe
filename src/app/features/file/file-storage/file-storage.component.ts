@@ -12,6 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { MultipartCharacterService } from '@axe/application/tabletop/multipart-character.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
 import { emitSelectFile } from '@axe/core/event/domain-events';
@@ -35,6 +36,7 @@ import {
   clearBackgroundAt,
   PickedColor,
 } from '@axe/features/file/file-storage/transparent-background';
+import { MultipartCharacterComponent } from '@axe/features/file/multipart-character/multipart-character.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -111,6 +113,28 @@ export class FileStorageComponent implements DroppedImageHolder {
   private readonly rolePermission = inject(RolePermissionService);
   private readonly droppedImages = inject(DroppedImageEventHandlerService);
   private readonly t = inject(TRANSLATE_FN);
+  private readonly multipart = inject(MultipartCharacterService);
+
+  get canCreateParts(): boolean {
+    this.objectChange.fileVersion();
+    this.objectChange.collectionOf('image-tag')();
+    const identifier = [...this.checkedFiles][0];
+    if (identifier) this.objectChange.versionOf(`imagetag_${identifier}`)();
+    const image = identifier ? this.imageStorage.get(identifier) : null;
+    return this.checkedFiles.size === 1 && !!image && this.mayShow(image) && this.multipart.mayUse(identifier);
+  }
+
+  openMultipart(): void {
+    if (!this.canCreateParts) return;
+    const component = this.panelService.open(MultipartCharacterComponent, {
+      title: this.t('feature.file.multipart.title'),
+      width: 680,
+      height: 650,
+      minWidth: 300,
+      minHeight: 400,
+    });
+    void component.initialize([...this.checkedFiles][0]);
+  }
 
   /** The label shown for a tag in the tag filter, with the all and untagged entries translated. */
   displayTagName(tag: string): string {

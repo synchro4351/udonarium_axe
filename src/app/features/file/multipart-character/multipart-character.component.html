@@ -1,0 +1,106 @@
+<p class="text-ui-muted mt-0 text-sm">{{ 'feature.file.multipart.hint' | transloco }}</p>
+@if (url()) {
+  <div class="bg-ui-input relative mx-auto w-fit max-w-full" data-testid="multipart-image">
+    <img class="block max-h-95 max-w-full" [src]="url()" alt="" draggable="false" />
+    <svg
+      class="absolute inset-0 size-full touch-none select-none"
+      [attr.viewBox]="'0 0 ' + width() + ' ' + height()"
+      preserveAspectRatio="none"
+      (pointerdown)="pointerDown($event)"
+      (pointermove)="pointerMove($event)"
+      (pointerup)="pointerUp($event)"
+      (pointercancel)="cancelPointer()"
+      (lostpointercapture)="cancelPointer()"
+      data-testid="multipart-select"
+      [attr.aria-label]="'feature.file.multipart.select' | transloco"
+    >
+      @for (part of parts(); track $index) {
+        <rect
+          [attr.x]="part.x"
+          [attr.y]="part.y"
+          [attr.width]="part.width"
+          [attr.height]="part.height"
+          fill="#38bdf833"
+          stroke="#38bdf8"
+          stroke-width="2"
+          vector-effect="non-scaling-stroke"
+        />
+        <text
+          [attr.x]="part.x + 4"
+          [attr.y]="part.y + height() / 25"
+          [attr.font-size]="height() / 25"
+          fill="white"
+          stroke="#000"
+          stroke-width="1"
+          paint-order="stroke"
+        >
+          {{ $index + 1 }}
+        </text>
+      }
+      @if (draft(); as part) {
+        <rect
+          [attr.x]="part.x"
+          [attr.y]="part.y"
+          [attr.width]="part.width"
+          [attr.height]="part.height"
+          fill="#fbbf2433"
+          stroke="#fbbf24"
+          stroke-width="2"
+          vector-effect="non-scaling-stroke"
+        />
+      }
+    </svg>
+  </div>
+}
+<div class="my-3 flex items-center justify-between gap-2 text-sm">
+  <span>{{ 'feature.file.multipart.count' | transloco: { count: parts().length, limit: limit } }}</span>
+  <button
+    type="button"
+    (click)="clear()"
+    [disabled]="busy() || !canEdit || !parts().length"
+    class="border-ui-border-panel rounded-ui-sm border px-2 py-1 disabled:opacity-40"
+  >
+    {{ 'feature.file.multipart.clear' | transloco }}
+  </button>
+</div>
+<div class="max-h-40 overflow-y-auto">
+  @for (part of parts(); track $index) {
+    <div class="mb-1 flex items-center gap-2">
+      <span class="w-6 text-center text-sm">{{ $index + 1 }}</span>
+      <input
+        class="bg-ui-input border-ui-border-panel rounded-ui-sm min-w-0 flex-1 border px-2 py-1"
+        maxlength="80"
+        [ngModel]="part.name"
+        (ngModelChange)="rename($index, $event)"
+        [disabled]="busy() || !canEdit"
+        [attr.aria-label]="'feature.file.multipart.name' | transloco"
+      />
+      <button
+        type="button"
+        (click)="remove($index)"
+        [disabled]="busy() || !canEdit"
+        class="rounded-ui-sm border-ui-border-panel border px-2 py-1 disabled:opacity-40"
+        [attr.aria-label]="'feature.file.multipart.remove' | transloco"
+      >
+        <i class="material-icons" aria-hidden="true">close</i>
+      </button>
+    </div>
+  }
+</div>
+@if (error()) {
+  <p class="text-ui-danger text-sm" role="alert">{{ error() | transloco }}</p>
+}
+<div class="mt-3 flex justify-end gap-2">
+  <button type="button" (click)="close()" class="border-ui-border-panel rounded-ui-sm border px-3 py-1.5">
+    {{ 'feature.file.multipart.cancel' | transloco }}
+  </button>
+  <button
+    type="button"
+    (click)="create()"
+    [disabled]="busy() || !canEdit || !parts().length"
+    class="bg-ui-accent text-ui-inverse rounded-ui-sm px-3 py-1.5 disabled:opacity-40"
+    data-testid="multipart-create"
+  >
+    {{ (busy() ? 'feature.file.multipart.preparing' : 'feature.file.multipart.create') | transloco }}
+  </button>
+</div>

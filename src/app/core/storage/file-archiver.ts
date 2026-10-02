@@ -26,6 +26,7 @@ interface LoadGuard extends GameObject {
 }
 
 const MEGA_BYTE = 1024 * 1024;
+export const MAX_IMAGE_FILE_SIZE = 2 * MEGA_BYTE;
 const DROP_STACK_OFFSET = 20;
 const XML_MIME_TYPE = 'text/xml';
 const INTERNAL_DRAG_TYPE = 'application/x-axe-internal-drag';
@@ -88,7 +89,7 @@ export class FileArchiver {
    */
   singleFileDropHandler: SingleFileDropHandler | null = null;
 
-  private maxImageSize = 2 * MEGA_BYTE;
+  private maxImageSize = MAX_IMAGE_FILE_SIZE;
   private maxAudioSize = 10 * MEGA_BYTE;
 
   private callbackOnDragStart: ((this: HTMLElement, e: DragEvent) => void) | null = null;

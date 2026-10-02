@@ -215,6 +215,15 @@
     }
   </div>
 
+  <button
+    type="button"
+    (click)="openMultipart()"
+    [disabled]="!canCreateParts"
+    class="border-ui-border-panel rounded-ui-sm mt-3 border px-2.5 py-1.5 text-sm disabled:opacity-40"
+    data-testid="multipart-open"
+  >
+    {{ 'feature.file.multipart.title' | transloco }}
+  </button>
   <div class="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] content-start gap-2 pt-3">
     @for (file of images(); track file) {
       <div
