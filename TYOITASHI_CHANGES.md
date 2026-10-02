@@ -4,6 +4,11 @@
 
 r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は公式v1.58.0（46707582）とv1.59.0（19e9d1c7）を取り込んでいます。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1〜r4の固定ソースと併せて確認してください。
 
+## 共有メモの部分Markdown（開発版）
+
+- [441f4a13](https://github.com/synchro4351/udonarium_axe/commit/441f4a13)：通常／整形の選択、制限したMarkdown、編集プレビューと記号挿入、卓上・ホバー表示。基点は公式v1.59.0統合済みのf42e153b。属性`textFormat`を既存の保存・同期へ追加し、欠落・未知の値は通常表示にします。Marked 15.0.12を実行時依存に追加します。
+- [17ba32be](https://github.com/synchro4351/udonarium_axe/commit/17ba32be9c22fad3ccc313553f74aa203ae91355)：[仕様・変更範囲・公式へ移す時の注意](https://github.com/synchro4351/udonarium_axe/blob/codex/shared-note-formatting/docs/TYOITASHI_SHARED_NOTE_FORMATTING.md)。シート・翻訳・スタイルなどには既存の私家変更があり、そのまま公式へcherry-pickできるとは限りません。チャットのMarkdown化は含みません。
+
 ## v1.59.0追従
 
 - [fb24e752](https://github.com/synchro4351/udonarium_axe/commit/fb24e752f58b78ce7c74e2026eb653a7f54ddc47)：私家版9ca3489aを基点に、公式固定タグv1.59.0（19e9d1c7）を一度merge。公式のスイッチ・コンパス・ボタン名ガイドなどを取り込み、アプリ初期化とチャット送信の競合で既存の私家機能を保持しました。独立した機能パッチではありません。
