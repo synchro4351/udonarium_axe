@@ -1,0 +1,203 @@
+[
+  {
+    "id": "cards",
+    "title": "カードをまとめて扱う",
+    "version": "r5で利用可",
+    "text": "自分と全員の手札を一覧に。ドラッグで渡す・引く操作ができ、公開は確認してから行います。部屋ごとに操作を制限し、不在者の手札はGMが引き継がせられます。",
+    "images": [
+      [
+        "hand-cards.png",
+        "自分の手札。公開状態と渡し主をカードの外に表示。"
+      ],
+      [
+        "all-hands.png",
+        "全員の手札。公開中は表面、非公開は裏面。"
+      ]
+    ],
+    "branch": "codex/card-hand-visibility-sort-provenance"
+  },
+  {
+    "id": "chat",
+    "title": "スタンプと絵文字で返す",
+    "version": "r5で利用可",
+    "text": "短い言葉からスタンプを候補表示。絵文字だけの発言は大きく、各発言には絵文字リアクションを付けられます。スタンプはセットで保存でき、キャラクターの頭上にも表示できます。",
+    "images": [
+      [
+        "stamps-picker.png",
+        "プリセット、絵文字、特殊記法を選ぶ。"
+      ],
+      [
+        "chat-stamps-suggestions.png",
+        "入力した言葉に合うスタンプを候補表示。"
+      ],
+      [
+        "chat-emoji.png",
+        "絵文字だけの発言は大きく表示。"
+      ]
+    ],
+    "branch": "codex/chat-stamps"
+  },
+  {
+    "id": "logs",
+    "title": "聞く・読み返す方法を選ぶ",
+    "version": "r5で利用可",
+    "text": "ブラウザの音声合成でチャットを読み上げ、声や速度は端末ごとに設定します。ログは装飾付きHTMLと、文字だけのテキストを選んで保存できます。読めない発言は出力しません。",
+    "images": [
+      [
+        "chat-text-log.png",
+        "チャットタブ設定から文字ログを保存。"
+      ]
+    ],
+    "branch": "codex/chat-stamps"
+  },
+  {
+    "id": "images",
+    "title": "画像を貼って、背景を透かす",
+    "version": "r5で利用可",
+    "text": "ファイル、ドロップ、クリップボードから画像を追加。1枚なら確認画面で背景色を選んで透過できます。卓の画像とスタンプで共通の画像一覧を使います。",
+    "images": [
+      [
+        "media-images.png",
+        "画像の入口を一つに整理した開発版の画面。"
+      ],
+      [
+        "image-transparency.png",
+        "スポイトで背景色を選び、透過結果を確認。"
+      ]
+    ],
+    "branch": "codex/clipboard-media-image"
+  },
+  {
+    "id": "cutin",
+    "title": "キャラクターが参戦する",
+    "version": "r5で利用可",
+    "text": "カットインへキャラクターの画像と名前を差し込みます。立ち絵を輪郭へドラッグで合わせれば、同じ輪郭を使う演出で再利用できます。画像がない時はシルエットを表示します。",
+    "images": [
+      [
+        "cutin-template.png",
+        "画像と文字を重ねた「参戦！」の見本。"
+      ],
+      [
+        "character-portrait-fit.png",
+        "キャラクターシートから立ち絵を輪郭に合わせる。"
+      ]
+    ],
+    "branch": "codex/character-portrait-fit"
+  },
+  {
+    "id": "effects",
+    "title": "小さな反応を、さっと送る",
+    "version": "r5で利用可",
+    "text": "絵文字、短い文字列、卓の画像を素材にするエフェクト。対象へぽんと出す、投げる、降らせる動きを短時間で再生し、ホットバーにも登録できます。",
+    "images": [
+      [
+        "reaction-effects.png",
+        "エフェクト一覧から反応演出を選ぶ。"
+      ],
+      [
+        "reaction-effect-material.png",
+        "反応の素材と動きを編集する。"
+      ]
+    ],
+    "branch": "codex/emoji-effects"
+  },
+  {
+    "id": "hotbar",
+    "title": "3つの見本から試す",
+    "version": "開発版",
+    "text": "初回のホットバーに、1D100の入力、キャラクターシートの開閉、コマへの視点移動を用意。異なる用途の操作を試し、そのまま編集・削除できます。既存のバーは変更しません。",
+    "images": [
+      [
+        "hotbar-starters.png",
+        "新規利用者向けの3つの見本。"
+      ]
+    ],
+    "branch": "codex/hotbar-discovery-samples"
+  },
+  {
+    "id": "notes",
+    "title": "長い共有メモを読みやすく",
+    "version": "開発版",
+    "text": "必要なメモだけ「整形」にして、見出し・箇条書き・引用・コードを使います。数式のアスタリスクは文字のまま。既存のメモは通常表示を保ち、チャットはMarkdown化しません。",
+    "images": [
+      [
+        "shared-note-formatting.png",
+        "編集しながら見出しと箇条書きを確認。"
+      ]
+    ],
+    "branch": "codex/shared-note-formatting"
+  },
+  {
+    "id": "editor",
+    "title": "基本から始め、詳細へ進む",
+    "version": "開発版",
+    "text": "カットイン編集のタイムラインや変形設定は、必要な時に開きます。折り畳んでもすべてのレイヤーを選べるので、画像と文字から始めて細かな演出へ進めます。",
+    "images": [
+      [
+        "cutin-simple-editor.png",
+        "基本操作とレイヤー一覧を残した初期画面。"
+      ],
+      [
+        "cutin-detailed-editor.png",
+        "タイムラインと詳細を開いた画面。"
+      ]
+    ],
+    "branch": "codex/cutin-ui-disclosure"
+  },
+  {
+    "id": "samples",
+    "title": "テンプレートと素材集を分ける",
+    "version": "開発版",
+    "text": "新しい卓はSample1・Sample2・Sample_Templateから。短い演出見本は必要なものだけ追加するか、16個の素材ZIPを通常の読み込みで取り込めます。",
+    "images": [
+      [
+        "cutin-sample-template.png",
+        "キャラクター画像と名前を差し込む簡単なテンプレート。"
+      ],
+      [
+        "cutin-example-library.png",
+        "追加で読み込む演出見本の素材集。"
+      ]
+    ],
+    "branch": "codex/cutin-sample-library"
+  },
+  {
+    "id": "letters",
+    "title": "一つの文字列に、字ごとの動き",
+    "version": "開発版",
+    "text": "文章は一つのまま、字が現れる順番・間隔・方向・傾き・退場を選べます。簡単な見本ボタンから始め、細かな設定は必要な時に開きます。",
+    "images": [
+      [
+        "cutin-letter-controls.png",
+        "中央から出現し、上へ退場する設定の例。"
+      ]
+    ],
+    "branch": "codex/cutin-letter-animation-controls"
+  },
+  {
+    "id": "ruby",
+    "title": "ルビを半角で入力",
+    "version": "開発版",
+    "text": "|漢字<かんじ> と半角で入力できます。従来表記も残し、読み上げ・ログ・吹き出しでの読み方を揃えます。",
+    "images": [
+      [
+        "ascii-ruby-chat.png",
+        "新旧の記法を同じチャットで使った例。"
+      ]
+    ],
+    "branch": "codex/ascii-ruby"
+  },
+  {
+    "id": "parts",
+    "title": "一枚の絵から、部位ごとのコマ",
+    "version": "開発版",
+    "text": "画像をドラッグで囲み、部位ごとの名前を付けて作成します。HPや移動は各コマで独立し、元画像も残ります。通常の卓データとして保存できます。",
+    "images": [
+      [
+        "multipart-selection.png",
+        "頭部と胴体を囲み、別々のキャラクターコマにする例。"
+      ]
+    ],
+    "branch": "codex/multipart-character-tokens"
+  }
+]
