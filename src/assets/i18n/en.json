@@ -593,7 +593,8 @@
         "portraitCharacter": "Character to show",
         "portraitNone": "No image (silhouette)",
         "portraitImage": "Portrait",
-        "portraitFitOnSheet": "How the portrait sits in the slot is set per character, with \"Cut-in fit\" on the character sheet."
+        "portraitFitOnSheet": "How the portrait sits in the slot is set per character, with \"Cut-in fit\" on the character sheet.",
+        "directionDetails": "Display direction"
       },
       "cutInEditor": {
         "portraitSlot": "Use character portrait at playback",
@@ -686,7 +687,7 @@
         "toggleHidden": "Show / hide",
         "toggleLocked": "Lock / unlock",
         "unnamedLayer": "(unnamed)",
-        "noLayers": "No layers yet",
+        "noLayers": "No layers",
         "emptyStage": "Add an image to start stacking layers",
         "noSelection": "Pick a layer to see its settings",
         "play": "Play",
@@ -776,7 +777,9 @@
         "stageZoomFit": "Fit the whole cut-in (or hold ctrl and scroll)",
         "copyPose": "Take the moment this layer is holding (ctrl and C)",
         "pastePose": "Lay it down at the playhead (ctrl and V)",
-        "seekTo": "Go to a moment"
+        "seekTo": "Go to a moment",
+        "timelineHint": "Open the timeline to edit sounds and keyframes",
+        "layerDetails": "Position, motion and effects"
       }
     },
     "card": {

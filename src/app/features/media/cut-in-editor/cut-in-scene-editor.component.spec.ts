@@ -95,6 +95,66 @@ describe('CutInSceneEditorComponent', () => {
     return component as unknown as EditorApi;
   }
 
+  function openTimeline(): void {
+    const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      '[data-testid="cut-in-timeline-toggle"]'
+    )!;
+    if (button.getAttribute('aria-expanded') !== 'true') button.click();
+    fixture.detectChanges();
+  }
+
+  describe('folded editing', () => {
+    it('starts without a timeline but keeps hidden layers selectable', async () => {
+      editor().addTextLayer();
+      const first = component.layers()[0];
+      first.hidden = true;
+      editor().addImageLayer();
+      editor().changed();
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelector('cut-in-timeline')).toBeNull();
+      const rows = root.querySelectorAll<HTMLElement>('[data-testid="cut-in-compact-layers"] li');
+      expect(rows).toHaveLength(2);
+      Array.from(rows)
+        .find((row) => row.textContent?.includes(first.name))!
+        .click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(component.selected()?.identifier).toBe(first.identifier);
+      expect(root.querySelector<HTMLInputElement>('[name="cut-in-layer-name"]')?.value).toBe(first.name);
+    });
+
+    it('keeps scene keys and selection when the timeline opens and folds', () => {
+      editor().addTextLayer();
+      const layer = component.layers()[0];
+      layer.tracks = encodeCutInTracks({ x: [{ t: 800, v: 23 }] });
+      editor().changed();
+      const before = layer.tracks;
+      openTimeline();
+      expect(fixture.nativeElement.querySelector('cut-in-timeline')).toBeTruthy();
+      const button = fixture.nativeElement.querySelector('[data-testid="cut-in-timeline-toggle"]') as HTMLButtonElement;
+      button.click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('cut-in-timeline')).toBeNull();
+      expect(layer.tracks).toBe(before);
+      expect(component.selected()?.identifier).toBe(layer.identifier);
+    });
+
+    it('allows a reader to inspect folded layers without editing them', async () => {
+      editor().addTextLayer();
+      fixture.componentRef.setInput('isEditable', false);
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      root.querySelector<HTMLElement>('[data-testid="cut-in-compact-layers"] li')!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(root.querySelector<HTMLInputElement>('[name="cut-in-layer-name"]')?.disabled).toBe(true);
+      expect(root.querySelector('li')?.getAttribute('draggable')).toBeNull();
+      openTimeline();
+      expect(root.querySelector<HTMLButtonElement>('[data-testid="cut-in-remove-keys"]')?.disabled).toBe(true);
+    });
+  });
+
   function pointer(type: string, x: number, y: number, buttons = 1): PointerEvent {
     return {
       type,
@@ -529,6 +589,7 @@ describe('CutInSceneEditorComponent', () => {
       }
 
       function removeKeysButton(): HTMLButtonElement {
+        openTimeline();
         return (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
           '[data-testid="cut-in-remove-keys"]'
         )!;
@@ -574,6 +635,8 @@ describe('CutInSceneEditorComponent', () => {
 
   describe('the regions that handle their own pointer', () => {
     it('claims the stage and the whole timeline section from the panel', () => {
+      editor().addImageLayer();
+      openTimeline();
       const root = fixture.nativeElement as HTMLElement;
       const claimed = Array.from(root.querySelectorAll('.panel-no-drag'));
 
@@ -681,6 +744,7 @@ describe('CutInSceneEditorComponent', () => {
     }
 
     function withKeyAndSound(): void {
+      openTimeline();
       editor().addImageLayer();
       component.layers()[0].tracks = encodeCutInTracks({ x: [{ t: 1000, v: 10 }] });
       component.scene()!.sounds = '[{"t":2000,"a":"se-1","v":100}]';

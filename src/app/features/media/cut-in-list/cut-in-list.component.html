@@ -46,7 +46,13 @@
       }
     </ul>
 
-    <div class="border-ui-border-panel flex shrink-0 flex-col gap-1 border-t border-solid px-2.5 py-2 text-[11px]">
+    <details
+      data-testid="cut-in-direction-details"
+      class="border-ui-border-panel flex shrink-0 flex-col gap-1 border-t border-solid px-2.5 py-2 text-[11px]"
+    >
+      <summary class="text-ui-text cursor-pointer font-semibold">
+        {{ 'feature.media.cutIn.directionDetails' | transloco }}
+      </summary>
       <label class="text-ui-muted flex flex-col gap-1">
         <span>{{ 'feature.media.cutIn.multiDirection' | transloco }}</span>
         <select
@@ -61,7 +67,7 @@
         </select>
       </label>
       <span class="text-ui-dim">{{ 'feature.media.cutIn.multiDirectionHint' | transloco }}</span>
-    </div>
+    </details>
   </aside>
 
   <main

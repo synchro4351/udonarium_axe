@@ -593,7 +593,8 @@
         "portraitCharacter": "표시할 캐릭터",
         "portraitNone": "이미지 없음 (실루엣)",
         "portraitImage": "초상화",
-        "portraitFitOnSheet": "틀 안에서 초상화의 위치는 캐릭터 시트의 '컷인 위치'에서 캐릭터별로 정합니다."
+        "portraitFitOnSheet": "틀 안에서 초상화의 위치는 캐릭터 시트의 '컷인 위치'에서 캐릭터별로 정합니다.",
+        "directionDetails": "표시 방향"
       },
       "cutInEditor": {
         "portraitSlot": "재생할 때 캐릭터 초상화 사용",
@@ -776,7 +777,9 @@
         "stageZoomFit": "전체 보기(Ctrl+휠로도 확대·축소)",
         "copyPose": "이 순간의 모습 복사(Ctrl+C)",
         "pastePose": "재생 헤드 위치에 붙여넣기(Ctrl+V)",
-        "seekTo": "시각 지정"
+        "seekTo": "시각 지정",
+        "timelineHint": "타임라인을 열어 소리와 키프레임을 편집합니다",
+        "layerDetails": "위치·움직임·효과"
       }
     },
     "card": {

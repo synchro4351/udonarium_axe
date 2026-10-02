@@ -593,7 +593,8 @@
         "portraitCharacter": "表示するキャラクター",
         "portraitNone": "画像なし（シルエット）",
         "portraitImage": "立ち絵",
-        "portraitFitOnSheet": "枠の中での立ち絵の位置は、キャラクターシートの「カットイン位置」でキャラクターごとに決めます。"
+        "portraitFitOnSheet": "枠の中での立ち絵の位置は、キャラクターシートの「カットイン位置」でキャラクターごとに決めます。",
+        "directionDetails": "表示の向き"
       },
       "cutInEditor": {
         "portraitSlot": "再生時のキャラクター画像を使う",
@@ -776,7 +777,9 @@
         "stageZoomFit": "全体を表示（Ctrl+ホイールでも拡縮）",
         "copyPose": "この瞬間の姿をコピー（Ctrl+C）",
         "pastePose": "再生ヘッドの位置に貼り付け（Ctrl+V）",
-        "seekTo": "時刻を指定"
+        "seekTo": "時刻を指定",
+        "timelineHint": "時間軸を開いて音やキーフレームを編集します",
+        "layerDetails": "位置・動き・効果"
       }
     },
     "card": {

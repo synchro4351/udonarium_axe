@@ -141,6 +141,9 @@ interface Drag {
 /** How far one press of an arrow moves the playhead: the same grid a moment is rounded to. */
 const STEP_MS = SNAP_MS;
 
+/** Gives each editor's folding timeline an id of its own, for the button that opens it to point at. */
+let nextTimelineRegion = 0;
+
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'cut-in-scene-editor',
@@ -178,6 +181,15 @@ export class CutInSceneEditorComponent {
   protected readonly playheadMs = signal(0);
   /** Where a template just made was opened, so playing from there untouched still plays it from the start. */
   private posterMs: number | null = null;
+
+  /**
+   * Whether the timeline and the tools for keys and sounds are shown.
+   *
+   * It starts folded, so the stage has the room and the layers sit in a short list below it.
+   * It belongs to this screen only and is never written into the scene.
+   */
+  protected readonly timelineOpen = signal(false);
+  protected readonly timelineRegionId = `cut-in-timeline-${++nextTimelineRegion}`;
 
   /** The heads beside the timeline start below its ruler and its sound row. */
   protected readonly timelineHeadOffsetPx = TIMELINE_HEAD_OFFSET_PX;
@@ -412,10 +424,13 @@ export class CutInSceneEditorComponent {
       }
     });
 
-    afterNextRender(() => {
-      this.watchStageSize();
-      this.watchTimelineRoom();
+    // The timeline comes and goes with its fold, so its room is measured afresh each time it is drawn.
+    effect((onCleanup) => {
+      const element = this.timelineArea()?.nativeElement;
+      if (element) onCleanup(this.watchTimelineRoom(element));
     });
+
+    afterNextRender(() => this.watchStageSize());
     this.destroyRef.onDestroy(() => {
       this.flushDrag();
       this.pause();
@@ -985,20 +1000,31 @@ export class CutInSceneEditorComponent {
     this.bumped.update((count) => count + 1);
   }
 
-  /** How much room the bands have, which is what the scale is worked out against. */
-  private watchTimelineRoom(): void {
-    const element = this.timelineArea()?.nativeElement;
-    if (!element) return;
+  /**
+   * Opens or folds the timeline.
+   *
+   * The stage grows or shrinks by the timeline's height, so its fit is worked out again once the
+   * new layout is drawn, rather than left to whenever the browser reports the change.
+   */
+  protected toggleTimeline(): void {
+    this.timelineOpen.update((open) => !open);
+    afterNextRender(() => this.measureStage(), { injector: this.injector });
+  }
 
+  /**
+   * How much room the bands have, which is what the scale is worked out against. Hands back what
+   * stops the watching, for when the timeline is folded away.
+   */
+  private watchTimelineRoom(element: HTMLElement): () => void {
     this.timelineRoomPx.set(Math.round(element.getBoundingClientRect().width));
-    if (typeof ResizeObserver !== 'function') return;
+    if (typeof ResizeObserver !== 'function') return () => {};
 
     const observer = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect;
       if (rect) this.timelineRoomPx.set(Math.round(rect.width));
     });
     observer.observe(element);
-    this.destroyRef.onDestroy(() => observer.disconnect());
+    return () => observer.disconnect();
   }
 
   /**
@@ -1054,6 +1080,13 @@ export class CutInSceneEditorComponent {
     const bounds = area?.getBoundingClientRect();
     const holdPx = bounds ? event.clientX - bounds.left - TIMELINE_HEAD_W_PX : undefined;
     this.zoomBy(event.deltaY < 0 ? TIMELINE_ZOOM_STEP : 1 / TIMELINE_ZOOM_STEP, holdPx);
+  }
+
+  /** Reads the stage's size straight off the page. */
+  private measureStage(): void {
+    const bounds = this.stageArea()?.nativeElement.getBoundingClientRect();
+    if (!bounds) return;
+    this.stageSize.set({ width: Math.round(bounds.width), height: Math.round(bounds.height) });
   }
 
   private watchStageSize(): void {

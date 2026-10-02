@@ -25,15 +25,6 @@
       <i class="material-icons">gradient</i>{{ 'feature.media.cutInEditor.addFill' | transloco }}
     </button>
     <button
-      class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex cursor-pointer items-center gap-1 border border-solid bg-transparent px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50 [&_.material-icons]:text-[14px]!"
-      type="button"
-      [disabled]="!isEditable()"
-      [title]="'feature.media.cutInEditor.addSoundHint' | transloco"
-      (click)="addSound()"
-    >
-      <i class="material-icons">volume_up</i>{{ 'feature.media.cutInEditor.addSound' | transloco }}
-    </button>
-    <button
       class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-7 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-50 [&_.material-icons]:text-[14px]!"
       type="button"
       [disabled]="!isEditable() || !selected()"
@@ -50,66 +41,6 @@
       (click)="removeSelected()"
     >
       <i class="material-icons">delete</i>
-    </button>
-    <button
-      class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-7 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-50 [&_.material-icons]:text-[14px]!"
-      type="button"
-      data-testid="cut-in-remove-keys"
-      [disabled]="!isEditable() || !canRemoveKeysAtPlayhead()"
-      [title]="'feature.media.cutInEditor.removeKeysHere' | transloco"
-      (click)="removeKeysAtPlayhead()"
-    >
-      <i class="material-icons">remove_circle_outline</i>
-    </button>
-    <button
-      class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-7 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-50 [&_.material-icons]:text-[14px]!"
-      type="button"
-      data-testid="cut-in-remove-sound"
-      [disabled]="!isEditable() || !hasSoundAtPlayhead()"
-      [title]="'feature.media.cutInEditor.removeSoundHere' | transloco"
-      (click)="removeSoundAtPlayhead()"
-    >
-      <i class="material-icons">volume_off</i>
-    </button>
-
-    <span class="border-ui-border-panel mx-1 h-5 border-l border-solid"></span>
-
-    <button
-      class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-7 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[14px]!"
-      type="button"
-      [disabled]="!isEditable() || !selected()"
-      [title]="'feature.media.cutInEditor.copyPose' | transloco"
-      (click)="copyPose()"
-    >
-      <i class="material-icons">bookmark_add</i>
-    </button>
-    <button
-      class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-7 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[14px]!"
-      type="button"
-      [disabled]="!isEditable() || !selected() || !hasHeldPose"
-      [title]="'feature.media.cutInEditor.pastePose' | transloco"
-      (click)="pastePose()"
-    >
-      <i class="material-icons">bookmark_added</i>
-    </button>
-
-    <span class="border-ui-border-panel mx-1 h-5 border-l border-solid"></span>
-
-    <button
-      class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-7 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[14px]!"
-      type="button"
-      [title]="'feature.media.cutInEditor.jumpBack' | transloco"
-      (click)="jumpToKey(false)"
-    >
-      <i class="material-icons">skip_previous</i>
-    </button>
-    <button
-      class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-7 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[14px]!"
-      type="button"
-      [title]="'feature.media.cutInEditor.jumpForward' | transloco"
-      (click)="jumpToKey(true)"
-    >
-      <i class="material-icons">skip_next</i>
     </button>
 
     <span class="border-ui-border-panel mx-1 h-5 border-l border-solid"></span>
@@ -295,89 +226,211 @@
     </div>
   </div>
 
-  <div class="panel-no-drag border-ui-border-panel flex h-40 shrink-0 flex-col border-t border-solid">
-    <div class="border-ui-border-panel text-ui-muted flex shrink-0 items-center gap-2 border-b border-solid px-2 py-1">
-      <i class="material-icons text-[13px]! opacity-70">schedule</i>
-      <input
-        class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm focus:border-ui-accent w-16 border border-solid px-1 py-0.5 text-[11px] tabular-nums outline-none"
-        type="number"
-        step="0.01"
-        min="0"
-        [max]="durationMs() / 1000"
-        [value]="playheadSeconds()"
-        [title]="'feature.media.cutInEditor.seekTo' | transloco"
-        (change)="onSeekSeconds($event)"
-      />
-      <span class="text-ui-dim text-[11px] tabular-nums">/ {{ clock() }}</span>
+  <div
+    class="panel-no-drag border-ui-border-panel flex shrink-0 flex-col border-t border-solid"
+    [class.h-40]="timelineOpen()"
+  >
+    <div
+      class="border-ui-border-panel text-ui-muted flex shrink-0 flex-wrap items-center gap-2 border-b border-solid px-2 py-1"
+    >
+      <button
+        class="text-ui-text hover:bg-ui-hover rounded-ui-sm inline-flex cursor-pointer items-center gap-0.5 border-none bg-transparent py-0.5 pr-1.5 pl-0.5 text-[11px] font-semibold [&_.material-icons]:text-[16px]!"
+        type="button"
+        data-testid="cut-in-timeline-toggle"
+        [attr.aria-expanded]="timelineOpen()"
+        [attr.aria-controls]="timelineOpen() ? timelineRegionId : null"
+        [title]="'feature.media.cutInEditor.timelineHint' | transloco"
+        (click)="toggleTimeline()"
+      >
+        <i class="material-icons">{{ timelineOpen() ? 'expand_more' : 'chevron_right' }}</i
+        >{{ 'feature.media.cutInEditor.timeline' | transloco }}
+      </button>
 
-      <span class="ml-auto inline-flex items-center gap-0.5">
-        <button
-          class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-6 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[13px]!"
-          type="button"
-          [disabled]="!canZoomOut()"
-          [title]="'feature.media.cutInEditor.zoomOut' | transloco"
-          (click)="zoomOut()"
-        >
-          <i class="material-icons">zoom_out</i>
-        </button>
-        <button
-          class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex h-6 min-w-11 cursor-pointer items-center justify-center border border-solid bg-transparent px-1 text-[10px] tabular-nums disabled:cursor-not-allowed disabled:opacity-40"
-          type="button"
-          [disabled]="!canZoomOut()"
-          [title]="'feature.media.cutInEditor.zoomFit' | transloco"
-          (click)="zoomToFit()"
-        >
-          {{ zoomPercent() }}%
-        </button>
-        <button
-          class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-6 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[13px]!"
-          type="button"
-          [disabled]="!canZoomIn()"
-          [title]="'feature.media.cutInEditor.zoomIn' | transloco"
-          (click)="zoomIn()"
-        >
-          <i class="material-icons">zoom_in</i>
-        </button>
+      <span class="inline-flex items-center gap-1">
+        <i class="material-icons text-[13px]! opacity-70">schedule</i>
+        <input
+          class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm focus:border-ui-accent w-16 border border-solid px-1 py-0.5 text-[11px] tabular-nums outline-none"
+          name="cut-in-seek-seconds"
+          type="number"
+          step="0.01"
+          min="0"
+          [max]="durationMs() / 1000"
+          [value]="playheadSeconds()"
+          [title]="'feature.media.cutInEditor.seekTo' | transloco"
+          [attr.aria-label]="'feature.media.cutInEditor.seekTo' | transloco"
+          (change)="onSeekSeconds($event)"
+        />
+        <span class="text-ui-dim text-[11px] tabular-nums">/ {{ clock() }}</span>
       </span>
+
+      @if (timelineOpen()) {
+        <span class="inline-flex items-center gap-0.5" data-testid="cut-in-key-tools">
+          <button
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex h-6 cursor-pointer items-center gap-0.5 border border-solid bg-transparent px-1.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[13px]!"
+            type="button"
+            [disabled]="!isEditable()"
+            [title]="'feature.media.cutInEditor.addSoundHint' | transloco"
+            (click)="addSound()"
+          >
+            <i class="material-icons">volume_up</i>{{ 'feature.media.cutInEditor.addSound' | transloco }}
+          </button>
+          <button
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-6 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[13px]!"
+            type="button"
+            data-testid="cut-in-remove-sound"
+            [disabled]="!isEditable() || !hasSoundAtPlayhead()"
+            [title]="'feature.media.cutInEditor.removeSoundHere' | transloco"
+            (click)="removeSoundAtPlayhead()"
+          >
+            <i class="material-icons">volume_off</i>
+          </button>
+          <button
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-6 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[13px]!"
+            type="button"
+            data-testid="cut-in-remove-keys"
+            [disabled]="!isEditable() || !canRemoveKeysAtPlayhead()"
+            [title]="'feature.media.cutInEditor.removeKeysHere' | transloco"
+            (click)="removeKeysAtPlayhead()"
+          >
+            <i class="material-icons">remove_circle_outline</i>
+          </button>
+
+          <span class="border-ui-border-panel mx-1 h-4 border-l border-solid"></span>
+
+          <button
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-6 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[13px]!"
+            type="button"
+            [disabled]="!isEditable() || !selected()"
+            [title]="'feature.media.cutInEditor.copyPose' | transloco"
+            (click)="copyPose()"
+          >
+            <i class="material-icons">bookmark_add</i>
+          </button>
+          <button
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-6 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[13px]!"
+            type="button"
+            [disabled]="!isEditable() || !selected() || !hasHeldPose"
+            [title]="'feature.media.cutInEditor.pastePose' | transloco"
+            (click)="pastePose()"
+          >
+            <i class="material-icons">bookmark_added</i>
+          </button>
+
+          <span class="border-ui-border-panel mx-1 h-4 border-l border-solid"></span>
+
+          <button
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-6 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[13px]!"
+            type="button"
+            [title]="'feature.media.cutInEditor.jumpBack' | transloco"
+            (click)="jumpToKey(false)"
+          >
+            <i class="material-icons">skip_previous</i>
+          </button>
+          <button
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-6 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[13px]!"
+            type="button"
+            [title]="'feature.media.cutInEditor.jumpForward' | transloco"
+            (click)="jumpToKey(true)"
+          >
+            <i class="material-icons">skip_next</i>
+          </button>
+        </span>
+
+        <span class="ml-auto inline-flex items-center gap-0.5">
+          <button
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-6 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[13px]!"
+            type="button"
+            [disabled]="!canZoomOut()"
+            [title]="'feature.media.cutInEditor.zoomOut' | transloco"
+            (click)="zoomOut()"
+          >
+            <i class="material-icons">zoom_out</i>
+          </button>
+          <button
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex h-6 min-w-11 cursor-pointer items-center justify-center border border-solid bg-transparent px-1 text-[10px] tabular-nums disabled:cursor-not-allowed disabled:opacity-40"
+            type="button"
+            [disabled]="!canZoomOut()"
+            [title]="'feature.media.cutInEditor.zoomFit' | transloco"
+            (click)="zoomToFit()"
+          >
+            {{ zoomPercent() }}%
+          </button>
+          <button
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm inline-flex size-6 cursor-pointer items-center justify-center border border-solid bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-40 [&_.material-icons]:text-[13px]!"
+            type="button"
+            [disabled]="!canZoomIn()"
+            [title]="'feature.media.cutInEditor.zoomIn' | transloco"
+            (click)="zoomIn()"
+          >
+            <i class="material-icons">zoom_in</i>
+          </button>
+        </span>
+      }
     </div>
 
-    <div class="flex min-h-0 flex-1 overflow-auto" #timelineArea (wheel)="onTimelineWheel($event)">
+    @if (timelineOpen()) {
       <div
-        class="border-ui-border-panel bg-ui-panel sticky left-0 z-2 shrink-0 border-r border-solid"
-        [style.width.px]="timelineHeadWidthPx"
+        class="flex min-h-0 flex-1 overflow-auto"
+        #timelineArea
+        role="region"
+        [id]="timelineRegionId"
+        [attr.aria-label]="'feature.media.cutInEditor.timeline' | transloco"
+        (wheel)="onTimelineWheel($event)"
       >
-        <!-- Level with the ruler and the sound row, so the first head meets the first band. -->
-        <div class="border-ui-border-panel border-b border-solid" [style.height.px]="timelineHeadOffsetPx"></div>
-        <cut-in-layer-list
+        <div
+          class="border-ui-border-panel bg-ui-panel sticky left-0 z-2 shrink-0 border-r border-solid"
+          [style.width.px]="timelineHeadWidthPx"
+        >
+          <!-- Level with the ruler and the sound row, so the first head meets the first band. -->
+          <div class="border-ui-border-panel border-b border-solid" [style.height.px]="timelineHeadOffsetPx"></div>
+          <cut-in-layer-list
+            [layers]="layers()"
+            [selected]="selected()"
+            [isEditable]="isEditable()"
+            (selectLayer)="onSelect($event)"
+            (toggleHidden)="onToggleHidden($event)"
+            (toggleLocked)="onToggleLocked($event)"
+            (reorder)="onReorder($event)"
+          />
+        </div>
+
+        <cut-in-timeline
+          [viewportPx]="timelineViewportPx()"
+          [zoom]="timelineZoom()"
           [layers]="layers()"
+          [sounds]="sounds()"
           [selected]="selected()"
+          [durationMs]="durationMs()"
+          [playheadMs]="playheadMs()"
           [isEditable]="isEditable()"
+          (seek)="onSeek($event)"
+          (cue)="onCue($event)"
           (selectLayer)="onSelect($event)"
-          (toggleHidden)="onToggleHidden($event)"
-          (toggleLocked)="onToggleLocked($event)"
-          (reorder)="onReorder($event)"
+          (moveKey)="onMoveKey($event)"
+          (removeKey)="onRemoveKey($event)"
+          (moveSound)="onMoveSound($event)"
+          (removeSound)="onRemoveSound($event)"
+          (trimLayer)="onTrimLayer($event)"
+          (trimmed)="onTrimmed()"
         />
       </div>
-
-      <cut-in-timeline
-        [viewportPx]="timelineViewportPx()"
-        [zoom]="timelineZoom()"
-        [layers]="layers()"
-        [sounds]="sounds()"
-        [selected]="selected()"
-        [durationMs]="durationMs()"
-        [playheadMs]="playheadMs()"
-        [isEditable]="isEditable()"
-        (seek)="onSeek($event)"
-        (cue)="onCue($event)"
-        (selectLayer)="onSelect($event)"
-        (moveKey)="onMoveKey($event)"
-        (removeKey)="onRemoveKey($event)"
-        (moveSound)="onMoveSound($event)"
-        (removeSound)="onRemoveSound($event)"
-        (trimLayer)="onTrimLayer($event)"
-        (trimmed)="onTrimmed()"
-      />
-    </div>
+    } @else {
+      <!-- Folded, the layers stay listed so a hidden or locked one can still be picked and moved. -->
+      <div class="max-h-24 min-h-0 overflow-y-auto" data-testid="cut-in-compact-layers">
+        @if (layers().length === 0) {
+          <div class="text-ui-dim px-2 py-1.5 text-[11px]">{{ 'feature.media.cutInEditor.noLayers' | transloco }}</div>
+        } @else {
+          <cut-in-layer-list
+            [layers]="layers()"
+            [selected]="selected()"
+            [isEditable]="isEditable()"
+            (selectLayer)="onSelect($event)"
+            (toggleHidden)="onToggleHidden($event)"
+            (toggleLocked)="onToggleLocked($event)"
+            (reorder)="onReorder($event)"
+          />
+        }
+      </div>
+    }
   </div>
 </div>
