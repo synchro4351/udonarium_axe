@@ -4,6 +4,8 @@
 
 基本機能・使い方・サーバー構築については[公式の利用ガイド](https://xelltis.github.io/udonarium_axe/)と[公式README](https://github.com/Xelltis/udonarium_axe#readme)をご覧ください。ここでは公式との差分だけを紹介します。
 
+[写真で見る機能紹介](docs/showcase/README.md) — カード・チャット・画像・演出を13項目、21枚の画面で紹介しています。
+
 ## バージョンとソース
 
 - **固定版：tyoitashi r5／Axe v1.57.1** — [ソース `7033c85e`](https://github.com/synchro4351/udonarium_axe/tree/7033c85eed2cacd9c7ea44689e11ef9686b781f8)
