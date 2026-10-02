@@ -95,6 +95,8 @@
                     >
                       @if (entry.text) {
                         <span class="font-semibold">{{ entry.text }}</span>
+                      } @else if (entry.icon === handCardsIcon) {
+                        <ui-hand-cards-icon class="size-3.75" />
                       } @else {
                         <i class="material-icons" aria-hidden="true">{{ entry.icon }}</i>
                       }

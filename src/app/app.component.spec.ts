@@ -178,6 +178,16 @@ describe('AppComponent', () => {
       expect(entry('インベントリ')).toBeTruthy();
     });
 
+    it('draws the hand beside its small menu with its own icon rather than the icon name', () => {
+      guide.show();
+      fixture.detectChanges();
+
+      const hand = entry('手札');
+
+      expect(hand.querySelector('ui-hand-cards-icon')).toBeTruthy();
+      expect(hand.querySelector('.material-icons')).toBeNull();
+    });
+
     it('does what an entry beside a small menu is for, and puts the guide away', () => {
       const open = vi.spyOn(TestBed.inject(RoomPanelService), 'open').mockImplementation(() => {});
       guide.show();
