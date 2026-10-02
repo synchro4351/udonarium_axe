@@ -7,7 +7,7 @@
 ## バージョンとソース
 
 - **固定版：tyoitashi r5／Axe v1.57.1** — [ソース `7033c85e`](https://github.com/synchro4351/udonarium_axe/tree/7033c85eed2cacd9c7ea44689e11ef9686b781f8)
-- **開発版：Axe v1.58.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`9ca3489a`](https://github.com/synchro4351/udonarium_axe/tree/9ca3489a9cee64bcc4ff08aaea2f87a903afc270)。公式のメニューカスタマイズを取り込み、私家版のスタンプ・手札入口を接続しました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
+- **開発版：Axe v1.59.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`f42e153b`](https://github.com/synchro4351/udonarium_axe/tree/f42e153bff5d70f8f99d70e6a41d7fa82097a234)。公式のスイッチ・コンパス・ボタン名ガイドを取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
@@ -16,7 +16,9 @@
 
 [試用サイト](https://udonarium-trial.synwork.work/)で固定版`tyoitashi r5`を試せます。個人用の卓とは別の試用環境です。実験的な機能を含むため、動作が不安定な場合があります。大切な卓データは手元へ保存してください。デモのソースは上記の固定コミット`7033c85e`です。
 
-## 開発版で追加した変更（Axe v1.58.0）
+## 開発版で追加した変更（Axe v1.59.0）
+
+- 公式v1.59.0へ追従しました。GMが地形などへ複数の動作を設定できる[スイッチ](https://xelltis.github.io/udonarium_axe/manual/switch)、コンパス、ボタン名のガイドを公式仕様のまま使えます。ガイドにも私家版の手札アイコンを表示します。スイッチからキャラクター画像のカットインテンプレートを再生した場合は、キャラクター情報が渡らないためシルエットになります。[追従ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/upstream-v1-59-0)。
 
 - ホットバーと手札の初期位置をチャットの横へ、横幅が足りないときは上へ配置します。手札一覧は「全員」から開き、画像のファイル・ドロップ・貼り付けを一つの追加領域に整理しました。スタンプを登録する画面は「スタンプ管理」と区別し、カットインのキャラクター関連の操作名を短くしました。見本から新しく作ったカットインは文字が出揃う時点をプレビューし、最初の再生は冒頭から始まります。既存の配置・保存形式は変更しません。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/ui-entry-cleanup)。
 
