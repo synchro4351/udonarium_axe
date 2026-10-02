@@ -50,16 +50,20 @@ describe('AppInitializationService', () => {
       expect(objectStore.get<SoundEffect>('SoundEffect')).toBeTruthy();
     });
 
-    it('lays down the sample cut-ins, each with a face and sounds of its own', () => {
+    it('lays down fixed-image samples and a character portrait template', () => {
       const cutIns = objectStore.getObjects(CutIn);
 
-      expect(cutIns.length).toBeGreaterThan(0);
-      for (const cutIn of cutIns) {
+      expect(cutIns.map((cutIn) => cutIn.name)).toEqual(['Sample1', 'Sample2', 'Sample_Template']);
+      for (const cutIn of cutIns.filter((sample) => sample.name !== 'Sample_Template')) {
         expect(cutIn.isComposed).toBe(true);
         expect(cutIn.scene?.layers.some((layer) => layer.imageIdentifier.length > 0)).toBe(true);
         expect(cutIn.scene?.soundList.length).toBeGreaterThan(0);
         for (const sound of cutIn.scene!.soundList) expect(sound.a).toBeTruthy();
       }
+      const template = cutIns.find((sample) => sample.name === 'Sample_Template')!;
+      expect(template.isComposed).toBe(true);
+      expect(template.scene!.takesCharacter).toBe(true);
+      expect(template.scene!.layers.some((layer) => layer.portraitSlot)).toBe(true);
     });
 
     it('sets up the audio presets', () => {

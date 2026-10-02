@@ -9,6 +9,7 @@ import {
   SAMPLE_PORTRAIT_IDENTIFIER,
 } from '@axe/domain/media/builtin-cut-ins';
 import { CutIn } from '@axe/domain/media/cut-in';
+import { portraitFrameOf } from '@axe/domain/media/cut-in-portrait';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
 import { sceneDurationOf, toWebAnimationFrames } from '@axe/domain/media/cut-in-scene-timeline';
 import { ImageTag, SYSTEM_RESERVED_TAG } from '@axe/domain/media/image-tag';
@@ -61,6 +62,28 @@ describe('the cut-ins a new room starts with', () => {
     made();
 
     expect(store.getObjects(CutIn)).toHaveLength(DEFAULT_CUT_IN_SEEDS.length);
+  });
+
+  it('adds a character template that uses the shared bust fit and character name', () => {
+    const template = made().find((cutIn) => cutIn.name === 'Sample_Template')!;
+    expect(template.scene!.takesCharacter).toBe(true);
+    const portrait = template.scene!.layers.find((layer) => layer.portraitSlot)!;
+    expect(portraitFrameOf([portrait])).toBe('bust');
+    expect(portrait.width / portrait.height).toBeCloseTo(340 / 400);
+    expect(template.scene!.layers.some((layer) => layer.text === '{character}')).toBe(true);
+    const xml = ObjectSerializer.instance.toXml(template);
+    expect(xml).toContain('portraitSlot="true"');
+    expect(xml).toContain('{character}');
+  });
+
+  it('keeps an edited template unchanged when defaults are initialized again', () => {
+    const template = made().find((cutIn) => cutIn.name === 'Sample_Template')!;
+    template.name = 'My template';
+    template.scene!.layers[0].fillFrom = '#123456';
+    made();
+    expect(store.get<CutIn>(template.identifier)).toBe(template);
+    expect(template.name).toBe('My template');
+    expect(template.scene!.layers[0].fillFrom).toBe('#123456');
   });
 
   it('registers the faces it comes with, one identifier each', () => {

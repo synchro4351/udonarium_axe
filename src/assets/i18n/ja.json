@@ -573,7 +573,7 @@
         "multiDirection_vertical-left": "上下左",
         "multiDirection_four-directions": "上下左右",
         "multiDirectionHint": "卓を真上から見ているあいだだけ、四方に向けて出します。",
-        "sceneTemplatePick": "見本から作成",
+        "sceneTemplatePick": "演出見本を追加",
         "sceneTemplate_battle": "戦闘開始",
         "sceneTemplate_success": "成功！",
         "sceneTemplate_transition": "場面転換",
@@ -594,7 +594,11 @@
         "portraitNone": "画像なし（シルエット）",
         "portraitImage": "立ち絵",
         "portraitFitOnSheet": "枠の中での立ち絵の位置は、キャラクターシートの「カットイン位置」でキャラクターごとに決めます。",
-        "directionDetails": "表示の向き"
+        "directionDetails": "表示の向き",
+        "characterExamples": "キャラクター用",
+        "reactionExamples": "短い演出・リアクション",
+        "examplePack": "見本16個のZIP",
+        "examplePackHint": "ダウンロードしたZIPを卓へ読み込むと、演出見本をまとめて追加できます。"
       },
       "cutInEditor": {
         "portraitSlot": "再生時のキャラクター画像を使う",

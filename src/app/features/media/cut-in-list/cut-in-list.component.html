@@ -24,10 +24,25 @@
         (change)="createFromTemplate($event)"
       >
         <option value="">{{ 'feature.media.cutIn.sceneTemplatePick' | transloco }}</option>
-        @for (template of sceneTemplates; track template) {
-          <option [value]="template">{{ 'feature.media.cutIn.sceneTemplate_' + template | transloco }}</option>
-        }
+        <optgroup [label]="'feature.media.cutIn.characterExamples' | transloco">
+          <option value="portrait">{{ 'feature.media.cutIn.sceneTemplate_portrait' | transloco }}</option>
+        </optgroup>
+        <optgroup [label]="'feature.media.cutIn.reactionExamples' | transloco">
+          @for (template of sceneTemplates; track template) {
+            @if (template !== 'portrait') {
+              <option [value]="template">{{ 'feature.media.cutIn.sceneTemplate_' + template | transloco }}</option>
+            }
+          }
+        </optgroup>
       </select>
+      <a
+        class="text-ui-muted hover:text-ui-accent mx-2 mt-1 mb-2 inline-flex items-center gap-1 text-[11px]"
+        href="assets/samples/tyoitashi-cut-in-examples.zip"
+        download="tyoitashi-cut-in-examples.zip"
+        data-testid="cut-in-example-pack"
+        [title]="'feature.media.cutIn.examplePackHint' | transloco"
+        ><i class="material-icons text-[13px]!">download</i>{{ 'feature.media.cutIn.examplePack' | transloco }}</a
+      >
     }
 
     <ul class="m-0 flex-1 list-none overflow-y-auto px-0 py-1" role="listbox">

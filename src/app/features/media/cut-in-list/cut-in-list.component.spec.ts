@@ -1,8 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TabletopDisplayPreferenceService } from '@axe/application/ui/tabletop-display-preference.service';
+import { CutIn } from '@axe/domain/media/cut-in';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
-import { CutIn } from '@axe/domain/media/cut-in';
 import { GameTable } from '@axe/domain/tabletop/game-table';
 import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
 import { CutInListComponent } from '@axe/features/media/cut-in-list/cut-in-list.component';

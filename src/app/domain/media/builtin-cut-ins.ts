@@ -17,13 +17,13 @@ import { PresetSound } from '@axe/domain/media/sound-effect';
 /**
  * The cut-ins a new room starts with.
  *
- * Both are the shape a summoning cut-in takes: a face filling a window, the sound of it,
+ * The first two show the shape a summoning cut-in takes: a face filling a window, the sound of it,
  * and the word for that sound stamped across the corner. The older style stands its
  * window upright; the newer one leans it over and tears its edge. Everything but the
  * face is drawn — bands, lines, dots and words — so opening either in the scene editor
  * shows how it was put together, and the face is one field to change.
  *
- * The identifiers are fixed, so everyone in a room ends up with the same two rather than
+ * The identifiers are fixed, so everyone in a room ends up with the same samples rather than
  * a copy each, the way the built-in effects work.
  */
 
@@ -63,6 +63,7 @@ interface LayerSeed {
   // image
   portrait?: boolean;
   face?: boolean;
+  portraitSlot?: boolean;
   objectFit?: string;
   objectPosY?: number;
   opacity?: number;
@@ -422,13 +423,83 @@ export const DEFAULT_CUT_IN_SEEDS: readonly CutInSeed[] = [
       },
     ],
   },
+  {
+    identifier: 'cutInSampleTemplate',
+    sceneIdentifier: 'cutInSampleTemplate_scene',
+    name: 'Sample_Template',
+    width: 640,
+    height: 360,
+    durationMs: 2200,
+    sounds: [],
+    layers: [
+      {
+        identifier: 'cutInSampleTemplate_band',
+        name: '帯',
+        kind: 'fill',
+        x: 0,
+        y: 200,
+        width: 640,
+        height: 120,
+        fillShape: 'linear',
+        fillFrom: '#245c88',
+        tracks: {
+          opacity: [
+            { t: 0, v: 0 },
+            { t: 200, v: 1 },
+            { t: 1900, v: 1 },
+            { t: 2200, v: 0 },
+          ],
+        },
+      },
+      {
+        identifier: 'cutInSampleTemplate_portrait',
+        name: 'キャラクター画像',
+        kind: 'image',
+        x: 360,
+        y: 0,
+        width: 272,
+        height: 320,
+        portraitSlot: true,
+        tracks: {
+          opacity: [
+            { t: 0, v: 0 },
+            { t: 200, v: 1 },
+            { t: 1900, v: 1 },
+            { t: 2200, v: 0 },
+          ],
+        },
+      },
+      {
+        identifier: 'cutInSampleTemplate_name',
+        name: 'キャラクター名',
+        kind: 'text',
+        x: 20,
+        y: 225,
+        width: 340,
+        height: 60,
+        text: '{character}',
+        fontSizePx: 42,
+        fontWeight: 700,
+        color: '#ffffff',
+        textAlign: 'center',
+        tracks: {
+          opacity: [
+            { t: 0, v: 0 },
+            { t: 200, v: 1 },
+            { t: 1900, v: 1 },
+            { t: 2200, v: 0 },
+          ],
+        },
+      },
+    ],
+  },
 ] as const;
 
 /**
  * Makes the samples, leaving alone any that are already there.
  *
  * Called on a fresh store, before a room's own objects arrive, so everyone builds the
- * same two under the same identifiers and syncing settles them into one set.
+ * same samples under fixed identifiers and syncing settles them into one set.
  */
 export function createDefaultCutIns(imageStorage: ImageStorage): CutIn[] {
   const pictures = {
@@ -530,6 +601,7 @@ function makeLayer(seed: LayerSeed, pictures: SamplePictures): CutInLayer {
 
   if (seed.portrait) layer.imageIdentifier = pictures.portrait;
   if (seed.face) layer.imageIdentifier = pictures.face;
+  if (seed.portraitSlot) layer.portraitSlot = true;
   if (seed.objectFit) layer.objectFit = seed.objectFit;
   if (seed.objectPosY !== undefined) layer.objectPosY = seed.objectPosY;
 
