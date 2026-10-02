@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ImageStorage } from '@axe/core/storage/image-storage';
+import { objectChanged$ } from '@axe/core/sync/object-event-extension';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
@@ -372,6 +373,86 @@ describe('CutInStageComponent', () => {
   });
 
   describe('letters that move or lean on their own', () => {
+    type LetterCall = [{ offset: number; opacity: number; transform: string }[], KeyframeAnimationOptions];
+
+    /** The animations set going for letters, which come after the one for their layer. */
+    function letterCalls(animate: ReturnType<typeof vi.fn>): LetterCall[] {
+      return (animate.mock.calls as unknown as LetterCall[]).slice(1);
+    }
+
+    it('lets exit-only letters leave on the scene clock, gone by the time the layer goes', () => {
+      const animate = stubAnimate();
+      const scene = makeScene(2000);
+      addLayer(scene, { kind: 'text', text: 'AB', letterExit: 'fade', endMs: 1000 });
+
+      show(scene, true);
+
+      expect(animate).toHaveBeenCalledTimes(3);
+      for (const [frames, options] of letterCalls(animate)) {
+        expect(frames.find((frame) => frame.offset === 0.5)?.opacity).toBe(0);
+        expect(options.duration).toBe(2000);
+      }
+    });
+
+    it('brings the letters in from the end, counting the launched name and a joined emoji', () => {
+      const animate = stubAnimate();
+      const scene = makeScene(2000);
+      addLayer(scene, {
+        kind: 'text',
+        text: '{character}\n👍🏽!',
+        letterMotion: 'fade',
+        letterOrder: 'reverse',
+        letterIntervalMs: 100,
+        letterDurationMs: 100,
+      });
+      fixture.componentRef.setInput('portrait', {
+        characterIdentifier: '',
+        imageIdentifier: '',
+        fit: { scale: 1, x: 0, y: 0 },
+        characterName: 'Bo',
+      });
+
+      show(scene, true);
+
+      // B, o, 👍🏽 and !: the last is in first, each a hundred ms after the one after it.
+      const fullAt = letterCalls(animate).map(([frames]) => frames.find((frame) => frame.opacity === 1)!.offset * 2000);
+      expect(fullAt.map(Math.round)).toEqual([400, 300, 200, 100]);
+    });
+
+    it('runs the letters from where a replay picks the scene up, and holds them at the scrubber', () => {
+      const animate = stubAnimate();
+      const scene = makeScene(2000);
+      addLayer(scene, { kind: 'text', text: 'AB', letterMotion: 'slide' });
+
+      show(scene, true, 0, 500);
+      expect(letterCalls(animate).every(([, options]) => options.delay === -500)).toBe(true);
+
+      animate.mockClear();
+      show(scene, false, 250);
+      const handles = animate.mock.results.slice(1).map((result) => result.value);
+      expect(handles).toHaveLength(2);
+      for (const handle of handles) {
+        expect(handle.pause).toHaveBeenCalled();
+        expect(handle.currentTime).toBe(250);
+      }
+    });
+
+    it('sets the letters going again when a control is changed elsewhere in the room', () => {
+      const animate = stubAnimate();
+      const scene = makeScene(2000);
+      const layer = addLayer(scene, { kind: 'text', text: 'AB', letterMotion: 'fade', letterIntervalMs: 100 });
+      show(scene, true);
+      const before = letterCalls(animate).map(([frames]) => frames.find((frame) => frame.opacity === 1)!.offset);
+
+      animate.mockClear();
+      layer.letterOrder = 'reverse';
+      objectChanged$.emit({ identifier: layer.identifier, aliasName: layer.aliasName, isSendFromSelf: false });
+      fixture.detectChanges();
+
+      const after = letterCalls(animate).map(([frames]) => frames.find((frame) => frame.opacity === 1)!.offset);
+      expect(after).toEqual([...before].reverse());
+    });
+
     it('draws each letter apart, keeping line breaks and joined emoji, and leans every other one', () => {
       const scene = makeScene();
       addLayer(scene, { kind: 'text', text: '{character}\n👍🏽!', letterTiltDeg: 10 });
@@ -393,6 +474,20 @@ describe('CutInStageComponent', () => {
         'rotate(10deg)',
       ]);
       expect(fixture.nativeElement.querySelectorAll('[data-testid="cut-in-letters"] br')).toHaveLength(1);
+    });
+
+    it('leans every letter the same way when asked', () => {
+      const scene = makeScene();
+      addLayer(scene, { kind: 'text', text: 'ABC', letterTiltDeg: 10, letterTiltMode: 'uniform' });
+
+      show(scene, false, 0);
+
+      const letters = [...fixture.nativeElement.querySelectorAll('[data-letter]')] as HTMLElement[];
+      expect(letters.map((letter) => letter.style.transform)).toEqual([
+        'rotate(10deg)',
+        'rotate(10deg)',
+        'rotate(10deg)',
+      ]);
     });
 
     it('sets each moving letter going on the scene clock, alongside its layer', () => {

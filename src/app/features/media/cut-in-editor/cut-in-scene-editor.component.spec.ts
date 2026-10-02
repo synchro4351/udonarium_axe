@@ -468,6 +468,25 @@ describe('CutInSceneEditorComponent', () => {
       expect(component.layers()[0].name).toBe('立ち絵');
     });
 
+    it('takes a detailed letter control back one step at a time', () => {
+      editor().addTextLayer();
+      const layer = component.layers()[0];
+      layer.letterOrder = 'reverse';
+      editor().changed();
+      layer.letterExit = 'rise';
+      editor().changed();
+
+      editor().undo();
+      expect(layer).toMatchObject({ letterOrder: 'reverse', letterExit: 'none' });
+
+      editor().undo();
+      expect(layer.letterOrder).toBe('forward');
+
+      editor().redo();
+      editor().redo();
+      expect(layer).toMatchObject({ letterOrder: 'reverse', letterExit: 'rise' });
+    });
+
     it('lets go of a selection that was taken away', () => {
       editor().addImageLayer();
       editor().undo();

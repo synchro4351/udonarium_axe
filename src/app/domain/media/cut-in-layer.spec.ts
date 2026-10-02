@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer, isCutInLayerKind, isCutInTextAlign } from '@axe/domain/media/cut-in-layer';
 
@@ -108,6 +109,76 @@ describe('CutInLayer', () => {
       layer.tracks = encodeCutInTracks({ opacity: [{ t: 2400, v: 0 }] });
 
       expect(layer.lastMomentMs).toBe(2400);
+    });
+  });
+
+  describe('the detailed letter controls', () => {
+    const detailed = {
+      letterMotion: 'slide',
+      letterOrder: 'center',
+      letterIntervalMs: 130,
+      letterDurationMs: 500,
+      letterTiltMode: 'uniform',
+      letterExit: 'rise',
+      letterExitDurationMs: 400,
+      letterDirection: 'left',
+    } as const;
+
+    function detailedLayer(): CutInLayer {
+      const layer = makeLayer();
+      layer.kind = 'text';
+      layer.text = '{character} 👍🏽';
+      Object.assign(layer, detailed);
+      return layer;
+    }
+
+    it('starts on the way letters moved before there were controls', () => {
+      expect(makeLayer()).toMatchObject({
+        letterOrder: 'forward',
+        letterIntervalMs: 60,
+        letterDurationMs: 260,
+        letterTiltMode: 'alternate',
+        letterExit: 'none',
+        letterExitDurationMs: 260,
+        letterDirection: 'up',
+      });
+    });
+
+    it('keeps them through a save and a copy, with the text left as one string', () => {
+      const layer = detailedLayer();
+
+      const restored = ObjectSerializer.instance.parseXml(layer.toXml()) as CutInLayer;
+      expect(restored).toMatchObject({ ...detailed, text: '{character} 👍🏽' });
+      expect(layer.clone()).toMatchObject(detailed);
+    });
+
+    it('sends them to the room as attributes of the layer, and takes them from it', () => {
+      const layer = detailedLayer();
+      const context = layer.toContext();
+
+      expect((context.syncData as { attributes: object }).attributes).toMatchObject(detailed);
+
+      const other = makeLayer();
+      other.apply({ ...context, identifier: other.identifier });
+      expect(other).toMatchObject(detailed);
+    });
+
+    it('reads a cut-in saved before the controls existed as it always played', () => {
+      const restored = ObjectSerializer.instance.parseXml(
+        '<cut-in-layer kind="text" text="参戦" letterMotion="pop"></cut-in-layer>'
+      ) as CutInLayer;
+
+      expect(restored).toMatchObject({ letterMotion: 'pop', letterOrder: 'forward', letterIntervalMs: 60 });
+    });
+
+    it('leaves a number a file garbles at its default', () => {
+      const restored = ObjectSerializer.instance.parseXml(
+        '<cut-in-layer kind="text" letterIntervalMs="soon" letterOrder="sideways"></cut-in-layer>'
+      ) as CutInLayer;
+
+      expect(restored.letterIntervalMs).toBe(60);
+      // Kept as written, and read as the default wherever it is played.
+      expect(restored.letterOrder).toBe('sideways');
     });
   });
 });

@@ -64,6 +64,44 @@ describe('posterFrameMs()', () => {
     }
   });
 
+  it('waits for the last letter in the chosen order, however it comes in', () => {
+    for (const letterMotion of ['fade', 'slide'] as const) {
+      const scene = emptyScene();
+      const layer = addLayer(scene, 'text', 'call', { width: 640, height: 360 });
+      Object.assign(layer, {
+        text: 'ABCD',
+        letterMotion,
+        letterOrder: 'center',
+        letterIntervalMs: 200,
+        letterDurationMs: 200,
+        letterDirection: 'left',
+      });
+
+      // From the middle out, the fourth letter goes last: 3 × 200 ms after the first, and 200 ms to come in.
+      expect(posterFrameMs(scene), letterMotion).toBe(800);
+    }
+  });
+
+  it('passes over the moments its letters are leaving', () => {
+    const scene = emptyScene();
+    const layer = addLayer(scene, 'text', 'call', { width: 640, height: 360 });
+    // The layer is clearest late in the scene, which is when its letters would be leaving.
+    layer.tracks = encodeCutInTracks({
+      opacity: [
+        { t: 0, v: 0 },
+        { t: 1900, v: 1 },
+      ],
+    });
+    Object.assign(layer, { text: 'AB', letterExit: 'none' });
+    expect(posterFrameMs(scene)).toBeGreaterThan(940);
+
+    // Leaving over a second, the first letter starts to go at 2000 - 1000 - 60.
+    Object.assign(layer, { letterExit: 'fade', letterExitDurationMs: 1000 });
+    const at = posterFrameMs(scene);
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThan(940);
+  });
+
   it('waits until every popping letter of the portrait template has landed', () => {
     for (const title of ['参戦！', 'ここに\n参戦！']) {
       const scene = createCutInSceneTemplate('portrait', title).scene!;

@@ -28,6 +28,7 @@ import {
   layerFilter,
   layerOrigin,
   layerTransform,
+  layerWindow,
   sampleLayerAt,
   sceneDurationOf,
   toCrumbleFrames,
@@ -244,7 +245,7 @@ export class CutInStageComponent {
     if (!drawsLetters(layer)) return null;
     return splitLetters(this.textOf(layer)).map((letter) => ({
       ...letter,
-      rest: letter.newline ? '' : `rotate(${letterTiltOf(letter.index, layer.letterTiltDeg)}deg)`,
+      rest: letter.newline ? '' : `rotate(${letterTiltOf(letter.index, layer.letterTiltDeg, layer.letterTiltMode)}deg)`,
     }));
   }
 
@@ -298,9 +299,11 @@ export class CutInStageComponent {
         this.crumbleHandles.set(layer.identifier, crumbleElement.animate(crumbleFrames, options));
       }
 
-      // Letters that move ride on the same clock as their layer, each on an animation of its own.
-      if (layer.kind === 'text' && isCutInLetterMotion(layer.letterMotion) && layer.letterMotion !== 'none') {
+      // Letters that move ride on the same clock as their layer, each on an animation of its own,
+      // counted along the text as it is shown, with the launched character's name in.
+      if (layer.kind === 'text' && isCutInLetterMotion(layer.letterMotion) && drawsLetters(layer)) {
         const letters = Array.from(element.querySelectorAll<HTMLElement>('[data-letter]'));
+        const { endMs } = layerWindow(layer, durationMs);
         this.letterHandles.set(
           layer.identifier,
           letters.map((letter) =>
@@ -311,7 +314,10 @@ export class CutInStageComponent {
                 layer.letterTiltDeg,
                 layer.fontSizePx,
                 layer.startMs,
-                durationMs
+                durationMs,
+                layer,
+                letters.length,
+                endMs
               ),
               options
             )

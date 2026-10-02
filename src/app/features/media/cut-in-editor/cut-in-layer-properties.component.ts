@@ -30,9 +30,18 @@ import { CUT_IN_TEXT_ALIGNS, CutInLayer, type CutInTextAlign, isCutInTextAlign }
 import { applyLayerPreset, CUT_IN_LAYER_PRESETS } from '@axe/domain/media/cut-in-layer-presets';
 import {
   CUT_IN_CHARACTER_TOKEN,
+  CUT_IN_LETTER_DIRECTIONS,
+  CUT_IN_LETTER_EXITS,
   CUT_IN_LETTER_MOTIONS,
+  CUT_IN_LETTER_ORDERS,
+  CUT_IN_LETTER_TILTS,
+  type CutInLetterControls,
   type CutInLetterMotion,
+  type CutInLetterSettings,
   isCutInLetterMotion,
+  LETTER_TIMING_LIMITS,
+  letterControlTakesEffect,
+  letterSettingsOf,
   MAX_LETTER_TILT_DEG,
 } from '@axe/domain/media/cut-in-text';
 import { CUT_IN_WIPES, type CutInWipe, isCutInWipe } from '@axe/domain/media/cut-in-wipe';
@@ -48,6 +57,10 @@ import {
 import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
+
+/** The simple letter looks offered as buttons, ahead of the folded detailed controls. */
+const CUT_IN_LETTER_PRESETS = ['fade', 'pop', 'wave'] as const;
+type CutInLetterPreset = (typeof CUT_IN_LETTER_PRESETS)[number];
 
 /**
  * What the selected layer is told.
@@ -81,6 +94,17 @@ export class CutInLayerPropertiesComponent {
 
   readonly textAligns = CUT_IN_TEXT_ALIGNS;
   readonly letterMotions = CUT_IN_LETTER_MOTIONS;
+  readonly letterPresets = CUT_IN_LETTER_PRESETS;
+  readonly letterSelects = [
+    { key: 'letterOrder' as const, choices: CUT_IN_LETTER_ORDERS },
+    { key: 'letterTiltMode' as const, choices: CUT_IN_LETTER_TILTS },
+    { key: 'letterExit' as const, choices: CUT_IN_LETTER_EXITS },
+    { key: 'letterDirection' as const, choices: CUT_IN_LETTER_DIRECTIONS },
+  ];
+  readonly letterTimes = (['letterIntervalMs', 'letterDurationMs', 'letterExitDurationMs'] as const).map((key) => ({
+    key,
+    ...LETTER_TIMING_LIMITS[key],
+  }));
   readonly maxLetterTiltDeg = MAX_LETTER_TILT_DEG;
   readonly characterToken = CUT_IN_CHARACTER_TOKEN;
   readonly fontOptions = CUT_IN_FONT_OPTIONS;
@@ -468,6 +492,40 @@ export class CutInLayerPropertiesComponent {
   }
   set letterMotion(motion: CutInLetterMotion) {
     this.write((layer) => (layer.letterMotion = isCutInLetterMotion(motion) ? motion : 'none'));
+  }
+
+  /** The detailed letter controls as they play, with a missing or unknown value read as its default. */
+  get letterControls(): CutInLetterControls {
+    const layer = this.layer();
+    if (!layer) return letterSettingsOf();
+    this.objectChange.versionOf(layer.identifier)();
+    return letterSettingsOf(layer);
+  }
+
+  /**
+   * Whether a detailed letter control can be changed: by an editor, and only while it changes
+   * anything for the motion and exit as they stand. A control shut this way keeps its value.
+   */
+  letterControlEnabled(key: keyof CutInLetterControls): boolean {
+    const layer = this.layer();
+    if (!layer || !this.isEditable()) return false;
+    this.objectChange.versionOf(layer.identifier)();
+    return letterControlTakesEffect(key, layer);
+  }
+
+  /** Writes one detailed letter control, held to the values and range it allows. */
+  setLetterControl(key: keyof CutInLetterSettings, value: string | number | null): void {
+    const held = letterSettingsOf({ [key]: value ?? undefined } as CutInLetterSettings)[key];
+    this.write((layer) => Object.assign(layer, { [key]: held }));
+  }
+
+  /** One of the simple looks: every detailed control goes back to its default before the look is laid on. */
+  applyLetterPreset(preset: CutInLetterPreset): void {
+    this.write((layer) => {
+      Object.assign(layer, letterSettingsOf(), { letterMotion: preset, letterTiltDeg: 0 });
+      if (preset === 'fade') layer.letterDurationMs = 400;
+      if (preset === 'pop') layer.letterTiltDeg = 5;
+    });
   }
 
   /** How far every other letter leans the other way, held within what still reads as a letter. */

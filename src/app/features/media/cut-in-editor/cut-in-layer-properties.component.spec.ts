@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { objectChanged$ } from '@axe/core/sync/object-event-extension';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import { CutInLayerPropertiesComponent } from '@axe/features/media/cut-in-editor/cut-in-layer-properties.component';
@@ -534,6 +535,165 @@ describe('CutInLayerPropertiesComponent', () => {
     beforeEach(() => {
       layer.kind = 'text';
       fixture.detectChanges();
+    });
+
+    function field<T extends HTMLElement>(testId: string): T {
+      return (fixture.nativeElement as HTMLElement).querySelector<T>(`[data-testid="${testId}"]`)!;
+    }
+
+    it('offers the simple looks first and keeps the detailed controls folded away', () => {
+      const details = field<HTMLDetailsElement>('cut-in-letter-details');
+
+      expect(field('cut-in-letter-preset-fade')).not.toBeNull();
+      expect(details.open).toBe(false);
+      expect(details.querySelector('[data-testid="cut-in-letterOrder"]')).not.toBeNull();
+      expect(details.querySelector('[data-testid="cut-in-layer-letter-tilt"]')).not.toBeNull();
+    });
+
+    it('writes each detailed control, held to what it allows, with one undo step each', () => {
+      const commit = vi.fn();
+      component.commit.subscribe(commit);
+
+      component.setLetterControl('letterOrder', 'reverse');
+      component.setLetterControl('letterIntervalMs', 120);
+      component.setLetterControl('letterExit', 'rise');
+      component.setLetterControl('letterExitDurationMs', 99_999);
+      component.setLetterControl('letterDirection', 'diagonal');
+      component.setLetterControl('letterDurationMs', null);
+
+      expect(layer).toMatchObject({
+        letterOrder: 'reverse',
+        letterIntervalMs: 120,
+        letterExit: 'rise',
+        letterExitDurationMs: 3000,
+        letterDirection: 'up',
+        letterDurationMs: 260,
+      });
+      expect(commit).toHaveBeenCalledTimes(6);
+    });
+
+    it('puts every detailed control back before laying a simple look on, in one undo step', () => {
+      const commit = vi.fn();
+      Object.assign(layer, { letterOrder: 'center', letterIntervalMs: 500, letterExit: 'rise', letterTiltDeg: 12 });
+      component.commit.subscribe(commit);
+
+      component.applyLetterPreset('fade');
+
+      expect(layer).toMatchObject({
+        letterMotion: 'fade',
+        letterOrder: 'forward',
+        letterIntervalMs: 60,
+        letterDurationMs: 400,
+        letterExit: 'none',
+        letterTiltDeg: 0,
+      });
+      expect(commit).toHaveBeenCalledTimes(1);
+
+      component.applyLetterPreset('pop');
+      expect(layer).toMatchObject({ letterMotion: 'pop', letterDurationMs: 260, letterTiltDeg: 5 });
+    });
+
+    it('writes a detailed control chosen from its list', async () => {
+      const select = field<HTMLSelectElement>('cut-in-letterOrder');
+      select.value = 'center';
+      select.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+
+      expect(layer.letterOrder).toBe('center');
+    });
+
+    it('shows a control changed elsewhere in the room, and an unknown one as its default', async () => {
+      layer.letterExit = 'shrink';
+      layer.letterIntervalMs = 240;
+      objectChanged$.emit({ identifier: layer.identifier, aliasName: layer.aliasName, isSendFromSelf: false });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(field<HTMLSelectElement>('cut-in-letterExit').value).toBe('shrink');
+      expect(field<HTMLInputElement>('cut-in-letterIntervalMs').value).toBe('240');
+
+      layer.letterOrder = 'sideways' as never;
+      expect(component.letterControls.letterOrder).toBe('forward');
+    });
+
+    const detailedControls = [
+      'letterOrder',
+      'letterTiltMode',
+      'letterExit',
+      'letterDirection',
+      'letterIntervalMs',
+      'letterDurationMs',
+      'letterExitDurationMs',
+    ] as const;
+
+    /** The detailed controls that can be changed, once the form has caught up with the layer. */
+    async function openControls(): Promise<string[]> {
+      fixture.detectChanges();
+      // A form control takes its disabled state on the microtask after the binding changes.
+      await fixture.whenStable();
+      return detailedControls.filter((control) => !field<HTMLInputElement>(`cut-in-${control}`).disabled);
+    }
+
+    it('opens only the controls that change anything for the motion and exit, keeping what the rest hold', async () => {
+      Object.assign(layer, { letterDirection: 'left', letterDurationMs: 700, letterExitDurationMs: 900 });
+      const always = ['letterOrder', 'letterTiltMode', 'letterExit'];
+
+      expect(await openControls()).toEqual(always);
+
+      component.letterMotion = 'slide';
+      expect(await openControls()).toEqual([...always, 'letterDirection', 'letterIntervalMs', 'letterDurationMs']);
+
+      component.letterMotion = 'fade';
+      expect(await openControls()).toEqual([...always, 'letterIntervalMs', 'letterDurationMs']);
+      expect(field<HTMLSelectElement>('cut-in-letterDirection').value).toBe('left');
+
+      component.letterMotion = 'wave';
+      component.setLetterControl('letterExit', 'shrink');
+      expect(await openControls()).toEqual([...always, 'letterIntervalMs', 'letterExitDurationMs']);
+      expect(field<HTMLInputElement>('cut-in-letterDurationMs').value).toBe('700');
+
+      component.setLetterControl('letterExit', 'none');
+      expect(await openControls()).toEqual(always);
+      expect(layer).toMatchObject({ letterDirection: 'left', letterDurationMs: 700, letterExitDurationMs: 900 });
+      expect(field<HTMLInputElement>('cut-in-letterExitDurationMs').value).toBe('900');
+    });
+
+    it('opens and shuts the controls as the motion and exit change elsewhere in the room', async () => {
+      expect(await openControls()).not.toContain('letterDirection');
+
+      layer.letterMotion = 'pop';
+      layer.letterExit = 'rise';
+      objectChanged$.emit({ identifier: layer.identifier, aliasName: layer.aliasName, isSendFromSelf: false });
+
+      expect(await openControls()).toEqual(detailedControls);
+
+      layer.letterMotion = 'shake';
+      objectChanged$.emit({ identifier: layer.identifier, aliasName: layer.aliasName, isSendFromSelf: false });
+
+      expect(await openControls()).toEqual([
+        'letterOrder',
+        'letterTiltMode',
+        'letterExit',
+        'letterIntervalMs',
+        'letterExitDurationMs',
+      ]);
+    });
+
+    it('changes nothing for a reader and locks every detailed control, even those in use', async () => {
+      component.letterMotion = 'pop';
+      component.setLetterControl('letterExit', 'fade');
+      expect(await openControls()).toEqual(detailedControls);
+
+      fixture.componentRef.setInput('isEditable', false);
+
+      expect(await openControls()).toEqual([]);
+      component.setLetterControl('letterIntervalMs', 200);
+      component.applyLetterPreset('wave');
+
+      expect(layer.letterIntervalMs).toBe(60);
+      expect(layer.letterMotion).toBe('pop');
+      expect(field<HTMLButtonElement>('cut-in-letter-preset-pop').disabled).toBe(true);
     });
 
     it('pulls the letters together or pushes them apart', () => {

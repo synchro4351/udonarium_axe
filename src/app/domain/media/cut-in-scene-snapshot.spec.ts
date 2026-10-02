@@ -175,6 +175,38 @@ describe('cut-in scene snapshots', () => {
       expect(layer.text).toBe('{character}\n参戦！');
     });
 
+    it('restores the detailed letter order, timing, direction, tilt and exit', () => {
+      const scene = makeScene();
+      const layer = addLayer(scene, 'call');
+      layer.kind = 'text';
+      const detailed = {
+        letterMotion: 'slide',
+        letterOrder: 'center',
+        letterIntervalMs: 130,
+        letterDurationMs: 500,
+        letterTiltMode: 'uniform',
+        letterExit: 'rise',
+        letterExitDurationMs: 400,
+        letterDirection: 'left',
+      } as const;
+      Object.assign(layer, detailed);
+      const before = snapshotScene(scene);
+
+      Object.assign(layer, {
+        letterMotion: 'none',
+        letterOrder: 'forward',
+        letterIntervalMs: 60,
+        letterDurationMs: 260,
+        letterTiltMode: 'alternate',
+        letterExit: 'none',
+        letterExitDurationMs: 260,
+        letterDirection: 'up',
+      });
+      restoreScene(scene, before);
+
+      expect(layer).toMatchObject(detailed);
+    });
+
     it('does nothing without a scene', () => {
       expect(() => restoreScene(null, snapshotScene(null))).not.toThrow();
     });

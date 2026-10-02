@@ -120,20 +120,79 @@
             <option [value]="motion">{{ 'feature.media.cutInEditor.letterMotion_' + motion | transloco }}</option>
           }
         </select>
-        <label class="text-ui-muted text-[11px]">{{ 'feature.media.cutInEditor.letterTilt' | transloco }}</label>
-        <input
-          class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm box-border w-full border border-solid px-1.5 py-1 text-right text-[12px] outline-none disabled:opacity-50"
-          name="cut-in-layer-letter-tilt"
-          data-testid="cut-in-layer-letter-tilt"
-          type="number"
-          step="1"
-          [min]="-maxLetterTiltDeg"
-          [max]="maxLetterTiltDeg"
-          [title]="'feature.media.cutInEditor.letterTiltHint' | transloco"
-          [(ngModel)]="letterTiltDeg"
-          [disabled]="!isEditable()"
-        />
       </div>
+      <div class="flex flex-wrap gap-1">
+        @for (preset of letterPresets; track preset) {
+          <button
+            type="button"
+            class="border-ui-border-panel rounded-ui-sm hover:bg-ui-hover cursor-pointer border px-1.5 py-0.5 text-[11px] disabled:opacity-50"
+            [disabled]="!isEditable()"
+            (click)="applyLetterPreset(preset)"
+            [attr.data-testid]="'cut-in-letter-preset-' + preset"
+          >
+            {{ 'feature.media.cutInEditor.letterPreset_' + preset | transloco }}
+          </button>
+        }
+      </div>
+      <details data-testid="cut-in-letter-details" class="border-ui-border-panel rounded-ui-sm border p-1.5">
+        <summary class="text-ui-muted cursor-pointer text-[11px]">
+          {{ 'feature.media.cutInEditor.letterDetails' | transloco }}
+        </summary>
+        <div class="mt-2 grid grid-cols-[5rem_minmax(0,1fr)] items-center gap-x-1.5 gap-y-1">
+          @for (field of letterSelects; track field.key) {
+            <label class="text-ui-muted text-[11px]" [for]="'cut-in-' + field.key">{{
+              'feature.media.cutInEditor.' + field.key | transloco
+            }}</label>
+            <select
+              class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm box-border w-full border border-solid p-1 text-[12px] outline-none disabled:opacity-50"
+              [id]="'cut-in-' + field.key"
+              [name]="'cut-in-' + field.key"
+              [attr.data-testid]="'cut-in-' + field.key"
+              [ngModel]="letterControls[field.key]"
+              (ngModelChange)="setLetterControl(field.key, $event)"
+              [disabled]="!letterControlEnabled(field.key)"
+            >
+              @for (choice of field.choices; track choice) {
+                <option [value]="choice">
+                  {{ 'feature.media.cutInEditor.' + field.key + '_' + choice | transloco }}
+                </option>
+              }
+            </select>
+          }
+          @for (field of letterTimes; track field.key) {
+            <label class="text-ui-muted text-[11px]" [for]="'cut-in-' + field.key">{{
+              'feature.media.cutInEditor.' + field.key | transloco
+            }}</label>
+            <input
+              class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm box-border w-full border border-solid p-1 text-[12px] outline-none disabled:opacity-50"
+              type="number"
+              step="10"
+              [id]="'cut-in-' + field.key"
+              [name]="'cut-in-' + field.key"
+              [attr.data-testid]="'cut-in-' + field.key"
+              [min]="field.min"
+              [max]="field.max"
+              [ngModel]="letterControls[field.key]"
+              (ngModelChange)="setLetterControl(field.key, $event)"
+              [disabled]="!letterControlEnabled(field.key)"
+            />
+          }
+          <label class="text-ui-muted text-[11px]">{{ 'feature.media.cutInEditor.letterTilt' | transloco }}</label>
+          <input
+            class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm box-border w-full border border-solid px-1.5 py-1 text-right text-[12px] outline-none disabled:opacity-50"
+            name="cut-in-layer-letter-tilt"
+            data-testid="cut-in-layer-letter-tilt"
+            type="number"
+            step="1"
+            [min]="-maxLetterTiltDeg"
+            [max]="maxLetterTiltDeg"
+            [title]="'feature.media.cutInEditor.letterTiltHint' | transloco"
+            [(ngModel)]="letterTiltDeg"
+            [disabled]="!isEditable()"
+          />
+        </div>
+        <p class="text-ui-dim mt-1 text-[10px]">{{ 'feature.media.cutInEditor.letterTimingHint' | transloco }}</p>
+      </details>
       <div class="grid grid-cols-[3.6rem_minmax(0,1fr)] items-center gap-x-1.5 gap-y-1">
         <label class="text-ui-muted text-[11px]">{{ 'feature.media.cutInEditor.fontSize' | transloco }}</label>
         <input

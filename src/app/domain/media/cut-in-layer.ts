@@ -4,7 +4,13 @@ import type { CutInClip } from '@axe/domain/media/cut-in-clip';
 import type { CutInEffect } from '@axe/domain/media/cut-in-effect';
 import { type CutInFill, type CutInFillShape, DEFAULT_FILL_SCALE_PX } from '@axe/domain/media/cut-in-fill';
 import { type CutInTrackSet, lastKeyTime, parseCutInTracks } from '@axe/domain/media/cut-in-keyframe';
-import type { CutInLetterMotion } from '@axe/domain/media/cut-in-text';
+import type {
+  CutInLetterDirection,
+  CutInLetterExit,
+  CutInLetterMotion,
+  CutInLetterOrder,
+  CutInLetterTilt,
+} from '@axe/domain/media/cut-in-text';
 import type { CutInWipe } from '@axe/domain/media/cut-in-wipe';
 
 /**
@@ -106,6 +112,25 @@ export class CutInLayer extends ObjectNode {
   @SyncVar() letterMotion: CutInLetterMotion = 'none';
   /** How far every other letter leans the other way, in degrees. 0 keeps them upright. */
   @SyncVar() letterTiltDeg: number = 0;
+  /*
+   * The detailed letter controls. Each default is how the letters moved before there were
+   * controls, which is also what a cut-in saved without them reads as. They are read through
+   * `letterSettingsOf`, which holds whatever a file says to what can be played.
+   */
+  /** Which letter goes first. */
+  @SyncVar() letterOrder: CutInLetterOrder = 'forward';
+  /** How long after the one before each letter starts, in ms. */
+  @SyncVar() letterIntervalMs: number = 60;
+  /** How long one letter takes to come in, in ms. */
+  @SyncVar() letterDurationMs: number = 260;
+  /** Whether a tilt leans every other letter the other way or all of them the same way. */
+  @SyncVar() letterTiltMode: CutInLetterTilt = 'alternate';
+  /** How the letters leave before the layer goes. */
+  @SyncVar() letterExit: CutInLetterExit = 'none';
+  /** How long one letter takes to leave, in ms. */
+  @SyncVar() letterExitDurationMs: number = 260;
+  /** Which way a letter travels as it comes in. */
+  @SyncVar() letterDirection: CutInLetterDirection = 'up';
 
   // kind: fill
   @SyncVar() fillShape: CutInFillShape = 'linear';
