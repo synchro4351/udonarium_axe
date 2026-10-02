@@ -4,6 +4,12 @@
 
 r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は公式v1.58.0（46707582）とv1.59.0（19e9d1c7）を取り込んでいます。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1〜r4の固定ソースと併せて確認してください。
 
+## 半角山括弧のルビ（開発版）
+
+- [4048c900](https://github.com/synchro4351/udonarium_axe/commit/4048c900)：共通のルビ読み取り処理と、表示・段階表示・読み上げ・ログ・吹き出しへの接続。基点be4b77f4。従来記法を保ち、入力した文字列を保存・同期します。新しい依存パッケージや保存属性はありません。
+- [83371473](https://github.com/synchro4351/udonarium_axe/commit/83371473)：上記の共通処理を使い、エフェクト命令とホットバーの見た目の判定から読み仮名を除外する後続修正。エフェクトを続ける場合は空白で区切ります。
+- [cebe7468](https://github.com/synchro4351/udonarium_axe/commit/cebe7468)：[記法・互換性・確認結果](https://github.com/synchro4351/udonarium_axe/blob/codex/ascii-ruby/docs/TYOITASHI_ASCII_RUBY.md)。共有メモの整形表示は既存の限定Markdownに依存します。ルビの読み取り自体は文字アニメーションやXML属性修正に依存しません。
+
 ## XML属性の改行・タブ保持（開発版）
 
 - [8b1dc63c](https://github.com/synchro4351/udonarium_axe/commit/8b1dc63c)（本流では[dd3119c4](https://github.com/synchro4351/udonarium_axe/commit/dd3119c4)）：属性値にあるLF・CR・タブを数値文字参照で保存し、XMLの正規化で空白になるのを防ぎます。基点75b16b3a。変更はObjectSerializerとテストだけで、文字アニメーションに依存しません。形式・読み込み側・本文・P2P同期は維持します。
