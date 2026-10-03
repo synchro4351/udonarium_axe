@@ -44,7 +44,6 @@ import { DEFAULT_MENU_LAYOUTS } from '@axe/domain/ui/builtin-menu-layouts';
 import { MENU_COMMANDS } from '@axe/domain/ui/menu-command';
 import { isMenuGroup } from '@axe/domain/ui/menu-layout';
 import { VIEW_MODES } from '@axe/domain/ui/view-mode';
-import { CUT_IN_SCENE_TEMPLATES } from '@axe/features/media/cut-in-list/cut-in-scene-templates';
 import { MAP_KINDS } from '@axe/features/tabletop/dungeon-generator/dungeon-generator.component';
 const HOTBAR_FAILURES = ['noCharacter', 'notFound', 'noTab', 'offTable', 'empty'] as const;
 
@@ -99,7 +98,6 @@ const CHOICES: Record<string, readonly string[]> = {
   'feature.media.cutInEditor.easing': CUT_IN_EASING_NAMES,
   'feature.media.cutInEditor.look': CUT_IN_LAYER_PRESETS.map((preset) => preset.id),
   'feature.media.cutInEditor.preset': [...CUT_IN_ENTRANCES, ...CUT_IN_EXITS],
-  'feature.media.cutIn.sceneTemplate_': CUT_IN_SCENE_TEMPLATES,
   'feature.tabletop.displaySetting.viewMode_': VIEW_MODES,
   'feature.boardSwitch.kind.': SWITCH_ACTION_KINDS,
   'feature.boardSwitch.speakerOption.': SWITCH_SPEAKERS,

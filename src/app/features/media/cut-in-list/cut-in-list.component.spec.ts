@@ -58,23 +58,14 @@ describe('CutInListComponent', () => {
     component.selectedCutIn?.destroy();
   });
 
-  it('creates a new editable scene from an example', async () => {
+  it('offers no optional example picker or ZIP link', async () => {
     fixture.detectChanges();
     await fixture.whenStable();
-    const picker = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>(
-      '[data-testid="cut-in-scene-template"]'
-    )!;
-    picker.value = 'battle';
-    picker.dispatchEvent(new Event('change'));
+    const root = fixture.nativeElement as HTMLElement;
 
-    expect(component.getCutIns()).toHaveLength(1);
-    const kinds = component.selectedCutIn?.scene?.layers.map((layer) => layer.kind);
-    expect(kinds?.[0]).toBe('fill');
-    expect(kinds).toContain('text');
-    expect(component.selectedCutIn?.frameless).toBe(true);
-    expect(component.activeTab()).toBe('Scene');
-    expect(picker.value).toBe('');
-    component.selectedCutIn?.destroy();
+    expect(root.querySelector('[data-testid="cut-in-scene-template"]')).toBeNull();
+    expect(root.querySelector('[data-testid="cut-in-example-pack"]')).toBeNull();
+    expect(root.querySelector('a[download]')).toBeNull();
   });
 
   describe('a seat that is only watching', () => {

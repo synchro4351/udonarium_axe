@@ -7,6 +7,7 @@ import { CutIn } from '@axe/domain/media/cut-in';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import { type CutInPortraitFit, DEFAULT_CUT_IN_PORTRAIT_FIT } from '@axe/domain/media/cut-in-portrait';
+import { addLayer, ensureScene } from '@axe/features/media/cut-in-editor/cut-in-editor-ops';
 import { CutInFreshSceneService } from '@axe/features/media/cut-in-editor/cut-in-fresh-scene.service';
 import { keysOf, valueAt } from '@axe/features/media/cut-in-editor/cut-in-keyframe-edit';
 import { CutInPortraitPickService } from '@axe/features/media/cut-in-editor/cut-in-portrait-pick.service';
@@ -14,7 +15,6 @@ import { posterFrameMs } from '@axe/features/media/cut-in-editor/cut-in-poster-f
 import { CutInSceneEditorComponent } from '@axe/features/media/cut-in-editor/cut-in-scene-editor.component';
 import { CutInTimelineComponent, type TimelineRow } from '@axe/features/media/cut-in-editor/cut-in-timeline.component';
 import { TIMELINE_HEAD_W_PX } from '@axe/features/media/cut-in-editor/cut-in-timeline-geometry';
-import { createCutInSceneTemplate } from '@axe/features/media/cut-in-list/cut-in-scene-templates';
 import { CutInStageComponent } from '@axe/features/media/cut-in-stage/cut-in-stage.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
@@ -1127,8 +1127,24 @@ describe('CutInSceneEditorComponent', () => {
   });
 
   describe('a template just made', () => {
+    function fadingIn(title: string): CutIn {
+      const made = new CutIn();
+      made.name = title;
+      made.initialize();
+      const scene = ensureScene(made);
+      scene.durationMs = 1200;
+      const layer = addLayer(scene, 'fill', 'band', { width: 640, height: 360 });
+      layer.tracks = encodeCutInTracks({
+        opacity: [
+          { t: 0, v: 0 },
+          { t: 600, v: 1 },
+        ],
+      });
+      return made;
+    }
+
     it('opens once at its fullest moment, and leaves the playhead alone after that', () => {
-      const made = createCutInSceneTemplate('battle', '戦闘開始');
+      const made = fadingIn('戦闘開始');
       TestBed.inject(CutInFreshSceneService).mark(made.identifier);
 
       fixture.componentRef.setInput('cutIn', made);
@@ -1149,7 +1165,7 @@ describe('CutInSceneEditorComponent', () => {
 
     it('still plays from the start when played from where it opened', () => {
       const play = vi.spyOn(TestBed.inject(CutInSoundService), 'play').mockReturnValue({ stop: vi.fn() } as never);
-      const made = createCutInSceneTemplate('battle', '戦闘開始');
+      const made = fadingIn('戦闘開始');
       TestBed.inject(CutInFreshSceneService).mark(made.identifier);
       fixture.componentRef.setInput('cutIn', made);
       fixture.detectChanges();
@@ -1166,7 +1182,7 @@ describe('CutInSceneEditorComponent', () => {
     });
 
     it('leaves the playhead where it is for a cut-in that was not just made', () => {
-      const other = createCutInSceneTemplate('success', '成功！');
+      const other = fadingIn('成功！');
 
       fixture.componentRef.setInput('cutIn', other);
       fixture.detectChanges();

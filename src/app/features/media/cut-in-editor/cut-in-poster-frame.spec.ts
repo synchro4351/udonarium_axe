@@ -2,13 +2,14 @@ import { CutIn } from '@axe/domain/media/cut-in';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import { sampleLayerAt } from '@axe/domain/media/cut-in-scene-timeline';
-import { letterPoseAt, resolveCharacterName, splitLetters } from '@axe/domain/media/cut-in-text';
+import {
+  CUT_IN_CHARACTER_TOKEN,
+  letterPoseAt,
+  resolveCharacterName,
+  splitLetters,
+} from '@axe/domain/media/cut-in-text';
 import { addLayer, ensureScene } from '@axe/features/media/cut-in-editor/cut-in-editor-ops';
 import { posterFrameMs } from '@axe/features/media/cut-in-editor/cut-in-poster-frame';
-import {
-  createCutInSceneTemplate,
-  CUT_IN_SCENE_TEMPLATES,
-} from '@axe/features/media/cut-in-list/cut-in-scene-templates';
 
 describe('posterFrameMs()', () => {
   function emptyScene() {
@@ -51,19 +52,6 @@ describe('posterFrameMs()', () => {
     expect(sampleLayerAt(layer, at, scene.runningMs).opacity).toBeGreaterThan(0.9);
   });
 
-  it('opens every template on a moment that shows something', () => {
-    for (const kind of CUT_IN_SCENE_TEMPLATES) {
-      const scene = createCutInSceneTemplate(kind, kind).scene!;
-      const at = posterFrameMs(scene);
-      const shown = scene.layers.filter((layer) => {
-        const sample = sampleLayerAt(layer, at, scene.runningMs);
-        return !layer.hidden && sample.visible && sample.opacity > 0.5;
-      });
-
-      expect(shown.length, kind).toBeGreaterThan(0);
-    }
-  });
-
   it('waits for the last letter in the chosen order, however it comes in', () => {
     for (const letterMotion of ['fade', 'slide'] as const) {
       const scene = emptyScene();
@@ -102,9 +90,16 @@ describe('posterFrameMs()', () => {
     expect(at).toBeLessThan(940);
   });
 
-  it('waits until every popping letter of the portrait template has landed', () => {
+  it('waits until every popping letter has landed', () => {
     for (const title of ['参戦！', 'ここに\n参戦！']) {
-      const scene = createCutInSceneTemplate('portrait', title).scene!;
+      const scene = emptyScene();
+      for (const [name, startMs] of [
+        ['name', 460],
+        ['call', 760],
+      ] as const) {
+        const layer = addLayer(scene, 'text', name, { width: 800, height: 400 });
+        Object.assign(layer, { text: name === 'name' ? CUT_IN_CHARACTER_TOKEN : title, letterMotion: 'pop', startMs });
+      }
       const at = posterFrameMs(scene);
       const popping = scene.layers.filter((layer) => layer.kind === 'text' && layer.letterMotion === 'pop');
       expect(popping.length, title).toBeGreaterThan(1);
