@@ -541,13 +541,68 @@ describe('CutInLayerPropertiesComponent', () => {
       return (fixture.nativeElement as HTMLElement).querySelector<T>(`[data-testid="${testId}"]`)!;
     }
 
-    it('offers the simple looks first and keeps the detailed controls folded away', () => {
+    it('keeps every per-letter control in one folded section, presets before the motion selector', () => {
       const details = field<HTMLDetailsElement>('cut-in-letter-details');
+      const inside = (testId: string) => details.querySelector<HTMLElement>(`[data-testid="${testId}"]`)!;
 
-      expect(field('cut-in-letter-preset-fade')).not.toBeNull();
       expect(details.open).toBe(false);
-      expect(details.querySelector('[data-testid="cut-in-letterOrder"]')).not.toBeNull();
-      expect(details.querySelector('[data-testid="cut-in-layer-letter-tilt"]')).not.toBeNull();
+      expect(details.querySelector('summary')!.textContent!.trim()).toBe('文字ごと');
+      for (const testId of [
+        'cut-in-letter-preset-fade',
+        'cut-in-letter-preset-pop',
+        'cut-in-letter-preset-wave',
+        'cut-in-layer-letter-motion',
+        'cut-in-letterOrder',
+        'cut-in-letterTiltMode',
+        'cut-in-letterExit',
+        'cut-in-letterDirection',
+        'cut-in-letterIntervalMs',
+        'cut-in-letterDurationMs',
+        'cut-in-letterExitDurationMs',
+        'cut-in-layer-letter-tilt',
+      ]) {
+        expect(inside(testId), testId).not.toBeNull();
+      }
+      const before = inside('cut-in-letter-preset-wave').compareDocumentPosition(inside('cut-in-layer-letter-motion'));
+      expect(before & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('puts all whole-layer settings before the per-letter section', () => {
+      const order = [
+        'cut-in-section-text',
+        'cut-in-layer-details',
+        'cut-in-section-motion',
+        'cut-in-section-style',
+        'cut-in-letter-details',
+      ].map((testId) => field(testId));
+      for (let i = 1; i < order.length; i++) {
+        expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+      expect(field<HTMLDetailsElement>('cut-in-section-text').open).toBe(true);
+      expect(field<HTMLDetailsElement>('cut-in-layer-details').open).toBe(false);
+    });
+
+    it('inserts the character name from the placeholder, not from a button', () => {
+      const textarea = fixture.nativeElement.querySelector('textarea[name="cut-in-layer-text"]') as HTMLTextAreaElement;
+
+      expect(textarea.placeholder).toBe('{character}でキャラ名を挿入');
+      expect(fixture.nativeElement.querySelector('[data-testid="cut-in-layer-insert-character"]')).toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('キャラ名を入れる');
+    });
+
+    it('opens and shuts sections without touching the layer or the undo stack', () => {
+      const commit = vi.fn();
+      component.commit.subscribe(commit);
+      const before = layer.toXml();
+
+      const section = field<HTMLDetailsElement>('cut-in-letter-details');
+      section.open = true;
+      fixture.detectChanges();
+      section.open = false;
+      fixture.detectChanges();
+
+      expect(commit).not.toHaveBeenCalled();
+      expect(layer.toXml()).toBe(before);
     });
 
     it('writes each detailed control, held to what it allows, with one undo step each', () => {
@@ -714,6 +769,127 @@ describe('CutInLayerPropertiesComponent', () => {
       component.vertical = true;
 
       expect(layer.vertical).toBe(true);
+    });
+  });
+
+  describe('how the controls are grouped', () => {
+    const host = () => fixture.nativeElement as HTMLElement;
+    const section = (testId: string) => host().querySelector<HTMLDetailsElement>(`[data-testid="${testId}"]`);
+    const names = (root: ParentNode) =>
+      Array.from(root.querySelectorAll<HTMLElement>('[name]')).map((element) => element.getAttribute('name'));
+
+    const positionNames = [
+      'cut-in-layer-x',
+      'cut-in-layer-y',
+      'cut-in-layer-width',
+      'cut-in-layer-height',
+      'cut-in-layer-scale',
+      'cut-in-layer-rotation',
+    ];
+    const motionNames = [
+      'cut-in-layer-start',
+      'cut-in-layer-end',
+      'cut-in-layer-entrance',
+      'cut-in-layer-exit',
+      'cut-in-layer-preset-ms',
+      'cut-in-layer-wipe',
+      'cut-in-layer-crumble',
+    ];
+    const styleNames = [
+      'cut-in-layer-opacity',
+      'cut-in-layer-blur',
+      'cut-in-layer-skew-x',
+      'cut-in-layer-skew-y',
+      'cut-in-layer-clip',
+      'cut-in-layer-effect',
+      'cut-in-layer-look',
+    ];
+
+    it('splits position, whole-layer motion and look into three folded sections for every kind', () => {
+      for (const kind of ['image', 'text', 'fill'] as const) {
+        layer.kind = kind;
+        fixture.detectChanges();
+
+        const position = section('cut-in-layer-details')!;
+        const motion = section('cut-in-section-motion')!;
+        const style = section('cut-in-section-style')!;
+        expect([position.open, motion.open, style.open], kind).toEqual([false, false, false]);
+        expect(names(position), kind).toEqual(positionNames);
+        expect(names(motion), kind).toEqual(motionNames);
+        expect(names(style), kind).toEqual(styleNames);
+        expect(
+          [position, motion, style].map((element) => element.querySelector('summary')!.textContent!.trim()),
+          kind
+        ).toEqual(['位置とサイズ', '全体の動き', '見た目と効果']);
+      }
+    });
+
+    it('keeps the band colours in an open band section and has no text or per-letter section', () => {
+      layer.kind = 'fill';
+      fixture.detectChanges();
+
+      expect(section('cut-in-section-band')!.open).toBe(true);
+      expect(names(section('cut-in-section-band')!)).toContain('cut-in-layer-fill-from');
+      expect(section('cut-in-section-text')).toBeNull();
+      expect(section('cut-in-letter-details')).toBeNull();
+    });
+
+    it('shows the image controls plainly, with the portrait note as a tooltip rather than a paragraph', () => {
+      layer.kind = 'image';
+      layer.portraitSlot = true;
+      fixture.detectChanges();
+
+      expect(names(host())).toContain('cut-in-layer-portrait-slot');
+      expect(host().querySelector('label[title]')!.getAttribute('title')).toBe(
+        '画像がない場合はシルエットを表示します。'
+      );
+      expect(host().textContent).not.toContain('画像がない場合はシルエットを表示します。');
+      expect(section('cut-in-section-text')).toBeNull();
+    });
+
+    it('reveals the wipe and crumble amounts, with their keys, inside the motion section only when chosen', () => {
+      const motion = section('cut-in-section-motion')!;
+      expect(names(motion)).not.toContain('cut-in-layer-wipe-amount');
+
+      component.wipeShape = 'right';
+      component.crumbleShape = 'crumbleLeft';
+      fixture.detectChanges();
+
+      expect(names(motion)).toEqual(
+        expect.arrayContaining(['cut-in-layer-wipe-amount', 'cut-in-layer-crumble-amount'])
+      );
+    });
+
+    it('offers the curve inside the motion section once a key stands at the scrubber', async () => {
+      atPlayhead(400);
+      component.toggleKey('x');
+      objectChanged$.emit({ identifier: layer.identifier, aliasName: layer.aliasName, isSendFromSelf: false });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(names(section('cut-in-section-motion')!)).toContain('cut-in-layer-easing');
+    });
+
+    it('shows the effect strength and colour inside the look section as the effect needs them', () => {
+      component.effect = 'glow';
+      fixture.detectChanges();
+
+      expect(names(section('cut-in-section-style')!)).toEqual(
+        expect.arrayContaining(['cut-in-layer-effect-strength', 'cut-in-layer-effect-color'])
+      );
+    });
+
+    it('locks every control in every section for a reader, folded sections included', async () => {
+      layer.kind = 'text';
+      layer.wipeShape = 'right';
+      fixture.componentRef.setInput('isEditable', false);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const controls = Array.from(host().querySelectorAll<HTMLInputElement>('input, select, textarea, button'));
+      expect(controls.length).toBeGreaterThan(40);
+      expect(controls.filter((control) => !control.disabled).map((control) => control.name)).toEqual([]);
     });
   });
 });

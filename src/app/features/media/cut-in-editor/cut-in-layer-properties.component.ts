@@ -29,7 +29,6 @@ import { CUT_IN_TRACKS, type CutInTrackName } from '@axe/domain/media/cut-in-key
 import { CUT_IN_TEXT_ALIGNS, CutInLayer, type CutInTextAlign, isCutInTextAlign } from '@axe/domain/media/cut-in-layer';
 import { applyLayerPreset, CUT_IN_LAYER_PRESETS } from '@axe/domain/media/cut-in-layer-presets';
 import {
-  CUT_IN_CHARACTER_TOKEN,
   CUT_IN_LETTER_DIRECTIONS,
   CUT_IN_LETTER_EXITS,
   CUT_IN_LETTER_MOTIONS,
@@ -58,7 +57,7 @@ import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-sel
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
-/** The simple letter looks offered as buttons, ahead of the folded detailed controls. */
+/** The simple letter looks offered as buttons, ahead of the per-letter motion selector and detailed controls. */
 const CUT_IN_LETTER_PRESETS = ['fade', 'pop', 'wave'] as const;
 type CutInLetterPreset = (typeof CUT_IN_LETTER_PRESETS)[number];
 
@@ -106,7 +105,6 @@ export class CutInLayerPropertiesComponent {
     ...LETTER_TIMING_LIMITS[key],
   }));
   readonly maxLetterTiltDeg = MAX_LETTER_TILT_DEG;
-  readonly characterToken = CUT_IN_CHARACTER_TOKEN;
   readonly fontOptions = CUT_IN_FONT_OPTIONS;
   readonly easings = CUT_IN_EASING_NAMES;
   readonly fillShapes = CUT_IN_FILL_SHAPES;
@@ -536,12 +534,6 @@ export class CutInLayerPropertiesComponent {
     const tilt = Number(degrees);
     const held = Number.isFinite(tilt) ? Math.min(MAX_LETTER_TILT_DEG, Math.max(-MAX_LETTER_TILT_DEG, tilt)) : 0;
     this.write((layer) => (layer.letterTiltDeg = held));
-  }
-
-  /** Puts the token for the launched character's name at the end of the text. */
-  protected insertCharacterName(): void {
-    if (!this.isEditable()) return;
-    this.write((layer) => (layer.text = `${layer.text}${CUT_IN_CHARACTER_TOKEN}`));
   }
 
   /** Whether the fill chosen repeats, and so has a size worth setting. */

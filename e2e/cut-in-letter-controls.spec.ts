@@ -43,13 +43,14 @@ test('per-letter controls set the order, timing and exit the browser plays, and 
   await iconButton(editor, 'title').first().click();
   await editor.locator('textarea[name="cut-in-layer-text"]').fill('WXYZ');
 
-  // The simple looks come first; the detailed controls stay folded until asked for.
+  // Every per-letter control sits in the folded 文字ごと section, simple looks first.
   const details = editor.getByTestId('cut-in-letter-details');
   await expect(editor.getByTestId('cut-in-letterOrder')).toBeHidden();
+  await expect(editor.getByTestId('cut-in-letter-preset-fade')).toBeHidden();
+  await details.locator('summary').click();
   await editor.getByTestId('cut-in-letter-preset-fade').click();
   await expect(editor.getByTestId('cut-in-layer-letter-motion')).toHaveValue('fade');
 
-  await details.locator('summary').click();
   // A fade comes in where it rests, so it has no way in; without an exit, no exit length either.
   await expect(editor.getByTestId('cut-in-letterDirection')).toBeDisabled();
   await expect(editor.getByTestId('cut-in-letterExitDurationMs')).toBeDisabled();
