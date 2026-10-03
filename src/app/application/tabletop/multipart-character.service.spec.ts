@@ -104,6 +104,14 @@ describe('MultipartCharacterService', () => {
     expect(xml).toContain('part-1.png');
   });
 
+  it('rejects overlapping parts before cropping or creating anything', async () => {
+    const overlapping = [parts[0], { name: 'Body', x: 30, y: 20, width: 40, height: 60 }];
+    await expect(service.create(source.identifier, image, overlapping)).rejects.toThrow('Unavailable');
+    expect(crops).toBe(0);
+    expect(added).toHaveLength(0);
+    expect(created).toHaveLength(0);
+  });
+
   it('makes no images or characters when a later crop fails', async () => {
     beforeCrop = () => {
       if (crops === 2) throw new Error('Canvas');
