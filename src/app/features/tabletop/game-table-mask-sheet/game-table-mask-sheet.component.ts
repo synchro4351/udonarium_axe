@@ -8,10 +8,12 @@ import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { sheetPanelTitle } from '@axe/application/ui/sheet-panel';
+import { TextFormat } from '@axe/domain/data/text-format';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { GameTableMask } from '@axe/domain/tabletop/game-table-mask';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
+import { TextFormatSwitchComponent } from '@axe/ui/components/text-format-switch/text-format-switch.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -42,7 +44,7 @@ const SCRATCHED_COLOR_FALLBACK = '#808080';
   templateUrl: './game-table-mask-sheet.component.html',
   host: { class: 'block box-border h-full overflow-y-auto p-3 text-ui-text bg-ui-panel' },
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, SafePipe, TranslocoModule],
+  imports: [FormsModule, SafePipe, TextFormatSwitchComponent, TranslocoModule],
 })
 export class GameTableMaskSheetComponent {
   private readonly modalService = inject(ModalService);
@@ -109,6 +111,17 @@ export class GameTableMaskSheetComponent {
   onMapMaskText(event: Event): void {
     const mask = this.gameTableMask;
     if (mask) mask.text = (event.target as HTMLTextAreaElement).value;
+  }
+  /** How the mask's text is shown, re-read when the mask changes. */
+  readonly maskTextFormat = computed<TextFormat>(() => {
+    this.maskVersion();
+    return this._gameTableMask()?.textFormat ?? 'normal';
+  });
+  onMapMaskTextFormat(format: TextFormat): void {
+    const mask = this.gameTableMask;
+    if (!mask) return;
+    mask.textFormat = format;
+    this.objectChange.notifyChanged(mask.identifier);
   }
   onMapMaskFontSize(event: Event): void {
     const value = (event.target as HTMLInputElement).valueAsNumber;

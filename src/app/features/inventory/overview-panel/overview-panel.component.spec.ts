@@ -354,6 +354,75 @@ describe('OverviewPanelComponent', () => {
     }
   });
 
+  describe('a formatted long-text field', () => {
+    const SOURCE = '# 見出し\n|漢字《かんじ》 |word<ruby>\n`|a<b>` <script>x</script> 2*3+4';
+
+    function longText(): DataElement {
+      return DataElement.create('効果', SOURCE, {
+        [DataElementAttribute.ROLE]: DataElementRole.FIELD,
+        [DataElementAttribute.FIELD_TYPE]: DataElementFieldType.LONG_TEXT,
+      });
+    }
+
+    it('gives nothing for a field in the normal display, so it keeps its text area', () => {
+      expect(component.formattedFieldHtml(longText())).toBeNull();
+    });
+
+    it('renders a formatted field through the shared renderer without keeping raw markup', () => {
+      const field = longText();
+      field.setTextFormat('formatted');
+      const html = component.formattedFieldHtml(field)!;
+
+      expect(html).toContain('<h1');
+      expect(html.match(/<ruby/g)).toHaveLength(2);
+      expect(html).toContain('|a&lt;b&gt;');
+      expect(html).not.toContain('<script');
+      expect(html).toContain('2*3+4');
+      expect(field.value).toBe(SOURCE);
+    });
+  });
+
+  describe('a normal long-text field with ruby', () => {
+    const RUBY = '|漢字《かんじ》 |word<ruby> 1 <2 >0 2*3+4 <script>x</script>';
+
+    function longText(text: string): DataElement {
+      return DataElement.create('効果', text, {
+        [DataElementAttribute.ROLE]: DataElementRole.FIELD,
+        [DataElementAttribute.FIELD_TYPE]: DataElementFieldType.LONG_TEXT,
+      });
+    }
+
+    it('draws both notations through the shared helper, escaping markup and keeping literals', () => {
+      const field = longText(RUBY);
+      const html = component.rubyReaderFieldHtml(field)!;
+
+      expect(html.match(/<ruby/g)).toHaveLength(2);
+      expect(html).toContain('1 &lt;2 &gt;0 2*3+4');
+      expect(html).not.toContain('<script');
+      expect(field.value).toBe(RUBY);
+    });
+
+    it('keeps the text area for text without ruby and for a formatted field', () => {
+      expect(component.rubyReaderFieldHtml(longText('1 <2 >0 2*3+4 |a'))).toBeNull();
+      const formatted = longText(RUBY);
+      formatted.setTextFormat('formatted');
+      expect(component.rubyReaderFieldHtml(formatted)).toBeNull();
+    });
+
+    it('hands the field to the text area while it is edited, then reads it again', () => {
+      const field = longText(RUBY);
+      const textarea = document.createElement('textarea');
+      component.startRubyEditing(field, textarea);
+
+      expect(component.rubyReaderFieldHtml(field)).toBeNull();
+
+      component.stopRubyEditing(field);
+
+      expect(component.rubyReaderFieldHtml(field)).not.toBeNull();
+      expect(field.value).toBe(RUBY);
+    });
+  });
+
   describe('filtering the empty elements out', () => {
     it('returns nothing for the list with nothing to read', () => {
       component.tabletopObject = null!;

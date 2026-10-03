@@ -928,8 +928,7 @@
         "label": "Display",
         "normal": "Plain",
         "formatted": "Formatted",
-        "helpNormal": "Shown exactly as typed. Switch to Formatted to show headings and lists.",
-        "helpFormatted": "Start a line with \"# \", \"## \" or \"### \" for a heading, \"- \" for a bullet, \"1. \" for a numbered item or \"> \" for a quote. Text wrapped in ` is shown as typed. Emphasis with * or _, tables, links and HTML are not used.",
+        "placeholder": "# Heading\n- Bullet\n1. Numbered\n> Quote\n`code`\n|漢字《かんじ》 |word<ruby>",
         "preview": "Preview",
         "insertLabel": "Insert marks",
         "insert": {

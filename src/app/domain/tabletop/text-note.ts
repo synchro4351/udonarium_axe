@@ -1,18 +1,14 @@
 import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
 import { DataElement, DataElementType } from '@axe/domain/data/data-element';
+import { TextFormat, toTextFormat } from '@axe/domain/data/text-format';
 import { OwnedTabletopObject } from '@axe/domain/tabletop/owned-tabletop-object';
 import { moveToTopmost } from '@axe/domain/tabletop/tabletop-object-util';
 
-/**
- * How a note's body is shown: `normal` shows the text as typed, `formatted` reads a small set of
- * Markdown-style marks (headings, lists, quotes and code).
- */
-export type TextNoteFormat = 'normal' | 'formatted';
+/** How a note's body is shown; the same two formats every formatted text field uses. */
+export type TextNoteFormat = TextFormat;
 
 /** Reads a stored or received format, taking anything other than `formatted` as `normal`. */
-export function toTextNoteFormat(value: unknown): TextNoteFormat {
-  return value === 'formatted' ? 'formatted' : 'normal';
-}
+export const toTextNoteFormat = toTextFormat;
 
 @SyncObject('text-note')
 export class TextNote extends OwnedTabletopObject {

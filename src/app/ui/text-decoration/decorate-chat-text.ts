@@ -64,6 +64,11 @@ export function splitRubyNotation(text: string): RubyPart[] {
   }));
 }
 
+/** Whether the text holds any ruby notation, read the same way {@link escapeHtmlWithRuby} reads it. */
+export function hasRubyNotation(text: string): boolean {
+  return rubyNotationRuns(text).some((run) => run.reading !== '');
+}
+
 /**
  * Gathers each run of lines starting with `>` into one quote block, the lines joined by breaks.
  *

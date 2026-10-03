@@ -937,16 +937,32 @@
                 />
               </label>
               @if (canReadCardFace(c)) {
-                <label class="flex flex-col gap-1 text-[0.78em]">
-                  <span class="text-ui-muted">{{ 'feature.card.field.text' | transloco }}</span>
+                <div class="flex flex-col gap-1 text-[0.78em]">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-ui-muted">{{ 'feature.card.field.text' | transloco }}</span>
+                    <text-format-switch
+                      [value]="cardOwnFaceTextFormat(c)"
+                      [disabled]="!canEditCard()"
+                      (valueChange)="setCardOwnFaceTextFormat(c, $event)"
+                    />
+                  </div>
                   <textarea
                     class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm focus:border-ui-accent min-h-20 w-full resize-y border border-solid px-2 py-1 outline-none"
+                    data-testid="card-face-text"
+                    [attr.aria-label]="'feature.card.field.text' | transloco"
+                    [placeholder]="
+                      cardOwnFaceTextFormat(c) === 'formatted'
+                        ? ('feature.textNote.format.placeholder' | transloco)
+                        : ''
+                    "
                     [value]="cardOwnFaceText(c)"
                     (input)="setCardOwnFaceText(c, $event)"
                     (blur)="flushCardOwnFaceText()"
                   ></textarea>
-                  <span class="text-ui-dim text-[0.72em]">{{ 'feature.card.field.textHint' | transloco }}</span>
-                </label>
+                  @if (cardOwnFaceTextFormat(c) === 'normal') {
+                    <span class="text-ui-dim text-[0.72em]">{{ 'feature.card.field.textHint' | transloco }}</span>
+                  }
+                </div>
                 <label class="flex items-center gap-2 text-[0.78em]">
                   <span class="text-ui-muted">{{ 'feature.card.field.fontSize' | transloco }}</span>
                   <input
@@ -1135,26 +1151,7 @@
           </label>
           <div class="flex flex-wrap items-center gap-2 text-[0.78em]">
             <span class="text-ui-muted">{{ 'feature.textNote.format.label' | transloco }}</span>
-            <div
-              class="border-ui-border-panel rounded-ui-sm inline-flex overflow-hidden border border-solid"
-              role="radiogroup"
-              [attr.aria-label]="'feature.textNote.format.label' | transloco"
-            >
-              @for (format of textNoteFormats; track format) {
-                <button
-                  class="text-ui-muted hover:bg-ui-hover hover:text-ui-text cursor-pointer border-none bg-transparent px-2.5 py-0.75 leading-[1.4] whitespace-nowrap transition-[background,color]"
-                  [class.bg-ui-accent-bg!]="textNoteFormat(note) === format"
-                  [class.text-ui-accent!]="textNoteFormat(note) === format"
-                  [class.font-semibold]="textNoteFormat(note) === format"
-                  type="button"
-                  role="radio"
-                  [attr.aria-checked]="textNoteFormat(note) === format"
-                  (click)="setTextNoteFormat(note, format)"
-                >
-                  {{ 'feature.textNote.format.' + format | transloco }}
-                </button>
-              }
-            </div>
+            <text-format-switch [value]="textNoteFormat(note)" (valueChange)="setTextNoteFormat(note, $event)" />
             @if (textNoteFormat(note) === 'formatted') {
               <div
                 class="flex flex-wrap items-center gap-1"
@@ -1181,19 +1178,14 @@
             <textarea
               #noteBody
               class="border-ui-border-panel bg-ui-input text-ui-text rounded-ui-sm focus:border-ui-accent min-h-48 w-full resize-y border border-solid px-3 py-2 font-sans text-sm/relaxed whitespace-pre-wrap transition-colors outline-none [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-xs [&::-webkit-scrollbar-thumb]:bg-(--ui-panel-border) [&::-webkit-scrollbar-track]:bg-transparent"
+              [placeholder]="
+                textNoteFormat(note) === 'formatted' ? ('feature.textNote.format.placeholder' | transloco) : ''
+              "
               [value]="textNoteText(note)"
               (input)="setTextNoteText(note, $event)"
               spellcheck="false"
             ></textarea>
           </label>
-          <p class="text-ui-muted m-0 text-[0.74em] leading-normal">
-            {{
-              (textNoteFormat(note) === 'formatted'
-                ? 'feature.textNote.format.helpFormatted'
-                : 'feature.textNote.format.helpNormal'
-              ) | transloco
-            }}
-          </p>
           @if (textNoteFormat(note) === 'formatted') {
             <div class="flex flex-col gap-1 text-[0.78em]">
               <span class="text-ui-muted">{{ 'feature.textNote.format.preview' | transloco }}</span>

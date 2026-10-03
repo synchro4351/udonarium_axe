@@ -4,6 +4,7 @@
    automatic links are switched off and stay as literal text. Every piece of text goes through
    escapeHtml, and the ruby notation is applied to ordinary text only, never inside code. */
 
+import { TextFormat } from '@axe/domain/data/text-format';
 import { decorateChatStyleText, escapeHtml, escapeHtmlWithRuby } from '@axe/ui/text-decoration/decorate-chat-text';
 import { Marked, Tokenizer, type Tokens } from 'marked';
 
@@ -92,6 +93,14 @@ const noteMarked = new Marked({
     },
   },
 });
+
+/**
+ * Turns shared free text into HTML for its chosen format: the limited Markdown display for
+ * `formatted`, the ordinary chat-style decoration (which keeps legacy marks) for `normal`.
+ */
+export function decorateTextByFormat(text: string, format: TextFormat): string {
+  return format === 'formatted' ? formatNoteText(text) : decorateChatStyleText(text);
+}
 
 /**
  * Turns a note's body into HTML for the "formatted" display.

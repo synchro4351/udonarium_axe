@@ -8,6 +8,11 @@
     [style.transform]="transformCss()"
   >
     <!-- Keep ruby and surrounding text in one inline formatting context instead of separate flex items. -->
-    <span [innerHTML]="decoratedText() | safe: 'html'"></span>
+    <span
+      [class.note-formatted]="isFormatted()"
+      [class.note-formatted-compact]="isFormatted()"
+      [class.block]="isFormatted()"
+      [innerHTML]="decoratedText() | safe: 'html'"
+    ></span>
   </div>
 }

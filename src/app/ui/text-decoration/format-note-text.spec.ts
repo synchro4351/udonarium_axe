@@ -1,4 +1,5 @@
-import { formatNoteText } from '@axe/ui/text-decoration/format-note-text';
+import { decorateChatStyleText } from '@axe/ui/text-decoration/decorate-chat-text';
+import { decorateTextByFormat, formatNoteText } from '@axe/ui/text-decoration/format-note-text';
 
 const RUBY = '<ruby class="chat-ruby"><rb>漢字</rb><rt>かんじ</rt></ruby>';
 
@@ -228,5 +229,40 @@ describe('formatNoteText', () => {
       expect(tags.filter((tag) => !allowed.includes(tag))).toEqual([]);
       expect(html).not.toMatch(/\son[a-z]+="/);
     });
+  });
+});
+
+describe('decorateTextByFormat', () => {
+  it('keeps the ordinary decoration, with legacy marks, for the normal format', () => {
+    expect(decorateTextByFormat('> 引用\n# 見出し', 'normal')).toBe(decorateChatStyleText('> 引用\n# 見出し'));
+    expect(decorateTextByFormat('# 見出し', 'normal')).not.toContain('<h1');
+  });
+
+  it('reads headings, lists, quotes and code for the formatted format, from the same renderer as notes', () => {
+    const text = '# 見出し\n- 項目\n\n> 引用\n\n`a|b<c>`';
+    const html = decorateTextByFormat(text, 'formatted');
+    expect(html).toBe(formatNoteText(text));
+    expect(html).toContain('<h1');
+    expect(html).toContain('<li>');
+    expect(html).toContain('<blockquote>');
+  });
+
+  it('applies both ruby notations outside code and keeps code literal', () => {
+    const html = decorateTextByFormat('|漢字《かんじ》 |word<ruby>\n\n`|漢字《かんじ》 |a<b>`', 'formatted');
+    expect(html.match(/<ruby/g)).toHaveLength(2);
+    expect(html).toContain('<code>|漢字《かんじ》 |a&lt;b&gt;</code>');
+  });
+
+  it('keeps comparisons and arithmetic as typed', () => {
+    const html = decorateTextByFormat('1 <2 >0 and 2*3+4', 'formatted');
+    expect(html).toContain('1 &lt;2 &gt;0 and 2*3+4');
+    expect(html).not.toContain('<em>');
+  });
+
+  it('escapes script, images and malicious links in both formats', () => {
+    const text = '<img src=x onerror=alert(1)>\n[x](javascript:alert(1)) <script>1</script>';
+    for (const format of ['normal', 'formatted'] as const) {
+      expect(decorateTextByFormat(text, format)).not.toMatch(/<(img|script|a)\b/);
+    }
   });
 });

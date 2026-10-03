@@ -3,10 +3,21 @@ import {
   decorateQuoteLines,
   escapeHtml,
   escapeHtmlWithRuby,
+  hasRubyNotation,
   splitRubyNotation,
 } from '@axe/ui/text-decoration/decorate-chat-text';
 
 describe('decorate-chat-text', () => {
+  describe('hasRubyNotation', () => {
+    it('is true for either notation and false for plain, math-like or unfinished text', () => {
+      expect(hasRubyNotation('|漢字《かんじ》')).toBe(true);
+      expect(hasRubyNotation('a |word<ruby> b')).toBe(true);
+      expect(hasRubyNotation('1 <2 >0 2*3+4')).toBe(false);
+      expect(hasRubyNotation('|a')).toBe(false);
+      expect(hasRubyNotation('')).toBe(false);
+    });
+  });
+
   describe('escapeHtml', () => {
     it('escapes the html special characters', () => {
       expect(escapeHtml('<script>alert("x")</script>')).toBe('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;');

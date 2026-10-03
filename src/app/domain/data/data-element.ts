@@ -1,6 +1,7 @@
 import { Attributes } from '@axe/core/sync/attributes';
 import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
 import { ObjectNode } from '@axe/core/sync/object-node';
+import { TextFormat, toTextFormat } from '@axe/domain/data/text-format';
 
 const SAN_PATTERN = /^[SsＳｓ][AaＡａ][NnＮn]$/i;
 const SANITY_PATTERN = /^正気度$/i;
@@ -96,6 +97,7 @@ export const DataElementAttribute = {
   LOOP_HORIZONTAL: 'cs-loop-horizontal',
   LOOP_VERTICAL: 'cs-loop-vertical',
   BASE_DIFFICULTY: 'cs-base-difficulty',
+  TEXT_FORMAT: 'cs-text-format',
 } as const;
 
 const DATA_ELEMENT_ROLE_VALUES = new Set<string>(Object.values(DataElementRole));
@@ -164,6 +166,17 @@ export class DataElement extends ObjectNode {
   /** Whether this is a multi-line note. */
   get isNote(): boolean {
     return this.type != null && this.type === DataElementType.NOTE;
+  }
+
+  /** How this text is shown; `normal` when no format is stored or the stored one is unknown. */
+  get textFormat(): TextFormat {
+    return toTextFormat(this.getAttribute(DataElementAttribute.TEXT_FORMAT));
+  }
+
+  /** Stores the text format, removing the attribute for `normal`, the default. The text is untouched. */
+  setTextFormat(format: TextFormat): void {
+    if (toTextFormat(format) === 'normal') this.removeAttribute(DataElementAttribute.TEXT_FORMAT);
+    else this.setAttribute(DataElementAttribute.TEXT_FORMAT, 'formatted');
   }
 
   /** Whether a check field is ticked; any value other than 0 or `'0'` counts as ticked. */

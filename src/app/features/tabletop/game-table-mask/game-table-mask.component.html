@@ -73,7 +73,12 @@
             [style.color]="color"
             [style.text-shadow]="textOutline ? outlineShadowCss : 'none'"
           >
-            <span [innerHTML]="decoratedText() | safe"></span>
+            <span
+              [class.note-formatted]="textFormat === 'formatted'"
+              [class.note-formatted-compact]="textFormat === 'formatted'"
+              [class.block]="textFormat === 'formatted'"
+              [innerHTML]="decoratedText() | safe"
+            ></span>
           </div>
         }
         <div

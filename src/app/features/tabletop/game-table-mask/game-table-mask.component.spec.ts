@@ -193,6 +193,29 @@ describe('GameTableMaskComponent', () => {
       expect(text?.parentElement?.style.fontSize).toBe('27px');
     });
 
+    it('keeps the ordinary display for a normal mask, so a heading mark stays as typed', () => {
+      mask.text = '# 見出し\n- 項目';
+      fixture.detectChanges();
+      const text = fixture.nativeElement.querySelector('.z-1 span') as HTMLElement;
+      expect(text.querySelector('h1, ul')).toBeNull();
+      expect(text.classList.contains('note-formatted')).toBe(false);
+    });
+
+    it('draws a formatted mask through the shared renderer, escaping markup', async () => {
+      mask.text = '# 見出し\n- |剣《つるぎ》\n- |word<ruby>\n\n`|a<b>` 1 <2 >0 2*3+4 <img src=x onerror=alert(1)>';
+      mask.textFormat = 'formatted';
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const text = fixture.nativeElement.querySelector('.z-1 span') as HTMLElement;
+
+      expect(text.classList.contains('note-formatted')).toBe(true);
+      expect(text.querySelector('h1')?.textContent).toBe('見出し');
+      expect(text.querySelectorAll('ruby')).toHaveLength(2);
+      expect(text.querySelector('code')?.textContent).toBe('|a<b>');
+      expect(text.textContent).toContain('1 <2 >0 2*3+4');
+      expect(text.querySelector('img')).toBeNull();
+    });
+
     it('hides the text while the mask is being scratched and restores it afterwards', async () => {
       mask.owner = 'someone';
       await fixture.whenStable();

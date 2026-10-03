@@ -4,6 +4,7 @@ import { Attributes } from '@axe/core/sync/attributes';
 import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
 import { handLocationOf, isHandLocation, isHandOf } from '@axe/domain/card/hand-location';
 import { DataElement, DataElementType } from '@axe/domain/data/data-element';
+import { TextFormat, toTextFormat } from '@axe/domain/data/text-format';
 import { OwnedTabletopObject } from '@axe/domain/tabletop/owned-tabletop-object';
 import { moveToTopmost } from '@axe/domain/tabletop/tabletop-object-util';
 
@@ -55,6 +56,19 @@ export class Card extends OwnedTabletopObject {
     this.setOrCreateCommonValue('text', value, { type: DataElementType.NOTE, currentValue: value });
     const element = this.commonDataElement?.getFirstElementByName('text');
     if (element && element.currentValue !== value) element.currentValue = value;
+  }
+  /** How the face text is shown, kept on the text element; `normal` for a card without one. */
+  get faceTextFormat(): TextFormat {
+    return this.commonDataElement?.getFirstElementByName('text')?.textFormat ?? 'normal';
+  }
+  set faceTextFormat(format: TextFormat) {
+    let element = this.commonDataElement?.getFirstElementByName('text');
+    if (!element) {
+      if (toTextFormat(format) === 'normal') return;
+      this.faceText = '';
+      element = this.commonDataElement?.getFirstElementByName('text');
+    }
+    element?.setTextFormat(format);
   }
   /**
    * Font size of the face text, kept between 1 and 120 and rounded to a whole number.

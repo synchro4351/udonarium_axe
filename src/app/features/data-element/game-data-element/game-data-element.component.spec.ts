@@ -98,6 +98,177 @@ describe('GameDataElementComponent', () => {
     });
   });
 
+  describe('a long text with the formatted display', () => {
+    const SOURCE = '# 見出し\n- |漢字《かんじ》 |word<ruby>\n\n`|a<b>` 1 <2 >0 2*3+4 <script>x</script>';
+
+    function longText(isEdit: boolean, format: 'normal' | 'formatted'): DataElement {
+      const field = DataElement.create('効果', SOURCE, {
+        [DataElementAttribute.ROLE]: DataElementRole.FIELD,
+        [DataElementAttribute.FIELD_TYPE]: DataElementFieldType.LONG_TEXT,
+      });
+      field.setTextFormat(format);
+      fixture.componentRef.setInput('isEdit', isEdit);
+      fixture.componentRef.setInput('gameDataElement', field);
+      fixture.detectChanges();
+      return field;
+    }
+
+    const host = () => fixture.nativeElement as HTMLElement;
+
+    it('draws the shared formatted display outside editing, with ruby, literal code and no raw HTML', () => {
+      longText(false, 'formatted');
+      const shown = host().querySelector('[data-testid="long-text-formatted"]')!;
+
+      expect(shown.querySelector('h1')?.textContent).toBe('見出し');
+      expect(shown.querySelectorAll('ruby')).toHaveLength(2);
+      expect(shown.querySelector('code')?.textContent).toBe('|a<b>');
+      expect(shown.textContent).toContain('1 <2 >0 2*3+4');
+      expect(shown.querySelector('script')).toBeNull();
+      expect(host().querySelector('textarea')).toBeNull();
+    });
+
+    it('keeps the plain text area for a normal long text', async () => {
+      longText(false, 'normal');
+      await fixture.whenStable();
+
+      expect(host().querySelector('[data-testid="long-text-formatted"]')).toBeNull();
+      expect(host().querySelector<HTMLTextAreaElement>('textarea[name="data-value"]')!.value).toBe(SOURCE);
+    });
+
+    it('edits the raw text while editing, with examples as the placeholder, and no help paragraph', async () => {
+      longText(true, 'formatted');
+      await fixture.whenStable();
+      const textarea = host().querySelector<HTMLTextAreaElement>('textarea[name="data-value"]')!;
+
+      expect(host().querySelector('[data-testid="long-text-formatted"]')).toBeNull();
+      expect(host().querySelector('text-format-switch')).toBeTruthy();
+      expect(textarea.value).toBe(SOURCE);
+      expect(textarea.placeholder).toContain('# 見出し');
+      expect(host().textContent).not.toContain('入力したとおり');
+    });
+
+    it('switches the format from the editor without changing the text or the field type', () => {
+      const field = longText(true, 'normal');
+      host().querySelector<HTMLButtonElement>('text-format-switch button[data-format="formatted"]')!.click();
+      fixture.detectChanges();
+
+      expect(field.textFormat).toBe('formatted');
+      expect(field.value).toBe(SOURCE);
+      expect(field.fieldType).toBe(DataElementFieldType.LONG_TEXT);
+    });
+
+    it('does not switch while the value is locked', () => {
+      const field = longText(true, 'normal');
+      fixture.componentRef.setInput('isValueLocked', true);
+      fixture.detectChanges();
+      component.setTextFormat('formatted');
+
+      expect(field.textFormat).toBe('normal');
+    });
+
+    it('offers no switch for other kinds of field', () => {
+      const field = DataElement.create('名前', 'x', {
+        [DataElementAttribute.ROLE]: DataElementRole.FIELD,
+        [DataElementAttribute.FIELD_TYPE]: DataElementFieldType.TEXT,
+      });
+      fixture.componentRef.setInput('isEdit', true);
+      fixture.componentRef.setInput('gameDataElement', field);
+      fixture.detectChanges();
+
+      expect(host().querySelector('text-format-switch')).toBeNull();
+    });
+  });
+
+  describe('a normal long text with ruby', () => {
+    const RUBY = '|漢字《かんじ》 と |word<ruby> https://example.com/x 1 <2 >0 2*3+4 <b>x</b>';
+
+    function longText(text: string, isEdit = false): DataElement {
+      const field = DataElement.create('効果', text, {
+        [DataElementAttribute.ROLE]: DataElementRole.FIELD,
+        [DataElementAttribute.FIELD_TYPE]: DataElementFieldType.LONG_TEXT,
+      });
+      fixture.componentRef.setInput('isEdit', isEdit);
+      fixture.componentRef.setInput('gameDataElement', field);
+      fixture.detectChanges();
+      return field;
+    }
+
+    const host = () => fixture.nativeElement as HTMLElement;
+    const reader = () => host().querySelector<HTMLElement>('[data-testid="long-text-ruby-reader"]');
+    const textarea = () => host().querySelector<HTMLTextAreaElement>('textarea[name="data-value"]')!;
+
+    it('reads both ruby notations, keeps literals, links and escapes markup, and leaves the raw text alone', () => {
+      const field = longText(RUBY);
+      const shown = reader()!;
+
+      expect(shown.querySelectorAll('ruby')).toHaveLength(2);
+      expect(shown.querySelector('rt')?.textContent).toBe('かんじ');
+      expect(shown.querySelector('a')?.getAttribute('href')).toBe('https://example.com/x');
+      expect(shown.textContent).toContain('1 <2 >0 2*3+4 <b>x</b>');
+      expect(shown.querySelector('b')).toBeNull();
+      expect(textarea().hidden).toBe(true);
+      expect(field.value).toBe(RUBY);
+    });
+
+    it('opens the unchanged raw text for editing on click, and reads again after the area loses focus', async () => {
+      const field = longText(RUBY);
+      reader()!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(reader()).toBeNull();
+      expect(textarea().hidden).toBe(false);
+      expect(textarea().value).toBe(RUBY);
+      expect(field.value).toBe(RUBY);
+
+      textarea().dispatchEvent(new Event('blur'));
+      fixture.detectChanges();
+
+      expect(reader()).not.toBeNull();
+    });
+
+    it('does not open for editing when a link in it is clicked', () => {
+      longText(RUBY);
+      const link = reader()!.querySelector('a')!;
+      link.addEventListener('click', (event) => event.preventDefault());
+      link.click();
+      fixture.detectChanges();
+
+      expect(reader()).not.toBeNull();
+    });
+
+    it('does not open a locked value for editing', () => {
+      longText(RUBY);
+      fixture.componentRef.setInput('isValueLocked', true);
+      fixture.detectChanges();
+      reader()!.click();
+      fixture.detectChanges();
+
+      expect(reader()).not.toBeNull();
+      expect(textarea().readOnly).toBe(true);
+    });
+
+    it('keeps the plain text area for text without ruby, including math-like text', () => {
+      longText('1 <2 >0 2*3+4 |a');
+
+      expect(reader()).toBeNull();
+      expect(textarea().hidden).toBe(false);
+    });
+
+    it('does not take the place of the formatted display', () => {
+      const field = DataElement.create('効果', RUBY, {
+        [DataElementAttribute.ROLE]: DataElementRole.FIELD,
+        [DataElementAttribute.FIELD_TYPE]: DataElementFieldType.LONG_TEXT,
+      });
+      field.setTextFormat('formatted');
+      fixture.componentRef.setInput('gameDataElement', field);
+      fixture.detectChanges();
+
+      expect(reader()).toBeNull();
+      expect(host().querySelector('[data-testid="long-text-formatted"]')).not.toBeNull();
+    });
+  });
+
   describe('the icon picker', () => {
     it('lifts the heading it opens from above the headings of the children', () => {
       const group = DataElement.create('頭', '', { [DataElementAttribute.ROLE]: DataElementRole.GROUP });

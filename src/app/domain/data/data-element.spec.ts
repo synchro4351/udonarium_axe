@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import {
   DataElement,
@@ -468,6 +469,48 @@ describe('DataElement', () => {
 
       expect(reference).toBe('技能\\/戦闘/コスト');
       expect(DataElement.findElementByReference(detail, reference)).toBe(field);
+    });
+  });
+
+  describe('text format', () => {
+    it('is normal by default and for an unknown stored value', () => {
+      const element = DataElement.create('memo', 'text', { type: DataElementType.NOTE });
+      expect(element.textFormat).toBe('normal');
+      element.setAttribute(DataElementAttribute.TEXT_FORMAT, 'html');
+      expect(element.textFormat).toBe('normal');
+    });
+
+    it('stores formatted as an attribute and drops it again for normal, leaving the text alone', () => {
+      const element = DataElement.create('memo', '# 見出し\n|漢字《かんじ》', { type: DataElementType.NOTE });
+      element.setTextFormat('formatted');
+      expect(element.getAttribute(DataElementAttribute.TEXT_FORMAT)).toBe('formatted');
+      expect(element.textFormat).toBe('formatted');
+      expect(element.value).toBe('# 見出し\n|漢字《かんじ》');
+      element.setTextFormat('normal');
+      expect(element.getAttribute(DataElementAttribute.TEXT_FORMAT)).toBe('');
+      expect(element.value).toBe('# 見出し\n|漢字《かんじ》');
+    });
+
+    it('does not change the field type', () => {
+      const element = DataElement.create('memo', 'x', { type: DataElementType.NOTE });
+      element.setTextFormat('formatted');
+      expect(element.type).toBe(DataElementType.NOTE);
+      expect(element.fieldType).toBe(DataElementFieldType.LONG_TEXT);
+    });
+
+    it('survives an XML round trip, and an older save without it stays normal', () => {
+      const element = DataElement.create('memo', 'a\nb', { type: DataElementType.NOTE }, 'memo-xml');
+      element.setTextFormat('formatted');
+      const xml = element.toXml();
+      expect(xml).toContain('cs-text-format="formatted"');
+      const restored = ObjectSerializer.instance.parseXml(xml.replace('memo-xml', 'memo-xml-copy')) as DataElement;
+      expect(restored.textFormat).toBe('formatted');
+      expect(restored.value).toBe('a\nb');
+
+      const legacy = ObjectSerializer.instance.parseXml(
+        '<data name="memo" type="note" identifier="memo-legacy">a</data>'
+      ) as DataElement;
+      expect(legacy.textFormat).toBe('normal');
     });
   });
 
