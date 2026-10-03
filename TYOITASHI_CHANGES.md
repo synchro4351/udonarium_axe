@@ -30,6 +30,12 @@ r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は�
 - [fbf64463](https://github.com/synchro4351/udonarium_axe/commit/fbf64463)：読み込みなどでカットインが増減した時の一覧更新を、既存のコレクション通知へ接続する小修正。基点は34140927。素材集の機能には依存しません。
 - [e4e903e8](https://github.com/synchro4351/udonarium_axe/commit/e4e903e8)：Sample_Templateを初期登録し、演出見本16個を通常のXML・ZIP素材として整理。キャラクター画像テンプレートと既存のシーン・レイヤー・見本作成処理を使います。新しい保存形式はありません。
 - [75b16b3a](https://github.com/synchro4351/udonarium_axe/commit/75b16b3a52adfe214953e9b995872b6d1096f18e)：[使い方・依存関係・素材の再生成](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-sample-library/docs/TYOITASHI_CUTIN_SAMPLE_LIBRARY.md)。画像差し込みと発動者名の既存私家機能が前提です。公式へ移す時は単純な見本登録・ZIP素材と、テンプレートに必要な機能を分けて検討できます。
+- [codex/cutin-external-examples](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-external-examples)（基点70fbd8b1、コミットdf90db50）：上の75b16b3aで入れたアプリ内の「演出見本を追加」の選択欄とZIPリンクを外し、16個の見本を`examples/tyoitashi-cut-ins.zip`と`examples/tyoitashi-cut-ins/`のXML16個として配るだけにしました。初期のSample1・Sample2・Sample_Templateと、保存済みのカットインは変わりません。保存形式の変更・新しい依存パッケージはありません。[仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-external-examples/docs/TYOITASHI_CUTIN_EXTERNAL_EXAMPLES.md)。
+
+## カットインのレイヤー設定のグループ化（開発版）
+
+- [50ea3ac9](https://github.com/synchro4351/udonarium_axe/commit/50ea3ac928484eb5a3ee2520ae71ab2b8bd39d88)：レイヤー設定を「位置とサイズ」「全体の動き」「見た目と効果」に分け、文字は「文字の書式」を先頭、「文字ごと」を最後の折り畳み（見本ボタンが先）に。「キャラ名を入れる」ボタンを外してテキスト欄の案内へ置き換え。基点70fbd8b1、[codex/cutin-controls-layout](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-controls-layout)。項目・無効化の条件・保存形式・同期・取り消しは変えず、`{character}`の置換も従来のままです。使われなくなった翻訳キー（ja/en/ko）を整理しました。[仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-controls-layout/docs/TYOITASHI_CUTIN_CONTROLS_LAYOUT.md)。
+
 ## カットイン詳細の折り畳み（開発版）
 
 - [a06b80e8](https://github.com/synchro4351/udonarium_axe/commit/a06b80e8)：シーンの基本操作とレイヤー一覧を残し、タイムライン・レイヤーの詳細・多方向表示を折り畳むUI変更。基点は17ba32be。開閉はUI内だけの状態で、保存・同期形式は増やしません。閲覧専用入力のdisabled状態もフォームへ揃えました。
@@ -178,3 +184,13 @@ r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は�
 ## 取り込みについて
 
 参照・再利用はMITライセンスの範囲で歓迎します。採用やレビューをお願いするものではありません。表の基点には別機能も含まれるため、必要な変更を選び、取り込み先の公式バージョンで改めて検証してください。今の変更一覧を、依存関係のないパッチ集として扱わないでください。
+
+## 共有テキストの整形表示（開発版）
+
+- [c4c9016f](https://github.com/synchro4351/udonarium_axe/commit/c4c9016f57e1989703b2a315a5af875fec896d71)：基点70fbd8b1。[codex/shared-text-formatting](https://github.com/synchro4351/udonarium_axe/tree/codex/shared-text-formatting)。既存の限定Markdown・ルビ処理を長文欄、マップマスク、カードへ拡張。本文を保持し、DataElementの属性`cs-text-format`で整形の選択を保存・同期します。通常は属性なし。カードの秘匿・編集条件を保持し、通常の長文はルビがある場合だけ読み取り表示から元本文の編集へ切り替えます。新しい解析器・依存パッケージはありません。共有メモ整形とASCIIルビの既存変更が前提です。[仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/shared-text-formatting/docs/TYOITASHI_SHARED_TEXT_FORMATTING.md)。関連Angular8ファイル282件、機能枝全体1,008ファイル14,309件成功・1件skip。
+
+## 部位範囲の重複防止（開発版）
+
+- [01358e36](https://github.com/synchro4351/udonarium_axe/commit/01358e363793fa8676d09a115a86c2f017c8b884)：基点50ea3ac9。[codex/image-part-nonoverlap](https://github.com/synchro4351/udonarium_axe/tree/codex/image-part-nonoverlap)。画像の部位選択と作成前の検証で同じ重複判定を使用。接する辺・角は許可し、重なる面積がある範囲は拒否します。保存・同期形式は変えず、独立コマ生成が前提です。連動移動はこの修正に含めません。[仕様](https://github.com/synchro4351/udonarium_axe/blob/codex/image-part-nonoverlap/docs/TYOITASHI_IMAGE_PART_NONOVERLAP.md)。関連Angular3ファイル22件、コミット時の関連23ファイル593件成功。
+
+- 共有テキストのブラウザ回帰：[6ba5a88e](https://github.com/synchro4351/udonarium_axe/commit/6ba5a88e)、基点2da66388、`codex/card-format-browser-checks`。カード編集テストをGMで開始し、整形・元本文の保持・数式記号・伏せた文字の非表示を確認。製品の権限は変えません。Chromiumの対象8件と、通常長文ルビ編集・外部素材ZIPの16個読込が成功。

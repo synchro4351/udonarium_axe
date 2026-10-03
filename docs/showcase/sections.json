@@ -116,50 +116,50 @@
   },
   {
     "id": "notes",
-    "title": "長い共有メモを読みやすく",
+    "title": "長い文章を読みやすく",
     "version": "開発版",
-    "text": "長い共有メモだけ「整形」に切り替えると、見出し・箇条書き・引用・コードで読みやすくなります。2*3 のような * はそのまま表示されます。これまでのメモの見た目は変わりません。チャットの見た目も変わりません。",
+    "text": "共有メモ、キャラクターの長文、マップマスク、カードの文字を「整形」にすると、見出し・箇条書き・引用・コードを使えます。必要な欄だけ切り替えられ、2*3 のような計算の記号はそのまま残ります。",
     "images": [
       [
         "shared-note-formatting.png",
-        "編集しながら、見出しと箇条書きを確かめます。"
+        "見出し、箇条書き、引用、コードとルビを整形した表示です。"
       ]
     ],
-    "branch": "codex/shared-note-formatting"
+    "branch": "codex/shared-text-formatting"
   },
   {
     "id": "editor",
     "title": "カットインを手軽に作る",
     "version": "開発版",
-    "text": "カットインの編集では、タイムラインや変形の設定を、必要なときだけ開きます。閉じていても、すべてのレイヤーを選べます。まず画像と文字だけで作り、そこから細かい演出へ進めます。",
+    "text": "文字の書式、位置とサイズ、全体の動き、見た目と効果を、それぞれ必要なときに開きます。文字ごとの細かい動きは最後にまとめ、まず読みやすい文字と配置から作れます。",
     "images": [
       [
         "cutin-simple-editor.png",
-        "基本の操作とレイヤー一覧だけが出ている、最初の画面です。"
+        "初期テンプレートの文字を編集する画面です。タイムラインは閉じたまま使えます。"
       ],
       [
         "cutin-detailed-editor.png",
-        "タイムラインと詳細設定を開いた画面です。"
+        "文字の書式から編集を始めます。位置や動きは別の項目で調整できます。"
       ]
     ],
-    "branch": "codex/cutin-ui-disclosure"
+    "branch": "codex/cutin-controls-layout"
   },
   {
     "id": "samples",
     "title": "演出の見本を選ぶ",
     "version": "開発版",
-    "text": "新しい卓は、Sample1・Sample2・Sample_Template から始めます。短い演出の見本は16個あり、使いたいものだけ1つずつ追加できます。まとめて使うときは、16個入りのZIPをいつもの読み込みで取り込めます。",
+    "text": "新しい卓は、Sample1・Sample2・Sample_Template から始めます。短い演出の見本16個は、アプリには入っていません。必要なときだけ、GitHubから16個入りのZIPをダウンロードして、いつもの読み込みで部屋に取り込みます。すでに保存したカットインは、そのまま残ります。",
+    "link": [
+      "16個入りの演出見本ZIPをダウンロード",
+      "https://github.com/synchro4351/udonarium_axe/raw/main/examples/tyoitashi-cut-ins.zip"
+    ],
     "images": [
       [
         "cutin-sample-template.png",
         "キャラクターの画像と名前を差し込むだけの、簡単なテンプレートです。"
-      ],
-      [
-        "cutin-example-library.png",
-        "追加で読み込める、演出見本の素材集です。"
       ]
     ],
-    "branch": "codex/cutin-sample-library"
+    "branch": "codex/cutin-external-examples"
   },
   {
     "id": "letters",
@@ -169,7 +169,7 @@
     "images": [
       [
         "cutin-letter-controls.png",
-        "中央から現れて、上へ退場する設定の例です。"
+        "「文字ごと」を開くと、見本ボタンから動きを選べます。"
       ]
     ],
     "branch": "codex/cutin-letter-animation-controls"

@@ -4,12 +4,12 @@
 
 基本機能・使い方・サーバー構築については[公式の利用ガイド](https://xelltis.github.io/udonarium_axe/)と[公式README](https://github.com/Xelltis/udonarium_axe#readme)をご覧ください。ここでは公式との差分だけを紹介します。
 
-[写真で見る機能紹介](docs/showcase/README.md) — カード・チャット・画像・演出を13項目、21枚の画面で紹介しています。
+[写真で見る機能紹介](docs/showcase/README.md) — カード・チャット・画像・演出を13項目、20枚の画面で紹介しています。
 
 ## バージョンとソース
 
 - **固定版：tyoitashi r5／Axe v1.57.1** — [ソース `7033c85e`](https://github.com/synchro4351/udonarium_axe/tree/7033c85eed2cacd9c7ea44689e11ef9686b781f8)
-- **開発版：Axe v1.59.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`70fbd8b1`](https://github.com/synchro4351/udonarium_axe/tree/70fbd8b1)。公式のスイッチ・コンパス・ボタン名ガイドを取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
+- **開発版：Axe v1.59.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`6ba5a88e`](https://github.com/synchro4351/udonarium_axe/tree/6ba5a88e)。公式のスイッチ・コンパス・ボタン名ガイドを取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
@@ -20,6 +20,10 @@
 
 ## 開発版で追加した変更（Axe v1.59.0）
 
+- キャラクターの長文、マップマスク、カードの文字でも「整形」を選べます。共有メモと同じ見出し・リスト・引用・コード・ルビを使い、本文を変えず表示を切り替えます。通常の長文でもルビを表示し、クリックして元の記法を編集できます。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/shared-text-formatting) · [仕様と保存形式](https://github.com/synchro4351/udonarium_axe/blob/codex/shared-text-formatting/docs/TYOITASHI_SHARED_TEXT_FORMATTING.md)。
+
+- 部位画像の範囲が重なる選択を防ぎます。境界が接する範囲は選べ、削除した範囲は選び直せます。部位コマの連動移動は現在ありません。[単独の修正](https://github.com/synchro4351/udonarium_axe/tree/codex/image-part-nonoverlap) · [仕様](https://github.com/synchro4351/udonarium_axe/blob/codex/image-part-nonoverlap/docs/TYOITASHI_IMAGE_PART_NONOVERLAP.md)。
+
 - 登録した画像を囲み、部位ごとのキャラクターコマを作れます。元画像を残し、HP・名前・移動は各コマで独立。通常の卓データとして保存できます。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/multipart-character-tokens) · [仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-character-tokens/docs/TYOITASHI_MULTIPART_CHARACTER_TOKENS.md)。
 
 - ルビを `|漢字<かんじ>` と半角で入力できます。従来表記も使え、表示・読み上げ・ログ・吹き出しを揃えました。読み仮名をエフェクト命令と誤認する問題も修正しました。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/ascii-ruby) · [仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/ascii-ruby/docs/TYOITASHI_ASCII_RUBY.md)。
@@ -28,9 +32,11 @@
 
 - カットインの文字を一つの文章のまま、1字ずつ動かせます。見本ボタンから始め、詳細で順番・間隔・方向・傾き・退場を調整します。動きに効かない項目は無効になり、保存・同期・取り消しにも対応します。リプレイの動画書き出しには文字ごとの動きが入りません。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-letter-animation-controls) · [仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-letter-animation-controls/docs/TYOITASHI_CUTIN_LETTER_CONTROLS.md)。
 
-- 新しい卓では公式のSample1・Sample2と、キャラクター画像を使うSample_Templateから始めます。短い演出見本は必要なものを1個ずつ追加するか、16個の素材ZIPを通常の読み込みで取り込めます。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-sample-library) · [素材と仕様](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-sample-library/docs/TYOITASHI_CUTIN_SAMPLE_LIBRARY.md)。
+- 新しい卓では公式のSample1・Sample2と、キャラクター画像を使うSample_Templateから始めます。アプリ内の「演出見本を追加」の選択欄は外しました。短い演出見本16個は、[examples/tyoitashi-cut-ins.zip](https://github.com/synchro4351/udonarium_axe/raw/main/examples/tyoitashi-cut-ins.zip)をダウンロードし、通常の読み込みで部屋へ取り込むと追加できます。画像や音声は含まず、通常のカットインとして編集できます。以前の版で追加した見本を含め、保存済みのカットインは変わりません。個別のXMLは[examples/tyoitashi-cut-ins/](examples/tyoitashi-cut-ins/)にあります。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-external-examples) · [仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-external-examples/docs/TYOITASHI_CUTIN_EXTERNAL_EXAMPLES.md)。
 
-- カットインのシーン編集は、基本操作とレイヤー一覧を残して詳細を折り畳みます。タイムライン、位置・動き・効果、表示の向きは必要な時に開けます。既存の演出・保存形式は変わりません。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-ui-disclosure) · [変更範囲](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-ui-disclosure/docs/TYOITASHI_CUTIN_DISCLOSURE.md)。
+- カットインのレイヤー設定を「位置とサイズ」「全体の動き」「見た目と効果」に分けました。文字レイヤーは「文字の書式」を先頭に置き、「文字ごと」は最後の折り畳みに入れて、見本ボタンを先に出します。「キャラ名を入れる」ボタンはなくし、テキスト欄の案内に`{character}`と書きます。項目と保存形式は変わりません。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-controls-layout) · [仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-controls-layout/docs/TYOITASHI_CUTIN_CONTROLS_LAYOUT.md)。
+
+- カットインのシーン編集は、基本操作とレイヤー一覧を残して詳細を折り畳みます。タイムライン、レイヤー設定、表示の向きは必要な時に開けます。既存の演出・保存形式は変わりません。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-ui-disclosure) · [変更範囲](https://github.com/synchro4351/udonarium_axe/blob/codex/cutin-ui-disclosure/docs/TYOITASHI_CUTIN_DISCLOSURE.md)。
 
 - 共有メモで「通常／整形」を選べます。整形では見出し・箇条書き・引用・コードを使い、長い情報を読みやすくします。数式のアスタリスクやHTMLは文字として残ります。設定はメモと一緒に保存・同期され、既存のメモは通常のままです。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/shared-note-formatting) · [仕様と再利用時の依存関係](https://github.com/synchro4351/udonarium_axe/blob/codex/shared-note-formatting/docs/TYOITASHI_SHARED_NOTE_FORMATTING.md)。
 

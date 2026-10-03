@@ -22,13 +22,15 @@ for section in sections:
  md += ['## '+section['title'],'','**'+label+'**','',section['text'].replace('|漢字<かんじ>','`|漢字<かんじ>`').replace('|漢字《かんじ》','`|漢字《かんじ》`').replace('2*3','`2*3`'),'']
  ref += ['## '+section['title'],'','- 提供状況: '+section['version'],'- 機能のブランチ: ['+section['branch']+']('+branch+')','']
  figures=[]
+ link=section.get('link')
+ if link:md += ['['+link[0]+']('+link[1]+')','']
  for file,caption in section['images']:
   source=manifest[file]['source'];link=repo+'/tree/'+source
   md += ['!['+caption+']('+file+')','',caption,'']
   ref.append('- `'+file+'`: 撮影ソース ['+source+']('+link+')、素材: '+manifest[file]['sample'])
   figures.append(f'<figure><a href="{esc(file)}" aria-label="{esc(caption)}（画像を大きく表示）"><img src="{esc(file)}" alt="{esc(caption)}" loading="lazy"></a><figcaption>{esc(caption)}</figcaption></figure>')
  ref.append('')
- cards.append(f'<section id="{section["id"]}" class="feature"><div class="section-heading"><span class="badge {"dev" if section["version"]=="開発版" else ""}">{esc(label)}</span><h2>{esc(section["title"])}</h2></div><p>{esc(section["text"])}</p><div class="shots">'+''.join(figures)+'</div></section>')
+ cards.append(f'<section id="{section["id"]}" class="feature"><div class="section-heading"><span class="badge {"dev" if section["version"]=="開発版" else ""}">{esc(label)}</span><h2>{esc(section["title"])}</h2></div><p>{esc(section["text"])}</p>'+(f'<p><a href="{esc(section["link"][1])}">{esc(section["link"][0])}</a></p>' if section.get('link') else '')+f'<div class="shots">'+''.join(figures)+'</div></section>')
 rights='画面写真は動きを止めたものです。ソースと同梱素材の条件は、リポジトリの'
 materials='画面は本派生版と公式Axeの公開サンプル、独自の検証素材で撮影しています。実際の卓や参加者の私的な情報、持ち込みの第三者スタンプ素材は入っていません。ソースと同梱素材の条件は、リポジトリのLICENSEを見てください。絵文字の形は、端末のフォントで変わります。動作・保存・同期の確認結果は、各機能のブランチで確認できます。'
 md += ['## 素材と利用条件','',rights+'[LICENSE]('+repo+'/blob/main/LICENSE)を見てください。くわしい確認結果は[開発者向け資料]('+dev+')にあります。','']

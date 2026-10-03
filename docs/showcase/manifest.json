@@ -46,28 +46,23 @@
   },
   {
     "file": "shared-note-formatting.png",
-    "source": "17ba32be9c22fad3ccc313553f74aa203ae91355",
-    "sample": "bundled public sample, isolated offline browser"
+    "source": "2da66388f311ad4fda3d77eb2d71f1c0c9e9e898",
+    "sample": "fictional adventure note, isolated offline browser"
   },
   {
     "file": "cutin-simple-editor.png",
-    "source": "3414092749630e99a008273ab50a0b9f4ef0da14",
-    "sample": "bundled public sample, isolated offline browser"
+    "source": "2da66388f311ad4fda3d77eb2d71f1c0c9e9e898",
+    "sample": "bundled public template, isolated offline browser"
   },
   {
     "file": "cutin-detailed-editor.png",
-    "source": "3414092749630e99a008273ab50a0b9f4ef0da14",
-    "sample": "bundled public sample, isolated offline browser"
+    "source": "50ea3ac928484eb5a3ee2520ae71ab2b8bd39d88",
+    "sample": "bundled public template and fictional text, isolated offline browser"
   },
   {
     "file": "cutin-sample-template.png",
-    "source": "75b16b3a52adfe214953e9b995872b6d1096f18e",
-    "sample": "bundled public sample, isolated offline browser"
-  },
-  {
-    "file": "cutin-example-library.png",
-    "source": "75b16b3a52adfe214953e9b995872b6d1096f18e",
-    "sample": "bundled public sample, isolated offline browser"
+    "source": "2da66388f311ad4fda3d77eb2d71f1c0c9e9e898",
+    "sample": "bundled public template, isolated offline browser"
   },
   {
     "file": "reaction-effects.png",
@@ -91,8 +86,8 @@
   },
   {
     "file": "cutin-letter-controls.png",
-    "source": "26b6eb5b84ab713de02a2bf2e00903b8aa94d684",
-    "sample": "bundled public Sample_Template edited in isolated offline browser"
+    "source": "50ea3ac928484eb5a3ee2520ae71ab2b8bd39d88",
+    "sample": "bundled public template and fictional text, isolated offline browser"
   },
   {
     "file": "ascii-ruby-chat.png",

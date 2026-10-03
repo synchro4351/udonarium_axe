@@ -59,35 +59,34 @@
 
 - `hotbar-starters.png`: 撮影ソース [17ba32be9c22fad3ccc313553f74aa203ae91355](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)、素材: bundled public sample, isolated offline browser
 
-## 長い共有メモを読みやすく
+## 長い文章を読みやすく
 
 - 提供状況: 開発版
-- 機能のブランチ: [codex/shared-note-formatting](https://github.com/synchro4351/udonarium_axe/tree/codex/shared-note-formatting)
+- 機能のブランチ: [codex/shared-text-formatting](https://github.com/synchro4351/udonarium_axe/tree/codex/shared-text-formatting)
 
-- `shared-note-formatting.png`: 撮影ソース [17ba32be9c22fad3ccc313553f74aa203ae91355](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)、素材: bundled public sample, isolated offline browser
+- `shared-note-formatting.png`: 撮影ソース [2da66388f311ad4fda3d77eb2d71f1c0c9e9e898](https://github.com/synchro4351/udonarium_axe/tree/2da66388f311ad4fda3d77eb2d71f1c0c9e9e898)、素材: fictional adventure note, isolated offline browser
 
 ## カットインを手軽に作る
 
 - 提供状況: 開発版
-- 機能のブランチ: [codex/cutin-ui-disclosure](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-ui-disclosure)
+- 機能のブランチ: [codex/cutin-controls-layout](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-controls-layout)
 
-- `cutin-simple-editor.png`: 撮影ソース [3414092749630e99a008273ab50a0b9f4ef0da14](https://github.com/synchro4351/udonarium_axe/tree/3414092749630e99a008273ab50a0b9f4ef0da14)、素材: bundled public sample, isolated offline browser
-- `cutin-detailed-editor.png`: 撮影ソース [3414092749630e99a008273ab50a0b9f4ef0da14](https://github.com/synchro4351/udonarium_axe/tree/3414092749630e99a008273ab50a0b9f4ef0da14)、素材: bundled public sample, isolated offline browser
+- `cutin-simple-editor.png`: 撮影ソース [2da66388f311ad4fda3d77eb2d71f1c0c9e9e898](https://github.com/synchro4351/udonarium_axe/tree/2da66388f311ad4fda3d77eb2d71f1c0c9e9e898)、素材: bundled public template, isolated offline browser
+- `cutin-detailed-editor.png`: 撮影ソース [50ea3ac928484eb5a3ee2520ae71ab2b8bd39d88](https://github.com/synchro4351/udonarium_axe/tree/50ea3ac928484eb5a3ee2520ae71ab2b8bd39d88)、素材: bundled public template and fictional text, isolated offline browser
 
 ## 演出の見本を選ぶ
 
 - 提供状況: 開発版
-- 機能のブランチ: [codex/cutin-sample-library](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-sample-library)
+- 機能のブランチ: [codex/cutin-external-examples](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-external-examples)
 
-- `cutin-sample-template.png`: 撮影ソース [75b16b3a52adfe214953e9b995872b6d1096f18e](https://github.com/synchro4351/udonarium_axe/tree/75b16b3a52adfe214953e9b995872b6d1096f18e)、素材: bundled public sample, isolated offline browser
-- `cutin-example-library.png`: 撮影ソース [75b16b3a52adfe214953e9b995872b6d1096f18e](https://github.com/synchro4351/udonarium_axe/tree/75b16b3a52adfe214953e9b995872b6d1096f18e)、素材: bundled public sample, isolated offline browser
+- `cutin-sample-template.png`: 撮影ソース [2da66388f311ad4fda3d77eb2d71f1c0c9e9e898](https://github.com/synchro4351/udonarium_axe/tree/2da66388f311ad4fda3d77eb2d71f1c0c9e9e898)、素材: bundled public template, isolated offline browser
 
 ## 文字を一つずつ動かす
 
 - 提供状況: 開発版
 - 機能のブランチ: [codex/cutin-letter-animation-controls](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-letter-animation-controls)
 
-- `cutin-letter-controls.png`: 撮影ソース [26b6eb5b84ab713de02a2bf2e00903b8aa94d684](https://github.com/synchro4351/udonarium_axe/tree/26b6eb5b84ab713de02a2bf2e00903b8aa94d684)、素材: bundled public Sample_Template edited in isolated offline browser
+- `cutin-letter-controls.png`: 撮影ソース [50ea3ac928484eb5a3ee2520ae71ab2b8bd39d88](https://github.com/synchro4351/udonarium_axe/tree/50ea3ac928484eb5a3ee2520ae71ab2b8bd39d88)、素材: bundled public template and fictional text, isolated offline browser
 
 ## ルビを手軽に入力
 
