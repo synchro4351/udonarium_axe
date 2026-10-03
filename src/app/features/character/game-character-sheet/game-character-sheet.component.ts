@@ -35,6 +35,7 @@ import {
   DataElementFieldType,
   DataElementRole,
 } from '@axe/domain/data/data-element';
+import { TextFormat } from '@axe/domain/data/text-format';
 import { DiceSymbol } from '@axe/domain/dice/dice-symbol';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { CharacterSheetTarget } from '@axe/domain/tabletop/character-sheet-target';
@@ -61,6 +62,7 @@ import {
   TextNoteFormatMark,
 } from '@axe/features/tabletop/text-note/text-note-format-marks';
 import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
+import { TextFormatSwitchComponent } from '@axe/ui/components/text-format-switch/text-format-switch.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { formatNoteText } from '@axe/ui/text-decoration/format-note-text';
 import { TranslocoModule } from '@jsverse/transloco';
@@ -77,6 +79,7 @@ import { TranslocoModule } from '@jsverse/transloco';
     GameCharacterSettingsTabComponent,
     GameDataElementComponent,
     SafePipe,
+    TextFormatSwitchComponent,
     TranslocoModule,
   ],
 })
@@ -410,6 +413,18 @@ export class GameCharacterSheetComponent {
     if (!this.canEditCard() || !this.canReadCardFace(c)) return;
     c.faceFontColor = (event.target as HTMLInputElement).value;
   }
+  /** How the card's face text is shown, or normal for a user who may not read it. */
+  cardOwnFaceTextFormat(c: Card): TextFormat {
+    this.objectChange.versionOf(c.identifier)();
+    return this.canReadCardFace(c) ? c.faceTextFormat : 'normal';
+  }
+  /** Switches how the face text is shown; the text is written first so a pending edit is not lost. */
+  setCardOwnFaceTextFormat(c: Card, format: TextFormat): void {
+    if (!this.canEditCard() || !this.canReadCardFace(c)) return;
+    this.flushCardOwnFaceText();
+    c.faceTextFormat = format;
+    this.objectChange.notifyChanged(c.identifier);
+  }
   cardOwnFaceTextOutline(c: Card): boolean {
     this.objectChange.versionOf(c.identifier)();
     return this.canReadCardFace(c) && c.faceTextOutline;
@@ -445,7 +460,6 @@ export class GameCharacterSheetComponent {
   setTextNoteText(note: TextNote, event: Event): void {
     note.text = (event.target as HTMLTextAreaElement).value;
   }
-  protected readonly textNoteFormats: readonly TextNoteFormat[] = ['normal', 'formatted'];
   protected readonly textNoteFormatMarks = TEXT_NOTE_FORMAT_MARKS;
   /** The note's display format, for the format switch. */
   textNoteFormat(note: TextNote): TextNoteFormat {

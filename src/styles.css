@@ -455,6 +455,23 @@ ruby.chat-ruby rt {
   padding: 0;
   background: none;
 }
+/* Used together with .note-formatted for text drawn over card art and map masks, which keep their
+   own colours, so the quote and list marks follow the text colour and spacing stays tight. */
+.note-formatted-compact :is(p, ul, ol, pre, blockquote) {
+  margin: 0.1em 0;
+}
+.note-formatted-compact :is(h1, h2, h3) {
+  margin: 0.15em 0 0.1em;
+}
+.note-formatted-compact :is(ul, ol) {
+  padding-left: 0;
+  list-style-position: inside;
+}
+.note-formatted-compact blockquote {
+  background: none;
+  color: inherit;
+  border-left-color: currentColor;
+}
 
 /* ChatMessageComponent.jumpEffect が要素を [class.chat-message-highlight] でトグルしたとき、
    accent カラーで一瞬光らせる。`animation:` ショートハンドは Tailwind の animate-chat-* と衝突して

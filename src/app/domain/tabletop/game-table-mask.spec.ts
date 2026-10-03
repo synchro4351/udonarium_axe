@@ -187,6 +187,31 @@ describe('GameTableMask', () => {
     expect(restored.outlineColor).toBe('#abcdef');
   });
 
+  it('keeps the text format on the text element, normal by default, and round-trips it through XML', () => {
+    const mask = GameTableMask.create('mask', 2, 2, 100, 'mask-fmt-id');
+    expect(mask.textFormat).toBe('normal');
+    mask.text = '> 引用\n1 <2 >0 and 2*3+4';
+    mask.textFormat = 'formatted';
+    expect(mask.textFormat).toBe('formatted');
+    expect(mask.text).toBe('> 引用\n1 <2 >0 and 2*3+4');
+    const xml = mask.toXml().replace(/location\.[a-z]+="[^"]*"\s*/g, '');
+    const restored = ObjectSerializer.instance.parseXml(xml) as GameTableMask;
+    expect(restored.textFormat).toBe('formatted');
+    expect(restored.text).toBe(mask.text);
+    mask.textFormat = 'normal';
+    expect(mask.textFormat).toBe('normal');
+    expect(mask.text).toBe('> 引用\n1 <2 >0 and 2*3+4');
+  });
+
+  it('creates a text element only when a mask without one is switched to formatted', () => {
+    const mask = GameTableMask.create('mask', 1, 1, 100);
+    mask.commonDataElement!.getFirstElementByName('text')?.destroy();
+    mask.textFormat = 'normal';
+    expect(mask.commonDataElement!.getFirstElementByName('text')).toBeNull();
+    mask.textFormat = 'formatted';
+    expect(mask.textFormat).toBe('formatted');
+  });
+
   it('clamps invalid imported font size and falls back invalid outline colour', () => {
     const mask = GameTableMask.create('Imported mask', 1, 1, 100);
     mask.commonDataElement!.appendChild(DataElement.create('fontsize', '999'));

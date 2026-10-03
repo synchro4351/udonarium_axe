@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  afterNextRender,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  Injector,
+  input,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { EffectCastService } from '@axe/application/effect/effect-cast.service';
 import { EffectLibraryService } from '@axe/application/effect/effect-library.service';
@@ -49,6 +59,7 @@ import {
   type TableColumn as DataElementTableColumn,
   type TableColumnHeaderGroup as DataElementTableColumnHeaderGroup,
 } from '@axe/domain/data/table-layout';
+import { TextFormat } from '@axe/domain/data/text-format';
 import {
   canAcceptChildRole,
   canDropStructureElement,
@@ -67,9 +78,12 @@ import { GameDataElementTableViewComponent } from '@axe/features/data-element/ga
 import { escapeHtml, isUrlText } from '@axe/features/data-element/game-data-element/game-data-element-utils';
 import { GameDataElementRangeShapeComponent } from '@axe/features/data-element/game-data-element-range-shape/game-data-element-range-shape.component';
 import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
+import { TextFormatSwitchComponent } from '@axe/ui/components/text-format-switch/text-format-switch.component';
 import { NgSelectWindowDirective } from '@axe/ui/directives/ng-select-window.directive';
 import { LinkifyPipe } from '@axe/ui/pipes/linkify.pipe';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
+import { escapeHtmlWithRuby, hasRubyNotation } from '@axe/ui/text-decoration/decorate-chat-text';
+import { formatNoteText } from '@axe/ui/text-decoration/format-note-text';
 import { TranslocoModule } from '@jsverse/transloco';
 import { NgOptionComponent, NgSelectComponent } from '@ng-select/ng-select';
 
@@ -87,6 +101,7 @@ import { NgOptionComponent, NgSelectComponent } from '@ng-select/ng-select';
     GameDataElementTableViewComponent,
     TranslocoModule,
     GameDataElementRangeShapeComponent,
+    TextFormatSwitchComponent,
   ],
   host: {
     class:
@@ -106,6 +121,7 @@ export class GameDataElementComponent {
   private readonly objectStore = inject(ObjectStore);
   private readonly imageStorage = inject(ImageStorage);
   private readonly objectChange = inject(ObjectChangeService);
+  private readonly injector = inject(Injector);
   private readonly dataElementDrag = inject(DataElementDragService);
   private readonly uiSignalService = inject(UiSignalService);
   private readonly t = inject(TRANSLATE_FN);
@@ -1339,6 +1355,54 @@ export class GameDataElementComponent {
 
   readonly escapeHtml = escapeHtml;
   readonly isUrlText = isUrlText;
+
+  /** How this long text is shown, re-read when the element changes. */
+  readonly textFormat = computed<TextFormat>(() => {
+    const element = this.gameDataElement();
+    this.objectChange.versionOf(element.identifier)();
+    return element.textFormat;
+  });
+  isTextFormatted(): boolean {
+    return this.textFormat() === 'formatted';
+  }
+  /** Whether a long text in the normal display holds ruby notation and is not being edited. */
+  readonly isRubyReaderShown = computed(() => {
+    if (this.isTextFormatted() || this.rubyEditing()) return false;
+    const element = this.gameDataElement();
+    this.objectChange.versionOf(element.identifier)();
+    return hasRubyNotation(`${element.value ?? ''}`);
+  });
+  readonly rubyEditing = signal(false);
+  /** The normal-mode long text with its ruby drawn; links are added by the template, the text stays as typed. */
+  readonly rubyReaderHtml = computed(() => {
+    const element = this.gameDataElement();
+    this.objectChange.versionOf(element.identifier)();
+    return escapeHtmlWithRuby(`${element.value ?? ''}`);
+  });
+  /** A click on a link in the reader follows the link; any other click opens the text for editing. */
+  onRubyReaderClick(event: MouseEvent, textarea: HTMLTextAreaElement): void {
+    if ((event.target as HTMLElement | null)?.closest('a')) return;
+    this.startRubyEditing(textarea);
+  }
+  /** Opens the text area behind the reader, unless the value is locked. */
+  startRubyEditing(textarea: HTMLTextAreaElement): void {
+    if (this.isValueLocked()) return;
+    this.rubyEditing.set(true);
+    afterNextRender(() => textarea.focus(), { injector: this.injector });
+  }
+  /** The long text as the formatted display shows it. */
+  readonly formattedValueHtml = computed(() => {
+    const element = this.gameDataElement();
+    this.objectChange.versionOf(element.identifier)();
+    return formatNoteText(`${element.value ?? ''}`);
+  });
+  /** Switches how the text is shown; the stored text is left as typed. */
+  setTextFormat(format: TextFormat): void {
+    if (this.isValueLocked()) return;
+    const element = this.gameDataElement();
+    element.setTextFormat(format);
+    this.objectChange.notifyChanged(element.identifier);
+  }
 
   protected editCheckedIds = new Set<string>();
 

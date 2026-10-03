@@ -426,29 +426,51 @@
               />
             </span>
           </div>
-          <div class="relative ml-2 text-[1em] leading-[1.8]">
-            <div class="absolute inset-0">
-              <textarea
-                class="text-ui-text hover:bg-ui-hover focus:bg-ui-input box-border size-full resize-none overflow-hidden rounded-xs border-none bg-transparent p-0 font-[inherit] leading-[inherit] wrap-anywhere [word-break:break-word] whitespace-pre-wrap outline-none"
-                name="data-value"
-                name="data-value"
-                [(ngModel)]="dataElm.value"
-                spellcheck="false"
-                (focus)="textFocus(dataElm.myIdentifer)"
-                [hidden]="!isEditUrl(dataElm.myIdentifer) && isUrlText(dataElm.value)"
-              ></textarea>
-              <span
-                class="text-ui-text box-border size-full overflow-hidden rounded-xs border-none bg-transparent p-0 font-[inherit] leading-[inherit] wrap-anywhere [word-break:break-word] whitespace-pre-wrap outline-none"
-                [innerHTML]="escapeHtml(dataElm.value) | linkify"
-                [hidden]="isEditUrl(dataElm.myIdentifer) || !isUrlText(dataElm.value)"
-              ></span>
-            </div>
+          @let formattedField = formattedFieldHtml(dataElm);
+          @if (formattedField !== null) {
             <div
-              class="invisible h-auto min-h-6 min-w-12 overflow-hidden wrap-anywhere [word-break:break-word] whitespace-pre-wrap"
-            >
-              {{ dataElm.value }}
+              class="note-formatted text-ui-text ml-2 min-h-6 text-[1em] leading-[1.8] wrap-anywhere [word-break:break-word]"
+              data-testid="overview-field-formatted"
+              [innerHTML]="formattedField | safe"
+            ></div>
+          } @else {
+            @let rubyField = rubyReaderFieldHtml(dataElm);
+            @if (rubyField !== null) {
+              <div
+                class="text-ui-text ml-2 min-h-6 cursor-text text-[1em] leading-[1.8] wrap-anywhere [word-break:break-word] whitespace-pre-wrap"
+                data-testid="overview-field-ruby-reader"
+                tabindex="0"
+                [innerHTML]="rubyField | linkify | safe"
+                (click)="onRubyReaderClick($event, dataElm, fieldArea)"
+                (keydown.enter)="startRubyEditing(dataElm, fieldArea)"
+              ></div>
+            }
+            <div class="relative ml-2 text-[1em] leading-[1.8]" [hidden]="rubyField !== null">
+              <div class="absolute inset-0">
+                <textarea
+                  #fieldArea
+                  (blur)="stopRubyEditing(dataElm)"
+                  class="text-ui-text hover:bg-ui-hover focus:bg-ui-input box-border size-full resize-none overflow-hidden rounded-xs border-none bg-transparent p-0 font-[inherit] leading-[inherit] wrap-anywhere [word-break:break-word] whitespace-pre-wrap outline-none"
+                  name="data-value"
+                  name="data-value"
+                  [(ngModel)]="dataElm.value"
+                  spellcheck="false"
+                  (focus)="textFocus(dataElm.myIdentifer)"
+                  [hidden]="!isEditUrl(dataElm.myIdentifer) && isUrlText(dataElm.value)"
+                ></textarea>
+                <span
+                  class="text-ui-text box-border size-full overflow-hidden rounded-xs border-none bg-transparent p-0 font-[inherit] leading-[inherit] wrap-anywhere [word-break:break-word] whitespace-pre-wrap outline-none"
+                  [innerHTML]="escapeHtml(dataElm.value) | linkify"
+                  [hidden]="isEditUrl(dataElm.myIdentifer) || !isUrlText(dataElm.value)"
+                ></span>
+              </div>
+              <div
+                class="invisible h-auto min-h-6 min-w-12 overflow-hidden wrap-anywhere [word-break:break-word] whitespace-pre-wrap"
+              >
+                {{ dataElm.value }}
+              </div>
             </div>
-          </div>
+          }
         </div>
       }
       @case ('markdown') {

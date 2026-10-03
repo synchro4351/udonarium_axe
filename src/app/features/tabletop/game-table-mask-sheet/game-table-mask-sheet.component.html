@@ -215,16 +215,22 @@
         class="bg-ui-elevated border-ui-border-panel text-ui-text rounded-ui-sm m-1 flex flex-col gap-2 border border-solid p-3"
         data-map-mask-text-editor
       >
-        <label class="flex flex-col gap-1 text-[0.78em]">
+        <div class="flex flex-wrap items-center justify-between gap-2 text-[0.78em]">
           <span class="text-ui-muted">{{ 'feature.inventory.sheet.mapMaskText' | transloco }}</span>
-          <textarea
-            class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent w-full resize-y border border-solid px-2 py-1 outline-none"
-            rows="4"
-            [value]="mask.text"
-            (input)="onMapMaskText($event)"
-          ></textarea>
-        </label>
-        <span class="text-ui-faint text-[0.68em]">{{ 'feature.card.field.textHint' | transloco }}</span>
+          <text-format-switch [value]="maskTextFormat()" (valueChange)="onMapMaskTextFormat($event)" />
+        </div>
+        <textarea
+          class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent w-full resize-y border border-solid px-2 py-1 text-[0.78em] outline-none"
+          rows="4"
+          data-testid="map-mask-text"
+          [attr.aria-label]="'feature.inventory.sheet.mapMaskText' | transloco"
+          [placeholder]="maskTextFormat() === 'formatted' ? ('feature.textNote.format.placeholder' | transloco) : ''"
+          [value]="mask.text"
+          (input)="onMapMaskText($event)"
+        ></textarea>
+        @if (maskTextFormat() === 'normal') {
+          <span class="text-ui-faint text-[0.68em]">{{ 'feature.card.field.textHint' | transloco }}</span>
+        }
         <div class="flex flex-wrap items-center gap-3">
           <label class="flex items-center gap-2 text-[0.78em]">
             <span class="text-ui-muted">{{ 'feature.inventory.sheet.fontSize' | transloco }}</span>

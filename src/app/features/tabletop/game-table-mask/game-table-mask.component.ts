@@ -25,6 +25,7 @@ import { sheetPanelBox, sheetPanelTitle } from '@axe/application/ui/sheet-panel'
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { getPeerContext } from '@axe/core/network/peer-context-source';
 import { ImageFile, imageFileEqual } from '@axe/core/storage/image-file';
+import { TextFormat } from '@axe/domain/data/text-format';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { GridType } from '@axe/domain/tabletop/game-table';
 import { GameTableMask } from '@axe/domain/tabletop/game-table-mask';
@@ -47,7 +48,7 @@ import { SelectableDirective } from '@axe/ui/directives/selectable.directive';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { setupInputHandler, setupMovableForPiece } from '@axe/ui/tabletop/setup-tabletop-piece';
 import { translateZCss, Z_OFFSET_MASK_PX } from '@axe/ui/tabletop/z-offset';
-import { decorateChatStyleText } from '@axe/ui/text-decoration/decorate-chat-text';
+import { decorateTextByFormat } from '@axe/ui/text-decoration/format-note-text';
 import { TranslocoModule } from '@jsverse/transloco';
 
 @Component({
@@ -212,7 +213,11 @@ export class GameTableMaskComponent {
     this.maskVersion();
     return this.gameTableMask()?.outlineColor ?? '#ffffff';
   }
-  readonly decoratedText = computed(() => decorateChatStyleText(this.text));
+  get textFormat(): TextFormat {
+    this.maskVersion();
+    return this.gameTableMask()?.textFormat ?? 'normal';
+  }
+  readonly decoratedText = computed(() => decorateTextByFormat(this.text, this.textFormat));
   get outlineShadowCss(): string {
     const shadow = `0px 0px ${(this.fontSize + 9) * 0.075}px ${this.outlineColor}`;
     return Array<string>(8).fill(shadow).join(', ');

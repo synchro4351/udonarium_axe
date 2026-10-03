@@ -319,6 +319,59 @@ describe('GameCharacterSheetComponent', () => {
     }
   });
 
+  it('switches the card face text between normal and formatted without losing the text', async () => {
+    const card = Card.create('Formatted card', 'front.png', 'back.png');
+    card.faceText = '# 見出し\n- 項目';
+    component.tabletopObject = card;
+
+    try {
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      const textarea = host.querySelector<HTMLTextAreaElement>('[data-testid="card-face-text"]')!;
+      const format = (label: string) =>
+        Array.from(host.querySelectorAll<HTMLButtonElement>('text-format-switch button')).find(
+          (button) => button.textContent?.trim() === label
+        )!;
+      expect(format('通常').getAttribute('aria-checked')).toBe('true');
+      expect(textarea.placeholder).toBe('');
+
+      format('整形').click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(card.faceTextFormat).toBe('formatted');
+      expect(card.faceText).toBe('# 見出し\n- 項目');
+      expect(textarea.value).toBe('# 見出し\n- 項目');
+      expect(textarea.placeholder).toContain('> 引用');
+
+      format('通常').click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(card.faceTextFormat).toBe('normal');
+      expect(card.faceText).toBe('# 見出し\n- 項目');
+    } finally {
+      card.destroy();
+    }
+  });
+
+  it('keeps a hidden card face and its format out of the editor', () => {
+    const card = Card.create('Hidden card', 'front.png', 'back.png');
+    card.faceText = 'secret';
+    card.faceTextFormat = 'formatted';
+    card.state = CardState.BACK;
+    card.owner = 'another-user';
+    component.tabletopObject = card;
+
+    try {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('text-format-switch')).toBeNull();
+      expect(component.cardOwnFaceTextFormat(card)).toBe('normal');
+      component.setCardOwnFaceTextFormat(card, 'normal');
+      expect(card.faceTextFormat).toBe('formatted');
+    } finally {
+      card.destroy();
+    }
+  });
+
   it('takes a new font size as it is typed rather than waiting for the field to be left', () => {
     const card = Card.create('Sized card', 'front.png', 'back.png');
     component.tabletopObject = card;
@@ -716,6 +769,24 @@ describe('GameCharacterSheetComponent', () => {
       expect(preview.innerHTML).toContain('<h1>見出し</h1>');
       expect(preview.innerHTML).toContain('<li>項目</li>');
       expect(host().querySelectorAll('[role="toolbar"] button')).toHaveLength(5);
+    });
+
+    it('has no explanatory paragraph and shows the syntax examples only as the placeholder when formatted', async () => {
+      fixture.detectChanges();
+      const textArea = host().querySelector('textarea')!;
+      expect(host().textContent).not.toContain('入力したとおり');
+      expect(host().textContent).not.toContain('強調');
+      expect(textArea.placeholder).toBe('');
+
+      formatButton('整形').click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(host().textContent).not.toContain('入力したとおり');
+      expect(host().textContent).not.toContain('強調');
+      expect(textArea.placeholder).toContain('# 見出し');
+      expect(textArea.placeholder).toContain('|漢字《かんじ》');
+      expect(note.text).toBe('# 見出し\n- 項目');
     });
 
     it('puts a mark at the start of the line in the body and keeps the text area focused', async () => {

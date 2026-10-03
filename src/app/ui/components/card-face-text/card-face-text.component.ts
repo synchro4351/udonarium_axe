@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { Card } from '@axe/domain/card/card';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
-import { decorateChatStyleText } from '@axe/ui/text-decoration/decorate-chat-text';
+import { decorateTextByFormat } from '@axe/ui/text-decoration/format-note-text';
 
 @Component({
   selector: 'card-face-text',
@@ -27,7 +27,10 @@ export class CardFaceTextComponent {
     const card = this.trackCardFace();
     return card.isVisible ? card.faceText : '';
   });
-  readonly decoratedText = computed(() => decorateChatStyleText(this.visibleText()));
+  readonly isFormatted = computed(() => this.trackCardFace().faceTextFormat === 'formatted');
+  readonly decoratedText = computed(() =>
+    decorateTextByFormat(this.visibleText(), this.isFormatted() ? 'formatted' : 'normal')
+  );
   readonly fontSize = computed(() => {
     // Match TextNote's numeric font-size convention, then scale the whole face for previews.
     return (this.trackCardFace().faceFontSize + 9) * this.scale();

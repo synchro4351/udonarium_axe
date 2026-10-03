@@ -124,6 +124,44 @@ describe('Card', () => {
       expect(restored.commonDataElement!.getFirstElementByName('color')?.value).toBe('#555555');
     });
 
+    it('keeps the face text format on the text element, normal by default, and the text untouched', () => {
+      const card = Card.create('Information', 'front.png', 'back.png');
+      expect(card.faceTextFormat).toBe('normal');
+      card.faceText = '# 見出し';
+      card.faceTextFormat = 'formatted';
+      expect(card.faceTextFormat).toBe('formatted');
+      expect(card.faceText).toBe('# 見出し');
+      card.faceText = '# 見出し\n- 項目';
+      expect(card.faceTextFormat).toBe('formatted');
+      card.faceTextFormat = 'normal';
+      expect(card.faceTextFormat).toBe('normal');
+      expect(card.faceText).toBe('# 見出し\n- 項目');
+    });
+
+    it('creates the text element for a legacy card switched to formatted, and none for normal', () => {
+      const card = Card.create('Legacy', 'front.png', 'back.png');
+      card.commonDataElement?.getFirstElementByName('text')?.destroy();
+      card.faceTextFormat = 'normal';
+      expect(card.commonDataElement?.getFirstElementByName('text')).toBeNull();
+      card.faceTextFormat = 'formatted';
+      expect(card.faceTextFormat).toBe('formatted');
+      expect(card.faceText).toBe('');
+    });
+
+    it('round-trips the face text format through XML', () => {
+      const card = Card.create('Information', 'front.png', 'back.png');
+      card.faceText = '- 項目';
+      card.faceTextFormat = 'formatted';
+      const xml = card.toXml().replace(/location\.[a-z]+="[^"]*"\s*/g, '');
+      for (const object of store.getObjects()) store.delete(object, false);
+      store.clearDeleteHistory();
+
+      const restored = ObjectSerializer.instance.parseXml(xml) as Card;
+
+      expect(restored.faceTextFormat).toBe('formatted');
+      expect(restored.faceText).toBe('- 項目');
+    });
+
     it('round-trips face text through XML', () => {
       const card = Card.create('Information', 'front.png', 'back.png');
       card.faceText = 'Sword & shield\n|剣《つるぎ》';

@@ -3,6 +3,7 @@ import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
 import { DataElement, DataElementType } from '@axe/domain/data/data-element';
+import { TextFormat, toTextFormat } from '@axe/domain/data/text-format';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { appendPieceDataElements } from '@axe/domain/tabletop/piece-data-elements';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
@@ -46,6 +47,18 @@ export class GameTableMask extends TabletopObject {
   }
   set text(value: string) {
     this.setOrCreateTextElement('text', value, { type: DataElementType.NOTE, currentValue: value });
+  }
+
+  /** How the text is shown, kept on the text element; `normal` for a mask without one. */
+  get textFormat(): TextFormat {
+    return this.getElement('text', this.commonDataElement)?.textFormat ?? 'normal';
+  }
+  set textFormat(format: TextFormat) {
+    if (!this.getElement('text', this.commonDataElement)) {
+      if (toTextFormat(format) === 'normal') return;
+      this.text = '';
+    }
+    this.getElement('text', this.commonDataElement)?.setTextFormat(format);
   }
 
   get fontSize(): number {

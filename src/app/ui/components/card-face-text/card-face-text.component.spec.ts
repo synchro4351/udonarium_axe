@@ -53,6 +53,56 @@ describe('CardFaceTextComponent', () => {
     expect(flow.childNodes).toHaveLength(3);
   });
 
+  it('keeps the ordinary display for a normal card, so headings stay as typed', () => {
+    card.faceText = '# 見出し\n- 項目';
+    fixture.detectChanges();
+
+    const flow = fixture.nativeElement.querySelector('div > span') as HTMLSpanElement;
+    expect(flow.querySelector('h1, ul')).toBeNull();
+    expect(flow.classList.contains('note-formatted')).toBe(false);
+  });
+
+  it('draws a formatted card through the shared renderer, with ruby of both kinds and literal code', () => {
+    card.faceText = '# 見出し\n- |剣《つるぎ》\n- |word<ruby>\n\n`|a<b>` 1 <2 >0 2*3+4';
+    card.faceTextFormat = 'formatted';
+    fixture.detectChanges();
+
+    const flow = fixture.nativeElement.querySelector('div > span') as HTMLSpanElement;
+    expect(flow.classList.contains('note-formatted')).toBe(true);
+    expect(flow.querySelector('h1')?.textContent).toBe('見出し');
+    expect(flow.querySelectorAll('li')).toHaveLength(2);
+    expect(flow.querySelectorAll('ruby')).toHaveLength(2);
+    expect(flow.querySelector('code')?.textContent).toBe('|a<b>');
+    expect(flow.textContent).toContain('1 <2 >0 2*3+4');
+  });
+
+  it('escapes script and links on a formatted card', () => {
+    card.faceText = '<script>alert(1)</script> [x](javascript:alert(1)) <img src=x onerror=alert(1)>';
+    card.faceTextFormat = 'formatted';
+    fixture.detectChanges();
+
+    const flow = fixture.nativeElement.querySelector('div > span') as HTMLSpanElement;
+    expect(flow.querySelector('script, a, img')).toBeNull();
+    expect(flow.textContent).toContain('<script>alert(1)</script>');
+  });
+
+  it('follows a change of format and never shows a formatted hidden card', () => {
+    card.faceText = '# 見出し';
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('h1')).toBeNull();
+
+    card.faceTextFormat = 'formatted';
+    objectChange.notifyChanged(card.identifier);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('h1')).toBeTruthy();
+
+    card.state = CardState.BACK;
+    card.owner = 'someone-else';
+    objectChange.notifyChanged(card.identifier);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('見出し');
+  });
+
   it('does not create text DOM for a card hidden from this peer', () => {
     card.faceText = 'secret';
     card.state = CardState.BACK;

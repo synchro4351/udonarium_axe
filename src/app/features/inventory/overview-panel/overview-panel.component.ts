@@ -7,6 +7,8 @@ import {
   DestroyRef,
   ElementRef,
   inject,
+  Injector,
+  signal,
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -54,6 +56,7 @@ import { DraggableDirective } from '@axe/ui/directives/draggable.directive';
 import { LinkifyPipe } from '@axe/ui/pipes/linkify.pipe';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { edgeDetailAnchor, EdgeDetailSeat } from '@axe/ui/tabletop/edge-detail-layout';
+import { escapeHtmlWithRuby, hasRubyNotation } from '@axe/ui/text-decoration/decorate-chat-text';
 import { formatNoteText } from '@axe/ui/text-decoration/format-note-text';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -81,6 +84,7 @@ export class OverviewPanelComponent {
   private readonly inventoryService = inject(GameObjectInventoryService);
   private readonly pointerDeviceService = inject(PointerDeviceService);
   private readonly domSanitizer = inject(DomSanitizer);
+  private readonly injector = inject(Injector);
   private readonly imageStorage = inject(ImageStorage);
   private readonly objectStore = inject(ObjectStore);
   private readonly objectChange = inject(ObjectChangeService);
@@ -178,6 +182,49 @@ export class OverviewPanelComponent {
     if (!(note instanceof TextNote) || note.format !== 'formatted') return null;
     return formatNoteText(note.text);
   });
+
+  /**
+   * A long-text field's value as the formatted display shows it, or null for a field left in the
+   * normal display, which keeps its text area. The field stays editable from the sheet.
+   */
+  formattedFieldHtml(dataElm: DataElement): string | null {
+    this.objectVersion();
+    if (dataElm.textFormat !== 'formatted') return null;
+    return formatNoteText(`${dataElm.value ?? ''}`);
+  }
+
+  private readonly rubyEditingIds = signal<ReadonlySet<string>>(new Set());
+
+  /**
+   * A normal-display long-text field's value with its ruby drawn, or null when the field has no
+   * ruby notation, is formatted, or is open for editing; those keep the text area.
+   */
+  rubyReaderFieldHtml(dataElm: DataElement): string | null {
+    this.objectVersion();
+    if (dataElm.textFormat === 'formatted' || this.rubyEditingIds().has(dataElm.identifier)) return null;
+    const value = `${dataElm.value ?? ''}`;
+    return hasRubyNotation(value) ? escapeHtmlWithRuby(value) : null;
+  }
+
+  /** A click on a link in the reader follows the link; any other click opens the text for editing. */
+  onRubyReaderClick(event: MouseEvent, dataElm: DataElement, textarea: HTMLTextAreaElement): void {
+    if ((event.target as HTMLElement | null)?.closest('a')) return;
+    this.startRubyEditing(dataElm, textarea);
+  }
+
+  startRubyEditing(dataElm: DataElement, textarea: HTMLTextAreaElement): void {
+    this.rubyEditingIds.update((ids) => new Set(ids).add(dataElm.identifier));
+    afterNextRender(() => textarea.focus(), { injector: this.injector });
+  }
+
+  stopRubyEditing(dataElm: DataElement): void {
+    if (!this.rubyEditingIds().has(dataElm.identifier)) return;
+    this.rubyEditingIds.update((ids) => {
+      const next = new Set(ids);
+      next.delete(dataElm.identifier);
+      return next;
+    });
+  }
 
   /**
    * The data fields the panel lists for the object.

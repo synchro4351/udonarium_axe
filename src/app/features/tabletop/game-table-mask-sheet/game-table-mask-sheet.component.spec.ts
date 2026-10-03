@@ -66,6 +66,30 @@ describe('GameTableMaskSheetComponent', () => {
     ImageStorage.instance.images.forEach((image) => ImageStorage.instance.delete(image.identifier));
   });
 
+  it('switches the mask text between normal and formatted without touching the text', async () => {
+    mask.text = '# 見出し\n|漢字《かんじ》';
+    await settle();
+    const host = fixture.nativeElement as HTMLElement;
+    const textarea = host.querySelector<HTMLTextAreaElement>('[data-testid="map-mask-text"]')!;
+    const choose = (format: string) =>
+      host.querySelector<HTMLButtonElement>(`[data-map-mask-text-editor] button[data-format="${format}"]`)!.click();
+
+    expect(mask.textFormat).toBe('normal');
+    expect(textarea.placeholder).toBe('');
+
+    choose('formatted');
+    await settle();
+    expect(mask.textFormat).toBe('formatted');
+    expect(mask.text).toBe('# 見出し\n|漢字《かんじ》');
+    expect(textarea.value).toBe('# 見出し\n|漢字《かんじ》');
+    expect(textarea.placeholder).toContain('> 引用');
+
+    choose('normal');
+    await settle();
+    expect(mask.textFormat).toBe('normal');
+    expect(mask.text).toBe('# 見出し\n|漢字《かんじ》');
+  });
+
   it('edits legacy mask text and colours without duplicate common fields', async () => {
     const mask = GameTableMask.create('Legacy mask', 2, 2, 100);
     component.gameTableMask = mask;
