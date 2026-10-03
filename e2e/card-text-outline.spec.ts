@@ -2,6 +2,16 @@ import { expect, Page, test } from '@playwright/test';
 
 import { openTableContextMenu, waitAppReady } from './helpers';
 
+// Card editing is GM-only unless the room allows players, and a fresh session starts as a player.
+async function becomeGm(page: Page) {
+  await page
+    .locator('ui-panel')
+    .filter({ hasText: '接続情報' })
+    .getByRole('button', { name: /^\s*GM\s*$/ })
+    .click();
+  await expect(page.locator('app-gm-toolbar [title^="暗闇"]')).toBeVisible({ timeout: 10000 });
+}
+
 async function createBlankCard(page: Page) {
   const menu = await openTableContextMenu(page);
   await menu.getByText('ブランクカードを作成').click();
@@ -46,6 +56,7 @@ async function getTextGeometry(locator: ReturnType<Page['locator']>) {
 
 test('card face text preserves ruby and newlines while toggling its halo', async ({ page }) => {
   await waitAppReady(page);
+  await becomeGm(page);
   await createBlankCard(page);
   const sheet = await openCardEditor(page);
 
@@ -105,4 +116,46 @@ test('card face text preserves ruby and newlines while toggling its halo', async
   expect(textGeometryAfter).toEqual(textGeometryBefore);
   await expect(renderedText.locator('ruby')).toContainText('かんじ');
   await expect(renderedText).toHaveText(/漢字.*二行目/s);
+});
+
+test('card face text renders shared formatted markup, keeps raw text, and hides when face down', async ({ page }) => {
+  await waitAppReady(page);
+  await becomeGm(page);
+  await createBlankCard(page);
+  const sheet = await openCardEditor(page);
+
+  const raw = '# Title\n- first item\n> quoted line\n`a<b>`\n｜漢字《かんじ》\n1 < 2 > 0 2*3+4';
+  const textInput = sheet.locator('[data-testid="card-face-text"]');
+  await textInput.fill(raw);
+  await textInput.blur();
+
+  const formatSwitch = sheet.getByRole('radiogroup', { name: '表示形式' });
+  await formatSwitch.getByRole('radio', { name: '整形' }).click();
+  await expect(formatSwitch.getByRole('radio', { name: '整形' })).toHaveAttribute('aria-checked', 'true');
+
+  const rendered = page.locator('card-face-text').first().locator('span.note-formatted');
+  await expect(rendered.locator('h1')).toHaveText('Title');
+  await expect(rendered.locator('ul > li')).toHaveText('first item');
+  await expect(rendered.locator('blockquote')).toContainText('quoted line');
+  await expect(rendered.locator('code').first()).toHaveText('a<b>');
+  await expect(rendered.locator('ruby')).toContainText('漢字');
+  await expect(rendered.locator('ruby')).toContainText('かんじ');
+  await expect(rendered).toContainText('1 < 2 > 0 2*3+4');
+  await expect(rendered.locator('em, script, img')).toHaveCount(0);
+
+  await formatSwitch.getByRole('radio', { name: '通常' }).click();
+  await expect(formatSwitch.getByRole('radio', { name: '通常' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('card-face-text span.note-formatted')).toHaveCount(0);
+  await expect(page.locator('card-face-text').first().locator('h1, ul, blockquote')).toHaveCount(0);
+  await expect(textInput).toHaveValue(raw);
+
+  await formatSwitch.getByRole('radio', { name: '整形' }).click();
+  await expect(rendered.locator('h1')).toHaveText('Title');
+
+  await page.locator('card').first().dispatchEvent('contextmenu');
+  const menu = page.locator('context-menu');
+  await expect(menu.locator('li').first()).toBeVisible({ timeout: 5000 });
+  await menu.getByText('裏にする', { exact: true }).click();
+  await expect(page.locator('card-face-text span')).toHaveCount(0);
+  await expect(page.locator('card-face-text').first()).not.toContainText('Title');
 });
