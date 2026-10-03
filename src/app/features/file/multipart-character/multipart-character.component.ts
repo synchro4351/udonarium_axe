@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
@@ -10,7 +10,9 @@ import {
   imagePartBetween,
   ImagePoint,
   imagePointAt,
+  imagePointInsideAnyPart,
   MAX_IMAGE_PARTS,
+  overlapsAnyImagePart,
 } from '@axe/domain/character/image-part';
 import { loadPartImage } from '@axe/infrastructure/media/image-part-crop';
 import { TranslocoModule } from '@jsverse/transloco';
@@ -38,6 +40,10 @@ export class MultipartCharacterComponent {
   readonly height = signal(0);
   readonly parts = signal<ImagePart[]>([]);
   readonly draft = signal<ImagePart | null>(null);
+  readonly draftBlocked = computed(() => {
+    const draft = this.draft();
+    return !!draft && overlapsAnyImagePart(draft, this.parts());
+  });
   readonly busy = signal(false);
   readonly error = signal('');
   readonly limit = MAX_IMAGE_PARTS;
@@ -94,10 +100,13 @@ export class MultipartCharacterComponent {
       this.parts().length >= this.limit
     )
       return;
+    const start = this.point(event);
+    if (imagePointInsideAnyPart(start, this.parts())) return;
     event.preventDefault();
     event.stopPropagation();
+    this.error.set('');
     this.pointer = event.pointerId;
-    this.start = this.point(event);
+    this.start = start;
     (event.currentTarget as SVGSVGElement).setPointerCapture(event.pointerId);
   }
 
@@ -116,8 +125,12 @@ export class MultipartCharacterComponent {
       this.t('feature.file.multipart.part', { number: this.parts().length + 1 })
     );
     this.cancelPointer();
-    if (this.canEdit && !this.busy() && part.width >= 2 && part.height >= 2)
-      this.parts.update((parts) => [...parts, part]);
+    if (!this.canEdit || this.busy() || part.width < 2 || part.height < 2) return;
+    if (overlapsAnyImagePart(part, this.parts())) {
+      this.error.set('feature.file.multipart.overlap');
+      return;
+    }
+    this.parts.update((parts) => [...parts, part]);
   }
 
   cancelPointer(): void {

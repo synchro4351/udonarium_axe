@@ -43,8 +43,8 @@
           [attr.y]="part.y"
           [attr.width]="part.width"
           [attr.height]="part.height"
-          fill="#fbbf2433"
-          stroke="#fbbf24"
+          [attr.fill]="draftBlocked() ? '#f8717133' : '#fbbf2433'"
+          [attr.stroke]="draftBlocked() ? '#f87171' : '#fbbf24'"
           stroke-width="2"
           vector-effect="non-scaling-stroke"
         />

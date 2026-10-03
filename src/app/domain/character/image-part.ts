@@ -36,6 +36,24 @@ export function imagePartBetween(start: ImagePoint, end: ImagePoint, name: strin
   };
 }
 
+type ImageRegion = Pick<ImagePart, 'x' | 'y' | 'width' | 'height'>;
+
+/** True when the regions share positive area; touching edges or corners do not overlap. */
+export function imageRegionsOverlap(a: ImageRegion, b: ImageRegion): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+export function overlapsAnyImagePart(region: ImageRegion, parts: readonly ImageRegion[]): boolean {
+  return parts.some((part) => imageRegionsOverlap(region, part));
+}
+
+/** True when the point is strictly inside a region; points on an edge may start a neighbouring selection. */
+export function imagePointInsideAnyPart(point: ImagePoint, parts: readonly ImageRegion[]): boolean {
+  return parts.some(
+    (part) => point.x > part.x && point.x < part.x + part.width && point.y > part.y && point.y < part.y + part.height
+  );
+}
+
 export function validImageParts(parts: readonly ImagePart[], width: number, height: number): boolean {
   return (
     Number.isFinite(width) &&
@@ -55,7 +73,8 @@ export function validImageParts(parts: readonly ImagePart[], width: number, heig
         part.y + part.height <= height &&
         part.name.trim().length > 0 &&
         part.name.trim().length <= 80
-    )
+    ) &&
+    parts.every((part, i) => !overlapsAnyImagePart(part, parts.slice(i + 1)))
   );
 }
 
