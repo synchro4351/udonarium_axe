@@ -4,7 +4,7 @@
 
 新しい卓には、公式のSample1・Sample2に加えて **Sample_Template** を置く。3レイヤーの小さな見本で、キャラクター画像の枠と名前差し込みを説明する。画像がなければ顔・肩のシルエットになる。キャラクターシートで設定したバストアップの位置合わせを再利用する。
 
-その他の16個は必要な時だけ追加する演出見本。カットイン一覧の「演出見本を追加」で1個を作るか、「見本16個のZIP」でまとめて保存・読込できる。キャラクター用の参戦と短い演出・リアクションを区別する。今回の整理では、既存の1個ずつ作る機能も残した。教材としてすぐ試せる操作を維持し、部屋の一覧には自動追加しない。
+その他の16個は必要な時だけ使う演出見本で、アプリには含めない。配布ZIPはリポジトリの`examples/tyoitashi-cut-ins.zip`（経緯は[外部配布への移行](TYOITASHI_CUTIN_EXTERNAL_EXAMPLES.md)）。部屋の一覧には自動追加しない。
 
 ## 保存・同期・既存データ
 
@@ -19,10 +19,9 @@
 基点：公式v1.59.0を含む私家版`3414092749630e99a008273ab50a0b9f4ef0da14`。ブランチ`codex/cutin-sample-library`。
 
 - `builtin-cut-ins.ts`：Sample_Templateの固定seedとportraitSlotを適用する処理。既存のSample1・2の内容は変えない。
-- 一覧HTML：候補の区分と通常ZIPへのダウンロードリンク。ja/en/koのラベル。
 - `examples/tyoitashi-cut-ins/`：差分が読める配布用XML16個と説明。
 - `scripts/package-cut-in-examples.mjs`：既存のfflateでZIPを生成。通常ビルドの必須工程や依存パッケージを追加しない。
-- `src/assets/samples/tyoitashi-cut-in-examples.zip`：約21KBの配布素材。
+- `examples/tyoitashi-cut-ins.zip`：配布用のZIP。アプリの`assets`には入れない。
 
 Sample_Templateは私家版のキャラクター画像テンプレートと名前差し込み機能に依存する。公式へ移す場合は、その機能も併せて適用するか、固定画像と固定文字へ変更する。演出集は通常のシーン・レイヤーを使うが、文字単位の動き・文字の折返しなどの私家拡張を含む見本がある。対応する変更を省くと同じ見た目にならない。コミットだけで依存なしに取り込めるとは扱わない。
 

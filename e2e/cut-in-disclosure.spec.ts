@@ -5,7 +5,9 @@ test.describe('cut-in progressive disclosure', () => {
   test.beforeEach(async ({ page }) => {
     await waitAppReady(page);
     await openPanel(page, 'カットイン');
-    await page.getByTestId('cut-in-scene-template').selectOption('portrait');
+    const panel = page.locator('app-cut-in-list');
+    await panel.locator('aside ul[role="listbox"] > li').filter({ hasText: 'Sample_Template' }).click();
+    await panel.getByRole('tab', { name: 'シーン', exact: true }).click();
     await expect(page.locator('cut-in-scene-editor')).toBeVisible();
   });
 

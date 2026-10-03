@@ -36,7 +36,9 @@ test('per-letter controls set the order, timing and exit the browser plays, and 
 }) => {
   await waitAppReady(page);
   await openPanel(page, 'カットイン');
-  await page.getByTestId('cut-in-scene-template').selectOption('portrait');
+  const panel = page.locator('app-cut-in-list');
+  await panel.locator('aside ul[role="listbox"] > li').filter({ hasText: 'Sample_Template' }).click();
+  await panel.getByRole('tab', { name: 'シーン', exact: true }).click();
   const editor = page.locator('cut-in-scene-editor');
   await expect(editor).toBeVisible();
 
