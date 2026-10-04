@@ -4,6 +4,17 @@
 
 r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は公式v1.58.0（46707582）とv1.59.0（19e9d1c7）を取り込んでいます。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1〜r4の固定ソースと併せて確認してください。
 
+## 連動する多部位キャラクター（開発版）
+
+- [5df7c7bf](https://github.com/synchro4351/udonarium_axe/commit/5df7c7bf)：既存キャラクターを部位に分け、同じ画像枠に透明な余白を保ち、部位ごとのクリック・リソース・バフ・エフェクトと連動移動を扱います。基点6ba5a88e。通常のキャラクターへ同期属性4つを追加し、部屋ZIPで保存します。コピーと単体読込では連動を外します。
+- [02c4f9f2](https://github.com/synchro4351/udonarium_axe/commit/02c4f9f2)：[仕様・確認結果・制限](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-linked-characters/docs/TYOITASHI_LINKED_MULTIPART.md)。既存の部位範囲選択・キャラクター複製・同期・複数コマ移動・エフェクト再生に依存します。同時操作の専用排他制御、チャットの親→部位選択、相対位置での連動は今回の範囲外です。
+
+## ZIP内の画像の拡張子が欠けている場合（開発版）
+
+- [36883e87](https://github.com/synchro4351/udonarium_axe/commit/36883e87)：既知の拡張子を優先し、未知の拡張子だけPNG・JPEG・GIF・WebPの署名で補います。Worker・通常展開の共通判定。基点6ba5a88e、多部位機能に依存しません。[範囲と保存への影響](https://github.com/synchro4351/udonarium_axe/blob/codex/archive-image-mime/docs/TYOITASHI_ARCHIVE_IMAGE_MIME.md)。画像の識別子や保存形式を変えません。
+
+- [03526cf8](https://github.com/synchro4351/udonarium_axe/commit/03526cf8)：通常の名前で保存されたZIP内画像の元バイト列とSHA-256を保持し、読み込み時の再エンコードでXMLの画像参照が切れる問題を防ぎます。画像一覧には元の名前を残します。通常の画像アップロードと、既存の64桁の画像名は変更しません。
+
 ## 画像から部位ごとのコマ（開発版）
 
 - [c44fb960](https://github.com/synchro4351/udonarium_axe/commit/c44fb960)：画像一覧から範囲選択を開き、正方形の透明余白付き画像と標準キャラクターを作成。基点cebe7468。最大20部位、独立HP、全画像の準備後に権限・元画像・テーブル・画面の状態を再確認します。

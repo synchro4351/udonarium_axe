@@ -9,7 +9,7 @@
 ## バージョンとソース
 
 - **固定版：tyoitashi r5／Axe v1.57.1** — [ソース `7033c85e`](https://github.com/synchro4351/udonarium_axe/tree/7033c85eed2cacd9c7ea44689e11ef9686b781f8)
-- **開発版：Axe v1.59.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`6ba5a88e`](https://github.com/synchro4351/udonarium_axe/tree/6ba5a88e)。公式のスイッチ・コンパス・ボタン名ガイドを取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
+- **開発版：Axe v1.59.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`f3cbe94d`](https://github.com/synchro4351/udonarium_axe/tree/f3cbe94d)。公式のスイッチ・コンパス・ボタン名ガイドを取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
@@ -20,9 +20,13 @@
 
 ## 開発版で追加した変更（Axe v1.59.0）
 
+- 画像付きのキャラクターを「部位に分ける」から多部位コマにできます。HP・バフは部位ごとに、位置・サイズ・向きは一緒に操作できます。元のシートを各部位へ引き継ぐので、不要な項目だけ後から削れます。元コマは墓場に残ります。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/multipart-linked-characters) · [使い方と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-linked-characters/docs/TYOITASHI_LINKED_MULTIPART.md)。
+
+- 一部の外部ツールで拡張子が欠けたZIP内の画像を読み込めるようにしました。[独立した修正](https://github.com/synchro4351/udonarium_axe/tree/codex/archive-image-mime)。
+
 - キャラクターの長文、マップマスク、カードの文字でも「整形」を選べます。共有メモと同じ見出し・リスト・引用・コード・ルビを使い、本文を変えず表示を切り替えます。通常の長文でもルビを表示し、クリックして元の記法を編集できます。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/shared-text-formatting) · [仕様と保存形式](https://github.com/synchro4351/udonarium_axe/blob/codex/shared-text-formatting/docs/TYOITASHI_SHARED_TEXT_FORMATTING.md)。
 
-- 部位画像の範囲が重なる選択を防ぎます。境界が接する範囲は選べ、削除した範囲は選び直せます。部位コマの連動移動は現在ありません。[単独の修正](https://github.com/synchro4351/udonarium_axe/tree/codex/image-part-nonoverlap) · [仕様](https://github.com/synchro4351/udonarium_axe/blob/codex/image-part-nonoverlap/docs/TYOITASHI_IMAGE_PART_NONOVERLAP.md)。
+- 部位画像の範囲が重なる選択を防ぎます。境界が接する範囲は選べ、削除した範囲は選び直せます。画像一覧から作るコマは、それぞれ独立して動きます。[単独の修正](https://github.com/synchro4351/udonarium_axe/tree/codex/image-part-nonoverlap) · [仕様](https://github.com/synchro4351/udonarium_axe/blob/codex/image-part-nonoverlap/docs/TYOITASHI_IMAGE_PART_NONOVERLAP.md)。
 
 - 登録した画像を囲み、部位ごとのキャラクターコマを作れます。元画像を残し、HP・名前・移動は各コマで独立。通常の卓データとして保存できます。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/multipart-character-tokens) · [仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-character-tokens/docs/TYOITASHI_MULTIPART_CHARACTER_TOKENS.md)。
 
