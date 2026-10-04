@@ -474,3 +474,17 @@ describe('FileArchiver', () => {
     });
   });
 });
+
+describe('external archive raster identifiers', () => {
+  it('passes a raw-byte hash filename to the image store so XML references survive conversion', async () => {
+    const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3]);
+    const add = vi.spyOn(ImageStorage.instance, 'addAsync').mockResolvedValue(ImageFile.createEmpty('test'));
+    const zipped = zipSync({ 'image.undefined': bytes });
+    await FileArchiver.instance.load([new File([zipped.slice()], 'external.zip', { type: 'application/zip' })]);
+    expect(add).toHaveBeenCalledTimes(1);
+    const file = add.mock.calls[0][0] as File;
+    expect(file.name).toMatch(/^[0-9a-f]{64}\.png$/);
+    expect(new Uint8Array(await file.arrayBuffer())).toEqual(bytes);
+    add.mockRestore();
+  });
+});
