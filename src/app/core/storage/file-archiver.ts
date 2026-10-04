@@ -314,7 +314,20 @@ export class FileArchiver {
 
     for (const entry of entries) {
       try {
-        await this.loadFiles([new File([entry.blob], entry.name, { type: entry.type })], dropPoint, false);
+        let name = entry.name;
+        let originalIdentifier: string | null = null;
+        // External character archives may use a plain image filename while XML refers to its raw-byte hash.
+        // Keep those bytes and identifiers instead of re-encoding them as a newly uploaded image.
+        if (entry.type.startsWith('image/') && entry.blob.size <= this.maxImageSize && !/^[0-9a-f]{64}\./.test(name)) {
+          const header = new Uint8Array(await entry.blob.slice(0, 12).arrayBuffer());
+          if (MimeType.rasterType(header)) {
+            originalIdentifier = await FileReaderUtil.calcSHA256Async(entry.blob);
+            name = `${originalIdentifier}.${MimeType.extension(entry.type)}`;
+          }
+        }
+        await this.loadFiles([new File([entry.blob], name, { type: entry.type })], dropPoint, false);
+        const image = originalIdentifier ? ImageStorage.instance.get(originalIdentifier) : null;
+        if (image?.name === name) image.context.name = entry.name;
       } catch (reason) {
         Logger.warn('[FileArchiver] ZIP展開エラー', reason);
       }
