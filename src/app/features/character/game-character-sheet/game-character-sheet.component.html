@@ -15,7 +15,11 @@
     }
     <button (click)="clone()">{{ 'feature.inventory.sheet.copy' | transloco }}</button>
     <button (click)="saveToXML()">{{ 'feature.inventory.sheet.save' | transloco }}</button>
-    @if (character) {}
+    @if (character && canSplitParts()) {
+      <button type="button" data-testid="sheet-split-parts" (click)="splitParts()">
+        {{ 'feature.character.contextMenu.splitParts' | transloco }}
+      </button>
+    }
   </div>
 }
 

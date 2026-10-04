@@ -9,6 +9,7 @@ import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { clearPartGroup } from '@axe/domain/character/part-group';
 import { DisclosureMode } from '@axe/domain/disclosure/disclosure';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { GameTableMask } from '@axe/domain/tabletop/game-table-mask';
@@ -84,7 +85,8 @@ export class GameCharacterGeneratorComponent {
   /** Builds whatever objects an XML save fragment describes, for a role that may edit the table. */
   createGameCharacterForXML(xml: string) {
     if (!this.canEdit) return;
-    this.objectSerializer.parseXml(xml);
+    const created = this.objectSerializer.parseXml(xml);
+    if (created instanceof GameCharacter) clearPartGroup(created);
   }
 
   /**

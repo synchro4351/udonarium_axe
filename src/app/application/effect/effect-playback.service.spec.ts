@@ -1,6 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { EffectPlaybackService, MAX_ACTIVE_REACTIONS } from '@axe/application/effect/effect-playback.service';
+import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
+import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { EffectPreset } from '@axe/domain/effect/effect-preset';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
@@ -124,5 +127,35 @@ describe('EffectPlaybackService', () => {
     service.play(cast());
 
     expect(service.tokenReactions().size).toBe(0);
+  });
+});
+
+describe('EffectPlaybackService linked targets', () => {
+  it('resolves each viewer locally without changing the broadcast', () => {
+    const part = GameCharacter.create('Dragon(Head)', 2, '');
+    part.partGroup = 'group';
+    part.partRegion = '0 0 0.5 1 1';
+    const preset = new EffectPreset();
+    ObjectStore.instance.add(preset, false);
+    let local = { x: 100, y: 200, z: 30 };
+    TestBed.configureTestingModule({ providers: [...TEST_PROVIDERS] });
+    TestBed.overrideProvider(MultipartGroupService, { useValue: { anchorOf: () => local } });
+    TestBed.overrideProvider(TabletopService, { useValue: { gridSize: () => 50 } });
+    const service = TestBed.inject(EffectPlaybackService);
+    const raw = {
+      presetIdentifier: preset.identifier,
+      seed: 1,
+      targets: [{ identifier: part.identifier, x: 5, y: 6, z: 7 }],
+    };
+    try {
+      expect(service.play(raw)?.cast.targets[0]).toEqual({ identifier: part.identifier, ...local });
+      local = { x: 300, y: 400, z: 50 };
+      expect(service.play(raw)?.cast.targets[0]).toEqual({ identifier: part.identifier, ...local });
+      expect(raw.targets).toEqual([{ identifier: part.identifier, x: 5, y: 6, z: 7 }]);
+    } finally {
+      part.destroy();
+      ObjectStore.instance.remove(preset);
+      TestBed.resetTestingModule();
+    }
   });
 });

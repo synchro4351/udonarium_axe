@@ -50,6 +50,16 @@ export class GameCharacter extends OwnedTabletopObject {
    * as JSON. Read and written through `character-portrait-fit`.
    */
   @SyncVar() portraitFits: string = '';
+  /**
+   * A linked part's group key, shared by every part cut from one picture; empty for an ordinary
+   * character. It is a key of its own rather than an identifier, which changes on every load.
+   */
+  @SyncVar() partGroup: string = '';
+  /** The name of the creature the part belongs to, kept apart from the part's own name. */
+  @SyncVar() partGroupName: string = '';
+  @SyncVar() partName: string = '';
+  /** The part's rectangle in the shared picture, as `part-group` writes it. */
+  @SyncVar() partRegion: string = '';
   private static readonly MAX_DETAIL_GROUP_DEPTH = 2;
 
   constructor(identifier: string = generateUuid()) {
@@ -243,6 +253,17 @@ export class GameCharacter extends OwnedTabletopObject {
       const file = ImageStorage.instance.get(image.value as string);
       return file ? file : ImageFile.Empty;
     }
+  }
+
+  /** The image element that `imageFile` reads, so the picture shown can be swapped in place. */
+  get imageSourceElement(): DataElement | null {
+    const images = this.imageDataElement;
+    if (!images) return null;
+    const iconNum = this.getIconNumElement();
+    if (!iconNum) return images.getFirstElementByName('imageIdentifier');
+    if (images.children.length === 0) return null;
+    const n = Math.min(Number(iconNum.currentValue), images.children.length - 1);
+    return n < 0 || Number.isNaN(n) ? null : images.children[n];
   }
 
   /** How many cells the piece spans, kept in its common data. 1 when unset. */
@@ -559,10 +580,15 @@ export class GameCharacter extends OwnedTabletopObject {
    * Copies the piece and names the copy with the next free number, so copying `Goblin` when
    * `Goblin_2` exists makes `Goblin_3`.
    *
-   * The numbers already taken are counted across every character outside the graveyard.
+   * The numbers already taken are counted across every character outside the graveyard. A copy of
+   * a linked part is an ordinary character: it never joins the group it was copied from.
    */
   override clone(): this {
     const cloneObject = super.clone();
+    cloneObject.partGroup = '';
+    cloneObject.partGroupName = '';
+    cloneObject.partName = '';
+    cloneObject.partRegion = '';
 
     let objectname: string;
     const reg = new RegExp('^(.*)_([0-9]+)$');

@@ -23,6 +23,7 @@ import { RolePermissionService } from '@axe/application/permission/role-permissi
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { GravityService } from '@axe/application/tabletop/gravity.service';
 import { LegacyScratchMaskMigrationService } from '@axe/application/tabletop/legacy-scratch-mask-migration.service';
+import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { TabletopActionService } from '@axe/application/tabletop/tabletop-action.service';
 import { TurnOrderService } from '@axe/application/turn/turn-order.service';
@@ -445,6 +446,7 @@ export class AppComponent {
     inject(FogMemoryWriterService);
     inject(CutInService);
     inject(GravityService);
+    inject(MultipartGroupService);
     inject(LegacyScratchMaskMigrationService);
     inject(TurnOrderService);
     inject(SkinService);

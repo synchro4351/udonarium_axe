@@ -1,8 +1,12 @@
-import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
+import { computed, DestroyRef, inject, Injectable, Injector, signal } from '@angular/core';
+import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
+import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { MotionService } from '@axe/application/ui/motion.service';
 import { effectCast$ } from '@axe/core/event/domain-events';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { PERF_EFFECT_FRAME, perfCounters } from '@axe/core/util/perf-counters';
+import { GameCharacter } from '@axe/domain/character/game-character';
+import { isLinkedPart } from '@axe/domain/character/part-group';
 import { EffectCast, normalizeEffectCast } from '@axe/domain/effect/effect-cast';
 import { DefeatReaction, defeatReactionOf } from '@axe/domain/effect/effect-defeat';
 import { EffectPreset } from '@axe/domain/effect/effect-preset';
@@ -28,6 +32,7 @@ export class EffectPlaybackService {
   private readonly objectStore = inject(ObjectStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly motion = inject(MotionService);
+  private readonly injector = inject(Injector);
 
   private readonly _activeCasts = signal<ActiveEffectCast[]>([]);
   readonly activeCasts = this._activeCasts.asReadonly();
@@ -100,10 +105,10 @@ export class EffectPlaybackService {
    * 12 casts run at once, 4 of them reactions; the oldest is dropped.
    */
   play(raw: unknown): ActiveEffectCast | null {
-    const cast = normalizeEffectCast(raw);
-    if (!cast) return null;
+    const normalized = normalizeEffectCast(raw);
+    if (!normalized) return null;
 
-    const preset = this.objectStore.get<EffectPreset>(cast.presetIdentifier);
+    const preset = this.objectStore.get<EffectPreset>(normalized.presetIdentifier);
     if (!(preset instanceof EffectPreset)) return null;
 
     this.scheduleLaunchSound(preset);
@@ -112,11 +117,32 @@ export class EffectPlaybackService {
 
     this.startScreenShake(preset);
 
+    const cast = this.localPartAnchors(normalized);
     const active: ActiveEffectCast = { key: ++this.nextKey, cast, preset, startedAt: clock() };
     this._activeCasts.update((casts) => withoutOldReactions([...casts, active]).slice(-MAX_ACTIVE_CASTS));
     this.now.set(active.startedAt);
     this.startLoop();
     return active;
+  }
+
+  /** Billboard parts face each viewer, so their visual anchors must be resolved on this screen. */
+  private localPartAnchors(cast: EffectCast): EffectCast {
+    const anchor = (identifier: string) => {
+      const character = this.objectStore.get(identifier);
+      if (!(character instanceof GameCharacter) || !isLinkedPart(character)) return null;
+      const grid = this.injector.get(TabletopService).gridSize();
+      return this.injector.get(MultipartGroupService).anchorOf(character, grid);
+    };
+    const targets = cast.targets.map((target) => {
+      const position = anchor(target.identifier);
+      return position ? { ...target, ...position } : target;
+    });
+    const caster = cast.origin ? anchor(cast.casterIdentifier) : null;
+    return {
+      ...cast,
+      targets,
+      origin: caster ? { ...caster, z: caster.z + this.injector.get(TabletopService).gridSize() } : cast.origin,
+    };
   }
 
   /**

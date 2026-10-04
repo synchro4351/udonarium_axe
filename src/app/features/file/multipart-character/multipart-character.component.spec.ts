@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { MultipartCharacterService } from '@axe/application/tabletop/multipart-character.service';
 import { PanelService } from '@axe/application/ui/panel.service';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { MultipartCharacterComponent } from '@axe/features/file/multipart-character/multipart-character.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
 describe('MultipartCharacterComponent', () => {
-  const service = { mayUse: () => true, create: vi.fn() };
+  const service = { mayUse: () => true, mayLink: () => true, create: vi.fn(), createLinked: vi.fn() };
   beforeEach(() => {
     TestBed.configureTestingModule({ imports: [MultipartCharacterComponent], providers: [...TEST_PROVIDERS] });
     TestBed.overrideProvider(MultipartCharacterService, { useValue: service });
@@ -15,6 +16,7 @@ describe('MultipartCharacterComponent', () => {
     TestBed.resetTestingModule();
     vi.restoreAllMocks();
     service.create.mockReset();
+    service.createLinked.mockReset();
   });
 
   it('maps touch pointer coordinates, names a reverse-drag selection and removes it', () => {
@@ -129,6 +131,53 @@ describe('MultipartCharacterComponent', () => {
       expect(component.draftBlocked()).toBe(true);
       component.draft.set({ name: '', x: 100, y: 0, width: 50, height: 50 });
       expect(component.draftBlocked()).toBe(false);
+      fixture.destroy();
+    });
+  });
+
+  describe('splitting a character', () => {
+    const character = { identifier: 'dragon', name: 'Dragon', imageFile: { identifier: 'img' } } as GameCharacter;
+    const setup = () => {
+      const fixture = TestBed.createComponent(MultipartCharacterComponent);
+      const component = fixture.componentInstance;
+      component.character.set(character);
+      component.groupName.set('Dragon');
+      component['identifier'] = 'img';
+      component['image'] = {} as HTMLImageElement;
+      return { fixture, component };
+    };
+    const part = (x: number) => ({ name: `P${x}`, x, y: 0, width: 10, height: 10 });
+
+    it('needs two parts and a creature name before it splits, then passes them on', async () => {
+      const { fixture, component } = setup();
+      component.parts.set([part(0)]);
+      expect(component.canCreate).toBe(false);
+      await component.create();
+      expect(service.createLinked).not.toHaveBeenCalled();
+      component.parts.set([part(0), part(10)]);
+      component.groupName.set(' ');
+      expect(component.canCreate).toBe(false);
+      component.groupName.set('Wyrm');
+      expect(component.canCreate).toBe(true);
+      await component.create();
+      expect(service.createLinked).toHaveBeenCalledWith(
+        character,
+        component['image'],
+        [part(0), part(10)],
+        'Wyrm',
+        expect.any(Function)
+      );
+      expect(service.create).not.toHaveBeenCalled();
+      fixture.destroy();
+    });
+
+    it('checks the character rather than the bare image, and stops when it may not be split', async () => {
+      const { fixture, component } = setup();
+      component.parts.set([part(0), part(10)]);
+      vi.spyOn(service, 'mayLink').mockReturnValue(false);
+      expect(component.canEdit).toBe(false);
+      await component.create();
+      expect(service.createLinked).not.toHaveBeenCalled();
       fixture.destroy();
     });
   });

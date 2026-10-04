@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { strFromU8, unzipSync } from 'fflate';
 import { expect, Page, test } from '@playwright/test';
 
 import { openPanel, waitAppReady } from './helpers';
@@ -86,4 +88,76 @@ test('cancel and remove never create tokens', async ({ page }) => {
   await panel.getByRole('button', { name: 'やめる', exact: true }).click();
   await expect(panel).toHaveCount(0);
   await expect(page.locator('game-character')).toHaveCount(before);
+});
+
+test('splits an existing character and drags its separate hit regions together', async ({ page }) => {
+  await waitAppReady(page);
+  const original = page.locator('game-character').filter({ hasText: 'モンスターC' }).first();
+  await original.dispatchEvent('contextmenu');
+  await page.locator('context-menu').getByText('部位に分ける', { exact: true }).click();
+  const panel = page.locator('multipart-character');
+  await expect(panel.getByTestId('multipart-select')).toBeVisible();
+  await panel.getByTestId('multipart-group-name').fill('検証ドラゴン');
+  await selectPart(page, [0.02, 0.02], [0.48, 0.98]);
+  await selectPart(page, [0.52, 0.02], [0.98, 0.98]);
+  await panel.getByRole('textbox', { name: '部位名', exact: true }).nth(0).fill('頭部');
+  await panel.getByRole('textbox', { name: '部位名', exact: true }).nth(1).fill('胴体');
+  await panel.getByTestId('multipart-create').click();
+  await expect(panel).toHaveCount(0);
+  const head = page
+    .locator('game-character')
+    .filter({ has: page.getByTestId('part-name').filter({ hasText: '頭部' }) });
+  const body = page
+    .locator('game-character')
+    .filter({ has: page.getByTestId('part-name').filter({ hasText: '胴体' }) });
+  await expect(head).toHaveCount(1);
+  await expect(body).toHaveCount(1);
+  await expect(head.locator('.animate-bounce-in')).toHaveCount(0);
+  await expect(body.locator('.animate-bounce-in')).toHaveCount(0);
+  await expect(page.locator('game-character').filter({ hasText: 'モンスターC' })).toHaveCount(0);
+  await expect.poll(async () => (await head.getByTestId('part-region').boundingBox())?.width ?? 0).toBeGreaterThan(10);
+  const before = await head.getByTestId('part-region').boundingBox();
+  const bodyBefore = await body.getByTestId('part-region').boundingBox();
+  expect(before).not.toBeNull();
+  expect(bodyBefore).not.toBeNull();
+  const x = before!.x + before!.width / 2;
+  const y = before!.y + before!.height * 0.8;
+  const hit = await page.evaluate(
+    ({ x, y }) =>
+      document.elementFromPoint(x, y)?.closest('game-character')?.querySelector('[data-testid="part-name"]')
+        ?.textContent,
+    { x, y }
+  );
+  expect(hit).toContain('頭部');
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 80, y + 40, { steps: 10 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => {
+      const after = await head.getByTestId('part-region').boundingBox();
+      return after ? Math.hypot(after.x - before!.x, after.y - before!.y) : 0;
+    })
+    .toBeGreaterThan(30);
+  await expect
+    .poll(async () => {
+      const a = (await head.getByTestId('part-region').boundingBox())!;
+      const b = (await body.getByTestId('part-region').boundingBox())!;
+      return Math.hypot(b.x - bodyBefore!.x - (a.x - before!.x), b.y - bodyBefore!.y - (a.y - before!.y));
+    })
+    .toBeLessThan(3);
+  await head.dispatchEvent('contextmenu');
+  await page.locator('context-menu').getByText('詳細を表示', { exact: true }).click();
+  const downloadReady = page.waitForEvent('download');
+  await page.locator('game-character-sheet').getByRole('button', { name: '保存', exact: true }).click();
+  const download = await downloadReady;
+  const entries = unzipSync(await readFile((await download.path())!));
+  const xml = Object.entries(entries)
+    .filter(([name]) => name.endsWith('.xml'))
+    .map(([, data]) => strFromU8(data))
+    .join('');
+  expect(xml).toContain('partGroup=');
+  expect(xml).toContain('partRegion=');
+  expect(xml).toContain('検証ドラゴン');
+  expect(xml).toContain('HP');
 });

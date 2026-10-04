@@ -2579,4 +2579,102 @@ describe('GameCharacterComponent', () => {
       character.destroy();
     }
   });
+
+  describe('a linked part', () => {
+    const made: GameCharacter[] = [];
+    let imageId: string;
+
+    beforeEach(() => {
+      const images = TestBed.inject(ImageStorage);
+      imageId = images.add('https://example.invalid/linked-part.png').identifier;
+    });
+    afterEach(() => {
+      for (const piece of made.splice(0)) piece.destroy();
+      TestBed.inject(ImageStorage).delete(imageId);
+    });
+
+    function part(name: string, region: string, group = 'wyrm'): GameCharacter {
+      const piece = GameCharacter.create(`Wyrm(${name})`, 2, imageId);
+      piece.partGroup = group;
+      piece.partGroupName = 'Wyrm';
+      piece.partName = name;
+      piece.partRegion = region;
+      made.push(piece);
+      return piece;
+    }
+
+    function show(piece: GameCharacter): HTMLElement {
+      fixture.componentRef.setInput('gameCharacter', piece);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('answers the pointer only on its own region, with its name there', () => {
+      const root = show(part('Head', '0.5 0 0.5 0.5 2'));
+      const picture = root.querySelector<HTMLElement>('[data-testid="part-picture"]')!;
+      expect(picture.style.getPropertyValue('clip-path')).toBe('inset(0% 0% 50% 50%)');
+      expect(picture.style.pointerEvents || getComputedStyle(picture).pointerEvents).not.toBe('none');
+      const source = root.querySelector<HTMLElement>('[data-testid="multi-angle-piece-motion-source"]')!;
+      expect(source.style.pointerEvents).toBe('none');
+      const region = root.querySelector<HTMLElement>('[data-testid="part-region"]')!;
+      expect([region.style.left, region.style.top, region.style.width, region.style.height]).toEqual([
+        '50%',
+        '0%',
+        '50%',
+        '50%',
+      ]);
+      expect(region.querySelector('[data-testid="part-name"]')!.textContent!.trim()).toBe('Head');
+      expect(root.querySelector('[data-testid="piece-name"]')).toBeNull();
+    });
+
+    it('marks an aimed part on its region instead of over the shared stack', () => {
+      const head = part('Head', '0 0 0.5 1 1');
+      head.targeted = true;
+      const root = show(head);
+      expect(root.querySelector('[data-testid="part-region"]')!.getAttribute('data-targeted')).toBe('true');
+      expect(root.querySelector('[data-testid="target-marker"]')).toBeNull();
+      expect(root.querySelector('[data-testid="target-ring"]')).toBeNull();
+    });
+
+    it('shows its own buffs inside its region', () => {
+      const head = part('Head', '0 0 0.5 1 1');
+      head.addExtendData();
+      head
+        .buffDataElement!.getFirstElementByName('バフ/デバフ')!
+        .appendChild(DataElement.create('Poison', 3, { type: DataElementType.NUMBER_RESOURCE, currentValue: 3 }, ''));
+      const root = show(head);
+      expect(root.querySelector('[data-testid="part-buffs"] [data-testid="buff-badge"]')).not.toBeNull();
+      expect(root.querySelector('[data-testid="buff-plate"]')).toBeNull();
+    });
+
+    it('leaves an ordinary character as it was', () => {
+      const plain = GameCharacter.create('Plain', 1, imageId);
+      made.push(plain);
+      const root = show(plain);
+      expect(root.querySelector('[data-testid="part-picture"]')).toBeNull();
+      expect(
+        root.querySelector<HTMLElement>('[data-testid="multi-angle-piece-motion-source"]')!.style.pointerEvents
+      ).toBe('');
+    });
+
+    it('turns every part of a group in one phase, counted from one clock', () => {
+      const table = TestBed.inject(TabletopService).currentTable;
+      TestBed.inject(ViewModePreferenceService).choose('flat');
+      table.multiAngleEnabled = true;
+      vi.spyOn(Date, 'now').mockReturnValue(123_456);
+      show(part('Head', '0 0 0.5 1 1'));
+      const head = component.multiAnglePieceRotationDelaySeconds();
+      const other = TestBed.createComponent(GameCharacterComponent);
+      other.componentRef.setInput('gameCharacter', part('Tail', '0.5 0 0.5 1 1'));
+      other.detectChanges();
+      expect(other.componentInstance.multiAnglePieceRotationDelaySeconds()).toBe(head);
+      const stranger = TestBed.createComponent(GameCharacterComponent);
+      stranger.componentRef.setInput('gameCharacter', part('Head', '0 0 0.5 1 1', 'another'));
+      stranger.detectChanges();
+      expect(stranger.componentInstance.multiAnglePieceRotationDelaySeconds()).not.toBe(head);
+      other.destroy();
+      stranger.destroy();
+      vi.restoreAllMocks();
+    });
+  });
 });

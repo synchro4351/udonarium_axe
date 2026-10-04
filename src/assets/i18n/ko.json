@@ -1717,7 +1717,11 @@
         "unavailable": "이미지를 사용할 수 없습니다. 이미지 로딩과 편집 권한을 확인하세요.",
         "failed": "만들지 못했습니다. 영역과 이미지를 확인하고 다시 시도하세요.",
         "oversized": "잘라낸 이미지가 2MB를 초과합니다. 더 작은 영역을 선택하세요.",
-        "overlap": "영역은 겹칠 수 없습니다. 변이 맞닿는 것은 괜찮습니다."
+        "overlap": "영역은 겹칠 수 없습니다. 변이 맞닿는 것은 괜찮습니다.",
+        "linkTitle": "{{name}}을(를) 부위로 나누기",
+        "linkHint": "부위를 두 개 이상 지정하고 이름을 붙이세요. 원본 캐릭터는 묘지로 옮겨집니다.",
+        "groupName": "몬스터 이름",
+        "link": "부위로 나누기"
       }
     },
     "character": {
@@ -1751,6 +1755,8 @@
         "showVisionRange": "시야 범위 표시",
         "target": "타깃",
         "clearTargets": "타깃 모두 해제",
+        "splitParts": "부위로 나누기",
+        "unlinkPart": "부위 연동 해제",
         "radialBasic": "기본 정보",
         "radialChat": "채팅",
         "radialBuffEffect": "버프·연출",

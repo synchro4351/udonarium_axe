@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { MovableLike, MultiMovableService } from '@axe/application/ui/multi-movable.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { Terrain } from '@axe/domain/tabletop/terrain';
 import { makeFakeTabletopObject } from '@axe/testing/factories/tabletop-object.factory';
 
@@ -138,5 +139,60 @@ describe('MultiMovableService', () => {
     leader.posX = 100;
     service.applyLeaderDelta(leader);
     expect(follower.posX).toBe(10);
+  });
+
+  describe('linked parts', () => {
+    const made: GameCharacter[] = [];
+    function part(group: string, location = 'table'): MovableLike {
+      const character = GameCharacter.create('Part', 1, '');
+      character.partGroup = group;
+      character.partRegion = '0 0 0.5 1 1';
+      character.location.name = location;
+      made.push(character);
+      return { identifier: character.identifier, tabletopObject: character, posX: 0, posY: 0 };
+    }
+    afterEach(() => {
+      for (const character of made.splice(0)) character.destroy();
+    });
+
+    it('brings the other parts on the table along from the leader place, unselected', () => {
+      const head = part('g');
+      const tail = part('g');
+      const dead = part('g', 'graveyard');
+      const stranger = part('other');
+      head.posX = 100;
+      head.posY = 50;
+      tail.posX = 140;
+      tail.posY = 90;
+      for (const ref of [head, tail, dead, stranger]) service.register(ref);
+      selection.replaceSelection([stranger.identifier]);
+
+      expect(service.beginDrag(head)).toBe(true);
+      expect(service.isMoving(head.identifier)).toBe(true);
+      expect(service.isMoving(tail.identifier)).toBe(true);
+      expect(service.isMoving(dead.identifier)).toBe(false);
+      head.posX = 130;
+      head.posY = 70;
+      service.applyLeaderDelta(head);
+
+      expect([tail.posX, tail.posY]).toEqual([130, 70]);
+      expect([dead.posX, stranger.posX]).toEqual([0, 0]);
+      service.endDrag(head);
+      expect(service.isMoving(tail.identifier)).toBe(false);
+    });
+
+    it('moves a selected linked part once, from the leader place', () => {
+      const head = part('g');
+      const tail = part('g');
+      tail.posX = 500;
+      service.register(head);
+      service.register(tail);
+      selection.replaceSelection([head.identifier, tail.identifier]);
+      service.beginDrag(head);
+      head.posX = 10;
+      service.applyLeaderDelta(head);
+      expect(tail.posX).toBe(10);
+      expect(service.followerTabletopObjectsFor(head.identifier)).toHaveLength(1);
+    });
   });
 });

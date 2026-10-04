@@ -5,6 +5,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { MultipartCharacterService } from '@axe/application/tabletop/multipart-character.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import {
   ImagePart,
   imagePartBetween,
@@ -14,6 +15,7 @@ import {
   MAX_IMAGE_PARTS,
   overlapsAnyImagePart,
 } from '@axe/domain/character/image-part';
+import { MIN_LINKED_PARTS } from '@axe/domain/character/part-group';
 import { loadPartImage } from '@axe/infrastructure/media/image-part-crop';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -47,6 +49,10 @@ export class MultipartCharacterComponent {
   readonly busy = signal(false);
   readonly error = signal('');
   readonly limit = MAX_IMAGE_PARTS;
+  /** The character being split into linked parts; null when cutting independent tokens from an image. */
+  readonly character = signal<GameCharacter | null>(null);
+  readonly groupName = signal('');
+  readonly minimum = computed(() => (this.character() ? MIN_LINKED_PARTS : 1));
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
@@ -58,11 +64,11 @@ export class MultipartCharacterComponent {
     this.identifier = identifier;
     this.busy.set(true);
     try {
-      if (!this.service.mayUse(identifier)) throw new Error('Unavailable');
+      if (!this.mayEdit()) throw new Error('Unavailable');
       const url = this.images.get(identifier)!.url;
       const image = await loadPartImage(url);
       if (!this.alive) return;
-      if (!this.service.mayUse(identifier)) throw new Error('Unavailable');
+      if (!this.mayEdit()) throw new Error('Unavailable');
       this.image = image;
       this.width.set(image.naturalWidth);
       this.height.set(image.naturalHeight);
@@ -74,12 +80,31 @@ export class MultipartCharacterComponent {
     }
   }
 
+  /** Opens on the picture a character is showing, to split it into linked parts. */
+  initializeForCharacter(character: GameCharacter): Promise<void> {
+    this.character.set(character);
+    this.groupName.set(character.name);
+    return this.initialize(character.imageFile.identifier);
+  }
+
+  private mayEdit(): boolean {
+    const character = this.character();
+    return character ? this.service.mayLink(character) : this.service.mayUse(this.identifier);
+  }
+
   get canEdit(): boolean {
     this.changes.fileVersion();
     this.changes.collectionOf('image-tag')();
     this.changes.versionOf(`imagetag_${this.identifier}`)();
     this.changes.collectionOf('peer-cursor')();
-    return !!this.image && this.service.mayUse(this.identifier);
+    const character = this.character();
+    if (character) this.changes.versionOf(character.identifier)();
+    return !!this.image && this.mayEdit();
+  }
+
+  get canCreate(): boolean {
+    const named = !this.character() || this.groupName().trim().length > 0;
+    return !this.busy() && this.canEdit && named && this.parts().length >= this.minimum();
   }
 
   private point(event: PointerEvent): ImagePoint {
@@ -157,16 +182,17 @@ export class MultipartCharacterComponent {
   }
 
   async create(): Promise<void> {
-    if (this.busy() || !this.canEdit || !this.image || this.parts().length === 0) return;
+    if (!this.canCreate || !this.image) return;
     this.busy.set(true);
     this.error.set('');
+    const stillOpen = () => this.alive && this.images.get(this.identifier)?.url === this.url();
+    const character = this.character();
     try {
-      await this.service.create(
-        this.identifier,
-        this.image,
-        this.parts(),
-        () => this.alive && this.images.get(this.identifier)?.url === this.url()
-      );
+      if (character) {
+        await this.service.createLinked(character, this.image, this.parts(), this.groupName(), stillOpen);
+      } else {
+        await this.service.create(this.identifier, this.image, this.parts(), stillOpen);
+      }
       if (this.alive) this.close();
     } catch (error) {
       if (this.alive)

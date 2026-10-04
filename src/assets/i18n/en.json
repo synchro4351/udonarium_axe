@@ -1717,7 +1717,11 @@
         "unavailable": "Image unavailable. Check that it is loaded and you can edit the table.",
         "failed": "Could not create tokens. Check the regions and image, then try again.",
         "oversized": "A cropped image exceeds 2 MB. Select a smaller region.",
-        "overlap": "Regions cannot overlap. Touching edges is fine."
+        "overlap": "Regions cannot overlap. Touching edges is fine.",
+        "linkTitle": "Split {{name}} into parts",
+        "linkHint": "Outline and name two or more parts. The original moves to the graveyard.",
+        "groupName": "Monster name",
+        "link": "Split into parts"
       }
     },
     "character": {
@@ -1751,6 +1755,8 @@
         "showVisionRange": "Show range of sight",
         "target": "Target",
         "clearTargets": "Stop aiming at everything",
+        "splitParts": "Split into parts",
+        "unlinkPart": "Unlink this part",
         "radialBasic": "Basics",
         "radialChat": "Chat",
         "radialBuffEffect": "Buffs & effects",

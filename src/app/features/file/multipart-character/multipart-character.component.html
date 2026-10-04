@@ -1,4 +1,19 @@
-<p class="text-ui-muted mt-0 text-sm">{{ 'feature.file.multipart.hint' | transloco }}</p>
+<p class="text-ui-muted mt-0 text-sm">
+  {{ (character() ? 'feature.file.multipart.linkHint' : 'feature.file.multipart.hint') | transloco }}
+</p>
+@if (character()) {
+  <label class="mb-2 flex items-center gap-2 text-sm">
+    <span class="shrink-0">{{ 'feature.file.multipart.groupName' | transloco }}</span>
+    <input
+      class="bg-ui-input border-ui-border-panel rounded-ui-sm min-w-0 flex-1 border px-2 py-1"
+      maxlength="80"
+      data-testid="multipart-group-name"
+      [ngModel]="groupName()"
+      (ngModelChange)="groupName.set($event)"
+      [disabled]="busy() || !canEdit"
+    />
+  </label>
+}
 @if (url()) {
   <div class="bg-ui-input relative mx-auto w-fit max-w-full" data-testid="multipart-image">
     <img class="block max-h-95 max-w-full" [src]="url()" alt="" draggable="false" />
@@ -97,10 +112,17 @@
   <button
     type="button"
     (click)="create()"
-    [disabled]="busy() || !canEdit || !parts().length"
+    [disabled]="!canCreate"
     class="bg-ui-accent text-ui-inverse rounded-ui-sm px-3 py-1.5 disabled:opacity-40"
     data-testid="multipart-create"
   >
-    {{ (busy() ? 'feature.file.multipart.preparing' : 'feature.file.multipart.create') | transloco }}
+    {{
+      (busy()
+        ? 'feature.file.multipart.preparing'
+        : character()
+          ? 'feature.file.multipart.link'
+          : 'feature.file.multipart.create'
+      ) | transloco
+    }}
   </button>
 </div>

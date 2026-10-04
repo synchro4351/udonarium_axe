@@ -50,6 +50,23 @@ describe('TabletopService', () => {
       const [character] = ObjectStore.instance.getObjects(GameCharacter);
       expect(character.partyIdentifier).toBe('');
     });
+
+    it('comes in as an ordinary character when it was saved as one linked part', () => {
+      TestBed.inject(TabletopService);
+      const head = GameCharacter.create('Wyrm(Head)', 2, '');
+      head.partGroup = 'wyrm';
+      head.partRegion = '0 0 0.5 1 1';
+
+      emitXmlLoaded({
+        xmlElement: xml2element(
+          '<character partGroup="wyrm" partGroupName="Wyrm" partName="Tail" partRegion="0.5 0 0.5 1 1"></character>'
+        )!,
+      });
+
+      const loaded = ObjectStore.instance.getObjects(GameCharacter).find((character) => character !== head)!;
+      expect([loaded.partGroup, loaded.partGroupName, loaded.partName, loaded.partRegion]).toEqual(['', '', '', '']);
+      expect(head.partGroup).toBe('wyrm');
+    });
   });
 
   describe('lightSources', () => {

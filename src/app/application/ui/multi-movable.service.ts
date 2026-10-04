@@ -1,5 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
+import { GameCharacter } from '@axe/domain/character/game-character';
+import { isLinkedPart, linkedPartsOf } from '@axe/domain/character/part-group';
 import { isLockedInPlace } from '@axe/domain/tabletop/lockable';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
 
@@ -54,13 +56,14 @@ export class MultiMovableService {
   /**
    * Starts a group drag led by one piece, and says whether anything will follow it.
    *
-   * Only a selected piece leads. The other selected pieces that are registered and not locked
-   * become followers, with their starting positions noted. A leader outside the selection clears
-   * any earlier group and answers false.
+   * A selected piece brings the other unlocked selected pieces. A linked part also brings its
+   * group without selection; unrelated selected pieces stay where they are in that case.
    */
   beginDrag(leader: MovableLike): boolean {
     const selected = this.selectionSignalService.selectedObjects();
-    if (!leader.identifier || !selected.has(leader.identifier)) {
+    const selectedLeader = selected.has(leader.identifier);
+    const linkedLeader = leader.tabletopObject instanceof GameCharacter && isLinkedPart(leader.tabletopObject);
+    if (!leader.identifier || (!selectedLeader && !linkedLeader)) {
       this.clear();
       return false;
     }
@@ -68,14 +71,56 @@ export class MultiMovableService {
     this.leaderStartX = leader.posX;
     this.leaderStartY = leader.posY;
     this.followers = [];
-    for (const id of selected) {
+    for (const id of selectedLeader ? selected : []) {
       if (id === leader.identifier) continue;
       const ref = this.registry.get(id);
       if (!ref) continue;
       if (this.isLocked(ref)) continue;
       this.followers.push({ ref, startX: ref.posX, startY: ref.posY });
     }
+    this.addLinkedParts(leader);
+    if (selectedLeader) {
+      const expanded = new Set(linkedLeader ? [(leader.tabletopObject as GameCharacter).partGroup] : []);
+      for (const id of selected) {
+        const ref = this.registry.get(id);
+        const object = ref?.tabletopObject;
+        if (ref && object instanceof GameCharacter && isLinkedPart(object) && !this.isLocked(ref)) {
+          if (expanded.has(object.partGroup)) continue;
+          expanded.add(object.partGroup);
+          this.addLinkedParts(ref);
+        }
+      }
+    }
     return this.followers.length > 0;
+  }
+
+  /**
+   * The parts linked to a dragged part come along, starting from the leader's own place: a group
+   * stands on one spot, so one that had drifted apart is brought back together by the drag.
+   */
+  private addLinkedParts(leader: MovableLike): void {
+    const part = leader.tabletopObject;
+    if (!(part instanceof GameCharacter) || !isLinkedPart(part)) return;
+    const following = new Set(this.followers.map((f) => f.ref.identifier));
+    const linked = linkedPartsOf(
+      part,
+      [...this.registry.values()]
+        .map((ref) => ref.tabletopObject)
+        .filter((object): object is GameCharacter => object instanceof GameCharacter)
+    );
+    for (const other of linked) {
+      if (following.has(other.identifier)) {
+        this.followers = this.followers.filter((f) => f.ref.identifier !== other.identifier);
+      }
+      const ref = this.registry.get(other.identifier);
+      if (ref) this.followers.push({ ref, startX: leader.posX, startY: leader.posY });
+    }
+  }
+
+  /** Whether the piece is leading or following a drag that is under way. */
+  isMoving(identifier: string): boolean {
+    if (!identifier || this.leaderId === null) return false;
+    return this.leaderId === identifier || this.followers.some((f) => f.ref.identifier === identifier);
   }
 
   /**

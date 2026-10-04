@@ -126,6 +126,28 @@ export class ObjectPanelService {
     else this.panelService.openLazy(load, option, (component) => component.character.set(character));
   }
 
+  /** Opens the region picker that splits a character on the table into linked parts. */
+  openPartSplit(character: GameCharacter): void {
+    const load = () =>
+      import('@axe/features/file/multipart-character/multipart-character.component').then(
+        (m) => m.MultipartCharacterComponent
+      );
+    const at = this.pointerDeviceService.pointers[0];
+    this.panelService.openLazy(
+      load,
+      {
+        title: this.t('feature.file.multipart.linkTitle', { name: character.name }),
+        width: 680,
+        height: 680,
+        minWidth: 300,
+        minHeight: 400,
+        left: at.x - 340,
+        top: at.y - 340,
+      },
+      (component) => void component.initializeForCharacter(character)
+    );
+  }
+
   private option(title: string, size: ObjectPanelSize, place: ObjectPanelPlace, detach: DetachRequest): PanelOption {
     const at = place.at ?? this.pointerDeviceService.pointers[0];
     const offset = place.offset ?? { x: size.width / 2, y: size.height / 2 };

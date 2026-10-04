@@ -15,6 +15,7 @@ import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { MultipartCharacterService } from '@axe/application/tabletop/multipart-character.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { DataElementDragService } from '@axe/application/ui/data-element-drag.service';
 import { ModalService } from '@axe/application/ui/modal.service';
@@ -56,6 +57,7 @@ import { clampInRange, roundOr } from '@axe/features/character/game-character-sh
 import { ImportCharacterImgComponent } from '@axe/features/character/import-character-img/import-character-img.component';
 import { GameDataElementComponent } from '@axe/features/data-element/game-data-element/game-data-element.component';
 import { DisclosureControlComponent } from '@axe/features/disclosure/disclosure-control/disclosure-control.component';
+import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import {
   applyTextNoteFormatMark,
   TEXT_NOTE_FORMAT_MARKS,
@@ -99,6 +101,8 @@ export class GameCharacterSheetComponent {
   private readonly translateFn = inject(TRANSLATE_FN);
   private readonly rolePermission = inject(RolePermissionService);
   private readonly cardGame = inject(CardGameService);
+  private readonly multipart = inject(MultipartCharacterService);
+  private readonly objectPanels = inject(ObjectPanelService);
 
   /**
    * Whether this user may change the card's properties, which the room grants to the game master and,
@@ -780,6 +784,22 @@ export class GameCharacterSheetComponent {
   clone() {
     if (!this.rolePermission.canEditTabletop) return;
     if (this.tabletopObject) cloneTabletopObject(this.tabletopObject);
+  }
+
+  /** Whether the character on the table may be split into linked parts from here. */
+  canSplitParts(): boolean {
+    const char = this.character;
+    if (!char) return false;
+    this.objectChange.versionOf(char.identifier)();
+    this.objectChange.fileVersion();
+    this.objectChange.trackMyCursor();
+    return this.multipart.mayLink(char);
+  }
+
+  /** Opens the region picker on the character's own picture, to split it into linked parts. */
+  splitParts(): void {
+    const char = this.character;
+    if (char && this.multipart.mayLink(char)) this.objectPanels.openPartSplit(char);
   }
 
   /** Does nothing; the hide checkbox changes the character through its own binding. */

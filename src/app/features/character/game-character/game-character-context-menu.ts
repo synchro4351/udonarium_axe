@@ -44,6 +44,10 @@ export interface GameCharacterContextMenuCallbacks {
   onToggleTarget?: () => void;
   /** Stops aiming at everything. Left out where nothing is aimed at. */
   onClearTargets?: () => void;
+  /** Cuts the piece's picture into linked parts. Left out where it may not be split. */
+  onSplitParts?: () => void;
+  /** Takes a linked part out of its group. Left out for anything but a part. */
+  onUnlinkPart?: () => void;
 }
 
 export interface GameCharacterContextMenuModel {
@@ -398,6 +402,22 @@ export function buildGameCharacterContextMenuModel(
     ...overlapEntries,
     buildLockToggleAction(char.isLock, (next) => (char.isLock = next), t),
     buildCopyAction(char, gridSize, t),
+    ...(callbacks.onSplitParts
+      ? [
+          {
+            name: t('feature.character.contextMenu.splitParts'),
+            action: () => callbacks.onSplitParts?.(),
+          } as ContextMenuAction,
+        ]
+      : []),
+    ...(callbacks.onUnlinkPart
+      ? [
+          {
+            name: t('feature.character.contextMenu.unlinkPart'),
+            action: () => callbacks.onUnlinkPart?.(),
+          } as ContextMenuAction,
+        ]
+      : []),
     ...(callbacks.onToggleTarget
       ? [
           {

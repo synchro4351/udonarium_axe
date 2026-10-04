@@ -164,6 +164,36 @@ describe('buildGameCharacterContextMenu()', () => {
     });
   });
 
+  describe('linked parts', () => {
+    it('offers splitting and unlinking only where given, in the flat and radial menus', () => {
+      const onSplitParts = vi.fn();
+      const onUnlinkPart = vi.fn();
+      const plain = buildGameCharacterContextMenu(
+        makeChar() as unknown as GameCharacter,
+        50,
+        makeService(),
+        callbacks(),
+        t
+      );
+      expect(names(plain)).not.toContain('部位に分ける');
+      expect(names(plain)).not.toContain('部位の連動を外す');
+
+      const model = buildGameCharacterContextMenuModel(
+        makeChar() as unknown as GameCharacter,
+        50,
+        makeService(),
+        { ...callbacks(), onSplitParts, onUnlinkPart },
+        t
+      );
+      model.actions.find((action) => action.name === '部位に分ける')!.action!();
+      model.actions.find((action) => action.name === '部位の連動を外す')!.action!();
+      expect(onSplitParts).toHaveBeenCalledTimes(1);
+      expect(onUnlinkPart).toHaveBeenCalledTimes(1);
+      const objectGroup = model.radialGroups.find((group) => group.icon === 'settings')!;
+      expect(names(objectGroup.actions)).toEqual(expect.arrayContaining(['部位に分ける', '部位の連動を外す']));
+    });
+  });
+
   it('leads with the sheet, which opens the group at the top', () => {
     const char = makeChar();
     const menu = buildGameCharacterContextMenu(char as unknown as GameCharacter, 50, makeService(), callbacks(), t);

@@ -1,4 +1,4 @@
-import { NgClass, NgStyle } from '@angular/common';
+import { NgClass, NgStyle, NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -29,6 +29,8 @@ import { BoardSwitchService } from '@axe/application/tabletop/board-switch.servi
 import { ConcealmentService } from '@axe/application/tabletop/concealment.service';
 import { MovePlanService } from '@axe/application/tabletop/move-plan.service';
 import { MoveRangeService } from '@axe/application/tabletop/move-range.service';
+import { MultipartCharacterService } from '@axe/application/tabletop/multipart-character.service';
+import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
 import { RangeShapeInvokeService } from '@axe/application/tabletop/range-shape-invoke.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { TriggerFireService } from '@axe/application/tabletop/trigger-fire.service';
@@ -55,6 +57,15 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { BuffBadge, toBuffBadges } from '@axe/domain/character/buff-badge';
 import { BUFF_VIEW_LABEL_KEYS, type BuffViewMode, nextBuffViewMode } from '@axe/domain/character/buff-view-mode';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import {
+  decodePartRegion,
+  isLinkedPart,
+  partBoxRegion,
+  partClipPath,
+  PartFrame,
+  PartRegion,
+  partRegionStyle,
+} from '@axe/domain/character/part-group';
 import { gaugeNumbersOf, isGaugeInverted, PieceGauge, selectPieceGauges } from '@axe/domain/character/piece-gauge';
 import { isResourceElement } from '@axe/domain/character/resource-catalog';
 import {
@@ -189,6 +200,7 @@ interface PieceRightDrag {
     SelectableDirective,
     NgClass,
     NgStyle,
+    NgTemplateOutlet,
     GameDataElementBuffComponent,
     SafePipe,
     TranslocoModule,
@@ -235,6 +247,8 @@ export class GameCharacterComponent {
   private readonly visionService = inject(VisionService);
   private readonly overheadSpeechService = inject(OverheadSpeechService);
   private readonly imageStorage = inject(ImageStorage);
+  private readonly multipart = inject(MultipartCharacterService);
+  private readonly partGroups = inject(MultipartGroupService);
 
   readonly isTargeted = computed(() => {
     this.uiSignalService.targetChange();
@@ -580,6 +594,57 @@ export class GameCharacterComponent {
     fitInCell: this.fitsImageInCell,
   });
 
+  /** The piece's rectangle in its group's shared picture; null for an ordinary character. */
+  readonly partFrame = computed<PartFrame | null>(() => {
+    const char = this.gameCharacter();
+    if (!char) return null;
+    this.objectChange.versionOf(char.identifier)();
+    return isLinkedPart(char) ? decodePartRegion(char.partRegion) : null;
+  });
+
+  /**
+   * Where the part lies in the box its picture is drawn in. A picture fitted into the square is
+   * letterboxed; otherwise the box takes the picture's own shape.
+   */
+  readonly partBox = computed<PartRegion | null>(() => {
+    const frame = this.partFrame();
+    if (!frame) return null;
+    return partBoxRegion(frame, this.isPoster() || this.imageView.fitsInCell());
+  });
+
+  /** Clips the part's full-frame picture, and with it the pointer, to its own region. */
+  readonly partClip = computed(() => {
+    const box = this.partBox();
+    return box ? partClipPath(box) : null;
+  });
+
+  readonly partRegionCss = computed(() => {
+    const box = this.partBox();
+    return box ? partRegionStyle(box) : null;
+  });
+
+  readonly partLabel = computed(() => {
+    const char = this.gameCharacter();
+    if (!char || !this.partFrame()) return '';
+    return char.partName || this.name();
+  });
+
+  /** Labels inside a part's picture are drawn at the picture's supersampled scale. */
+  readonly partFontSizePx = computed(() => 10 * this.imageView.supersample());
+
+  /**
+   * The turning ring of a part answers only around the piece, never over the pictures of the
+   * other parts stacked on it. It is not offered on hexes, whose ring is round.
+   */
+  readonly partRingClip = computed(() => {
+    if (!this.partFrame() || this.pedestalHexParams()) return null;
+    return 'polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, 6px 22px, 6px calc(100% - 22px), calc(100% - 6px) calc(100% - 22px), calc(100% - 6px) 22px, 6px 22px)';
+  });
+  readonly partRingPointer = computed(() => {
+    if (!this.partFrame()) return null;
+    return this.partRingClip() ? 'auto' : 'none';
+  });
+
   private readonly pieceCenterShift = computed(
     () => `translateX(-50%) translateX(${(this.size() * this.gridSize) / 2}px)`
   );
@@ -855,6 +920,7 @@ export class GameCharacterComponent {
   readonly multiAngleOrbitVisible = computed(
     () =>
       this.multiAngleNameOrbitEnabled() &&
+      !this.partFrame() &&
       ((this.name().length > 0 && !this.hideName()) ||
         (this.multiAngleResourceBuffOrbitEnabled() &&
           (this.orbitPieceGauges().length > 0 || (!this.hideBuff() && this.buffBadges().length > 0))))
@@ -889,9 +955,12 @@ export class GameCharacterComponent {
     multiAngleRotationPhase(`${this.gameCharacter()?.identifier ?? 'unknown'}:resource-buff`)
   );
 
-  private readonly multiAnglePiecePhase = computed(() =>
-    multiAngleRotationPhase(`${this.gameCharacter()?.identifier ?? 'unknown'}:piece`)
-  );
+  // Parts of one group turn as one picture, so they share a phase.
+  private readonly multiAnglePiecePhase = computed(() => {
+    const char = this.gameCharacter();
+    const key = this.partFrame() && char ? char.partGroup : (char?.identifier ?? 'unknown');
+    return multiAngleRotationPhase(`${key}:piece`);
+  });
 
   readonly multiAngleNameOrbitDelaySeconds = computed(
     () => -this.multiAngleNamePhase() * this.multiAngleNameOrbitAnimation().durationSeconds
@@ -917,9 +986,14 @@ export class GameCharacterComponent {
     );
   });
 
-  readonly multiAnglePieceRotationDelaySeconds = computed(
-    () => -this.multiAnglePiecePhase() * this.multiAnglePieceRotationAnimation().durationSeconds
-  );
+  readonly multiAnglePieceRotationDelaySeconds = computed(() => {
+    const duration = this.multiAnglePieceRotationAnimation().durationSeconds;
+    const delay = -this.multiAnglePiecePhase() * duration;
+    if (!this.partFrame() || !this.multiAngleNameOrbitEnabled() || !(duration > 0)) return delay;
+    // A spin starts when it is drawn. Counting it from one clock keeps a part drawn later, such
+    // as one back from the graveyard, in step with the rest of its group.
+    return delay - ((Date.now() / 1000) % duration);
+  });
 
   readonly buffOrbitFacing = computed<BillboardFacing>(() => this.labelStandFacing(this.buffOrbit()));
 
@@ -1356,6 +1430,9 @@ export class GameCharacterComponent {
         onPlanMove: this.moveRangeService.canPlan(char) ? () => void this.movePlan.begin(char) : undefined,
         onToggleTarget: () => this.toggleTarget(),
         onClearTargets: this.anythingTargeted() ? () => this.clearEveryTarget() : undefined,
+        onSplitParts: this.multipart.mayLink(char) ? () => this.objectPanels.openPartSplit(char) : undefined,
+        onUnlinkPart:
+          this.partFrame() && this.rolePermission.canEditTabletop ? () => this.partGroups.unlink(char) : undefined,
       },
       this.translateFn,
       overlapEntries,

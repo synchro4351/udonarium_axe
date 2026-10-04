@@ -8,6 +8,7 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { clearPartGroup } from '@axe/domain/character/part-group';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { Coin } from '@axe/domain/coin/coin';
@@ -254,7 +255,11 @@ export class TabletopService {
         gameObject.location.y = pointer.y - 25;
         gameObject.posZ = pointer.z;
         claimBroughtInPiece(gameObject, PeerCursor.myCursor?.userId ?? '');
-        if (gameObject instanceof GameCharacter) gameObject.partyIdentifier = '';
+        if (gameObject instanceof GameCharacter) {
+          gameObject.partyIdentifier = '';
+          // A part saved on its own comes back as an ordinary character, never into a group here.
+          clearPartGroup(gameObject);
+        }
         this.placeToTabletop(gameObject);
         SoundEffect.play(PresetSound.piecePut);
       } else if (gameObject instanceof ChatTab) {

@@ -17,14 +17,14 @@
     (pointercancel)="onPiecePointerCancel($event)"
     #root
   >
-    @if (hitFlash() === 'damage') {
+    @if (hitFlash() === 'damage' && !partFrame()) {
       <div
         data-testid="hit-flash"
         class="animate-hit-flash pointer-events-none absolute inset-0 rounded-full [-webkit-transform-style:preserve-3d] transform-3d"
         [ngStyle]="{ background: 'radial-gradient(circle, rgba(255,60,60,0.85) 0%, rgba(255,60,60,0) 70%)' }"
       ></div>
     }
-    @if (hitFlash() === 'heal') {
+    @if (hitFlash() === 'heal' && !partFrame()) {
       <div
         data-testid="heal-aura"
         class="animate-heal-rise pointer-events-none absolute inset-0 rounded-full [-webkit-transform-style:preserve-3d] transform-3d"
@@ -55,6 +55,7 @@
         <div
           data-testid="multi-angle-piece-motion-source"
           class="pointer-events-auto size-full [-webkit-transform-style:preserve-3d] transform-3d"
+          [style.pointer-events]="partFrame() ? 'none' : null"
           [class.animate-multi-angle-piece-spin]="multiAngleNameOrbitEnabled()"
           [style.animation-duration.s]="multiAnglePieceRotationAnimation().durationSeconds"
           [style.animation-timing-function]="multiAnglePieceRotationAnimation().timingFunction"
@@ -85,7 +86,7 @@
             [ngStyle]="pedestalOuterStyle()"
             [style.transform]="multiAnglePiecePedestalRotation()"
           ></div>
-          @if (isTargeted()) {
+          @if (isTargeted() && !partFrame()) {
             <div
               data-testid="target-ring"
               class="animate-target-ring pointer-events-none absolute box-border size-full rounded-[25px] border-[6px] border-solid border-[#ff3b30] filter-[drop-shadow(0_0_5px_rgba(255,59,48,0.95))] backface-hidden"
@@ -96,6 +97,8 @@
             <div
               class="rotate-grab absolute -top-5.5 -left-1.5 z-[-1] h-[calc(100%+44px)] w-[calc(100%+12px)] cursor-default rounded-[37px] opacity-0 backface-hidden group-hover:opacity-50 group-active:opacity-0 hover:opacity-100! active:opacity-100!"
               [ngStyle]="pedestalGrabStyle()"
+              [style.pointer-events]="partRingPointer()"
+              [style.clip-path]="partRingClip()"
             >
               <div
                 class="pointer-events-none box-border size-full rounded-[37px] border-x-12 border-y-28 border-solid border-t-[#999] border-r-[#ccc] border-b-[#ccc] border-l-[#999]"
@@ -169,7 +172,21 @@
               [src]="imageFile().url | safe: 'resourceUrl'"
             />
           }
-          @if (isPoster() && 0 < imageFile().url.length) {
+          @if (isPoster() && 0 < imageFile().url.length && partFrame()) {
+            <div
+              class="absolute inset-0 m-auto block size-full [-webkit-transform-style:preserve-3d] transform-3d"
+              [ngStyle]="{
+                width: imageView.supersamplePercent(),
+                height: imageView.supersamplePercent(),
+                maxWidth: 'none',
+                margin: imageView.supersampleInset(),
+                transform: groundLean() + ' ' + imageView.posterTransform(),
+              }"
+            >
+              <ng-container *ngTemplateOutlet="partPicture; context: { fit: 'object-contain size-full' }" />
+            </div>
+          }
+          @if (isPoster() && 0 < imageFile().url.length && !partFrame()) {
             <img
               class="image chrome-smooth-image-trick pointer-events-none absolute inset-0 m-auto block size-full object-contain"
               [ngStyle]="{
@@ -203,7 +220,7 @@
                 [style.height.px]="imageView.boxHeightPx()"
               >
                 @let buffEl = this.gameCharacter()!.buffDataElement;
-                @if (buffEl && buffNum() > 0 && !hideBuff() && !multiAngleResourceBuffOrbitEnabled()) {
+                @if (buffEl && buffNum() > 0 && !hideBuff() && !multiAngleResourceBuffOrbitEnabled() && !partFrame()) {
                   <div class="[-webkit-transform-style:preserve-3d] transform-3d">
                     <div
                       class="absolute m-auto [-webkit-transform-style:preserve-3d] transform-3d"
@@ -302,7 +319,7 @@
                     </div>
                   </div>
                 }
-                @if (floatingChanges().length > 0) {
+                @if (floatingChanges().length > 0 && !partFrame()) {
                   <div
                     class="pointer-events-none absolute [-webkit-transform-style:preserve-3d] transform-3d"
                     [appBillboard]="floatOrbitFacing()"
@@ -324,7 +341,7 @@
                     </div>
                   </div>
                 }
-                @if (pieceGauges().length > 0 && !multiAngleResourceBuffOrbitEnabled()) {
+                @if (pieceGauges().length > 0 && !multiAngleResourceBuffOrbitEnabled() && !partFrame()) {
                   <div
                     class="absolute [-webkit-transform-style:preserve-3d] transform-3d"
                     [appBillboard]="gaugeOrbitFacing()"
@@ -362,7 +379,7 @@
                     </div>
                   </div>
                 }
-                @if (name() && !hideName() && !multiAngleNameOrbitEnabled()) {
+                @if (name() && !hideName() && !multiAngleNameOrbitEnabled() && !partFrame()) {
                   <div
                     class="absolute [-webkit-transform-style:preserve-3d] transform-3d"
                     [style.font-size.px]="nameFontSizePx"
@@ -407,6 +424,7 @@
                     class="rotate-grab bg-ui-elevated text-ui-muted absolute top-0 left-0 z-1 flex cursor-default items-center justify-center rounded-full opacity-0 [-webkit-transform-style:preserve-3d] transform-3d group-hover:opacity-50 group-active:opacity-0 hover:opacity-100! active:opacity-100!"
                     [style.width.px]="rollHandleSizePx()"
                     [style.height.px]="rollHandleSizePx()"
+                    [style.pointer-events]="partFrame() ? 'auto' : null"
                     [ngStyle]="{ transform: rollHandleHeadTransform() }"
                   >
                     <i
@@ -420,6 +438,7 @@
                     class="rotate-grab bg-ui-elevated text-ui-muted absolute bottom-0 left-0 z-1 flex cursor-default items-center justify-center rounded-full opacity-0 [-webkit-transform-style:preserve-3d] transform-3d group-hover:opacity-50 group-active:opacity-0 hover:opacity-100! active:opacity-100!"
                     [style.width.px]="rollHandleSizePx()"
                     [style.height.px]="rollHandleSizePx()"
+                    [style.pointer-events]="partFrame() ? 'auto' : null"
                     [ngStyle]="{ transform: rollHandleFootTransform() }"
                   >
                     <i
@@ -429,7 +448,56 @@
                     >
                   </div>
                 }
-                @if (!isPoster() && 0 < imageFile().url.length && specifyKomaImageFlag() && !imageView.fitsInCell()) {
+                @if (!isPoster() && 0 < imageFile().url.length && partFrame()) {
+                  @if (specifyKomaImageFlag() && !imageView.fitsInCell()) {
+                    <div
+                      class="relative inset-x-0 bottom-0 m-auto align-bottom [-webkit-transform-style:preserve-3d] transform-3d"
+                      [appBillboard]="imageView.komaFacing()"
+                      [ngStyle]="{
+                        height: komaImageHeightSignal() * imageView.supersample() + 'px',
+                        width: 'auto',
+                        maxWidth: 'none',
+                        display: 'inline-block',
+                      }"
+                    >
+                      <ng-container *ngTemplateOutlet="partPicture; context: { fit: 'h-full w-auto max-w-none' }" />
+                    </div>
+                  } @else if (imageView.fitsInCell()) {
+                    <div
+                      class="relative inset-x-0 bottom-0 m-auto block align-bottom [-webkit-transform-style:preserve-3d] transform-3d"
+                      [appBillboard]="imageView.pieceFacing()"
+                      [ngStyle]="{
+                        width: imageView.supersamplePercent(),
+                        height: size() * gridSize * imageView.supersample() + 'px',
+                        maxWidth: 'none',
+                        marginLeft: imageView.supersampleInset(),
+                        marginRight: imageView.supersampleInset(),
+                      }"
+                    >
+                      <ng-container *ngTemplateOutlet="partPicture; context: { fit: 'size-full object-contain' }" />
+                    </div>
+                  } @else {
+                    <div
+                      class="relative inset-x-0 bottom-0 m-auto block align-bottom [-webkit-transform-style:preserve-3d] transform-3d"
+                      [appBillboard]="imageView.pieceFacing()"
+                      [ngStyle]="{
+                        width: imageView.supersamplePercent(),
+                        maxWidth: 'none',
+                        marginLeft: imageView.supersampleInset(),
+                        marginRight: imageView.supersampleInset(),
+                      }"
+                    >
+                      <ng-container *ngTemplateOutlet="partPicture; context: { fit: 'h-auto w-full' }" />
+                    </div>
+                  }
+                }
+                @if (
+                  !isPoster() &&
+                  0 < imageFile().url.length &&
+                  specifyKomaImageFlag() &&
+                  !imageView.fitsInCell() &&
+                  !partFrame()
+                ) {
                   <img
                     class="image chrome-smooth-image-trick inset-x-0 bottom-0 m-auto h-auto align-bottom [-webkit-transform-style:preserve-3d] transform-3d"
                     [appBillboard]="imageView.komaFacing()"
@@ -445,7 +513,13 @@
                     [src]="imageFile().url | safe: 'resourceUrl'"
                   />
                 }
-                @if (!isPoster() && 0 < imageFile().url.length && !specifyKomaImageFlag() && !imageView.fitsInCell()) {
+                @if (
+                  !isPoster() &&
+                  0 < imageFile().url.length &&
+                  !specifyKomaImageFlag() &&
+                  !imageView.fitsInCell() &&
+                  !partFrame()
+                ) {
                   <img
                     class="image chrome-smooth-image-trick inset-x-0 bottom-0 m-auto h-auto align-bottom [-webkit-transform-style:preserve-3d] transform-3d"
                     [appBillboard]="imageView.pieceFacing()"
@@ -459,7 +533,7 @@
                     [src]="imageFile().url | safe: 'resourceUrl'"
                   />
                 }
-                @if (!isPoster() && 0 < imageFile().url.length && imageView.fitsInCell()) {
+                @if (!isPoster() && 0 < imageFile().url.length && imageView.fitsInCell() && !partFrame()) {
                   <img
                     class="image chrome-smooth-image-trick inset-x-0 bottom-0 m-auto block object-contain align-bottom [-webkit-transform-style:preserve-3d] transform-3d"
                     [appBillboard]="imageView.pieceFacing()"
@@ -474,7 +548,7 @@
                     [src]="imageFile().url | safe: 'resourceUrl'"
                   />
                 }
-                @if (isTargeted()) {
+                @if (isTargeted() && !partFrame()) {
                   <div
                     class="pointer-events-none absolute bottom-0 left-0 [-webkit-transform-style:preserve-3d] transform-3d"
                     [appBillboard]="targetOrbitFacing()"
@@ -852,3 +926,89 @@
     </div>
   </div>
 }
+
+<!-- A linked part: the group's full frame clipped to this part's region, which is also all the
+     pointer can hit. Its name, bars, buffs and changes sit inside the region, not over the stack. -->
+<ng-template #partPicture let-fit="fit">
+  <img
+    class="image chrome-smooth-image-trick pointer-events-auto block"
+    [ngClass]="fit"
+    data-testid="part-picture"
+    [style.clip-path]="partClip()"
+    (load)="imageView.onImageLoad($event)"
+    [src]="imageFile().url | safe: 'resourceUrl'"
+    alt=""
+    draggable="false"
+  />
+  <div
+    class="pointer-events-none absolute"
+    data-testid="part-region"
+    [ngStyle]="partRegionCss()"
+    [style.font-size.px]="partFontSizePx()"
+    [style.box-shadow]="isTargeted() ? '0 0 0 0.3em #ff3b30, 0 0 0.8em rgba(255,59,48,0.9)' : null"
+    [attr.data-targeted]="isTargeted()"
+  >
+    @if (hitFlash(); as flash) {
+      <div
+        class="animate-hit-flash absolute inset-0"
+        [ngStyle]="{
+          background:
+            flash === 'damage'
+              ? 'radial-gradient(circle, rgba(255,60,60,0.85) 0%, rgba(255,60,60,0) 70%)'
+              : 'radial-gradient(circle, rgba(90,230,120,0.7) 0%, rgba(90,230,120,0) 70%)',
+        }"
+      ></div>
+    }
+    <div class="absolute top-0 left-1/2 flex -translate-x-1/2 flex-col items-center gap-[0.2em] whitespace-nowrap">
+      @if (!hideName() && partLabel()) {
+        <span
+          data-testid="part-name"
+          class="bg-ui-panel text-ui-text max-w-[12em] truncate rounded-full px-[0.5em] leading-snug opacity-90"
+          >{{ partLabel() }}{{ isLock ? ' 🔒' : '' }}</span
+        >
+      }
+      @for (row of gaugeRows(); track row.gauge.identifier) {
+        <span
+          data-testid="part-gauge"
+          class="relative block h-[0.45em] w-[5em] overflow-hidden rounded-full bg-black/55"
+          [attr.title]="row.gauge.name + ' ' + row.numbers"
+        >
+          <span
+            class="absolute inset-y-0 left-0 block"
+            [ngStyle]="{ width: row.gauge.ratio * 100 + '%', background: row.gauge.color }"
+          ></span>
+        </span>
+      }
+      @if (!hideBuff() && buffBadges().length > 0) {
+        <span class="flex items-center gap-[0.2em]" data-testid="part-buffs">
+          @for (badge of buffBadges().slice(0, 5); track badge.identifier) {
+            <span
+              data-testid="buff-badge"
+              class="inline-flex size-[1.4em] items-center justify-center rounded-full border border-solid border-white/35 text-[0.9em] leading-none"
+              [style.background]="badge.color"
+              [attr.title]="badge.name"
+            >
+              @if (badge.iconUrl) {
+                <img class="size-[0.9em] object-contain" [src]="badge.iconUrl | safe: 'resourceUrl'" alt="" />
+              } @else {
+                {{ badge.icon }}
+              }
+            </span>
+          }
+          @if (buffBadges().length > 5) {
+            <span class="text-white [text-shadow:0_0.1em_0.2em_#000]">+{{ buffBadges().length - 5 }}</span>
+          }
+        </span>
+      }
+      @for (change of floatingChanges(); track change.key) {
+        <span
+          data-testid="resource-change"
+          class="animate-float-change text-[1.4em] leading-none font-bold tabular-nums [text-shadow:0_0.06em_0_#000,0_-0.06em_0_#000,0.06em_0_0_#000,-0.06em_0_0_#000]"
+          [ngClass]="change.kind === 'damage' ? 'text-[#ff5a5a]' : 'text-[#5ce07a]'"
+          [attr.data-kind]="change.kind"
+          >{{ change.label }}</span
+        >
+      }
+    </div>
+  </div>
+</ng-template>

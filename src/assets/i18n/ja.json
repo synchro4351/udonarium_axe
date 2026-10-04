@@ -1717,7 +1717,11 @@
         "unavailable": "画像を利用できません。画像の読み込みと編集権限を確認してください。",
         "failed": "作成できませんでした。範囲と画像を確認して、もう一度お試しください。",
         "oversized": "切り抜いた画像が2MBを超えました。範囲を小さくしてください。",
-        "overlap": "範囲は重ねられません。"
+        "overlap": "範囲は重ねられません。",
+        "linkTitle": "{{name}}を部位に分ける",
+        "linkHint": "部位を2つ以上囲んで名前を付けます。元のキャラクターは墓場へ移ります。",
+        "groupName": "モンスター名",
+        "link": "部位に分ける"
       }
     },
     "character": {
@@ -1751,6 +1755,8 @@
         "showVisionRange": "視界範囲を表示",
         "target": "ターゲット",
         "clearTargets": "ターゲットを全部外す",
+        "splitParts": "部位に分ける",
+        "unlinkPart": "部位の連動を外す",
         "radialBasic": "基本情報",
         "radialChat": "チャット",
         "radialBuffEffect": "バフ・演出",
