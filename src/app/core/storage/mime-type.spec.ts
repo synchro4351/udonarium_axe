@@ -97,3 +97,19 @@ describe('MimeType', () => {
     });
   });
 });
+
+describe('rasterType', () => {
+  it.each([
+    [[137, 80, 78, 71, 13, 10, 26, 10], 'image/png'],
+    [[255, 216, 255], 'image/jpeg'],
+    [[71, 73, 70, 56, 55, 97], 'image/gif'],
+    [[71, 73, 70, 56, 57, 97], 'image/gif'],
+    [[82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80], 'image/webp'],
+  ])('recognizes a raster signature %s', (signature, mime) => {
+    expect(MimeType.rasterType(new Uint8Array(signature as number[]))).toBe(mime);
+  });
+  it('leaves empty, truncated, text and non-image RIFF files untyped', () => {
+    for (const bytes of [[], [137, 80, 78], [60, 115, 118, 103], [82, 73, 70, 70, 0, 0, 0, 0, 87, 65, 86, 69]])
+      expect(MimeType.rasterType(new Uint8Array(bytes))).toBe('');
+  });
+});

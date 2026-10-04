@@ -45,7 +45,7 @@ async function runZip(id: number, entries: readonly ZipEntry[]): Promise<void> {
 async function runUnzip(id: number, blob: Blob): Promise<void> {
   const unzipped = unzipSync(new Uint8Array(await blob.arrayBuffer()));
   const entries: ZipEntry[] = Object.entries(unzipped).map(([name, bytes]) => {
-    const type = MimeType.type(name);
+    const type = MimeType.type(name) || MimeType.rasterType(bytes);
     return { name, type, blob: new Blob([bytes], type.length > 0 ? { type } : undefined) };
   });
   scope.postMessage({ id, kind: 'unzip', ok: true, entries });
