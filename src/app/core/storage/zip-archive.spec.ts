@@ -2,6 +2,7 @@ import {
   createZipBlob,
   createZipBlobOnMainThread,
   readZipEntries,
+  readZipEntriesOnMainThread,
   useZipWorkerFactory,
 } from '@axe/core/storage/zip-archive';
 import { strToU8, unzipSync } from 'fflate';
@@ -56,6 +57,19 @@ describe('readZipEntries()', () => {
     expect(byName.get('picture.webp')?.type).toBe('image/webp');
     expect(await byName.get('data.xml')?.blob.text()).toBe('<room />');
     expect([...new Uint8Array(await byName.get('picture.webp')!.blob.arrayBuffer())]).toEqual([1, 2, 3]);
+  });
+
+  it('loads a raster entry with an unknown extension while preserving its name and bytes', async () => {
+    const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3]);
+    const archive = await createZipBlobOnMainThread([
+      new File([bytes], 'image.undefined'),
+      new File([strToU8('<svg/>')], 'not-an-image.unknown'),
+    ]);
+    const entries = await readZipEntriesOnMainThread(archive);
+    expect(entries[0].name).toBe('image.undefined');
+    expect(entries[0].type).toBe('image/png');
+    expect(new Uint8Array(await entries[0].blob.arrayBuffer())).toEqual(bytes);
+    expect(entries[1].type).toBe('');
   });
 
   it('fails on a broken archive', async () => {

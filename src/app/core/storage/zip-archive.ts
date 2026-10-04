@@ -58,7 +58,7 @@ export async function readZipEntriesOnMainThread(blob: Blob): Promise<ZipEntry[]
     });
   });
   return Object.entries(unzipped).map(([name, data]) => {
-    const type = MimeType.type(name);
+    const type = MimeType.type(name) || MimeType.rasterType(data);
     return { name, type, blob: new Blob([data.slice()], type.length > 0 ? { type } : undefined) };
   });
 }
