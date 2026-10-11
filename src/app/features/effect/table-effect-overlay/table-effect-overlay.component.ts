@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { EffectFieldRenderable, EffectFieldService } from '@axe/application/effect/effect-field.service';
 import { EffectPlaybackService } from '@axe/application/effect/effect-playback.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
@@ -10,6 +11,7 @@ import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { PERF_EFFECT_RENDERABLES, perfCounters } from '@axe/core/util/perf-counters';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { isLinkedPart } from '@axe/domain/character/part-group';
 import { EffectParticleLayer, effectParticles } from '@axe/domain/effect/effect-particles';
 import { stagedEffectParticles } from '@axe/domain/effect/effect-stage-timeline';
 import {
@@ -52,6 +54,7 @@ export class TableEffectOverlayComponent {
   private readonly playback = inject(EffectPlaybackService);
   private readonly fieldService = inject(EffectFieldService);
   private readonly tabletopService = inject(TabletopService);
+  private readonly multipartGroup = inject(MultipartGroupService);
   private readonly uiSignalService = inject(UiSignalService);
   private readonly visionService = inject(VisionService);
   private readonly objectStore = inject(ObjectStore);
@@ -304,6 +307,9 @@ export class TableEffectOverlayComponent {
   private centerOf(identifier: string, gridSize: number): { x: number; y: number; z: number } | null {
     const object = this.objectStore.get<TabletopObject>(identifier);
     if (!(object instanceof TabletopObject) || !object.isVisibleOnTable) return null;
+    // A following effect re-resolves its target every frame and so overrides the position stored in
+    // the cast; a linked part has to land on its own region on this viewer's screen, not on the whole picture.
+    if (object instanceof GameCharacter && isLinkedPart(object)) return this.multipartGroup.anchorOf(object, gridSize);
     const size = (object as { size?: number }).size;
     const half = (gridSize * (typeof size === 'number' && size > 0 ? size : 1)) / 2;
     return { x: object.location.x + half, y: object.location.y + half, z: object.posZ };

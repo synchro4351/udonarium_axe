@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { EffectPlaybackService } from '@axe/application/effect/effect-playback.service';
+import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
+import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
@@ -166,6 +168,38 @@ describe('TableEffectOverlayComponent', () => {
       expect(host.querySelector('canvas')).not.toBeNull();
     }
   });
+  it('lands a following effect on the region of a linked part, not the middle of the whole picture', () => {
+    // The overlay re-resolves a following target every frame, which overrode the cast's own anchor.
+    TestBed.inject(UiSignalService).tableViewRotation.set({ x: 0, y: 0, z: 0 });
+    const grid = TestBed.inject(TabletopService).gridSize();
+    const plain = GameCharacter.create('whole', 1, '');
+    const part = GameCharacter.create('right', 1, '');
+    for (const piece of [plain, part]) {
+      piece.location.x = 400;
+      piece.location.y = 300;
+    }
+    part.partGroup = 'g';
+    part.partRegion = '0.5 0 0.5 1 1';
+    ObjectStore.instance.add(plain, false);
+    ObjectStore.instance.add(part, false);
+    preset.followTarget = true;
+
+    const centreX = (identifier: string) => {
+      playback.play({ presetIdentifier: preset.identifier, targets: [{ identifier, x: 0, y: 0, z: 0 }], seed: 3 });
+      const placement = component.canvases().at(-1)!;
+      // The origin of the layer is subtracted at the end; read the translate3d that comes first.
+      return { x: Number(/translate3d\(([-\d.]+)px/.exec(placement.transform)![1]), layer: placement.layer };
+    };
+
+    const whole = centreX(plain.identifier).x;
+    const region = centreX(part.identifier).x;
+
+    expect(whole).toBeCloseTo(400 + grid / 2);
+    expect(region).toBeCloseTo(400 + grid / 2 + grid / 4);
+    ObjectStore.instance.remove(plain);
+    ObjectStore.instance.remove(part);
+  });
+
   it('writes a reaction as text over the target, with no canvas under it', () => {
     preset.kind = 'reactpop';
     preset.reactionText = 'ナイス！';
