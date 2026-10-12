@@ -12,6 +12,7 @@ import { FileStorageComponent, PENDING_NOTICE_KEYS } from '@axe/features/file/fi
 import type { clearBackgroundAt, ClearBackgroundResult } from '@axe/features/file/file-storage/transparent-background';
 import { expectPanelDragRecovery, PanelDragTestHostComponent } from '@axe/testing/panel-drag-recovery';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
+import { ImageEditQueue } from '@axe/ui/components/image-editor/image-edit-queue.service';
 import type { Mock } from 'vitest';
 
 describe('FileStorageComponent', () => {
@@ -41,37 +42,51 @@ describe('FileStorageComponent', () => {
   describe('keeping track of which files are picked', () => {
     it('picks one that was not picked', () => {
       component.imgBlockClick('img-123');
-      expect(component['checkedFiles'].has('img-123')).toBe(true);
+      expect(component['checkedFiles']().has('img-123')).toBe(true);
     });
 
     it('unpicks one that was', () => {
       component.imgBlockClick('img-123');
       component.imgBlockClick('img-123');
-      expect(component['checkedFiles'].has('img-123')).toBe(false);
+      expect(component['checkedFiles']().has('img-123')).toBe(false);
     });
 
     it('keeps several apart', () => {
       component.imgBlockClick('img-a');
       component.imgBlockClick('img-b');
-      expect(component['checkedFiles'].has('img-a')).toBe(true);
-      expect(component['checkedFiles'].has('img-b')).toBe(true);
+      expect(component['checkedFiles']().has('img-a')).toBe(true);
+      expect(component['checkedFiles']().has('img-b')).toBe(true);
 
       component.imgBlockClick('img-a');
-      expect(component['checkedFiles'].has('img-a')).toBe(false);
-      expect(component['checkedFiles'].has('img-b')).toBe(true);
+      expect(component['checkedFiles']().has('img-a')).toBe(false);
+      expect(component['checkedFiles']().has('img-b')).toBe(true);
+    });
+
+    it('moves the tick to a picture saved from the official editor', async () => {
+      const image = TestBed.inject(ImageStorage).add('before-edit');
+      image.context.name = 'map.png';
+      image.context.blob = new Blob(['image']);
+      component.imgBlockClick(image.identifier);
+      const edited = ImageFile.createEmpty('after-edit');
+      const edit = vi.spyOn(TestBed.inject(ImageEditQueue), 'edit').mockResolvedValue({ kind: 'added', image: edited });
+
+      await component.editChecked();
+
+      expect(edit).toHaveBeenCalledWith({ blob: image.blob, name: image.name, replaces: image });
+      expect(component['checkedFiles']()).toEqual(new Set(['after-edit']));
     });
   });
 
   describe('changeTag', () => {
     it('returns early for the tag that means everything', () => {
-      component['checkedFiles'].add('img-1');
+      component['checkedFiles'].set(new Set(['img-1']));
       component.newTagName.set('全て');
       component.changeTag();
       // finishes without error, changing no tag
     });
 
     it('returns early for the reserved tag', () => {
-      component['checkedFiles'].add('img-1');
+      component['checkedFiles'].set(new Set(['img-1']));
       component.newTagName.set('システム予約');
       component.changeTag();
       // finishes without error
@@ -141,6 +156,7 @@ describe('FileStorageComponent', () => {
   describe('holding a pasted or chosen picture before adding it', () => {
     let loadImages: ReturnType<typeof vi.spyOn>;
     let load: ReturnType<typeof vi.spyOn>;
+    let upload: ReturnType<typeof vi.spyOn>;
     let revokeObjectURL: ReturnType<typeof vi.spyOn>;
     let clearBackground: Mock<typeof clearBackgroundAt>;
     let addUnconfirmed: ReturnType<typeof vi.spyOn>;
@@ -204,6 +220,7 @@ describe('FileStorageComponent', () => {
         .spyOn(TestBed.inject(FileArchiver), 'loadImages')
         .mockResolvedValue({ images: [ImageFile.createEmpty('pasted')], oversized: [] });
       load = vi.spyOn(TestBed.inject(FileArchiver), 'load').mockResolvedValue();
+      upload = vi.spyOn(TestBed.inject(ImageEditQueue), 'upload').mockResolvedValue({ images: [], oversized: [] });
       clearBackground = vi.fn<typeof clearBackgroundAt>().mockResolvedValue({
         kind: 'cleared',
         file: transparentCopy(),
@@ -231,7 +248,7 @@ describe('FileStorageComponent', () => {
       (box.querySelector('[data-testid="file-choose"]') as HTMLButtonElement).click();
 
       expect(opened).toHaveBeenCalledTimes(1);
-      expect(buttonsOf(box)).toEqual(['folder_open', 'content_paste_go']);
+      expect(buttonsOf(box)).toEqual(['folder_open', 'content_paste_go', 'edit']);
       expect(fixture.nativeElement.querySelectorAll('input[type="file"]')).toHaveLength(1);
     });
 
@@ -448,22 +465,24 @@ describe('FileStorageComponent', () => {
       expect(input.value).toBe('');
     });
 
-    it('still loads several chosen files straight away', () => {
+    it('sends several chosen files through the official upload queue', () => {
       const files = [new File(['a'], 'a.png', { type: 'image/png' }), new File(['b'], 'b.png', { type: 'image/png' })];
 
       chooseFiles(...files);
 
-      expect(load).toHaveBeenCalledTimes(1);
-      expect(Array.from(load.mock.calls[0][0] as File[])).toEqual(files);
+      expect(upload).toHaveBeenCalledTimes(1);
+      expect(upload).toHaveBeenCalledWith(files);
+      expect(load).not.toHaveBeenCalled();
       expect(component.pendingImage()).toBeNull();
     });
 
-    it('still loads straight away a single file the preview cannot show', () => {
+    it('sends a single file the preview cannot show through the official upload queue', () => {
       const svg = new File(['<svg/>'], 'icon.svg', { type: 'image/svg+xml' });
 
       chooseFiles(svg);
 
-      expect(load).toHaveBeenCalledTimes(1);
+      expect(upload).toHaveBeenCalledWith([svg]);
+      expect(load).not.toHaveBeenCalled();
       expect(component.pendingImage()).toBeNull();
     });
 
@@ -836,7 +855,10 @@ describe('FileStorageComponent', () => {
         'feature.file.fileStorage.pasteHint',
         'feature.file.fileStorage.addImageHintTouch',
         'feature.file.fileStorage.paste',
-        'feature.file.imageIntake.failed',
+        'feature.file.fileStorage.editImage',
+        'feature.file.fileStorage.editImageHint',
+        'ui.imageEditor.editFirst',
+        'ui.imageEditor.editFirstHint',
         'feature.file.fileStorage.pending.confirm',
         'feature.file.fileStorage.pending.add',
         'feature.file.fileStorage.pending.cancel',

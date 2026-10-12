@@ -48,6 +48,12 @@ export interface GameCharacterContextMenuCallbacks {
   onSplitParts?: () => void;
   /** Takes a linked part out of its group. Left out for anything but a part. */
   onUnlinkPart?: () => void;
+  /** Opens a first-person view from the piece. Left out where it may not be viewed from. */
+  onViewFirstPerson?: () => void;
+  /** Shares the first-person view with the room. Left out for anyone but the GM. */
+  onShareFirstPerson?: () => void;
+  /** Stops sharing the first-person view with the room. Left out when another piece is shared. */
+  onStopSharingFirstPerson?: () => void;
 }
 
 export interface GameCharacterContextMenuModel {
@@ -245,6 +251,20 @@ export function buildGameCharacterContextMenuModel(
       name: (char.showVisionRange ? '✔ ' : '') + t('feature.character.contextMenu.showVisionRange'),
       action: () => (char.showVisionRange = !char.showVisionRange),
     },
+    ...(callbacks.onViewFirstPerson
+      ? [{ name: t('feature.character.contextMenu.viewFirstPerson'), action: () => callbacks.onViewFirstPerson?.() }]
+      : []),
+    ...(callbacks.onShareFirstPerson
+      ? [{ name: t('feature.character.contextMenu.shareFirstPerson'), action: () => callbacks.onShareFirstPerson?.() }]
+      : []),
+    ...(callbacks.onStopSharingFirstPerson
+      ? [
+          {
+            name: t('feature.character.contextMenu.stopSharingFirstPerson'),
+            action: () => callbacks.onStopSharingFirstPerson?.(),
+          },
+        ]
+      : []),
   ];
   const openActions = [...basicActions, ...chatActions, ...buffEffectActions, ...lightActions];
 

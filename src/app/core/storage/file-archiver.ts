@@ -86,6 +86,8 @@ export class FileArchiver {
 
   networkService = Network;
   singleFileDropHandler: SingleFileDropHandler | null = null;
+  /** Whether the current seat may load files dropped onto the page. */
+  mayLoadDrops: () => boolean = () => true;
   /**
    * The guard that asks, during online play, before dropped data overwrites the room settings; null
    * until the domain has put one in the object store.
@@ -159,6 +161,9 @@ export class FileArchiver {
     event.preventDefault();
     // A drop made up rather than made by a browser may carry no list of types at all.
     if (event.dataTransfer?.types?.includes(INTERNAL_DRAG_TYPE)) return;
+    // Check before offering a single image to the panel, so a guest cannot bypass the guard via
+    // the custom preview handler or fall through to the ordinary loader.
+    if (!this.mayLoadDrops()) return;
 
     // A drop can arrive before startup finishes, or where no guard exists at all.
     this.reloadCheck?.reloadCheckStart(this.networkService.peerContext?.roomName !== '');
@@ -202,7 +207,7 @@ export class FileArchiver {
     let droppedImageCount = 0;
     for (const file of loadFiles) {
       const imageDropPoint = placesDroppedImages ? this.offsetDropPoint(dropPoint, droppedImageCount) : undefined;
-      const isImageDropped = await this.handleImage(file, imageDropPoint, tooLarge);
+      const isImageDropped = await this.handleImage(file, imageDropPoint, tooLarge, placesDroppedImages);
       if (isImageDropped) droppedImageCount++;
       await this.handleAudio(file, tooLarge);
       await this.handleText(file, dropPoint);
@@ -253,14 +258,20 @@ export class FileArchiver {
   private async handleImage(
     file: File,
     dropPoint: { x: number; y: number } | undefined,
-    tooLarge: FileTooLarge[]
+    tooLarge: FileTooLarge[],
+    handsBackTooLarge: boolean
   ): Promise<boolean> {
     if (!file.type.startsWith('image/')) return false;
     // With no guard there is nothing to stop it.
     if (!(this.reloadCheck?.isLoadOk() ?? true)) return false;
     const image = await this.storeImage(file);
     if (!image) {
-      tooLarge.push({ name: file.name, kind: 'image', limitBytes: MAX_LOADED_IMAGE_BYTES });
+      tooLarge.push({
+        name: file.name,
+        kind: 'image',
+        limitBytes: MAX_LOADED_IMAGE_BYTES,
+        ...(handsBackTooLarge ? { file, ...(dropPoint ? { dropPoint } : {}) } : {}),
+      });
       return false;
     }
     if (dropPoint) emitImageDropped({ identifier: image.identifier, fileName: file.name, dropPoint });

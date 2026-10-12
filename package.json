@@ -1,6 +1,6 @@
 {
   "name": "udonarium_axe",
-  "version": "1.64.0",
+  "version": "1.65.2",
   "license": "MIT",
   "scripts": {
     "ng": "ng",
@@ -37,7 +37,6 @@
     "fflate": "^0.8.3",
     "linkify-html": "^4.3.2",
     "linkifyjs": "^4.3.2",
-    "marked": "^15.0.12",
     "mp4-muxer": "^5.2.2",
     "rxjs": "^7.5.5",
     "three": "0.186.1",

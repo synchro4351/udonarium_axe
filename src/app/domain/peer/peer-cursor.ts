@@ -186,8 +186,8 @@ export class PeerCursor extends GameObject {
   }
 
   /** The room's shared vote, which this peer's answer belongs to. */
-  get vote(): Vote {
-    return ObjectStore.instance.get<Vote>('Vote')!;
+  get vote(): Vote | null {
+    return ObjectStore.instance.get<Vote>('Vote');
   }
 
   static myCursor: PeerCursor = null!;
@@ -331,7 +331,8 @@ export class PeerCursor extends GameObject {
   /**
    * Takes in synced state, keeping the user and peer id lookups in step with it.
    *
-   * When the peer has answered a different vote, the room's vote is checked to see whether it has finished.
+   * When the peer has answered a different vote, the room's vote is checked to see whether it has
+   * finished, where the room holds one.
    */
   override apply(context: ObjectContext) {
     const syncData = context.syncData as Record<string, unknown>;
@@ -350,7 +351,7 @@ export class PeerCursor extends GameObject {
     super.apply(context);
 
     if (voteId != this.voteId) {
-      this.vote.chkFinishVote();
+      this.vote?.chkFinishVote();
     }
   }
 }

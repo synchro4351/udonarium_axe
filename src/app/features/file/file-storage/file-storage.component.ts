@@ -9,6 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ImageUploadPreferenceService } from '@axe/application/file/image-upload-preference.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
@@ -37,6 +38,7 @@ import {
   PickedColor,
 } from '@axe/features/file/file-storage/transparent-background';
 import { MultipartCharacterComponent } from '@axe/features/file/multipart-character/multipart-character.component';
+import { ImageEditQueue } from '@axe/ui/components/image-editor/image-edit-queue.service';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -61,7 +63,7 @@ type PendingNotice =
 /** The message shown for each outcome of pasting or choosing a picture and adding it. */
 export const PENDING_NOTICE_KEYS: Readonly<Record<PendingNotice, string>> = {
   none: 'feature.file.fileStorage.pasteNothing',
-  unsupported: 'feature.file.imageIntake.failed',
+  unsupported: 'feature.file.fileStorage.pending.failed',
   unreadable: 'feature.file.fileStorage.pasteWithKeys',
   noPermission: 'feature.file.fileStorage.pending.noPermission',
   oversized: 'feature.file.fileStorage.pending.oversized',
@@ -114,14 +116,16 @@ export class FileStorageComponent implements DroppedImageHolder {
   private readonly droppedImages = inject(DroppedImageEventHandlerService);
   private readonly t = inject(TRANSLATE_FN);
   private readonly multipart = inject(MultipartCharacterService);
+  private readonly editQueue = inject(ImageEditQueue);
+  protected readonly uploadPreference = inject(ImageUploadPreferenceService);
 
   get canCreateParts(): boolean {
     this.objectChange.fileVersion();
     this.objectChange.collectionOf('image-tag')();
-    const identifier = [...this.checkedFiles][0];
+    const identifier = [...this.checkedFiles()][0];
     if (identifier) this.objectChange.versionOf(`imagetag_${identifier}`)();
     const image = identifier ? this.imageStorage.get(identifier) : null;
-    return this.checkedFiles.size === 1 && !!image && this.mayShow(image) && this.multipart.mayUse(identifier);
+    return this.checkedFiles().size === 1 && !!image && this.mayShow(image) && this.multipart.mayUse(identifier);
   }
 
   openMultipart(): void {
@@ -133,7 +137,7 @@ export class FileStorageComponent implements DroppedImageHolder {
       minWidth: 300,
       minHeight: 400,
     });
-    void component.initialize([...this.checkedFiles][0]);
+    void component.initialize([...this.checkedFiles()][0]);
   }
 
   /** The label shown for a tag in the tag filter, with the all and untagged entries translated. */
@@ -143,12 +147,18 @@ export class FileStorageComponent implements DroppedImageHolder {
     return tag;
   }
 
-  protected checkedFiles = new Set<string>();
+  protected readonly checkedFiles = signal<ReadonlySet<string>>(new Set());
 
   /** Only the master may keep a picture back, or see one that is being kept. */
   get canKeepSecret(): boolean {
     return this.rolePermission.canSeeHidden;
   }
+
+  /** Whether the current seat may add or edit pictures. */
+  protected readonly canEdit = computed(() => {
+    this.objectChange.trackMyCursor();
+    return this.rolePermission.canEditTabletop;
+  });
 
   /** The master's own view of what is being kept. Everyone else never sees them at all. */
   readonly showSecret = signal(true);
@@ -244,7 +254,7 @@ export class FileStorageComponent implements DroppedImageHolder {
     const changeableImages = this.images();
 
     for (const img of changeableImages) {
-      if (this.checkedFiles.has(img.context.identifier)) {
+      if (this.checkedFiles().has(img.context.identifier)) {
         let imageTag = ImageTag.get(img.context.identifier);
         imageTag = imageTag ? imageTag : ImageTag.create(img.context.identifier);
         if (candidate === this.t('feature.file.fileStorage.unset')) {
@@ -267,7 +277,7 @@ export class FileStorageComponent implements DroppedImageHolder {
 
     for (const image of this.images()) {
       const identifier = image.context.identifier;
-      if (!this.checkedFiles.has(identifier)) continue;
+      if (!this.checkedFiles().has(identifier)) continue;
       const tag = ImageTag.get(identifier) ?? ImageTag.create(identifier);
       // What the tool brought with it is nobody's to keep or to give up.
       if (tag.tag === SYSTEM_RESERVED_TAG) continue;
@@ -305,13 +315,55 @@ export class FileStorageComponent implements DroppedImageHolder {
       input.value = '';
       return;
     }
-    const files = input.files;
-    if (files?.length === 1 && isPasteableImage(files[0].type)) {
-      void this.offer({ kind: 'image', file: files[0] });
-    } else if (files && files.length) {
-      this.fileArchiver.load(files);
-    }
+    const files = Array.from(input.files ?? []);
     input.value = '';
+    if (!files.length) return;
+    if (files.length === 1 && isPasteableImage(files[0].type)) {
+      void this.offer({ kind: 'image', file: files[0] });
+      return;
+    }
+    void this.uploadFiles(files);
+  }
+
+  /** Sends a batch through the official upload queue, which applies the edit-first preference. */
+  private async uploadFiles(files: readonly File[]): Promise<void> {
+    if (!this.rolePermission.canEditTabletop || !files.length) return;
+    this.notice.set('');
+    const { oversized } = await this.editQueue.upload(files);
+    if (oversized.length)
+      this.notice.set(this.t('feature.file.fileStorage.oversized', { names: oversized.join(', ') }));
+  }
+
+  /** What the last batch upload or edit asked for has to say, empty when nothing. */
+  readonly notice = signal('');
+
+  /** The one checked picture, if exactly one is still in the list. */
+  checkedImage(): ImageFile | null {
+    const checked = this.images().filter((image) => this.checkedFiles().has(image.identifier));
+    return checked.length === 1 ? checked[0] : null;
+  }
+
+  /** Opens the checked picture in the official editor and replaces it in place when saved. */
+  async editChecked(): Promise<void> {
+    const image = this.checkedImage();
+    if (!image || !this.rolePermission.canEditTabletop) return;
+    this.notice.set('');
+    let blob: Blob;
+    try {
+      blob = image.blob ?? (await (await fetch(image.url)).blob());
+    } catch {
+      this.notice.set(this.t('ui.imageEditor.failed'));
+      return;
+    }
+    const outcome = await this.editQueue.edit({ blob, name: image.name, replaces: image });
+    if (outcome.kind === 'added') {
+      this.checkedFiles.update((checked) => {
+        const next = new Set(checked);
+        next.delete(image.identifier);
+        next.add(outcome.image.identifier);
+        return next;
+      });
+    }
   }
 
   private readonly pasteBox = viewChild<ElementRef<HTMLElement>>('pasteBox');
@@ -623,10 +675,10 @@ export class FileStorageComponent implements DroppedImageHolder {
 
   /** Ticks or unticks a picture for the bulk tag and keep-back actions. */
   imgBlockClick(identifier: string) {
-    if (this.checkedFiles.has(identifier)) {
-      this.checkedFiles.delete(identifier);
-    } else {
-      this.checkedFiles.add(identifier);
-    }
+    this.checkedFiles.update((checked) => {
+      const next = new Set(checked);
+      if (!next.delete(identifier)) next.add(identifier);
+      return next;
+    });
   }
 }

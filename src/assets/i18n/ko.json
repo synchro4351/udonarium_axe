@@ -301,7 +301,8 @@
         "prefill": "채팅창에 초안 넣기",
         "turn": "행동 순서",
         "group": "멀티 액션",
-        "appearance": "겉모습 바꾸기"
+        "appearance": "겉모습 바꾸기",
+        "firstPerson": "던전드리 마스터 모드／돌아오기"
       },
       "mode": {
         "cast": "발동",
@@ -332,7 +333,8 @@
         "prefill": "채팅 입력창에 문자를 넣기만 하고 보내지는 않습니다. 긴 문장의 초안에 씁니다.",
         "turn": "행동 순서를 진행하거나 되돌립니다.",
         "group": "다른 칸을 골라 차례로 쏩니다. 멀티 액션끼리는 고를 수 없습니다.",
-        "appearance": "말 그림·서 있는 그림·크기를 바꿉니다. 멀티 액션에서 이펙트와 나란히 두면 변신 연출이 됩니다."
+        "appearance": "말 그림·서 있는 그림·크기를 바꿉니다. 멀티 액션에서 이펙트와 나란히 두면 변신 연출이 됩니다.",
+        "firstPerson": "그 캐릭터의 시점으로 들어갑니다. 그 시점으로 보고 있을 때 다시 누르면 테이블로 돌아옵니다."
       },
       "lock": "위치 고정",
       "pageTitle": "{{page}} 페이지",
@@ -1682,7 +1684,8 @@
         "outline": "테두리",
         "changeColor": "드러난 부분 색상",
         "scratchMaskNote": "※ width, height 항목은 최대 50",
-        "cutInFitPanelTitle": "컷인 위치 조정: {{name}}"
+        "cutInFitPanelTitle": "컷인 위치 조정: {{name}}",
+        "rangeShapeDiamond": "다이아몬드"
       },
       "settingsTab": {
         "inventorySetting": "인벤토리 설정",
@@ -1840,18 +1843,10 @@
           "undo": "되돌리기",
           "missed": "이미지 위를 클릭하세요",
           "failed": "투명하게 하지 못했습니다"
-        }
-      },
-      "imageIntake": {
-        "title": "이미지 추가",
-        "hint": "배경을 클릭하면 그 색과 이어진 범위가 투명해집니다. 여러 번 클릭할 수 있습니다.",
-        "tolerance": "색 범위",
-        "undo": "한 단계 되돌리기",
-        "cancel": "취소",
-        "add": "추가",
-        "failed": "이 이미지를 읽을 수 없습니다",
-        "tooLarge": "2MB를 넘어 추가할 수 없습니다. 투명하게 할 범위를 바꾸거나 작은 이미지를 사용해 주세요",
-        "saveFailed": "이미지를 저장하지 못했습니다. 다시 시도해 주세요"
+        },
+        "oversized": "2MB를 넘어 추가하지 못했습니다: {{names}}",
+        "editImage": "편집",
+        "editImageHint": "체크한 이미지 1장을 편집해 바꿉니다. 사용 중인 말 등도 새 이미지로 바뀝니다"
       },
       "tooLarge": {
         "one": "「{{name}}」은(는) 너무 커서 불러오지 못했습니다({{limits}})",
@@ -1922,7 +1917,10 @@
         "radialObject": "말 조작",
         "moveMode": "이동 방법",
         "splitParts": "부위로 나누기",
-        "unlinkPart": "부위 연동 해제"
+        "unlinkPart": "부위 연동 해제",
+        "viewFirstPerson": "이 캐릭터의 시점으로 보기",
+        "shareFirstPerson": "모두를 이 캐릭터의 시점으로",
+        "stopSharingFirstPerson": "모두의 공유 시점 해제"
       },
       "panel": {
         "sheet": "캐릭터 시트",
@@ -1968,7 +1966,8 @@
         "trigger": "트리거 캐릭터",
         "triggerPlaceholder": "지정하지 않으면 본인",
         "triggerUnknown": "{{name}}(탁상 밖)",
-        "iconImage": "이미지에서 고르기"
+        "iconImage": "이미지에서 고르기",
+        "more": "{{count}}개 더"
       },
       "importImg": {
         "sourceLabel": "복제 원본＞",
@@ -2226,7 +2225,11 @@
         "createDeck": "이미지 태그로 덱 만들기",
         "defaultDeckName": "덱",
         "defaultCoinName": "코인",
-        "createAmbience": "환경 이펙트 놓기"
+        "createAmbience": "환경 이펙트 놓기",
+        "rangeShapeDiamond": "다이아몬드",
+        "rangeShapeAsDiamond": "다이아몬드로 출력",
+        "rangeShapeAsSquare": "사각형으로 출력",
+        "rangeShapeSquareFamily": "사각형・다이아몬드"
       },
       "panel": {
         "terrain": "지형 설정",
@@ -2376,7 +2379,10 @@
         "doorStyleLift": "위로 올라감",
         "doorStyleSink": "아래로 가라앉음",
         "doorStyleSlide": "옆으로 미닫이",
-        "doorFlip": "열리는 방향 반전"
+        "doorFlip": "열리는 방향 반전",
+        "shapeAsDiamond": "다이아몬드로 출력",
+        "shapeAsSquare": "사각형으로 출력",
+        "shapeSquareFamily": "사각형・다이아몬드"
       },
       "holdHint": {
         "footing": "휠로 발판을 오르내리기",
@@ -2793,7 +2799,11 @@
       },
       "shownTo_master": "GM만",
       "shownTo_sight": "시야에 들어오면",
-      "shownTo_room": "전원"
+      "shownTo_room": "전원",
+      "rotateHint": {
+        "holdAlt": "Alt를 누르고 있는 동안 {{step}}°씩 맞춥니다",
+        "snapping": "{{step}}°씩 맞추는 중입니다"
+      }
     },
     "roomSettings": {
       "title": "방 설정",
@@ -5311,6 +5321,48 @@
           "hint": "주크박스 SE, 핫바 소리 등"
         }
       }
+    },
+    "firstPerson": {
+      "exit": "테이블로 돌아가기",
+      "enter": "던전드리 마스터 모드",
+      "chooseSeat": "던전드리 마스터 모드(캐릭터 선택)",
+      "noSeat": "던전드리 마스터 모드(볼 수 있는 캐릭터가 없습니다)",
+      "shareMenu": "모두의 시점 정하기",
+      "sharing": "공유 중인 시점 바꾸기",
+      "shareEmpty": "시점으로 볼 수 있는 캐릭터가 테이블에 없습니다",
+      "playerOwned": "PL",
+      "sharedBadge": "GM 공유 시점",
+      "sharedByGm": "GM이 시점을 공유 중입니다",
+      "stopSharing": "공유 시점 해제",
+      "sharedMissing": "공유 중인 캐릭터가 테이블에 없습니다(눌러서 해제)",
+      "keysHint": "WASD·↑↓로 이동 · Q/E·←→로 방향 전환 · Space로 문 · F로 불 · T로 타깃 · Shift+T로 타깃 모두 해제 · 드래그로 둘러보기(Esc로 정면)",
+      "keysHintHex": "W/S·↑↓로 앞뒤 · A/D로 앞 대각선 · Z/C로 뒤 대각선 · Q/E·←→로 방향 전환 · Space로 문 · F로 불 · T로 타깃 · Shift+T로 타깃 모두 해제 · 드래그로 둘러보기(Esc로 정면)",
+      "facing": {
+        "north": "북",
+        "northEast": "북동",
+        "east": "동",
+        "southEast": "남동",
+        "south": "남",
+        "southWest": "남서",
+        "west": "서",
+        "northWest": "북서"
+      },
+      "hud": {
+        "forward": "앞으로",
+        "back": "뒤로",
+        "left": "왼쪽으로",
+        "right": "오른쪽으로",
+        "frontLeft": "왼쪽 앞으로",
+        "frontRight": "오른쪽 앞으로",
+        "backLeft": "왼쪽 뒤로",
+        "backRight": "오른쪽 뒤로",
+        "turnLeft": "왼쪽으로 돌기",
+        "turnRight": "오른쪽으로 돌기",
+        "door": "문 열고 닫기",
+        "torchOn": "불을 켜기",
+        "torchOff": "불을 끄기",
+        "clearTargets": "타깃 해제"
+      }
     }
   },
   "app": {
@@ -5374,7 +5426,14 @@
       "buttonGuide": "모든 버튼 이름 표시 (? 키)",
       "soundSettings": "소리 설정",
       "stamp": "스탬프 관리",
-      "stampPacks": "스탬프 관리"
+      "stampPacks": "스탬프 관리",
+      "firstPersonEnter": "던전드리 마스터 모드",
+      "firstPersonChoose": "던전드리 마스터 모드(말 선택)",
+      "firstPersonExit": "던전드리 마스터 모드 끝내기",
+      "firstPersonNoSeat": "던전드리 마스터 모드(볼 수 있는 말이 없습니다)",
+      "firstPersonShared": "던전드리 마스터 모드(GM이 공유 중)",
+      "namesShown": "이름: 표시 중 (클릭하면 숨김)",
+      "namesHidden": "이름: 숨김 (클릭하면 표시)"
     },
     "roomDataDefault": "룸 데이터"
   },
@@ -6022,6 +6081,41 @@
       "standIn": "[{{words}}]",
       "unnamedPack": "(이름 없음)",
       "manage": "스탬프 세트 관리"
+    },
+    "imageEditor": {
+      "title": "이미지 편집",
+      "position": "{{count}}장 중 {{index}}번째: {{name}}",
+      "crop": "자르기",
+      "erase": "배경 투명화",
+      "turnLeft": "왼쪽으로 회전",
+      "turnRight": "오른쪽으로 회전",
+      "flipAcross": "좌우 반전",
+      "flipUpDown": "상하 반전",
+      "reset": "편집 모두 취소",
+      "cropHint": "이미지 위를 드래그해 남길 범위를 감쌉니다. 틀 안을 드래그하면 옮길 수 있고, 모서리를 드래그하면 크기를 바꿀 수 있습니다.",
+      "ratio_free": "자유",
+      "ratio_original": "원래 비율",
+      "keepWhole": "전체 사용",
+      "eraseHint": "배경을 클릭하면 그 색과 이어진 범위가 투명해집니다. 여러 번 클릭할 수 있습니다.",
+      "tolerance": "색 범위",
+      "undo": "한 단계 되돌리기",
+      "size": "출력 크기",
+      "width": "너비",
+      "height": "높이",
+      "keepProportions": "가로세로 비율 유지",
+      "cancel": "취소",
+      "skip": "이 이미지는 추가하지 않음",
+      "restAsTheyAre": "나머지는 그대로 추가",
+      "add": "추가",
+      "replace": "바꾸기",
+      "addAsCopy": "사본으로 추가",
+      "addAsCopyHint": "원래 이미지는 그대로 두고 편집한 이미지를 별도의 이미지로 추가합니다",
+      "failed": "이 이미지를 읽을 수 없습니다",
+      "tooLarge": "내보내면 {{size}}MB가 되어 2MB를 넘으므로 추가할 수 없습니다. 남길 범위를 줄이거나 출력 크기를 낮춰 주세요",
+      "overLimit": "이 이미지는 {{size}}MB로 상한 2MB를 넘습니다. 「추가」하면 가벼운 형식으로 변환합니다. 그래도 넘으면 잘라 내거나 출력 크기를 낮춰 주세요",
+      "editFirst": "편집한 뒤 추가",
+      "editFirstHint": "체크하면 고른 이미지를 한 장씩 편집 화면에서 연 뒤 추가합니다. 2MB를 넘는 이미지는 체크하지 않아도 편집 화면에서 열립니다",
+      "saveFailed": "이미지를 저장하지 못했습니다. 다시 시도해 주세요"
     }
   }
 }

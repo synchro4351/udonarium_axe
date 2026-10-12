@@ -56,10 +56,19 @@
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-1.5">
-      <input #fileInput type="file" class="hidden" (change)="handleFileSelect($event)" multiple accept="image/*" />
+      <input
+        #fileInput
+        type="file"
+        class="hidden"
+        [disabled]="!canEdit()"
+        (change)="handleFileSelect($event)"
+        multiple
+        accept="image/*"
+      />
       <button
         class="bg-ui-elevated border-ui-border-panel text-ui-text rounded-ui-sm hover:bg-ui-hover hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
         type="button"
+        [disabled]="!canEdit()"
         data-testid="file-choose"
         (click)="fileInput.click()"
       >
@@ -69,13 +78,38 @@
       <button
         class="bg-ui-elevated border-ui-border-panel text-ui-text rounded-ui-sm hover:bg-ui-hover hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
         type="button"
-        [disabled]="pendingAdding()"
+        [disabled]="!canEdit() || pendingAdding()"
         (click)="readFromClipboard()"
       >
         <i class="material-icons" aria-hidden="true">content_paste_go</i>
         {{ 'feature.file.fileStorage.paste' | transloco }}
       </button>
       <span class="ml-auto text-[11px]">{{ 'feature.file.fileStorage.maxSize' | transloco }}</span>
+      <button
+        class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] disabled:cursor-default disabled:opacity-40 [&_.material-icons]:text-[14px]!"
+        type="button"
+        data-testid="file-storage-edit"
+        [title]="'feature.file.fileStorage.editImageHint' | transloco"
+        [disabled]="!canEdit() || !checkedImage()"
+        (click)="editChecked()"
+      >
+        <i class="material-icons" aria-hidden="true">edit</i>
+        {{ 'feature.file.fileStorage.editImage' | transloco }}
+      </button>
+      <label
+        class="text-ui-muted ml-auto inline-flex cursor-pointer items-center gap-1 text-[12px] whitespace-nowrap select-none"
+        data-testid="file-storage-edit-first"
+        [title]="'ui.imageEditor.editFirstHint' | transloco"
+      >
+        <input
+          type="checkbox"
+          class="[accent-color:var(--ui-accent)]"
+          [checked]="uploadPreference.editFirst()"
+          [disabled]="!canEdit()"
+          (change)="uploadPreference.setEditFirst($any($event.target).checked)"
+        />
+        {{ 'ui.imageEditor.editFirst' | transloco }}
+      </label>
     </div>
   </div>
 
@@ -150,6 +184,7 @@
         <button
           class="bg-ui-accent-bg border-ui-accent text-ui-accent rounded-ui-sm hover:bg-ui-hover inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
           type="button"
+          data-testid="pending-image-add"
           [disabled]="pendingAdding() || clearingColor()"
           (click)="confirmPending()"
         >
@@ -178,6 +213,10 @@
       {{ pendingNoticeKeys[notice] | transloco }}
     }
   </p>
+
+  @if (notice(); as message) {
+    <span class="text-ui-dim mt-1 text-[11px]" data-testid="file-storage-notice">{{ message }}</span>
+  }
 
   <div
     class="bg-ui-panel border-ui-border-panel z-1 mx-[-8] mt-2.5 flex flex-wrap items-center gap-1.5 border-y border-solid px-2.5 py-2"
@@ -228,8 +267,8 @@
     @for (file of images(); track file) {
       <div
         class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:border-ui-accent relative flex cursor-pointer flex-col items-center gap-1 border border-solid p-1.5 transition-[background,border-color] select-none hover:shadow-[0_0_0_2px_var(--ui-accent-glow)]"
-        [class.border-ui-accent!]="checkedFiles.has(file.identifier)"
-        [class.bg-ui-accent-bg!]="checkedFiles.has(file.identifier)"
+        [class.border-ui-accent!]="checkedFiles().has(file.identifier)"
+        [class.bg-ui-accent-bg!]="checkedFiles().has(file.identifier)"
         (click)="imgBlockClick(file.identifier)"
       >
         @if (file.url) {
@@ -248,7 +287,7 @@
           <input
             class="size-3.5 [accent-color:var(--ui-accent)]"
             type="checkbox"
-            [checked]="checkedFiles.has(file.identifier)"
+            [checked]="checkedFiles().has(file.identifier)"
             tabindex="-1"
           />
         </div>

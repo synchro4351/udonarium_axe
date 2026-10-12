@@ -301,7 +301,8 @@
         "prefill": "チャット欄に下書きする",
         "turn": "行動順",
         "group": "マルチアクション",
-        "appearance": "見た目を変える"
+        "appearance": "見た目を変える",
+        "firstPerson": "ダンジョンドリィマスターモード／戻る"
       },
       "mode": {
         "cast": "発動",
@@ -332,7 +333,8 @@
         "prefill": "チャット入力欄に文字を置くだけで、送信はしません。長い呪文や定型文の下書きに使います。",
         "turn": "行動順を進めたり戻したりします。",
         "group": "他の枠をいくつか選んで、選んだ順に撃ちます。マルチアクション同士は選べません。",
-        "appearance": "コマの絵・立ち絵・大きさを差し替えます。マルチアクションでエフェクトと並べると、変身の演出になります。"
+        "appearance": "コマの絵・立ち絵・大きさを差し替えます。マルチアクションでエフェクトと並べると、変身の演出になります。",
+        "firstPerson": "そのキャラクターの視点に入ります。その視点で見ているときにもう一度押すと卓に戻ります。"
       },
       "lock": "位置を固定",
       "pageTitle": "{{page}} ページ目",
@@ -1682,7 +1684,8 @@
         "mapMaskBackground": "背景色",
         "outline": "文字の縁取り",
         "mapMaskOutlineColor": "縁取り色",
-        "cutInFitPanelTitle": "カットイン位置合わせ：{{name}}"
+        "cutInFitPanelTitle": "カットイン位置合わせ：{{name}}",
+        "rangeShapeDiamond": "ダイヤ"
       },
       "settingsTab": {
         "inventorySetting": "インベントリ設定",
@@ -1840,18 +1843,10 @@
           "undo": "元に戻す",
           "missed": "画像の上をクリックしてください",
           "failed": "透明にできませんでした"
-        }
-      },
-      "imageIntake": {
-        "title": "画像を追加",
-        "hint": "背景をクリックすると、その色とつながった範囲が透明になります。何度でもクリックできます。",
-        "tolerance": "色の幅",
-        "undo": "ひとつ戻す",
-        "cancel": "やめる",
-        "add": "追加",
-        "failed": "この画像は読み込めませんでした",
-        "tooLarge": "2MB を超えるため追加できません。透過する範囲を変えるか、小さな画像にしてください",
-        "saveFailed": "画像を保存できませんでした。もう一度お試しください"
+        },
+        "oversized": "2MBを超えるため取り込めませんでした: {{names}}",
+        "editImage": "編集",
+        "editImageHint": "チェックした画像 1 枚を編集して置き換えます。使っているコマなども新しい画像になります"
       },
       "tooLarge": {
         "one": "「{{name}}」は大きすぎるため読み込めませんでした（{{limits}}）",
@@ -1922,7 +1917,10 @@
         "radialObject": "コマ操作",
         "moveMode": "移動の仕方",
         "splitParts": "部位に分ける",
-        "unlinkPart": "部位の連動を外す"
+        "unlinkPart": "部位の連動を外す",
+        "viewFirstPerson": "このコマの視点で見る",
+        "shareFirstPerson": "全員をこのコマの視点にする",
+        "stopSharingFirstPerson": "全員の共有視点を解除する"
       },
       "panel": {
         "sheet": "キャラクターシート",
@@ -1968,7 +1966,8 @@
         "trigger": "トリガーキャラクター",
         "triggerPlaceholder": "未指定なら本人",
         "triggerUnknown": "{{name}}（卓外）",
-        "iconImage": "画像から選ぶ"
+        "iconImage": "画像から選ぶ",
+        "more": "あと{{count}}個"
       },
       "importImg": {
         "sourceLabel": "複製元＞",
@@ -2226,7 +2225,11 @@
         "createDeck": "画像タグから山札を作成",
         "defaultDeckName": "山札",
         "defaultCoinName": "コイン",
-        "createAmbience": "環境エフェクトを置く"
+        "createAmbience": "環境エフェクトを置く",
+        "rangeShapeDiamond": "ダイヤ",
+        "rangeShapeAsDiamond": "ダイヤとして出力",
+        "rangeShapeAsSquare": "四角形として出力",
+        "rangeShapeSquareFamily": "四角形・ダイヤ"
       },
       "panel": {
         "terrain": "地形設定",
@@ -2376,7 +2379,10 @@
         "doorStyleLift": "上へ上がる",
         "doorStyleSink": "下へ沈む",
         "doorStyleSlide": "横にスライド",
-        "doorFlip": "開く向きを反転"
+        "doorFlip": "開く向きを反転",
+        "shapeAsDiamond": "ダイヤとして出力",
+        "shapeAsSquare": "四角形として出力",
+        "shapeSquareFamily": "四角形・ダイヤ"
       },
       "holdHint": {
         "footing": "ホイールで足場を上下に辿る",
@@ -2793,7 +2799,11 @@
       },
       "shownTo_master": "GM だけ",
       "shownTo_sight": "視界に入ったら",
-      "shownTo_room": "全員"
+      "shownTo_room": "全員",
+      "rotateHint": {
+        "holdAlt": "Alt を押しているあいだ {{step}}° ごとにそろえる",
+        "snapping": "{{step}}° ごとにそろえています"
+      }
     },
     "roomSettings": {
       "title": "部屋設定",
@@ -5035,6 +5045,48 @@
           "hint": "ジュークボックスの SE、ホットバーなど"
         }
       }
+    },
+    "firstPerson": {
+      "exit": "卓に戻る",
+      "enter": "ダンジョンドリィマスターモード",
+      "chooseSeat": "ダンジョンドリィマスターモード（コマを選ぶ）",
+      "noSeat": "ダンジョンドリィマスターモード（見られるコマがいません）",
+      "shareMenu": "全員の視点を決める",
+      "sharing": "共有中の視点を変える",
+      "shareEmpty": "視点にできるコマが卓上にいません",
+      "playerOwned": "PL",
+      "sharedBadge": "GM の共有視点",
+      "sharedByGm": "GM が共有中",
+      "stopSharing": "全員の共有視点を解除",
+      "sharedMissing": "共有中のコマが卓にいません（押すと解除）",
+      "keysHint": "WASD・↑↓ で移動　Q/E・←→ で向きを変える　Space で扉　F で明かり　T でターゲット　Shift+T で全部外す　ドラッグで見回す（Esc で正面）",
+      "keysHintHex": "W/S・↑↓ で前後　A/D で斜め前　Z/C で斜め後ろ　Q/E・←→ で向きを変える　Space で扉　F で明かり　T でターゲット　Shift+T で全部外す　ドラッグで見回す（Esc で正面）",
+      "facing": {
+        "north": "北",
+        "northEast": "北東",
+        "east": "東",
+        "southEast": "南東",
+        "south": "南",
+        "southWest": "南西",
+        "west": "西",
+        "northWest": "北西"
+      },
+      "hud": {
+        "forward": "前へ",
+        "back": "後ろへ",
+        "left": "左へ",
+        "right": "右へ",
+        "frontLeft": "左前へ",
+        "frontRight": "右前へ",
+        "backLeft": "左後ろへ",
+        "backRight": "右後ろへ",
+        "turnLeft": "左を向く",
+        "turnRight": "右を向く",
+        "door": "扉を開け閉めする",
+        "torchOn": "明かりを灯す",
+        "torchOff": "明かりを消す",
+        "clearTargets": "ターゲットを外す"
+      }
     }
   },
   "app": {
@@ -5098,7 +5150,14 @@
       "buttonGuide": "ボタンの名前をすべて表示（? キー）",
       "soundSettings": "音の設定",
       "stamp": "スタンプ管理",
-      "stampPacks": "スタンプ管理"
+      "stampPacks": "スタンプ管理",
+      "firstPersonEnter": "ダンジョンドリィマスターモード",
+      "firstPersonChoose": "ダンジョンドリィマスターモード（コマを選ぶ）",
+      "firstPersonExit": "ダンジョンドリィマスターモードをやめる",
+      "firstPersonNoSeat": "ダンジョンドリィマスターモード（見られるコマがいません）",
+      "firstPersonShared": "ダンジョンドリィマスターモード（GM が共有中）",
+      "namesShown": "名前: 表示中（クリックで隠す）",
+      "namesHidden": "名前: 非表示（クリックで表示）"
     },
     "roomDataDefault": "ルームデータ"
   },
@@ -6020,6 +6079,41 @@
       "standIn": "［{{words}}］",
       "unnamedPack": "（名前なし）",
       "manage": "スタンプのセットを管理"
+    },
+    "imageEditor": {
+      "title": "画像の編集",
+      "position": "{{count}} 枚中 {{index}} 枚目：{{name}}",
+      "crop": "トリミング",
+      "erase": "背景透過",
+      "turnLeft": "左に回す",
+      "turnRight": "右に回す",
+      "flipAcross": "左右に反転",
+      "flipUpDown": "上下に反転",
+      "reset": "編集をすべて取り消す",
+      "cropHint": "画像の上をドラッグして、残す範囲を囲みます。枠の中をドラッグすると動かせ、角をドラッグすると大きさを変えられます。",
+      "ratio_free": "自由",
+      "ratio_original": "元の比率",
+      "keepWhole": "全体を使う",
+      "eraseHint": "背景をクリックすると、その色とつながった範囲が透明になります。何度でもクリックできます。",
+      "tolerance": "色の幅",
+      "undo": "ひとつ戻す",
+      "size": "出力サイズ",
+      "width": "幅",
+      "height": "高さ",
+      "keepProportions": "縦横比を保つ",
+      "cancel": "やめる",
+      "skip": "この画像は追加しない",
+      "restAsTheyAre": "残りはそのまま追加",
+      "add": "追加",
+      "replace": "置き換える",
+      "addAsCopy": "コピーとして追加",
+      "addAsCopyHint": "元の画像はそのまま残し、編集した画像を別の画像として加えます",
+      "failed": "この画像は読み込めませんでした",
+      "tooLarge": "書き出すと {{size}}MB になり、2MB を超えるため追加できません。残す範囲を狭めるか、出力サイズを下げてください",
+      "overLimit": "この画像は {{size}}MB で、上限の 2MB を超えています。「追加」で軽い形式に変換します。収まらないときは、切り抜くか出力サイズを下げてください",
+      "editFirst": "編集してから追加",
+      "editFirstHint": "チェックすると、選んだ画像を 1 枚ずつ編集画面で開いてから追加します。2MB を超える画像は、チェックがなくても編集画面で開きます",
+      "saveFailed": "画像を保存できませんでした。もう一度お試しください"
     }
   },
   "error": {}
