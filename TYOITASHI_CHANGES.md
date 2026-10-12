@@ -2,12 +2,30 @@
 
 [紹介ページ](README.md) · [版ごとの履歴](TYOITASHI_VERSIONS.md)
 
-r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は公式v1.58.0（46707582）とv1.59.0（19e9d1c7）を取り込んでいます。ここでは元の機能コミットを示します。後から公式の構造変更に合わせた調整もあるため、現在の実装はr1〜r4の固定ソースと併せて確認してください。
+r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は公式v1.65.2（2120bd0d）まで取り込んでいます。ここでは元の機能コミットと、その後の統合を示します。公式の構造変更に合わせた調整もあるため、現在の実装は機能を最初に追加したコミットだけでは分かりません。
+
+## 公式v1.64.0〜v1.65.2への追従
+
+- [5a7b3606](https://github.com/synchro4351/udonarium_axe/commit/5a7b3606)：f3cbe94dを基点に、公式v1.64.0（69b42aed）をマージしました。公式に取り込まれたフォント・文字効果・スタンプ・リアクション・吹き出し・カード・整形文の実装を基礎に、私家版だけの操作と保存データを引き継ぎます。単独の機能パッチではありません。
+- [917d9f60](https://github.com/synchro4351/udonarium_axe/commit/917d9f60)：公式v1.65.2（2120bd0d）を追加でマージしました。画像編集と一人称表示、ゲストの操作制限を取り込み、1枚ずつの画像確認や多部位・反応エフェクトとの接点を調整しました。整形文を公式の共通処理へ揃えたため、私家版で追加していたMarkedの直接の実行時依存を削除しています。
+- [cf9fcf27](https://github.com/synchro4351/udonarium_axe/commit/cf9fcf27)：多部位の操作改善を合流し、一人称表示でも対象部位の中央へ追従エフェクトを合わせました。[3d05f16c](https://github.com/synchro4351/udonarium_axe/commit/3d05f16c)では、2MBを超える選択画像を公式の画像編集へ渡す振り分けを修正しています。
+
+旧スタンプセット・発言・絵文字リアクション、立ち絵合わせ、吹き出しの部屋設定は、公式の保存構造へ変換します。公式にない検索語・セットZIPや詳細な文字効果は保持します。ログの秘密ダイス引用は、公開可能な引用では名前と出目を伏せた代替表示、閲覧できない個別発言と疑似削除は非表示に揃えました。元の機能コミットは以下へ残しています。
 
 ## 連動する多部位キャラクター（開発版）
 
 - [5df7c7bf](https://github.com/synchro4351/udonarium_axe/commit/5df7c7bf)：既存キャラクターを部位に分け、同じ画像枠に透明な余白を保ち、部位ごとのクリック・リソース・バフ・エフェクトと連動移動を扱います。基点6ba5a88e。通常のキャラクターへ同期属性4つを追加し、部屋ZIPで保存します。コピーと単体読込では連動を外します。
 - [02c4f9f2](https://github.com/synchro4351/udonarium_axe/commit/02c4f9f2)：[仕様・確認結果・制限](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-linked-characters/docs/TYOITASHI_LINKED_MULTIPART.md)。既存の部位範囲選択・キャラクター複製・同期・複数コマ移動・エフェクト再生に依存します。同時操作の専用排他制御、チャットの親→部位選択、相対位置での連動は今回の範囲外です。
+
+### 多部位の操作改善と表示位置
+
+基点はf3cbe94d。上の連動する多部位と、既存のキャラクター・エフェクト・バフ表示に依存します。公式だけを基点にした独立パッチではありません。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/multipart-usability)には次の目的別コミットを残しています。
+
+- [5990c401](https://github.com/synchro4351/udonarium_axe/commit/5990c401)：追従するエフェクトの位置を、部位範囲の中心へ合わせます。
+- [2e0aeda2](https://github.com/synchro4351/udonarium_axe/commit/2e0aeda2)：範囲の重なりを許可し、選択後の移動と8方向のサイズ調整を追加します。以前の重なり禁止の変更は、このコミットで置き換えます。
+- [9f6ceb7a](https://github.com/synchro4351/udonarium_axe/commit/9f6ceb7a)：通常のキャラクターにも、名前・リソースバー・バフの配置を選ぶ同期属性`labelPlacement`を追加します。欠落時は従来の頭上表示です。
+- [ca060162](https://github.com/synchro4351/udonarium_axe/commit/ca060162)：同じ画面内で、ドラッグに連動するコマの移動アニメーションによる遅れを抑えます。通信の一括化や排他制御は追加していません。
+- [ba0b6cb7](https://github.com/synchro4351/udonarium_axe/commit/ba0b6cb7)：[仕様、保存・同期への影響、検証、制限](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-usability/docs/TYOITASHI_MULTIPART_USABILITY.md)。切断・粉砕エフェクトの画像や、多方向表示の名前配置は今回の対象外です。
 
 ## ZIP内の画像の拡張子が欠けている場合（開発版）
 

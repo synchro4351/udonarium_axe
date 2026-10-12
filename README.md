@@ -8,8 +8,8 @@
 
 ## バージョンとソース
 
-- **固定版：tyoitashi r5／Axe v1.57.1** — [ソース `7033c85e`](https://github.com/synchro4351/udonarium_axe/tree/7033c85eed2cacd9c7ea44689e11ef9686b781f8)
-- **開発版：Axe v1.59.0 対応** — [`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`f3cbe94d`](https://github.com/synchro4351/udonarium_axe/tree/f3cbe94d)。公式のスイッチ・コンパス・ボタン名ガイドを取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
+- **固定版：tyoitashi r5／Axe v1.57.1**：[ソース `7033c85e`](https://github.com/synchro4351/udonarium_axe/tree/7033c85eed2cacd9c7ea44689e11ef9686b781f8)
+- **開発版：Axe v1.65.2対応**：[`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`3d05f16c`](https://github.com/synchro4351/udonarium_axe/tree/3d05f16c)。公式の画像編集・一人称表示を含む更新を取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
@@ -18,7 +18,7 @@
 
 [試用サイト](https://udonarium-trial.synwork.work/)で固定版`tyoitashi r5`を試せます。個人用の卓とは別の試用環境です。実験的な機能を含むため、動作が不安定な場合があります。大切な卓データは手元へ保存してください。デモのソースは上記の固定コミット`7033c85e`です。
 
-## 開発版で追加した変更（Axe v1.59.0）
+## 開発版で追加した変更（Axe v1.65.2）
 
 - 画像付きのキャラクターを「部位に分ける」から多部位コマにできます。HP・バフは部位ごとに、位置・サイズ・向きは一緒に操作できます。元のシートを各部位へ引き継ぐので、不要な項目だけ後から削れます。元コマは墓場に残ります。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/multipart-linked-characters) · [使い方と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-linked-characters/docs/TYOITASHI_LINKED_MULTIPART.md)。
 
@@ -26,7 +26,9 @@
 
 - キャラクターの長文、マップマスク、カードの文字でも「整形」を選べます。共有メモと同じ見出し・リスト・引用・コード・ルビを使い、本文を変えず表示を切り替えます。通常の長文でもルビを表示し、クリックして元の記法を編集できます。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/shared-text-formatting) · [仕様と保存形式](https://github.com/synchro4351/udonarium_axe/blob/codex/shared-text-formatting/docs/TYOITASHI_SHARED_TEXT_FORMATTING.md)。
 
-- 部位画像の範囲が重なる選択を防ぎます。境界が接する範囲は選べ、削除した範囲は選び直せます。画像一覧から作るコマは、それぞれ独立して動きます。[単独の修正](https://github.com/synchro4351/udonarium_axe/tree/codex/image-part-nonoverlap) · [仕様](https://github.com/synchro4351/udonarium_axe/blob/codex/image-part-nonoverlap/docs/TYOITASHI_IMAGE_PART_NONOVERLAP.md)。
+- 部位の範囲は重ねて選べます。選んだ範囲を移動したり、端をドラッグして大きさを直したりできます。部位を対象にしたエフェクトは、その範囲の中央へ出ます。[改善ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/multipart-usability) · [仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-usability/docs/TYOITASHI_MULTIPART_USABILITY.md)。
+
+- 名前・リソースバー・バフの表示位置を、頭上や画像内の上下左右などから選べます。多部位以外のキャラクターにも使えます。連動するコマをドラッグするときの、同じ画面内での動きのずれも抑えました。別端末への通信は従来どおり、コマごとに届きます。
 
 - 登録した画像を囲み、部位ごとのキャラクターコマを作れます。元画像を残し、HP・名前・移動は各コマで独立。通常の卓データとして保存できます。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/multipart-character-tokens) · [仕様と制限](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-character-tokens/docs/TYOITASHI_MULTIPART_CHARACTER_TOKENS.md)。
 
@@ -50,6 +52,20 @@
 
 - 公式v1.58.0のメニューカスタマイズに追従しました。メニュー配置は各端末に保存され、部屋ZIPでは共有されません。私家版のスタンプと手札の入口・更新印も新しい構造へ移しています。
 - 新しい利用者のホットバー初回表示には、`1D100`をチャットに記入する、キャラクターシートを開閉する、コマへ視点を移す、の3つの見本を置きます。後ろ2つはチャットの発言者にしたキャラクターを使います。見本は編集・削除でき、既存のホットバーは変更しません。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hotbar-discovery-samples)で変更を確認できます。
+
+## Axe公式取り込み済みの範囲
+
+公式v1.64.0以降には、これまでの私家版と重なる機能が入りました。開発版では公式の実装を基礎に、保存済みの私家版データを引き継ぎます。独自に残る操作もあるため、機能全体を一括して取り込み済みとはしていません。
+
+| 機能 | 公式にある範囲 | 私家版に残る主な違い |
+| --- | --- | --- |
+| カットイン | フォント選択、文字ごとの演出、発言者の画像と名前、立ち絵合わせ | 詳細な文字の順番・傾き・退場設定、見本素材 |
+| スタンプ・チャット | 画像スタンプ、リアクション、頭上吹き出し、文字ログ | 検索語、セットZIP、絵文字リアクション、引用部分だけの吹き出し |
+| カード | 受け渡し、不在の所有者からの引き継ぎ、山札の厚さ更新 | 全員の手札一覧、一覧でのドラッグ操作、部屋ごとの操作制限 |
+| 文字表示 | 整形メモ、ルビ | キャラクター・カード・マップマスクを含む共通の表示処理へ整理 |
+| 画像 | 取り込み時の編集、切り抜き・透過、ゲストの操作制限 | 1枚ずつの確認、選んだ色の全体透過、次の画像を入れる際の自動追加、多部位コマ |
+
+元の機能コミットと、公式追従時に整理した内容は[変更一覧](TYOITASHI_CHANGES.md)へ残しています。固定版r5の説明は、そのバージョンでの違いを記したものです。
 
 ## 固定版と公式Axe v1.57.1との違い
 
