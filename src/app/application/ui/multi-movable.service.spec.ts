@@ -48,6 +48,21 @@ describe('MultiMovableService', () => {
     expect(follower.posY).toBe(320);
   });
 
+  it('holds the glide off the followers for the length of the drag, as it is for the leader', () => {
+    const leader = makeMovable({ id: 'a' });
+    const follower = { ...makeMovable({ id: 'b' }), setAnimatedTransition: vi.fn() };
+    service.register(leader);
+    service.register(follower);
+    selection.replaceSelection(['a', 'b']);
+
+    service.beginDrag(leader);
+    expect(follower.setAnimatedTransition).toHaveBeenLastCalledWith(false);
+
+    service.endDrag(leader);
+    expect(follower.setAnimatedTransition).toHaveBeenLastCalledWith(true);
+    expect(follower.setAnimatedTransition).toHaveBeenCalledTimes(2);
+  });
+
   it('skips a locked follower', () => {
     const leader = makeMovable({ id: 'a', x: 0, y: 0 });
     const locked = makeMovable({ id: 'b', x: 100, y: 100, isLock: true });
