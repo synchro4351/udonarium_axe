@@ -89,7 +89,7 @@ test.describe('画像の編集', () => {
     await openFileStorage(page);
   });
 
-  test('小さな画像は確認プレビューに入り、追加を確定すると一覧に入ること', async ({ page }) => {
+  test('keeps a single small image pending until its addition is confirmed', async ({ page }) => {
     await uploadInput(page).setInputFiles({ name: 'tiny.png', mimeType: 'image/png', buffer: TINY_PNG });
 
     await expect(page.locator('[data-testid="pending-image"] img[alt="tiny.png"]')).toBeVisible();
@@ -118,7 +118,7 @@ test.describe('画像の編集', () => {
     await expect(page.locator('file-storage img[alt^="big."]')).toHaveCount(1);
   });
 
-  test('「編集してから追加」にチェックを入れると、複数選択した画像は順に編集画面で開くこと', async ({ page }) => {
+  test('edits a selected image batch in order when edit-first is enabled', async ({ page }) => {
     await page.getByTestId('file-storage-edit-first').locator('input').check();
     await uploadInput(page).setInputFiles([
       { name: 'tiny-a.png', mimeType: 'image/png', buffer: TINY_PNG },
