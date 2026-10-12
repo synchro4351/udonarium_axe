@@ -43,6 +43,7 @@ describe('ImageDropEventHandlerService', () => {
   let canEditTabletop: boolean;
   let dropTarget: Element | null;
   let localCoordinate: { x: number; y: number; z: number };
+  let coordinateTarget: HTMLElement | undefined;
 
   function setup(): void {
     TestBed.configureTestingModule({
@@ -50,7 +51,15 @@ describe('ImageDropEventHandlerService', () => {
         ...TEST_PROVIDERS,
         { provide: ObjectChangeService, useValue: { imageDropped$ } },
         { provide: TabletopActionService, useValue: { createGameCharacterWith } },
-        { provide: CoordinateService, useValue: { calcTabletopLocalCoordinate: () => localCoordinate } },
+        {
+          provide: CoordinateService,
+          useValue: {
+            calcTabletopLocalCoordinate: (_point: unknown, target: HTMLElement) => {
+              coordinateTarget = target;
+              return localCoordinate;
+            },
+          },
+        },
         { provide: TableSelecter, useValue: { viewTable: { width: 20, height: 20, gridSize: 50 } } },
         {
           provide: RolePermissionService,
@@ -75,6 +84,7 @@ describe('ImageDropEventHandlerService', () => {
     createGameCharacterWith = vi.fn();
     canEditTabletop = true;
     localCoordinate = { x: 100, y: 200, z: 0 };
+    coordinateTarget = undefined;
     document.body.innerHTML = '<div id="app-table-layer"></div>';
     dropTarget = document.querySelector('#app-table-layer');
     vi.spyOn(document, 'elementFromPoint').mockImplementation(() => dropTarget);
@@ -118,31 +128,34 @@ describe('ImageDropEventHandlerService', () => {
     expect(createGameCharacterWith).toHaveBeenCalledWith({ x: 975, y: 25, z: 0 }, expect.anything(), 'image-1');
   });
 
-  it('judges a drop confirmed later by where it landed, not by a panel opened over it since', () => {
-    document.body.innerHTML = '<div id="app-table-layer"><div id="piece"></div></div><div id="panel"></div>';
-    dropTarget = document.querySelector('#panel');
+  it('uses the target captured at the drop even when the preview now covers that point', () => {
+    document.body.innerHTML =
+      '<div id="app-table-layer"><div id="piece"></div></div><div id="file-storage-panel"></div>';
+    const capturedTarget = document.querySelector('#piece')! as HTMLElement;
+    dropTarget = document.querySelector('#file-storage-panel');
     setup();
 
     imageDropped$.emit({
       identifier: 'image-1',
       fileName: 'ゴブリン.png',
       dropPoint: { x: 10, y: 20 },
-      dropTarget: document.querySelector('#piece'),
+      dropTarget: capturedTarget,
     });
 
+    expect(coordinateTarget).toBe(capturedTarget);
     expect(createGameCharacterWith).toHaveBeenCalledWith({ x: 100, y: 200, z: 0 }, 'ゴブリン', 'image-1');
   });
 
-  it('falls back to what is under the point when the element it landed on is gone', () => {
-    document.body.innerHTML = '<div id="panel"></div>';
-    dropTarget = document.querySelector('#panel');
+  it('honours a captured empty target instead of placing on a preview opened over the point', () => {
+    document.body.innerHTML = '<div id="app-table-layer"></div><div id="file-storage-panel"></div>';
+    dropTarget = document.querySelector('#file-storage-panel');
     setup();
 
     imageDropped$.emit({
       identifier: 'image-1',
       fileName: 'ゴブリン.png',
       dropPoint: { x: 10, y: 20 },
-      dropTarget: document.createElement('div'),
+      dropTarget: null,
     });
 
     expect(createGameCharacterWith).not.toHaveBeenCalled();

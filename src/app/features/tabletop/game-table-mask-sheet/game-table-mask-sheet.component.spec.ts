@@ -90,14 +90,13 @@ describe('GameTableMaskSheetComponent', () => {
     expect(mask.text).toBe('# 見出し\n|漢字《かんじ》');
   });
 
-  it('edits legacy mask text and colours without duplicate common fields', async () => {
+  it('edits mask text and colours through the shared editor without duplicate controls', async () => {
     const mask = GameTableMask.create('Legacy mask', 2, 2, 100);
     component.gameTableMask = mask;
     try {
       fixture.detectChanges();
       const editor = fixture.nativeElement.querySelector('[data-map-mask-text-editor]') as HTMLElement;
       expect(editor).toBeTruthy();
-      expect(mask.commonDataElement!.getFirstElementByName('text')).toBeNull();
       const textarea = editor.querySelector('textarea')!;
       textarea.value = 'a|b《c》d\nsecond';
       textarea.dispatchEvent(new Event('input'));
@@ -115,8 +114,9 @@ describe('GameTableMaskSheetComponent', () => {
       await fixture.whenStable();
       fixture.detectChanges();
       expect(mask.text).toBe(textarea.value);
+      expect(mask.commonDataElement!.getElementsByName('text')).toHaveLength(1);
       expect(mask.fontSize).toBe(32);
-      expect(mask.color).toBe('#123456');
+      expect(mask.textColor).toBe('#123456');
       expect(mask.bgcolor).toBe('#abcdef');
       expect(mask.textOutline).toBe(true);
       expect(fixture.nativeElement.querySelectorAll('textarea')).toHaveLength(1);
@@ -179,6 +179,62 @@ describe('GameTableMaskSheetComponent', () => {
 
       expect(element.currentValue).toBe(100);
       expect(component.opacity).toBe(50);
+    });
+  });
+
+  describe('the words written across it', () => {
+    it('shows none, and the defaults, on a mask that never had any', () => {
+      expect(field('mask-text').value).toBe('');
+      expect(field('mask-text-size').value).toBe(String(GameTableMask.DEFAULT_TEXT_SIZE));
+      expect(field('mask-text-color').value).toBe('#ffffff');
+      expect(field('mask-text-outline').checked).toBe(true);
+    });
+
+    function typeSize(value: string, settle: boolean): void {
+      const size = field('mask-text-size');
+      size.value = value;
+      size.dispatchEvent(new Event('input'));
+      if (settle) size.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+    }
+
+    it('writes the words, their size, colour and outline to the mask', () => {
+      const text = fixture.nativeElement.querySelector('[data-field="mask-text"]') as HTMLTextAreaElement;
+      text.value = '扉\n（閉）';
+      text.dispatchEvent(new Event('input'));
+      typeSize('40', true);
+      const color = field('mask-text-color');
+      color.value = '#00ff00';
+      color.dispatchEvent(new Event('input'));
+      const outline = field('mask-text-outline');
+      outline.checked = false;
+      outline.dispatchEvent(new Event('change'));
+
+      expect(mask.text).toBe('扉\n（閉）');
+      expect(mask.textSize).toBe(40);
+      expect(mask.textColor).toBe('#00ff00');
+      expect(mask.textOutline).toBe(false);
+    });
+
+    it('lets a size be typed a digit at a time, taking it once it is settled and holding it to its bounds', () => {
+      typeSize('1', false);
+      expect(mask.textSize).toBe(8);
+      expect(field('mask-text-size').value).toBe('8');
+
+      typeSize('16', true);
+      expect(mask.textSize).toBe(16);
+
+      typeSize('500', true);
+      expect(mask.textSize).toBe(200);
+      expect(field('mask-text-size').value).toBe('200');
+    });
+
+    it('leaves the size alone for an empty field', () => {
+      typeSize('40', true);
+      typeSize('', true);
+
+      expect(mask.textSize).toBe(40);
+      expect(field('mask-text-size').value).toBe('');
     });
   });
 

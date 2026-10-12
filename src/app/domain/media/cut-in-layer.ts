@@ -4,13 +4,6 @@ import type { CutInClip } from '@axe/domain/media/cut-in-clip';
 import type { CutInEffect } from '@axe/domain/media/cut-in-effect';
 import { type CutInFill, type CutInFillShape, DEFAULT_FILL_SCALE_PX } from '@axe/domain/media/cut-in-fill';
 import { type CutInTrackSet, lastKeyTime, parseCutInTracks } from '@axe/domain/media/cut-in-keyframe';
-import type {
-  CutInLetterDirection,
-  CutInLetterExit,
-  CutInLetterMotion,
-  CutInLetterOrder,
-  CutInLetterTilt,
-} from '@axe/domain/media/cut-in-text';
 import type { CutInWipe } from '@axe/domain/media/cut-in-wipe';
 
 /**
@@ -85,8 +78,8 @@ export class CutInLayer extends ObjectNode {
   @SyncVar() objectPosX: number = 50;
   @SyncVar() objectPosY: number = 50;
   /**
-   * Shows the portrait a launch brings instead of its own picture, or the silhouette when it brings
-   * none. Off unless turned on, so no layer made before it starts taking portraits.
+   * Whether the layer shows the portrait of whoever the cut-in is played for, its own picture
+   * standing in where there is nobody; an older version shows its own picture.
    */
   @SyncVar() portraitSlot: boolean = false;
 
@@ -106,31 +99,22 @@ export class CutInLayer extends ObjectNode {
   /** Whether the words run down the layer rather than across it. */
   @SyncVar() vertical: boolean = false;
   /**
-   * How the letters move one at a time, while the text stays one string. `{character}` in the
-   * text is the name of the character the cut-in was launched for.
+   * How the letters come on one at a time, as `cut-in-letter-motion.ts` names the ways; empty for
+   * the words all at once, which is how every layer saved before reads.
    */
-  @SyncVar() letterMotion: CutInLetterMotion = 'none';
-  /** How far every other letter leans the other way, in degrees. 0 keeps them upright. */
-  @SyncVar() letterTiltDeg: number = 0;
-  /*
-   * The detailed letter controls. Each default is how the letters moved before there were
-   * controls, which is also what a cut-in saved without them reads as. They are read through
-   * `letterSettingsOf`, which holds whatever a file says to what can be played.
-   */
-  /** Which letter goes first. */
-  @SyncVar() letterOrder: CutInLetterOrder = 'forward';
-  /** How long after the one before each letter starts, in ms. */
+  @SyncVar() letterMotion: string = '';
+  /** How far apart the letters come on, in ms; 0 for the motion's own. */
+  @SyncVar() letterStaggerMs: number = 0;
+  /** How long one letter takes to come on, in ms; 0 for the motion's own. */
+  @SyncVar() letterDurationMs: number = 0;
+  /** Custom lettering settings remain synced beside the official timing controls. */
+  @SyncVar() letterOrder: string = 'forward';
   @SyncVar() letterIntervalMs: number = 60;
-  /** How long one letter takes to come in, in ms. */
-  @SyncVar() letterDurationMs: number = 260;
-  /** Whether a tilt leans every other letter the other way or all of them the same way. */
-  @SyncVar() letterTiltMode: CutInLetterTilt = 'alternate';
-  /** How the letters leave before the layer goes. */
-  @SyncVar() letterExit: CutInLetterExit = 'none';
-  /** How long one letter takes to leave, in ms. */
+  @SyncVar() letterTiltDeg: number = 0;
+  @SyncVar() letterTiltMode: string = 'alternate';
+  @SyncVar() letterExit: string = 'none';
   @SyncVar() letterExitDurationMs: number = 260;
-  /** Which way a letter travels as it comes in. */
-  @SyncVar() letterDirection: CutInLetterDirection = 'up';
+  @SyncVar() letterDirection: string = 'up';
 
   // kind: fill
   @SyncVar() fillShape: CutInFillShape = 'linear';
@@ -180,5 +164,23 @@ export class CutInLayer extends ObjectNode {
   /** The last moment this layer has anything left to do. */
   get lastMomentMs(): number {
     return Math.max(this.endMs, this.startMs, lastKeyTime(this.trackSet));
+  }
+
+  /**
+   * Reads a saved layer. A layer saved by a tyoitashi build before the official letter motion kept
+   * the gap between letters as `letterIntervalMs`; it also fills the official stagger where one
+   * is absent. Custom order, tilt, exit and direction controls are kept alongside official motion
+   * timing so a later save does not discard them.
+   */
+  override parseAttributes(attributes: NamedNodeMap): void {
+    super.parseAttributes(attributes);
+    const legacyInterval = attributes.getNamedItem('letterIntervalMs');
+    if (legacyInterval && !attributes.getNamedItem('letterStaggerMs')) {
+      const interval = Number(legacyInterval.value);
+      if (Number.isFinite(interval) && interval > 0) this.letterStaggerMs = interval;
+    } else if (!legacyInterval && attributes.getNamedItem('letterStaggerMs')) {
+      const interval = Number(attributes.getNamedItem('letterStaggerMs')!.value);
+      if (Number.isFinite(interval) && interval > 0) this.letterIntervalMs = interval;
+    }
   }
 }

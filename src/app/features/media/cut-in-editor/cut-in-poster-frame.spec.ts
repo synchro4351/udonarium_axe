@@ -60,7 +60,7 @@ describe('posterFrameMs()', () => {
         text: 'ABCD',
         letterMotion,
         letterOrder: 'center',
-        letterIntervalMs: 200,
+        letterStaggerMs: 200,
         letterDurationMs: 200,
         letterDirection: 'left',
       });
@@ -68,6 +68,19 @@ describe('posterFrameMs()', () => {
       // From the middle out, the fourth letter goes last: 3 × 200 ms after the first, and 200 ms to come in.
       expect(posterFrameMs(scene), letterMotion).toBe(800);
     }
+  });
+
+  it('waits for the last letter when the official type motion is selected', () => {
+    const scene = emptyScene();
+    const layer = addLayer(scene, 'text', 'call', { width: 640, height: 360 });
+    Object.assign(layer, {
+      text: 'ABCD',
+      letterMotion: 'type',
+      letterOrder: 'center',
+      letterStaggerMs: 200,
+    });
+
+    expect(posterFrameMs(scene)).toBe(600);
   });
 
   it('passes over the moments its letters are leaving', () => {

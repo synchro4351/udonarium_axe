@@ -1,94 +1,132 @@
 import { TestBed } from '@angular/core/testing';
 import { ChatReactionService } from '@axe/application/chat/chat-reaction.service';
-import { RolePermissionService } from '@axe/application/permission/role-permission.service';
+import { ObjectStore } from '@axe/core/sync/object-store';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
-import { ChatTab } from '@axe/domain/chat/chat-tab';
-import { PeerRole } from '@axe/domain/peer/peer-role';
+import { ChatReaction } from '@axe/domain/chat/chat-reaction';
+import { OPEN_STAMP_RULES, withStampsAllowed, withStampUseOn } from '@axe/domain/chat/stamp-rules';
+import { Config } from '@axe/domain/peer/config';
+import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { beMyself } from '@axe/testing/peer-context-stub';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
 describe('ChatReactionService', () => {
   let service: ChatReactionService;
-  let permission: RolePermissionService;
-  let tab: ChatTab;
+  const made: { destroy(): void }[] = [];
+
+  function line(fields: Partial<ChatMessage> = {}): ChatMessage {
+    const message = new ChatMessage();
+    message.initialize();
+    message.from = 'someone';
+    message.to = '';
+    message.tag = '';
+    message.text = '扉を開ける';
+    Object.assign(message, fields);
+    made.push(message);
+    return message;
+  }
+
+  function records(): ChatReaction[] {
+    return ObjectStore.instance.getObjects<ChatReaction>(ChatReaction);
+  }
+
+  function answer(message: ChatMessage, userId: string, name: string, stamps: string): void {
+    const reaction = ChatReaction.create(message.identifier, userId, name);
+    reaction.stamps = stamps;
+    made.push(reaction);
+  }
 
   beforeEach(() => {
+    for (const reaction of records()) reaction.destroy();
     TestBed.configureTestingModule({ providers: [...TEST_PROVIDERS] });
-    beMyself('alice');
     service = TestBed.inject(ChatReactionService);
-    permission = TestBed.inject(RolePermissionService);
-    vi.spyOn(permission, 'myRole', 'get').mockReturnValue(PeerRole.Player);
-    vi.spyOn(permission, 'canSeeHidden', 'get').mockReturnValue(false);
-    tab = new ChatTab();
-    tab.initialize();
+    beMyself('me');
+    PeerCursor.createMyCursor();
+    PeerCursor.myCursor.userId = 'me';
+    PeerCursor.myCursor.name = 'わたし';
   });
 
   afterEach(() => {
-    tab.destroy();
-    vi.restoreAllMocks();
+    for (const object of made.splice(0)) object.destroy();
+    for (const reaction of records()) reaction.destroy();
+    PeerCursor.myCursor = null!;
   });
 
-  function say(extra: Partial<Record<'to' | 'tag' | 'from', string>> = {}): ChatMessage {
-    return tab.addMessage({ from: 'bob', name: 'ボブ', text: 'やあ', timestamp: 1000, ...extra });
-  }
+  it("puts a stamp on a line in a record of the reader's own, and takes the record away with the last one off", () => {
+    const message = line();
 
-  it('leaves and takes back the reader’s own reaction on a line said to everyone', () => {
-    const message = say();
+    expect(service.toggle(message, 'sfx:creepy')).toBe(true);
+    expect(service.toggle(message, 'seal:ok')).toBe(true);
+    expect(records()).toHaveLength(1);
+    expect(records()[0]).toEqual(
+      expect.objectContaining({ messageIdentifier: message.identifier, userId: 'me', userName: 'わたし' })
+    );
 
-    expect(service.toggle(message, '👍')).toBe(true);
-    expect(service.reactionsOf(message)).toEqual([{ emoji: '👍', count: 1, mine: true }]);
-    expect(message.reactionOf('alice')).not.toBeNull();
-
-    expect(service.toggle(message, '👍')).toBe(false);
-    expect(service.reactionsOf(message)).toEqual([]);
+    expect(service.toggle(message, 'sfx:creepy')).toBe(false);
+    expect(service.toggle(message, 'seal:ok')).toBe(false);
+    expect(records()).toHaveLength(0);
   });
 
-  it('shows nothing of a whisper between others, and refuses a reaction to it', () => {
-    const whisper = say({ to: 'carol' });
-    whisper.toggleReaction('carol', '❤️');
+  it("never writes to anybody else's record", () => {
+    const message = line();
+    answer(message, 'other', 'あいて', 'sfx:creepy');
 
-    expect(service.canSee(whisper)).toBe(false);
-    expect(service.reactionsOf(whisper)).toEqual([]);
-    expect(service.toggle(whisper, '👍')).toBe(false);
-    expect(whisper.reactionOf('alice')).toBeNull();
+    service.toggle(message, 'sfx:creepy');
+
+    expect(records().map((each) => [each.userId, each.stamps])).toEqual([
+      ['other', 'sfx:creepy'],
+      ['me', 'sfx:creepy'],
+    ]);
   });
 
-  it('shows nothing of a secret roll kept from the reader, until they may see what is kept back', () => {
-    const secret = say({ tag: 'secret' });
-    secret.toggleReaction('bob', '😮');
+  it('counts each stamp on a line with who put it on, in the order they are offered', () => {
+    const message = line();
+    answer(message, 'other', 'あいて', 'seal:ok sfx:creepy');
+    answer(message, 'me', 'わたし', 'sfx:creepy');
+    answer(line(), 'other', 'あいて', 'seal:god');
 
-    expect(service.reactionsOf(secret)).toEqual([]);
-    expect(service.toggle(secret, '👍')).toBe(false);
-
-    vi.spyOn(permission, 'canSeeHidden', 'get').mockReturnValue(true);
-    expect(service.reactionsOf(secret)).toEqual([{ emoji: '😮', count: 1, mine: false }]);
+    expect(service.talliesOf(message.identifier)).toEqual([
+      { stampId: 'sfx:creepy', count: 2, names: ['あいて', 'わたし'], mine: true },
+      { stampId: 'seal:ok', count: 1, names: ['あいて'], mine: false },
+    ]);
   });
 
-  it('asks again at the moment of reacting, so a line made secret after the picker opened is refused', () => {
-    const message = say();
-    expect(service.canReact(message)).toBe(true);
+  it('leaves out a stamp this version does not know', () => {
+    const message = line();
+    answer(message, 'other', 'あいて', 'sfx:from-a-newer-version seal:ok');
 
-    message.tag = 'secret';
-
-    expect(service.toggle(message, '👍')).toBe(false);
-    expect(message.reactionOf('alice')).toBeNull();
+    expect(service.talliesOf(message.identifier).map((tally) => tally.stampId)).toEqual(['seal:ok']);
   });
 
-  it('refuses a reaction where the reader may not speak, while still showing the others', () => {
-    const message = say();
-    message.toggleReaction('bob', '🎉');
-    tab.plCanSpeak = false;
+  it('puts on no stamp the room does not let be put on, but takes one back that went on before', () => {
+    const message = line();
+    service.toggle(message, 'seal:ok');
+    Config.instance.stampRules = withStampsAllowed(OPEN_STAMP_RULES, 'reaction', ['seal:ok', 'seal:god'], false);
+    try {
+      expect(service.toggle(message, 'seal:god')).toBe(false);
+      expect(records()[0].stamps).toBe('seal:ok');
 
-    expect(service.canReact(message)).toBe(false);
-    expect(service.toggle(message, '👍')).toBe(false);
-    expect(service.reactionsOf(message)).toEqual([{ emoji: '🎉', count: 1, mine: false }]);
+      expect(service.toggle(message, 'seal:ok')).toBe(false);
+      expect(records()).toHaveLength(0);
+
+      Config.instance.stampRules = withStampUseOn(OPEN_STAMP_RULES, 'reaction', false);
+      expect(service.toggle(message, 'sfx:creepy')).toBe(false);
+      expect(records()).toHaveLength(0);
+    } finally {
+      Config.instance.stampRules = OPEN_STAMP_RULES;
+    }
   });
 
-  it('refuses a reaction to a line that has been deleted', () => {
-    const message = say();
-    message.destroy();
+  it('puts nothing on a line the reader is not shown, a stamp it does not know, or before a room is joined', () => {
+    const whisper = line({ to: 'third' });
+    expect(service.toggle(whisper, 'sfx:creepy')).toBe(false);
 
-    expect(service.toggle(message, '👍')).toBe(false);
-    expect(service.reactionsOf(message)).toEqual([]);
+    const message = line();
+    expect(service.toggle(message, 'sfx:from-a-newer-version')).toBe(false);
+
+    PeerCursor.myCursor.userId = '';
+    beMyself('');
+    expect(service.toggle(message, 'sfx:creepy')).toBe(false);
+
+    expect(records()).toHaveLength(0);
   });
 });

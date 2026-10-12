@@ -52,6 +52,52 @@
               {{ 'feature.roomSettings.diceBotHint' | transloco }}
             </p>
           </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-ui-text flex items-center gap-1.5 text-[13px] select-none">
+              <span class="flex-1">{{ 'feature.roomSettings.diceStage' | transloco }}</span>
+              <select
+                class="rounded-ui-sm border-ui-border-panel bg-ui-input text-ui-text border border-solid px-1 py-0.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
+                [(ngModel)]="diceStage"
+                name="diceStage"
+                data-testid="dice-stage"
+                [disabled]="isSharedReadOnly()"
+              >
+                @for (stage of diceStages; track stage) {
+                  <option [value]="stage">{{ 'feature.roomSettings.diceStage_' + stage | transloco }}</option>
+                }
+              </select>
+            </label>
+            <p class="text-ui-muted m-0 text-[11px] leading-relaxed">
+              {{ 'feature.roomSettings.diceStageHint' | transloco }}
+            </p>
+          </div>
+        </div>
+
+        <div
+          class="border-ui-border-panel bg-ui-surface rounded-ui flex flex-col gap-2.5 border border-solid p-3"
+          data-testid="room-settings-speech-bubbles"
+        >
+          <div class="min-w-0">
+            <span class="text-ui-muted text-[11px] font-semibold tracking-[0.06em] uppercase">{{
+              'feature.roomSettings.sectionSpeechBubbles' | transloco
+            }}</span>
+            <p class="text-ui-dim m-0 text-[11px]">{{ 'feature.roomSettings.sharedHint' | transloco }}</p>
+          </div>
+          <label
+            class="text-ui-text hover:bg-ui-hover rounded-ui-sm -mx-1.5 flex cursor-pointer items-center gap-2 px-1.5 py-1 text-[13px] transition-colors select-none"
+          >
+            <input
+              type="checkbox"
+              class="size-3.5 cursor-pointer [accent-color:var(--ui-accent)]"
+              [(ngModel)]="speechBubbles"
+              name="speechBubbles"
+              [disabled]="isSharedReadOnly()"
+            />
+            {{ 'feature.roomSettings.speechBubbles' | transloco }}
+          </label>
+          <p class="text-ui-muted m-0 text-[11px] leading-relaxed">
+            {{ 'feature.roomSettings.speechBubblesHint' | transloco }}
+          </p>
         </div>
 
         <div
@@ -195,37 +241,6 @@
             />
             {{ 'feature.roomSettings.allowPlayerCardEdit' | transloco }}
           </label>
-        </div>
-
-        <div
-          class="border-ui-border-panel bg-ui-surface rounded-ui flex flex-col gap-2.5 border border-solid p-3"
-          data-testid="room-settings-overhead-speech"
-        >
-          <div class="min-w-0">
-            <span class="text-ui-muted text-[11px] font-semibold tracking-[0.06em] uppercase">{{
-              'feature.roomSettings.sectionOverheadSpeech' | transloco
-            }}</span>
-            <p class="text-ui-dim m-0 text-[11px]">{{ 'feature.roomSettings.sharedHint' | transloco }}</p>
-          </div>
-          <label
-            class="text-ui-text flex items-center gap-1.5 text-[13px] select-none"
-            [class.cursor-pointer]="!isSharedReadOnly()"
-            [class.opacity-50]="isSharedReadOnly()"
-          >
-            <input
-              type="checkbox"
-              class="size-3.5 [accent-color:var(--ui-accent)] disabled:cursor-not-allowed"
-              [class.cursor-pointer]="!isSharedReadOnly()"
-              [(ngModel)]="showsOverheadSpeech"
-              name="showsOverheadSpeech"
-              data-testid="shows-overhead-speech"
-              [disabled]="isSharedReadOnly()"
-            />
-            {{ 'feature.roomSettings.showsOverheadSpeech' | transloco }}
-          </label>
-          <p class="text-ui-muted m-0 text-[11px] leading-relaxed">
-            {{ 'feature.roomSettings.overheadSpeechHint' | transloco }}
-          </p>
         </div>
       </div>
     }
@@ -897,6 +912,10 @@
       </div>
     }
 
+    @if (tab() === 'stamp') {
+      <room-stamp-rules />
+    }
+
     @if (tab() === 'archive') {
       <div class="contents" [attr.inert]="isReadOnly() ? '' : null">
         <div class="border-ui-border-panel bg-ui-surface rounded-ui flex flex-col gap-2.5 border border-solid p-3">
@@ -1015,6 +1034,29 @@
             {{ 'feature.roomSettings.realSizeReset' | transloco }}
           </button>
         </div>
+      </div>
+
+      <div
+        class="border-ui-danger-ring bg-ui-surface rounded-ui flex flex-col gap-2.5 border border-solid p-3"
+        data-testid="room-settings-danger-zone"
+      >
+        <div class="border-ui-danger border-l-2 border-solid pl-2">
+          <span class="text-ui-danger text-[12px] font-semibold tracking-wide">{{
+            'feature.roomSettings.sectionDanger' | transloco
+          }}</span>
+        </div>
+        <button
+          type="button"
+          class="rounded-ui-sm border-ui-danger-ring text-ui-danger hover:border-ui-danger hover:bg-ui-danger-bg flex cursor-pointer items-center gap-2 self-start border border-solid bg-transparent px-2.5 py-1.5 text-left text-[12px] transition-colors [&_i]:text-[18px]"
+          data-testid="room-settings-wipe-browser-data"
+          (click)="wipeBrowserData()"
+        >
+          <i class="material-icons">delete_forever</i>
+          {{ 'feature.roomSettings.wipeBrowserData' | transloco }}
+        </button>
+        <p class="text-ui-muted m-0 text-[11px] leading-relaxed">
+          {{ 'feature.roomSettings.wipeBrowserDataHint' | transloco }}
+        </p>
       </div>
     }
   </div>

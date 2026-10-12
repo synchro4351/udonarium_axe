@@ -1,118 +1,120 @@
-/* The "formatted" display of a shared note: a deliberately small subset of Markdown.
-   Only headings (# to ###, followed by a space), "-" and "1." lists, ">" quotes and inline or
-   fenced code are read. Emphasis, "*" and "+" bullets, tables, raw HTML, links, images and
-   automatic links are switched off and stay as literal text. Every piece of text goes through
-   escapeHtml, and the ruby notation is applied to ordinary text only, never inside code. */
-
 import { TextFormat } from '@axe/domain/data/text-format';
 import { decorateChatStyleText, escapeHtml, escapeHtmlWithRuby } from '@axe/ui/text-decoration/decorate-chat-text';
-import { Marked, Tokenizer, type Tokens } from 'marked';
+import { find } from 'linkifyjs';
 
-const HEADING_START = /^ {0,3}#{1,3}[ \t]/;
-const LIST_MARKER = /^ {0,3}(?:-|\d{1,9}\.)[ \t]/;
-const QUOTE_LINE = /^ {0,3}>/;
-const BLANK_OR_INDENTED_LINE = /^(?:[ \t]|$)/;
+const FENCE = /^```/;
+const HEADING = /^(#{1,3})\s+(.*)$/;
+const BULLET = /^-\s+(.*)$/;
+const NUMBERED = /^\d+\.\s+(.*)$/;
+const QUOTE = /^>\s?(.*)$/;
+const INLINE_CODE = /`([^`\n]+)`/g;
 
-/**
- * The leading lines of `src` that `keep` accepts, the first line always included.
- *
- * Used to stop lists and quotes at the first line that does not belong to them, instead of
- * Markdown's "lazy continuation", so an ordinary line after them stays an ordinary line.
- */
-function leadingLines(src: string, keep: (line: string) => boolean): string {
-  let end = 0;
-  while (end < src.length) {
-    const newline = src.indexOf('\n', end);
-    const lineEnd = newline === -1 ? src.length : newline;
-    if (end > 0 && !keep(src.slice(end, lineEnd))) break;
-    end = newline === -1 ? src.length : newline + 1;
+/** Words outside code as html: escaped, with their ruby, and an address made a link. */
+function prose(text: string): string {
+  let html = '';
+  let at = 0;
+  for (const link of find(text, 'url')) {
+    html += escapeHtmlWithRuby(text.slice(at, link.start));
+    html += `<a href="${escapeHtml(link.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.value)}</a>`;
+    at = link.end;
   }
-  return src.slice(0, end);
+  return html + escapeHtmlWithRuby(text.slice(at));
 }
 
-/** Escapes plain note text, applies the ruby notation, and keeps each line break. */
-function decoratePlainText(text: string): string {
-  return escapeHtmlWithRuby(text).split('\n').join('<br>');
+/** A line's words as html: code between backticks kept as it was typed, the rest as {@link prose}. */
+function inline(line: string): string {
+  let html = '';
+  let at = 0;
+  for (const match of line.matchAll(INLINE_CODE)) {
+    html += prose(line.slice(at, match.index));
+    html += `<code>${escapeHtml(match[1])}</code>`;
+    at = match.index + match[0].length;
+  }
+  return html + prose(line.slice(at));
 }
 
-const noteMarked = new Marked({
-  async: false,
-  gfm: false,
-  breaks: false,
-  pedantic: false,
-  tokenizer: {
-    heading(src) {
-      return HEADING_START.test(src) ? Tokenizer.prototype.heading.call(this, src) : undefined;
-    },
-    list(src) {
-      if (!LIST_MARKER.test(src)) return undefined;
-      const lines = leadingLines(src, (line) => BLANK_OR_INDENTED_LINE.test(line) || LIST_MARKER.test(line));
-      return Tokenizer.prototype.list.call(this, lines);
-    },
-    blockquote(src) {
-      if (!QUOTE_LINE.test(src)) return undefined;
-      return Tokenizer.prototype.blockquote.call(
-        this,
-        leadingLines(src, (line) => QUOTE_LINE.test(line))
-      );
-    },
-    // Indented code, rules, raw HTML, link definitions, tables and underlined headings.
-    code: () => undefined,
-    hr: () => undefined,
-    html: () => undefined,
-    def: () => undefined,
-    table: () => undefined,
-    lheading: () => undefined,
-    // Inline HTML, links, images, emphasis, strikethrough and automatic links.
-    tag: () => undefined,
-    link: () => undefined,
-    reflink: () => undefined,
-    emStrong: () => undefined,
-    del: () => undefined,
-    autolink: () => undefined,
-    url: () => undefined,
-  },
-  renderer: {
-    text(token: Tokens.Text | Tokens.Escape) {
-      if ('tokens' in token && token.tokens) return this.parser.parseInline(token.tokens);
-      if ('escaped' in token && token.escaped) return token.text;
-      return decoratePlainText(token.text);
-    },
-    code({ text }: Tokens.Code) {
-      return `<pre><code>${escapeHtml(text)}</code></pre>\n`;
-    },
-    // The tokenizers above never produce these; they are kept as literal text should one appear.
-    html({ raw }: Tokens.HTML | Tokens.Tag) {
-      return escapeHtml(raw);
-    },
-    link({ raw }: Tokens.Link) {
-      return escapeHtml(raw);
-    },
-    image({ raw }: Tokens.Image) {
-      return escapeHtml(raw);
-    },
-  },
-});
-
-/**
- * Turns shared free text into HTML for its chosen format: the limited Markdown display for
- * `formatted`, the ordinary chat-style decoration (which keeps legacy marks) for `normal`.
- */
-export function decorateTextByFormat(text: string, format: TextFormat): string {
-  return format === 'formatted' ? formatNoteText(text) : decorateChatStyleText(text);
+/** The lines from `start` that `pattern` takes, as far as they run, each with its words. */
+function run(lines: readonly string[], start: number, pattern: RegExp): string[] {
+  const taken: string[] = [];
+  for (let at = start; at < lines.length; at++) {
+    const match = pattern.exec(lines[at]);
+    if (!match) break;
+    taken.push(match[1]);
+  }
+  return taken;
 }
 
 /**
- * Turns a note's body into HTML for the "formatted" display.
+ * A shared note's text drawn with a little formatting, read from marks at the start of a line as a
+ * note is written in plain text: `#` to `###` headings, `- ` and `1. ` lists, `> ` quotes, code
+ * between backticks or in a fenced block, with ruby as in chat. A single line break stays a break and
+ * a blank line starts a new paragraph.
  *
- * Reads headings, `-` and `1.` lists, `>` quotes and inline or fenced code; every other mark is
- * shown as typed. Line breaks are kept, and the ruby notation (`|word<reading>` or `|word《reading》`)
- * applies outside code. Should the parser fail, the text is shown the normal way instead.
+ * What is read is kept to marks at the start of a line on purpose: stars and underscores are left
+ * as they are, since a sum such as `2*3` is ordinary in a game's notes. The text is escaped before
+ * anything is made of it and only a fixed set of tags is put round it, so nothing written can run
+ * or load anything for whoever sees the note; addresses become links, outside code.
  */
 export function formatNoteText(text: string): string {
-  try {
-    return noteMarked.parse(text, { async: false });
-  } catch {
-    return decorateChatStyleText(text);
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  const blocks: string[] = [];
+  let paragraph: string[] = [];
+  const closeParagraph = () => {
+    if (paragraph.length > 0) blocks.push(`<p>${paragraph.join('<br>')}</p>`);
+    paragraph = [];
+  };
+
+  let at = 0;
+  while (at < lines.length) {
+    const line = lines[at];
+    if (FENCE.test(line)) {
+      closeParagraph();
+      const code: string[] = [];
+      at++;
+      while (at < lines.length && !FENCE.test(lines[at])) code.push(lines[at++]);
+      at++;
+      blocks.push(`<pre><code>${escapeHtml(code.join('\n'))}</code></pre>`);
+      continue;
+    }
+    const heading = HEADING.exec(line);
+    if (heading) {
+      closeParagraph();
+      const level = heading[1].length;
+      blocks.push(`<h${level}>${inline(heading[2])}</h${level}>`);
+      at++;
+      continue;
+    }
+    const listed: [RegExp, string][] = [
+      [BULLET, 'ul'],
+      [NUMBERED, 'ol'],
+    ];
+    const list = listed.find(([pattern]) => pattern.test(line));
+    if (list) {
+      closeParagraph();
+      const items = run(lines, at, list[0]);
+      blocks.push(`<${list[1]}>${items.map((item) => `<li>${inline(item)}</li>`).join('')}</${list[1]}>`);
+      at += items.length;
+      continue;
+    }
+    if (QUOTE.test(line)) {
+      closeParagraph();
+      const quoted = run(lines, at, QUOTE);
+      blocks.push(`<blockquote>${quoted.map(inline).join('<br>')}</blockquote>`);
+      at += quoted.length;
+      continue;
+    }
+    if (line.trim().length === 0) {
+      closeParagraph();
+    } else {
+      paragraph.push(inline(line));
+    }
+    at++;
   }
+  closeParagraph();
+  return blocks.join('');
+}
+
+/** Applies the shared renderer to every free-text surface. */
+export function decorateTextByFormat(text: string, format: TextFormat): string {
+  return format === 'formatted' ? formatNoteText(text) : decorateChatStyleText(text);
 }

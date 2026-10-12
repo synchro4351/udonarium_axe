@@ -39,8 +39,8 @@ describe('StampPackListComponent', () => {
   function packWith(name: string): StampPack {
     const pack = new StampPack();
     pack.name = name;
-    pack.setItems([{ id: 's1', name: 'ok', imageIdentifier: 'image-ok', words: ['ok'] }]);
     pack.initialize();
+    pack.setItems([{ id: 's1', name: 'ok', imageIdentifier: 'image-ok', words: ['ok'] }]);
     return pack;
   }
 
@@ -109,11 +109,11 @@ describe('StampPackListComponent', () => {
     function twoStampPack(): StampPack {
       const pack = new StampPack();
       pack.name = 'pack';
+      pack.initialize();
       pack.setItems([
         { id: 's1', name: 'one', imageIdentifier: 'image-1', words: [] },
         { id: 's2', name: 'two', imageIdentifier: 'image-2', words: [] },
       ]);
-      pack.initialize();
       return pack;
     }
 

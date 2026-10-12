@@ -51,6 +51,14 @@ import { translateZCss, Z_OFFSET_MASK_PX } from '@axe/ui/tabletop/z-offset';
 import { decorateTextByFormat } from '@axe/ui/text-decoration/format-note-text';
 import { TranslocoModule } from '@jsverse/transloco';
 
+/** Words written across a mask, as they are drawn. */
+interface MaskWriting {
+  readonly text: string;
+  readonly size: number;
+  readonly color: string;
+  readonly outline: boolean;
+}
+
 @Component({
   selector: 'game-table-mask',
   templateUrl: './game-table-mask.component.html',
@@ -312,6 +320,23 @@ export class GameTableMaskComponent {
     }
     return buildMaskCss(params);
   });
+
+  /** The words written across the mask and how they are drawn, or null for a mask with none. */
+  readonly writing = computed<MaskWriting | null>(
+    () => {
+      const mask = this.gameTableMask();
+      if (!mask) return null;
+      this.objectChange.versionOf(mask.identifier)();
+      const text = mask.text;
+      if (text.trim().length < 1) return null;
+      return { text, size: mask.textSize, color: mask.textColor, outline: mask.textOutline };
+    },
+    {
+      equal: (a, b) =>
+        a === b ||
+        (!!a && !!b && a.text === b.text && a.size === b.size && a.color === b.color && a.outline === b.outline),
+    }
+  );
 
   readonly scratchedColor = computed(() => {
     const mask = this.gameTableMask();

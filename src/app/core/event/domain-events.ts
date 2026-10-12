@@ -39,15 +39,10 @@ export interface MessageAddedEvent {
   messageIdentifier: string;
 }
 
-export interface CardStackDecreasedEvent {
-  cardStackIdentifier: string;
-  cardIdentifier: string;
-}
-
 export interface CutInEvent {
   cutIn: unknown;
-  /** The portrait the launch brought for a template's portrait slot, as the launcher read it. */
-  portrait?: unknown;
+  /** Who the cut-in is played for, where a launch says. */
+  speaker?: unknown;
 }
 
 export interface VoteTally {
@@ -84,15 +79,22 @@ export interface ImageDroppedEvent {
   identifier: string;
   fileName: string;
   dropPoint: { x: number; y: number };
-  /**
-   * The element under the drop point when the drop was made, for an image placed only once the user
-   * confirmed it; without it, whatever is under the point now is taken instead.
-   */
   dropTarget?: Element | null;
 }
 
 export interface CcfoliaRoomDroppedEvent {
   entries: ArchiveEntries;
+}
+
+/** A file a load left out for being larger than its kind may be, with the limit it went over. */
+export interface FileTooLarge {
+  name: string;
+  kind: 'image' | 'audio';
+  limitBytes: number;
+}
+
+export interface FilesTooLargeEvent {
+  files: FileTooLarge[];
 }
 
 export interface LoadConfigEvent {
@@ -104,6 +106,13 @@ export interface DiceRolledEvent {
   sourceMessageIdentifier: string;
   /** Its answer, which carries what the dice showed. */
   resultMessageIdentifier: string;
+}
+
+export interface DiceThrowEvent {
+  /** The dice bot's answer whose dice are thrown. */
+  messageIdentifier: string;
+  /** The piece that said the line the answer answers, which the dice are thrown before on the table; blank for none. */
+  speakerIdentifier?: string;
 }
 
 export interface DiceBotUnreachableEvent {
@@ -125,6 +134,7 @@ export const soundEffect$ = new EventChannel<string>();
 
 export const effectCast$ = new EventChannel<EffectCastEvent>();
 export const diceRolled$ = new EventChannel<DiceRolledEvent>();
+export const diceThrow$ = new EventChannel<DiceThrowEvent>();
 export const diceBotCatalog$ = new EventChannel<void>();
 export const diceBotUnreachable$ = new EventChannel<DiceBotUnreachableEvent>();
 export const resourceChange$ = new EventChannel<ResourceChangeEvent>();
@@ -132,7 +142,6 @@ export const resourceChange$ = new EventChannel<ResourceChangeEvent>();
 export const selectGameTable$ = new EventChannel<SelectGameTableEvent>();
 export const updateAudioResource$ = new EventChannel<void>();
 export const messageAdded$ = new EventChannel<MessageAddedEvent>();
-export const cardStackDecreased$ = new EventChannel<CardStackDecreasedEvent>();
 export const startCutIn$ = new EventChannel<CutInEvent>();
 export const soundOnlyCutIn$ = new EventChannel<CutInEvent>();
 export const stopCutIn$ = new EventChannel<CutInEvent>();
@@ -146,6 +155,7 @@ export const fileLoaded$ = new EventChannel<void>();
 export const xmlLoaded$ = new EventChannel<XmlLoadedEvent>();
 export const imageDropped$ = new EventChannel<ImageDroppedEvent>();
 export const ccfoliaRoomDropped$ = new EventChannel<CcfoliaRoomDroppedEvent>();
+export const filesTooLarge$ = new EventChannel<FilesTooLargeEvent>();
 // The configuration load can emit before the app component subscribes, so this channel is
 // sticky: without it the event is missed and the peer id stays unset.
 export const loadConfig$ = new StickyEventChannel<LoadConfigEvent>();
@@ -178,10 +188,6 @@ export function emitSelectGameTable(event: SelectGameTableEvent) {
 /** Announces that a message joined a chat tab, whether sent here or received from a peer. */
 export function emitMessageAdded(event: MessageAddedEvent) {
   messageAdded$.emit(event);
-}
-/** Announces that a card left a card stack, whether taken here or by a peer. */
-export function emitCardStackDecreased(event: CardStackDecreasedEvent) {
-  cardStackDecreased$.emit(event);
 }
 /** Announces on this device that a cut-in starts; open windows for the same cut-in or tag close. */
 export function emitStartCutIn(event: CutInEvent) {
@@ -235,6 +241,10 @@ export function emitImageDropped(event: ImageDroppedEvent) {
 export function emitCcfoliaRoomDropped(event: CcfoliaRoomDroppedEvent) {
   ccfoliaRoomDropped$.emit(event);
 }
+/** Announces the files a load left out for being too large, once the whole load is done. */
+export function emitFilesTooLarge(event: FilesTooLargeEvent) {
+  filesTooLarge$.emit(event);
+}
 /** Announces that the app config loaded; the channel is sticky, so late subscribers still get it. */
 export function emitLoadConfig(event: LoadConfigEvent) {
   loadConfig$.emit(event);
@@ -272,6 +282,17 @@ export function callFlipCoin(identifier: string, face: string) {
 /** Tells every device, this one included, to play the shuffle animation of a card stack. */
 export function callShuffleCardStack(identifier: string) {
   networkSend('SHUFFLE_CARD_STACK', { identifier });
+}
+
+/**
+ * Has the dice of a roll just answered thrown on every device, this one included, or on this
+ * device alone for a roll nobody else may see yet.
+ *
+ * Nothing about the throw is kept: a room loaded later, or a replay, never throws it again.
+ */
+export function callDiceThrow(event: DiceThrowEvent, here: 'everywhere' | 'here') {
+  if (here === 'here') localDispatch('DICE_THROW', event);
+  else networkSend('DICE_THROW', event);
 }
 
 /** Plays a stored sound on every device, this one included, by its audio identifier. */
@@ -350,6 +371,13 @@ networkMessage$.subscribe((msg) => {
     case 'RESOURCE_CHANGE':
       resourceChange$.emit(msg.data as ResourceChangeEvent);
       break;
+    case 'DICE_THROW': {
+      const data = msg.data as Partial<DiceThrowEvent> | null;
+      if (typeof data?.messageIdentifier !== 'string') break;
+      const speaker = typeof data.speakerIdentifier === 'string' ? data.speakerIdentifier : '';
+      diceThrow$.emit({ messageIdentifier: data.messageIdentifier, speakerIdentifier: speaker });
+      break;
+    }
   }
 });
 

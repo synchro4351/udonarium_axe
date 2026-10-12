@@ -20,6 +20,7 @@ export const ROOM_PANELS = [
   'buffManager',
   'statusAilment',
   'diceTableSetting',
+  'myDice',
   'effectLibrary',
   'mapEditor',
   'dungeonGenerator',
@@ -27,6 +28,7 @@ export const ROOM_PANELS = [
   'replay',
   'tabletopDisplay',
   'skin',
+  'soundSettings',
   'menuEditor',
 ] as const;
 
@@ -59,6 +61,7 @@ const LABEL_KEYS: Record<PanelName, string> = {
   buffManager: 'feature.buffManager.title',
   statusAilment: 'feature.statusAilment.title',
   diceTableSetting: 'feature.dice.tableSetting.title',
+  myDice: 'feature.dice.myDice.title',
   effectLibrary: 'feature.effect.panelTitle',
   mapEditor: 'feature.mapEditor.title',
   dungeonGenerator: 'feature.tabletop.dungeonGenerator.title',
@@ -66,6 +69,7 @@ const LABEL_KEYS: Record<PanelName, string> = {
   replay: 'common.panel.replay',
   tabletopDisplay: 'feature.tabletop.displaySetting.title',
   skin: 'feature.skin.title',
+  soundSettings: 'common.panel.soundSettings',
   menuEditor: 'feature.menuEditor.title',
 };
 

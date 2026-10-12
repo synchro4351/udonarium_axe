@@ -38,6 +38,20 @@ describe('MimeType', () => {
       expect(MimeType.type('sound.ogg')).toBe('audio/ogg');
     });
 
+    it('types an m4a as MP4 audio, and AAC on its own as AAC', () => {
+      expect(MimeType.type('sound.m4a')).toBe('audio/mp4');
+      expect(MimeType.type('sound.aac')).toBe('audio/aac');
+    });
+
+    it('types the other names an Ogg file goes by as Ogg', () => {
+      expect(MimeType.type('sound.opus')).toBe('audio/ogg');
+      expect(MimeType.type('sound.oga')).toBe('audio/ogg');
+    });
+
+    it('types a flac', () => {
+      expect(MimeType.type('sound.FLAC')).toBe('audio/flac');
+    });
+
     it('types an mp4', () => {
       expect(MimeType.type('video.mp4')).toBe('video/mp4');
     });
@@ -95,21 +109,5 @@ describe('MimeType', () => {
     it('names a gif', () => {
       expect(MimeType.extension('image/gif')).toBe('gif');
     });
-  });
-});
-
-describe('rasterType', () => {
-  it.each([
-    [[137, 80, 78, 71, 13, 10, 26, 10], 'image/png'],
-    [[255, 216, 255], 'image/jpeg'],
-    [[71, 73, 70, 56, 55, 97], 'image/gif'],
-    [[71, 73, 70, 56, 57, 97], 'image/gif'],
-    [[82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80], 'image/webp'],
-  ])('recognizes a raster signature %s', (signature, mime) => {
-    expect(MimeType.rasterType(new Uint8Array(signature as number[]))).toBe(mime);
-  });
-  it('leaves empty, truncated, text and non-image RIFF files untyped', () => {
-    for (const bytes of [[], [137, 80, 78], [60, 115, 118, 103], [82, 73, 70, 70, 0, 0, 0, 0, 87, 65, 86, 69]])
-      expect(MimeType.rasterType(new Uint8Array(bytes))).toBe('');
   });
 });

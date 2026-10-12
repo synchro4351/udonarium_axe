@@ -1,5 +1,3 @@
-import { DEFAULT_REACTION_EMOJIS, isReactionEmoji } from '@axe/domain/chat/chat-reaction';
-
 /** An emoji the picker can find by name, with the words it answers to in each language offered. */
 interface NamedEmoji {
   readonly emoji: string;
@@ -87,42 +85,5 @@ const NAMED_EMOJIS: readonly NamedEmoji[] = [
  * them all, as the chat input's does.
  */
 export const CATALOG_EMOJIS: readonly string[] = [
-  ...new Set([...DEFAULT_REACTION_EMOJIS, ...NAMED_EMOJIS.map(({ emoji }) => emoji)]),
+  ...new Set(['👍', '❤️', '😂', '😮', '😢', '🙏', ...NAMED_EMOJIS.map(({ emoji }) => emoji)]),
 ];
-
-/** How many emoji a search offers at most, to keep the picker small. */
-export const MAX_REACTION_SEARCH_RESULTS = 24;
-
-const segmenter =
-  typeof Intl !== 'undefined' && 'Segmenter' in Intl
-    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
-    : null;
-
-/**
- * The query itself when it is one emoji a reader may leave, such as one pasted or typed from the
- * device's emoji keyboard; otherwise null. Only a single emoji counts, so a run of several, or any
- * text, is never offered as a reaction.
- */
-export function typedReactionEmoji(query: string): string | null {
-  const value = query.trim();
-  if (!isReactionEmoji(value)) return null;
-  if (segmenter && [...segmenter.segment(value)].length !== 1) return null;
-  return value;
-}
-
-/**
- * The emoji to offer for what the reader typed into the picker's search: the typed emoji itself
- * when it is one, then those whose names hold the query. Empty for an empty query.
- */
-export function searchReactionEmojis(query: string): string[] {
-  const needle = query.trim().toLocaleLowerCase();
-  if (needle.length === 0) return [];
-  const found = new Set<string>();
-  const typed = typedReactionEmoji(needle);
-  if (typed) found.add(typed);
-  for (const { emoji, names } of NAMED_EMOJIS) {
-    if (found.size >= MAX_REACTION_SEARCH_RESULTS) break;
-    if (emoji === needle || names.some((name) => name.toLocaleLowerCase().includes(needle))) found.add(emoji);
-  }
-  return [...found];
-}

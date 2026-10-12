@@ -44,7 +44,7 @@ describe('the table of what a menu can do', () => {
   });
 
   it('lets the stamp packs be put on every menu', () => {
-    const stamp = menuCommandOf('stamp')!;
+    const stamp = menuCommandOf('stampPacks')!;
     for (const surface of MENU_SURFACES) expect(menuCommandFits(stamp, surface)).toBe(true);
   });
 
@@ -87,9 +87,9 @@ describe('the table of what a menu can do', () => {
     });
 
     it('opens the stamp packs for everyone, a seat only watching included', () => {
-      const stamp = commandFor('stamp');
+      const stamp = commandFor('stampPacks');
       expect(stamp.action).toEqual({ kind: 'panel', panel: 'stampPacks' });
-      expect(stamp.labelKey).toBe('app.fab.stamp');
+      expect(stamp.labelKey).toBe('app.fab.stampPacks');
       expect(isMenuCommandOffered(stamp, PeerRole.GameMaster)).toBe(true);
       expect(isMenuCommandOffered(stamp, PeerRole.Player)).toBe(true);
       expect(isMenuCommandOffered(stamp, PeerRole.Guest)).toBe(true);
@@ -123,6 +123,22 @@ describe('the table of what a menu can do', () => {
       expect(offered).toContain('chat');
       expect(offered).not.toContain('zipLoad');
       expect(offered).not.toContain('darkness');
+    });
+
+    it('leaves a small menu open behind a switch of this seat, and closes it behind anything else', () => {
+      const stays = (key: string) => MENU_COMMANDS.find((command) => command.key === key)?.stays === true;
+
+      expect(['theme', 'language', 'motion', 'renderLite', 'viewMode'].every(stays)).toBe(true);
+      expect(['widgetClock', 'widgetMiniPlayer', 'widgetPlToolbar'].every(stays)).toBe(true);
+      expect(['skin', 'inventory', 'zipLoad', 'handRail', 'visualNovel', 'useMobileLayout'].some(stays)).toBe(false);
+    });
+
+    it('keeps the names the tests reached the drawer by before it was arranged', () => {
+      const testIdOf = (key: string) => MENU_COMMANDS.find((command) => command.key === key)?.testId;
+
+      expect(testIdOf('handRail')).toBe('fab-entry-hand');
+      expect(testIdOf('theme')).toBe('seat-theme');
+      expect(testIdOf('zipLoad')).toBe('save-load-load');
     });
 
     it('offers every menu something', () => {

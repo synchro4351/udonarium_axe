@@ -60,9 +60,9 @@ type PendingNotice =
 
 /** The message shown for each outcome of pasting or choosing a picture and adding it. */
 export const PENDING_NOTICE_KEYS: Readonly<Record<PendingNotice, string>> = {
-  none: 'feature.file.fileStorage.paste.none',
-  unsupported: 'feature.file.fileStorage.paste.unsupported',
-  unreadable: 'feature.file.fileStorage.paste.unreadable',
+  none: 'feature.file.fileStorage.pasteNothing',
+  unsupported: 'feature.file.imageIntake.failed',
+  unreadable: 'feature.file.fileStorage.pasteWithKeys',
   noPermission: 'feature.file.fileStorage.pending.noPermission',
   oversized: 'feature.file.fileStorage.pending.oversized',
   duplicate: 'feature.file.fileStorage.pending.duplicate',

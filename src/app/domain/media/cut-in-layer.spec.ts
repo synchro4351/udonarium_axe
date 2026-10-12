@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer, isCutInLayerKind, isCutInTextAlign } from '@axe/domain/media/cut-in-layer';
+import { letterTimingOf } from '@axe/domain/media/cut-in-letter-motion';
 
 describe('CutInLayer', () => {
   beforeEach(() => {
@@ -132,15 +133,21 @@ describe('CutInLayer', () => {
       return layer;
     }
 
-    it('starts on the way letters moved before there were controls', () => {
-      expect(makeLayer()).toMatchObject({
+    it('keeps legacy custom defaults beside the official timing defaults', () => {
+      const layer = makeLayer();
+      expect(layer).toMatchObject({
         letterOrder: 'forward',
         letterIntervalMs: 60,
-        letterDurationMs: 260,
+        letterStaggerMs: 0,
+        letterDurationMs: 0,
         letterTiltMode: 'alternate',
         letterExit: 'none',
         letterExitDurationMs: 260,
         letterDirection: 'up',
+      });
+      expect(letterTimingOf('pop', layer.letterStaggerMs, layer.letterDurationMs)).toEqual({
+        staggerMs: 60,
+        durationMs: 300,
       });
     });
 
@@ -165,10 +172,16 @@ describe('CutInLayer', () => {
 
     it('reads a cut-in saved before the controls existed as it always played', () => {
       const restored = ObjectSerializer.instance.parseXml(
-        '<cut-in-layer kind="text" text="参戦" letterMotion="pop"></cut-in-layer>'
+        '<cut-in-layer kind="text" text="参戦" letterMotion="pop" letterIntervalMs="60" letterDurationMs="260"></cut-in-layer>'
       ) as CutInLayer;
 
-      expect(restored).toMatchObject({ letterMotion: 'pop', letterOrder: 'forward', letterIntervalMs: 60 });
+      expect(restored).toMatchObject({
+        letterMotion: 'pop',
+        letterOrder: 'forward',
+        letterIntervalMs: 60,
+        letterStaggerMs: 60,
+        letterDurationMs: 260,
+      });
     });
 
     it('leaves a number a file garbles at its default', () => {

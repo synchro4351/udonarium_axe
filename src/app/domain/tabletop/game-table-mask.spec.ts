@@ -90,14 +90,7 @@ describe('GameTableMask', () => {
   describe('color', () => {
     it('falls back to a default colour when it carries none', () => {
       const mask = GameTableMask.create('test', 1, 1, 100);
-      expect(mask.color).toBe('#ffffff');
-    });
-
-    it('keeps white text when the background is set before the text color', () => {
-      const mask = GameTableMask.create('test', 1, 1, 100);
-      mask.bgcolor = '#000000';
-      expect(mask.color).toBe('#ffffff');
-      expect(mask.bgcolor).toBe('#000000');
+      expect(mask.color).toBe('#555555');
     });
 
     it('returns the colour it carries', () => {
@@ -123,107 +116,11 @@ describe('GameTableMask', () => {
     });
   });
 
-  describe('text settings', () => {
-    it('provides defaults without mutating a legacy mask', () => {
-      const mask = GameTableMask.create('legacy', 1, 1, 100);
-      const before = mask.commonDataElement!.children.length;
-      expect(mask.text).toBe('');
-      expect(mask.fontSize).toBe(18);
-      expect(mask.textOutline).toBe(false);
-      expect(mask.outlineColor).toBe('#ffffff');
-      expect(mask.commonDataElement!.children.length).toBe(before);
-    });
-
-    it('creates missing text fields lazily with stable identifiers', () => {
-      const mask = GameTableMask.create('legacy', 1, 1, 100, 'mask-id');
-      mask.text = 'hello';
-      mask.text = 'updated';
-      mask.fontSize = 24;
-      mask.textOutline = true;
-      mask.outlineColor = '#123456';
-      expect(mask.commonDataElement!.getFirstElementByName('text')!.identifier).toBe('text_mask-id');
-      expect(mask.commonDataElement!.getFirstElementByName('fontsize')!.identifier).toBe('fontsize_mask-id');
-      expect(mask.commonDataElement!.getFirstElementByName('textoutline')!.identifier).toBe('textoutline_mask-id');
-      expect(mask.text).toBe('updated');
-      expect(mask.commonDataElement!.getFirstElementByName('text')!.currentValue).toBe('updated');
-      expect(mask.fontSize).toBe(24);
-      expect(mask.textOutline).toBe(true);
-      expect(mask.outlineColor).toBe('#123456');
-    });
-
-    it('creates the paired color element without losing background semantics', () => {
-      const mask = GameTableMask.create('legacy', 1, 1, 100, 'mask-id');
-      mask.color = '#112233';
-      mask.bgcolor = '#445566';
-      const color = mask.commonDataElement!.getFirstElementByName('color')!;
-      expect(color.type).toBe('colors');
-      expect(color.value).toBe('#112233');
-      expect(color.currentValue).toBe('#445566');
-    });
-  });
-
   describe('what it inherits', () => {
     it('starts on the table', () => {
       const mask = GameTableMask.create('test', 1, 1, 100);
       expect(mask.location.name).toBe('table');
     });
-  });
-
-  it('round-trips text, outline, and paired colours through XML', () => {
-    const mask = GameTableMask.create('mask', 2, 2, 100, 'mask-id');
-    mask.text = 'A & B\n|漢《かん》';
-    mask.fontSize = 32;
-    mask.color = '#112233';
-    mask.bgcolor = '#445566';
-    mask.textOutline = true;
-    mask.outlineColor = '#abcdef';
-    const xml = mask.toXml().replace(/location\.[a-z]+="[^"]*"\s*/g, '');
-    const restored = ObjectSerializer.instance.parseXml(xml) as GameTableMask;
-    expect(restored.text).toBe(mask.text);
-    expect(restored.fontSize).toBe(32);
-    expect(restored.color).toBe('#112233');
-    expect(restored.bgcolor).toBe('#445566');
-    expect(restored.textOutline).toBe(true);
-    expect(restored.outlineColor).toBe('#abcdef');
-  });
-
-  it('keeps the text format on the text element, normal by default, and round-trips it through XML', () => {
-    const mask = GameTableMask.create('mask', 2, 2, 100, 'mask-fmt-id');
-    expect(mask.textFormat).toBe('normal');
-    mask.text = '> 引用\n1 <2 >0 and 2*3+4';
-    mask.textFormat = 'formatted';
-    expect(mask.textFormat).toBe('formatted');
-    expect(mask.text).toBe('> 引用\n1 <2 >0 and 2*3+4');
-    const xml = mask.toXml().replace(/location\.[a-z]+="[^"]*"\s*/g, '');
-    const restored = ObjectSerializer.instance.parseXml(xml) as GameTableMask;
-    expect(restored.textFormat).toBe('formatted');
-    expect(restored.text).toBe(mask.text);
-    mask.textFormat = 'normal';
-    expect(mask.textFormat).toBe('normal');
-    expect(mask.text).toBe('> 引用\n1 <2 >0 and 2*3+4');
-  });
-
-  it('creates a text element only when a mask without one is switched to formatted', () => {
-    const mask = GameTableMask.create('mask', 1, 1, 100);
-    mask.commonDataElement!.getFirstElementByName('text')?.destroy();
-    mask.textFormat = 'normal';
-    expect(mask.commonDataElement!.getFirstElementByName('text')).toBeNull();
-    mask.textFormat = 'formatted';
-    expect(mask.textFormat).toBe('formatted');
-  });
-
-  it('clamps invalid imported font size and falls back invalid outline colour', () => {
-    const mask = GameTableMask.create('Imported mask', 1, 1, 100);
-    mask.commonDataElement!.appendChild(DataElement.create('fontsize', '999'));
-    mask.commonDataElement!.appendChild(DataElement.create('outlinecolor', 'invalid'));
-    expect(mask.fontSize).toBe(120);
-    expect(mask.outlineColor).toBe('#ffffff');
-    const size = mask.commonDataElement!.getFirstElementByName('fontsize')!;
-    size.value = '-1';
-    expect(mask.fontSize).toBe(1);
-    size.value = 'invalid';
-    expect(mask.fontSize).toBe(18);
-    mask.destroy();
   });
 
   describe('its size', () => {
@@ -237,16 +134,6 @@ describe('GameTableMask', () => {
   });
 
   describe('paintColor', () => {
-    it('preserves the ink colour when painting a text-bearing mask', () => {
-      const mask = GameTableMask.create('Text mask', 2, 2, 100);
-      mask.text = 'Keep this readable';
-      mask.color = '#112233';
-      mask.paintColor('#abcdef');
-      expect(mask.color).toBe('#112233');
-      expect(mask.bgcolor).toBe('#abcdef');
-      mask.destroy();
-    });
-
     it('adds the colour element a mask made from the menu lacks, holding the colour twice', () => {
       const mask = GameTableMask.create('test', 1, 1, 100);
       expect(mask.commonDataElement!.getFirstElementByName('color')).toBeNull();
@@ -399,6 +286,103 @@ describe('GameTableMask', () => {
       expect(mask.scratchedImageIdentifier).toBe('image-1');
 
       mask.destroy();
+    });
+  });
+
+  describe('the words written across it', () => {
+    const made: GameTableMask[] = [];
+
+    function mask(): GameTableMask {
+      const created = GameTableMask.create('test', 2, 2, 100);
+      made.push(created);
+      return created;
+    }
+
+    afterEach(() => {
+      for (const each of made.splice(0)) each.destroy();
+    });
+
+    it('reads none, white, the default size and an outline on a mask that never had any', () => {
+      const plain = mask();
+
+      expect(plain.text).toBe('');
+      expect(plain.textColor).toBe('#ffffff');
+      expect(plain.textSize).toBe(GameTableMask.DEFAULT_TEXT_SIZE);
+      expect(plain.textOutline).toBe(true);
+      for (const name of ['text', 'fontsize', 'fontcolor', 'textoutline']) {
+        expect(plain.commonDataElement!.getFirstElementByName(name), name).toBeNull();
+      }
+    });
+
+    it('keeps the words, line breaks and all, in a note of their own', () => {
+      const written = mask();
+
+      written.text = '立入禁止\n（鍵がかかっている）';
+
+      const element = written.commonDataElement!.getFirstElementByName('text')!;
+      expect(element.identifier).toBe(`text_${written.identifier}`);
+      expect(element.isNote).toBe(true);
+      expect(written.text).toBe('立入禁止\n（鍵がかかっている）');
+    });
+
+    it('adds nothing for no words, and clears words once written', () => {
+      const written = mask();
+      written.text = '  ';
+      expect(written.commonDataElement!.getFirstElementByName('text')).toBeNull();
+
+      written.text = '扉';
+      written.text = '';
+      expect(written.text).toBe('');
+    });
+
+    it('holds the size between 8 and 200, and reads anything else as the default', () => {
+      const written = mask();
+
+      written.textSize = 500;
+      expect(written.textSize).toBe(200);
+      written.textSize = 3;
+      expect(written.textSize).toBe(8);
+      written.textSize = Number.NaN;
+      expect(written.textSize).toBe(GameTableMask.DEFAULT_TEXT_SIZE);
+    });
+
+    it('takes a colour, and reads one that is not a colour as white', () => {
+      const written = mask();
+
+      written.textColor = '#ff0000';
+      expect(written.textColor).toBe('#ff0000');
+      written.commonDataElement!.getFirstElementByName('fontcolor')!.value = 'red';
+      expect(written.textColor).toBe('#ffffff');
+    });
+
+    it('keeps an outline turned off as a check left blank, and adds nothing to keep it on', () => {
+      const written = mask();
+
+      written.textOutline = true;
+      expect(written.commonDataElement!.getFirstElementByName('textoutline')).toBeNull();
+
+      written.textOutline = false;
+      expect(written.textOutline).toBe(false);
+      expect(written.commonDataElement!.getFirstElementByName('textoutline')!.value).toBe(0);
+
+      written.textOutline = true;
+      expect(written.textOutline).toBe(true);
+    });
+
+    it('keeps a formatted display on its text element, and adds nothing for a normal one', () => {
+      const written = mask();
+
+      written.textFormat = 'normal';
+      expect(written.commonDataElement!.getFirstElementByName('text')).toBeNull();
+
+      written.textFormat = 'formatted';
+      expect(written.textFormat).toBe('formatted');
+      expect(written.text).toBe('');
+
+      written.text = '# 見出し';
+      expect(written.textFormat).toBe('formatted');
+      written.textFormat = 'normal';
+      expect(written.textFormat).toBe('normal');
     });
   });
 });

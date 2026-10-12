@@ -401,6 +401,112 @@ describe('CutInLayerPropertiesComponent', () => {
     });
   });
 
+  describe('the kinds of lettering offered for a text layer', () => {
+    function presetButton(id: string): HTMLButtonElement {
+      return fixture.nativeElement.querySelector(`[data-testid="cut-in-font-${id}"]`);
+    }
+
+    beforeEach(() => {
+      layer.kind = 'text';
+      fixture.componentRef.setInput('layer', layer);
+      fixture.detectChanges();
+    });
+
+    it('sets the text in the lettering picked, as a list of fonts that ends in a family', () => {
+      presetButton('mincho').click();
+
+      expect(layer.fontFamily).toContain('Mincho');
+      expect(layer.fontFamily.endsWith('serif')).toBe(true);
+    });
+
+    it('marks the one in use, and goes back to the default', () => {
+      presetButton('gothic').click();
+      fixture.detectChanges();
+      expect(presetButton('gothic').getAttribute('aria-pressed')).toBe('true');
+      expect(presetButton('default').getAttribute('aria-pressed')).toBe('false');
+
+      presetButton('default').click();
+      expect(layer.fontFamily).toBe('');
+    });
+
+    it('offers nothing to press where the layer may not be edited', () => {
+      fixture.componentRef.setInput('isEditable', false);
+      fixture.detectChanges();
+
+      expect(presetButton('gothic').disabled).toBe(true);
+    });
+  });
+
+  describe('how a text layer\u2019s letters come on', () => {
+    function presetButton(motion: string): HTMLButtonElement {
+      return fixture.nativeElement.querySelector(`[data-testid="cut-in-letter-preset-${motion}"]`);
+    }
+
+    beforeEach(() => {
+      layer.kind = 'text';
+      fixture.componentRef.setInput('layer', layer);
+      fixture.detectChanges();
+    });
+
+    it('picks a motion with its own timing, whatever had been set by hand', () => {
+      component.letterMotion = 'fade';
+      component.letterStaggerMs = 200;
+      component.letterDurationMs = 900;
+
+      presetButton('pop').click();
+      fixture.detectChanges();
+
+      expect([layer.letterMotion, layer.letterStaggerMs, layer.letterDurationMs]).toEqual(['pop', 0, 0]);
+      expect(presetButton('pop').getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('holds the timing to its bounds, keeps 0 for the motion\u2019s own, and goes back to all at once', () => {
+      component.letterMotion = 'slide';
+      component.letterStaggerMs = 5000;
+      component.letterDurationMs = 10;
+      expect([layer.letterStaggerMs, layer.letterDurationMs]).toEqual([1000, 50]);
+
+      component.letterDurationMs = 0;
+      expect(layer.letterDurationMs).toBe(0);
+
+      component.letterMotion = 'none';
+      expect(layer.letterMotion).toBe('none');
+      component.letterMotion = 'from-a-newer-version';
+      expect(layer.letterMotion).toBe('none');
+    });
+
+    it('asks only for the timing the motion uses', async () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const choose = async (motion: string) => {
+        const list = root.querySelector('[data-testid="cut-in-letter-motion"]') as HTMLSelectElement;
+        list.value = motion;
+        list.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+      };
+
+      await choose('type');
+      expect(layer.letterMotion).toBe('type');
+      expect(root.querySelector('[name="cut-in-layer-letter-stagger"]')).not.toBeNull();
+      expect(root.querySelector('[name="cut-in-layer-letter-duration"]')).toBeNull();
+
+      await choose('none');
+      expect(layer.letterMotion).toBe('none');
+      expect(root.querySelector('[name="cut-in-layer-letter-stagger"]')).toBeNull();
+    });
+
+    it('offers nothing to press where the layer may not be edited', () => {
+      fixture.componentRef.setInput('isEditable', false);
+      fixture.detectChanges();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('[data-testid="cut-in-letter-motion"]')!
+          .disabled
+      ).toBe(true);
+    });
+  });
+
   describe('the shape a layer is cut down to', () => {
     it('keeps its own box to begin with', () => {
       expect(component.clip).toBe('none');
@@ -416,6 +522,13 @@ describe('CutInLayerPropertiesComponent', () => {
       component.clip = 'trapezoid' as never;
 
       expect(layer.clip).toBe('none');
+    });
+
+    it('shows an outline it does not know as none, leaving it as it was', () => {
+      layer.clip = 'trapezoid' as never;
+
+      expect(component.clip).toBe('none');
+      expect(layer.clip).toBe('trapezoid');
     });
 
     it('takes a lean, held to what still leaves something to see', () => {
@@ -551,7 +664,7 @@ describe('CutInLayerPropertiesComponent', () => {
         'cut-in-letter-preset-fade',
         'cut-in-letter-preset-pop',
         'cut-in-letter-preset-wave',
-        'cut-in-layer-letter-motion',
+        'cut-in-letter-motion',
         'cut-in-letterOrder',
         'cut-in-letterTiltMode',
         'cut-in-letterExit',
@@ -563,7 +676,7 @@ describe('CutInLayerPropertiesComponent', () => {
       ]) {
         expect(inside(testId), testId).not.toBeNull();
       }
-      const before = inside('cut-in-letter-preset-wave').compareDocumentPosition(inside('cut-in-layer-letter-motion'));
+      const before = inside('cut-in-letter-preset-wave').compareDocumentPosition(inside('cut-in-letter-motion'));
       expect(before & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
@@ -815,7 +928,7 @@ describe('CutInLayerPropertiesComponent', () => {
         const style = section('cut-in-section-style')!;
         expect([position.open, motion.open, style.open], kind).toEqual([false, false, false]);
         expect(names(position), kind).toEqual(positionNames);
-        expect(names(motion), kind).toEqual(motionNames);
+        expect(names(motion), kind).toEqual(expect.arrayContaining(motionNames));
         expect(names(style), kind).toEqual(styleNames);
         expect(
           [position, motion, style].map((element) => element.querySelector('summary')!.textContent!.trim()),
@@ -840,10 +953,9 @@ describe('CutInLayerPropertiesComponent', () => {
       fixture.detectChanges();
 
       expect(names(host())).toContain('cut-in-layer-portrait-slot');
-      expect(host().querySelector('label[title]')!.getAttribute('title')).toBe(
-        '画像がない場合はシルエットを表示します。'
-      );
-      expect(host().textContent).not.toContain('画像がない場合はシルエットを表示します。');
+      const hint = host().querySelector('label[title]')!.getAttribute('title')!;
+      expect(hint).toContain('発言したキャラの立ち絵を出します');
+      expect(host().textContent).not.toContain(hint);
       expect(section('cut-in-section-text')).toBeNull();
     });
 

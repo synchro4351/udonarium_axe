@@ -179,7 +179,7 @@ describe('MenuCommandService', () => {
       seatAs(PeerRole.Guest);
       const open = vi.spyOn(TestBed.inject(RoomPanelService), 'open').mockImplementation(() => {});
 
-      expect(commands.run(commandOf('stamp'))).toBe('done');
+      expect(commands.run(commandOf('stampPacks'))).toBe('done');
       expect(open).toHaveBeenCalledWith('stampPacks');
     });
 
@@ -197,6 +197,20 @@ describe('MenuCommandService', () => {
 
       expect(commands.labelKeyOf(buffs)).toBe(shown ? 'app.fab.buffsShown' : 'app.fab.buffsHidden');
       expect(commands.iconOf(buffs)).toBe(shown ? 'auto_fix_high' : 'auto_fix_off');
+    });
+
+    it('switches what the characters say over their pieces, and names it by whether it is drawn', () => {
+      seatAs(PeerRole.Guest);
+      const overlay = TestBed.inject(PieceOverlayPreferenceService);
+      const speech = commandOf('speechBubbles');
+      const shown = overlay.speech();
+
+      expect(commands.labelKeyOf(speech)).toBe(shown ? 'app.fab.speechShown' : 'app.fab.speechHidden');
+      commands.run(speech);
+      expect(overlay.speech()).toBe(!shown);
+      expect(commands.litOf(speech)).toBe(!shown);
+      expect(commands.iconOf(speech)).toBe(shown ? 'speaker_notes_off' : 'chat_bubble');
+      commands.run(speech);
     });
 
     it('writes the language out rather than drawing a mark for it', () => {

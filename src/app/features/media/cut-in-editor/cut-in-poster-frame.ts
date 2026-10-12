@@ -1,9 +1,16 @@
 import type { CutInLayer } from '@axe/domain/media/cut-in-layer';
+import {
+  letterMotionOf,
+  letterPoseAt as officialLetterPoseAt,
+  letterTimingOf,
+} from '@axe/domain/media/cut-in-letter-motion';
 import type { CutInScene } from '@axe/domain/media/cut-in-scene';
 import { layerWindow, sampleLayerAt, sceneDurationOf } from '@axe/domain/media/cut-in-scene-timeline';
 import {
   type CutInLetterMotion,
+  isCutInLetterMotion,
   letterPoseAt,
+  letterRank,
   letterSettingsOf,
   resolveCharacterName,
   splitLetters,
@@ -61,16 +68,46 @@ export function posterFrameMs(scene: CutInScene | null): number {
  */
 function lettersInAt(layer: CutInLayer, ms: number, durationMs: number): number {
   if (layer.kind !== 'text') return 1;
-  const comesIn = LETTERS_COME_IN.includes(layer.letterMotion);
-  if (!comesIn && letterSettingsOf(layer).letterExit === 'none') return 1;
+  const motion = layer.letterMotion;
+  const settings = letterSettingsOf(layer);
+  const officialMotion = letterMotionOf(motion);
+  const comesIn =
+    (officialMotion !== null && ['type', 'fade', 'pop', 'slide'].includes(officialMotion)) ||
+    (isCutInLetterMotion(motion) && LETTERS_COME_IN.includes(motion));
+  if (!comesIn && settings.letterExit === 'none') return 1;
   const letters = splitLetters(resolveCharacterName(layer.text, '')).filter((letter) => !letter.newline);
   if (letters.length < 1) return 1;
   const { endMs } = layerWindow(layer, durationMs);
+  const customControls =
+    settings.letterOrder !== 'forward' ||
+    layer.letterTiltDeg !== 0 ||
+    settings.letterTiltMode !== 'alternate' ||
+    settings.letterExit !== 'none' ||
+    settings.letterDirection !== 'up';
+  const timing = officialMotion ? letterTimingOf(officialMotion, layer.letterStaggerMs, layer.letterDurationMs) : null;
+  const customTiming = timing
+    ? { ...layer, letterIntervalMs: timing.staggerMs, letterDurationMs: timing.durationMs }
+    : layer;
   // A letter coming in or leaving is still on its way, faded or out of place.
   const settled = letters.filter((letter) => {
-    const motion = comesIn ? layer.letterMotion : 'none';
-    const pose = letterPoseAt(motion, letter.index, 0, 1, ms, layer.startMs, layer, letters.length, endMs);
-    return pose.opacity >= 1 && pose.dx === 0 && pose.dy === 0;
+    if (officialMotion === 'type' || (officialMotion && !customControls)) {
+      const rank = letterRank(letter.index, letters.length, settings.letterOrder);
+      const pose = officialLetterPoseAt(officialMotion, rank, ms - layer.startMs, layer.fontSizePx, timing!);
+      return pose.opacity >= 1 && pose.dx === 0 && pose.dy === 0 && pose.scale === 1;
+    }
+    const legacyMotion = comesIn && isCutInLetterMotion(motion) ? motion : 'none';
+    const pose = letterPoseAt(
+      legacyMotion,
+      letter.index,
+      0,
+      layer.fontSizePx,
+      ms,
+      layer.startMs,
+      customTiming,
+      letters.length,
+      endMs
+    );
+    return pose.opacity >= 1 && pose.dx === 0 && pose.dy === 0 && pose.scale === 1;
   });
   return settled.length / letters.length;
 }

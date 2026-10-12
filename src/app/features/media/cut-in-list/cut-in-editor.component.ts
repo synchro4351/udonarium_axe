@@ -1,16 +1,20 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
-import { type CutInPortraitPick, CutInService } from '@axe/application/media/cut-in.service';
+import { CutInService } from '@axe/application/media/cut-in.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { portraitElementAt } from '@axe/domain/character/character-portrait';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { CutInLauncher } from '@axe/domain/media/cut-in-launcher';
-import { Jukebox } from '@axe/domain/media/jukebox';
+import { CutInLayer } from '@axe/domain/media/cut-in-layer';
+import { portraitFitFor } from '@axe/domain/media/cut-in-portrait-fit';
+import { type CutInSpeaker, SPEAKER_NAME_TOKEN } from '@axe/domain/media/cut-in-speaker';
 import { CutInBgmComponent } from '@axe/features/media/cut-in-bgm/cut-in-bgm.component';
 import { CutInPortraitPickService } from '@axe/features/media/cut-in-editor/cut-in-portrait-pick.service';
 import { CutInPortraitPickerComponent } from '@axe/features/media/cut-in-editor/cut-in-portrait-picker.component';
@@ -51,14 +55,18 @@ export class CutInEditorComponent {
   }
 
   /** Who the launch is for, as chosen here or on the scene tab. */
-  private get portraitPick(): CutInPortraitPick | null {
+  private get portraitSpeaker(): CutInSpeaker | null {
     const cutIn = this.c;
     if (!cutIn || !this.takesCharacter) return null;
     const choice = this.portraitChoice.choiceFor(cutIn.identifier);
-    if (!choice.characterIdentifier) return null;
+    const character = this.objectStore.get<GameCharacter>(choice.characterIdentifier);
+    if (!(character instanceof GameCharacter)) return null;
+    const imageIdentifier = this.hasPortraitSlot ? choice.imageIdentifier : '';
     return {
-      characterIdentifier: choice.characterIdentifier,
-      imageIdentifier: this.hasPortraitSlot ? choice.imageIdentifier : '',
+      characterId: character.identifier,
+      imageIdentifier,
+      name: character.name,
+      fit: portraitFitFor(character.cutInPortraitFits, imageIdentifier),
     };
   }
 
@@ -69,6 +77,49 @@ export class CutInEditorComponent {
 
   private get c(): CutIn | null {
     return this.cutIn();
+  }
+
+  /** Whether the cut-in's layers show the portrait or the name of whoever it is played for. */
+  readonly usesSpeaker = computed(() => {
+    const c = this.cutIn();
+    if (!c) return false;
+    this.objectChange.versionOf(c.identifier)();
+    this.objectChange.collectionOf(CutInLayer.aliasName)();
+    return (c.scene?.layers ?? []).some((layer) => {
+      this.objectChange.versionOf(layer.identifier)();
+      return layer.portraitSlot || layer.text.includes(SPEAKER_NAME_TOKEN);
+    });
+  });
+
+  /** The characters the cut-in can be tried out as, by name. */
+  readonly speakerChoices = computed(() => {
+    this.objectChange.collectionOf(GameCharacter.aliasName)();
+    return this.objectStore
+      .getObjects<GameCharacter>(GameCharacter)
+      .filter((character) => character.location.name !== 'graveyard')
+      .map((character) => ({ identifier: character.identifier, name: character.name }));
+  });
+
+  /** The character the cut-in is tried out as on this screen, empty for nobody; never shared. */
+  readonly trySpeakerId = signal('');
+
+  /** Who the cut-in is played for when tried out here: the character chosen, with their portrait now. */
+  private trySpeaker(): CutInSpeaker | null {
+    const character = this.objectStore.get<GameCharacter>(this.trySpeakerId());
+    if (!(character instanceof GameCharacter) || !this.usesSpeaker()) return null;
+    const portrait = portraitElementAt(character, character.selectedPortraitIndex);
+    const imageIdentifier = portrait ? `${portrait.value}` : character.imageFile.identifier;
+    return {
+      characterId: character.identifier,
+      imageIdentifier,
+      name: character.name,
+      fit: portraitFitFor(character.cutInPortraitFits, imageIdentifier),
+    };
+  }
+
+  /** The shared portrait picker takes precedence over the quick speaker selector. */
+  private speakerForLaunch(): CutInSpeaker | null {
+    return this.portraitSpeaker ?? this.trySpeaker();
   }
 
   private get editable(): boolean {
@@ -295,6 +346,10 @@ export class CutInEditorComponent {
     if (!this.c) return '';
     return this.editable ? this.c.audioName : '';
   }
+  isCutInBgmUploaded(): boolean {
+    this.objectChange.fileVersion();
+    return !!this.c?.audioIdentifier && !!this.audioStorage.get(this.c.audioIdentifier);
+  }
   set cutInAudioName(cutInAudioName: string) {
     if (this.editable && this.c) this.c.audioName = cutInAudioName;
   }
@@ -335,12 +390,6 @@ export class CutInEditorComponent {
   get maxSizeHeight(): number {
     if (this.c) this._maxSizeHeight = this.c.maxSizeHeight(this.isYouTubeCutIn());
     return this._maxSizeHeight;
-  }
-
-  /** Whether the cut-in's sound is present in this room's audio storage. */
-  isCutInBgmUploaded(): boolean {
-    if (!this.c) return false;
-    return this.audioStorage.get(this.cutInAudioIdentifier) !== null;
   }
 
   /**
@@ -426,14 +475,13 @@ export class CutInEditorComponent {
         this.c.height = this.originalImgHeight();
       }
     }
-    this.cutInService.launchForMyself(this.c, this.portraitPick);
+    this.cutInService.launchForMyself(this.c, this.speakerForLaunch());
   }
 
   /**
    * Plays the cut-in for everyone in the room.
    *
-   * It is sized to its picture first when original size is on, and the jukebox is stopped when the
-   * cut-in brings its own sound and has no tag.
+   * It is sized to its picture first when original size is on; the service handles any music stop.
    */
   playCutIn() {
     if (!this.c) return;
@@ -444,10 +492,7 @@ export class CutInEditorComponent {
         this.c.height = this.originalImgHeight();
       }
     }
-    if (this.isCutInBgmUploaded() && this.cutInTagName === '') {
-      this.jukebox.stop();
-    }
-    this.cutInService.launch(this.c, '', this.portraitPick);
+    this.cutInService.launch(this.c, '', this.speakerForLaunch());
   }
 
   /** Stops the cut-in for everyone in the room. */
@@ -496,9 +541,5 @@ export class CutInEditorComponent {
 
   private get cutInLauncher(): CutInLauncher {
     return this.objectStore.get<CutInLauncher>('CutInLauncher')!;
-  }
-
-  private get jukebox(): Jukebox {
-    return this.objectStore.get<Jukebox>('Jukebox')!;
   }
 }

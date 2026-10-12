@@ -11,6 +11,7 @@ import { PeerRole } from '@axe/domain/peer/peer-role';
 import { GameTable, GridType } from '@axe/domain/tabletop/game-table';
 import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
+import { BrowserDataWipeService } from '@axe/features/room-settings/browser-data-wipe.service';
 import { RoomSettingsPanelComponent } from '@axe/features/room-settings/room-settings-panel/room-settings-panel.component';
 import { expectPanelDragRecovery, PanelDragTestHostComponent } from '@axe/testing/panel-drag-recovery';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -91,6 +92,53 @@ describe('RoomSettingsPanelComponent', () => {
     expect(component.defaultDiceBot).not.toBe('Cthulhu7th');
   });
 
+  it('lets the master choose where the room has its rolls tumble, and shows a player only what was chosen', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const select: HTMLSelectElement = fixture.nativeElement.querySelector('[data-testid="dice-stage"]');
+    expect(select.value).toBe('off');
+    expect([...select.options].map((option) => option.value)).toEqual(['off', 'frame', 'table', 'both']);
+    expect(select.disabled).toBe(false);
+
+    select.value = 'frame';
+    select.dispatchEvent(new Event('change'));
+    expect(Config.instance.diceStage).toBe('frame');
+
+    PeerCursor.myCursor.role = PeerRole.Player;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component.diceStage = 'off';
+    // A model-bound control takes its disabled state a turn after the binding changes.
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(Config.instance.diceStage).toBe('frame');
+    expect(select.disabled).toBe(true);
+  });
+
+  it('lets the master turn off the bubbles over the pieces, and shows a player only that they are off', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const box: HTMLInputElement = fixture.nativeElement.querySelector(
+      '[data-testid="room-settings-speech-bubbles"] input[type="checkbox"]'
+    );
+    expect(box.checked).toBe(true);
+    expect(box.disabled).toBe(false);
+
+    box.click();
+    expect(Config.instance.speechBubblesEnabled).toBe(false);
+
+    PeerCursor.myCursor.role = PeerRole.Player;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component.speechBubbles = true;
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(Config.instance.speechBubblesEnabled).toBe(false);
+    expect(box.disabled).toBe(true);
+    Config.instance.speechBubblesEnabled = true;
+  });
   it('writes nothing for a reader who may not edit the table', () => {
     PeerCursor.myCursor.role = PeerRole.Guest;
     table.zocMode = 'stop';
@@ -357,6 +405,22 @@ describe('RoomSettingsPanelComponent', () => {
       button.click();
 
       expect(opened).toEqual(['replay']);
+    });
+
+    it('offers anyone, someone watching as well, to wipe this browser’s data from the utility part', async () => {
+      const wipe = vi.spyOn(TestBed.inject(BrowserDataWipeService), 'wipe').mockResolvedValue(false);
+      PeerCursor.myCursor.role = PeerRole.Guest;
+      component.tab.set('utility');
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const button = fixture.nativeElement.querySelector(
+        '[data-testid="room-settings-wipe-browser-data"]'
+      ) as HTMLButtonElement;
+      expect(button.closest('[inert]')).toBeNull();
+      button.click();
+
+      expect(wipe).toHaveBeenCalledOnce();
     });
 
     it('shows the boxes only once an enemy holds ground', async () => {
@@ -685,40 +749,6 @@ describe('RoomSettingsPanelComponent', () => {
       expect(toggle('allows-hand-draw').disabled).toBe(true);
       expect(Config.instance.allowsHandDraw).toBe(true);
       expect(Config.instance.allowsHandGive).toBe(true);
-    });
-  });
-
-  describe('speech bubbles over pieces', () => {
-    function toggle(): HTMLInputElement {
-      return (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>(
-        '[data-testid="shows-overhead-speech"]'
-      )!;
-    }
-
-    afterEach(() => (Config.instance.showsOverheadSpeech = false));
-
-    it('starts off and lets the master turn it on for the room', async () => {
-      Config.instance.showsOverheadSpeech = false;
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      expect(toggle().checked).toBe(false);
-      toggle().click();
-      fixture.detectChanges();
-
-      expect(Config.instance.showsOverheadSpeech).toBe(true);
-      expect(component.showsOverheadSpeech).toBe(true);
-    });
-
-    it('leaves it to the master', async () => {
-      PeerCursor.myCursor.role = PeerRole.Player;
-      fixture.detectChanges();
-      await fixture.whenStable();
-
-      component.showsOverheadSpeech = true;
-
-      expect(toggle().disabled).toBe(true);
-      expect(Config.instance.showsOverheadSpeech).toBe(false);
     });
   });
 

@@ -1,12 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { CutInSoundService } from '@axe/application/media/cut-in-sound.service';
-import { setPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
-import { type CutInPortraitFit, DEFAULT_CUT_IN_PORTRAIT_FIT } from '@axe/domain/media/cut-in-portrait';
+import { type CutInPortraitFit, withPortraitFits } from '@axe/domain/media/cut-in-portrait-fit';
 import { addLayer, ensureScene } from '@axe/features/media/cut-in-editor/cut-in-editor-ops';
 import { CutInFreshSceneService } from '@axe/features/media/cut-in-editor/cut-in-fresh-scene.service';
 import { keysOf, valueAt } from '@axe/features/media/cut-in-editor/cut-in-keyframe-edit';
@@ -1073,7 +1072,7 @@ describe('CutInSceneEditorComponent', () => {
 
   describe('previewing a character picture in the portrait slot', () => {
     type FitApi = {
-      previewPortrait(): { imageIdentifier: string; characterName: string; fit: CutInPortraitFit } | null;
+      previewSpeaker(): { imageIdentifier: string; name: string; fit: CutInPortraitFit | null } | null;
       onStageWheel(event: WheelEvent): void;
     };
 
@@ -1102,18 +1101,20 @@ describe('CutInSceneEditorComponent', () => {
 
       const stage = fixture.debugElement.query(By.directive(CutInStageComponent))
         .componentInstance as CutInStageComponent;
-      expect(stage.portrait()).toMatchObject({ imageIdentifier: 'hero-face', characterName: 'Hero' });
+      expect(stage.speaker()).toMatchObject({ imageIdentifier: 'hero-face', name: 'Hero' });
       expect(fixture.nativeElement.querySelector('[data-testid="cut-in-portrait-preview"]')).not.toBeNull();
     });
 
     it('previews the fit the character keeps, and follows it when the sheet changes it', async () => {
       const { hero } = withSlotAndHero();
-      expect(fitting().previewPortrait()?.fit).toEqual(DEFAULT_CUT_IN_PORTRAIT_FIT);
+      expect(fitting().previewSpeaker()?.fit).toBeNull();
 
-      setPortraitFitOf(hero, 'bust', 'hero-face', { scale: 2, x: 30, y: 15 });
+      hero.cutInPortraitFits = withPortraitFits('', new Map([['hero-face', { scale: 2, x: 0.3, y: 0.15 }]]), [
+        'hero-face',
+      ]);
       await fixture.whenStable();
 
-      expect(fitting().previewPortrait()?.fit).toEqual({ scale: 2, x: 30, y: 15 });
+      expect(fitting().previewSpeaker()?.fit).toEqual({ scale: 2, x: 0.3, y: 0.15 });
     });
 
     it('never writes a fit, whether the stage is dragged or wheeled', () => {
@@ -1122,7 +1123,7 @@ describe('CutInSceneEditorComponent', () => {
       drag([100, 100], [140, 100]);
       fitting().onStageWheel({ deltaY: -100, ctrlKey: false, metaKey: false, preventDefault: vi.fn() } as never);
 
-      expect(hero.portraitFits).toBe('');
+      expect(hero.cutInPortraitFits).toBe('');
     });
   });
 

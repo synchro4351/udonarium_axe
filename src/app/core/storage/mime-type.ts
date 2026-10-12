@@ -26,8 +26,12 @@ const types = {
   zip: 'application/zip',
   mp3: 'audio/mp3',
   wav: 'audio/wav',
-  m4a: 'audio/aac',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
   ogg: 'audio/ogg',
+  oga: 'audio/ogg',
+  opus: 'audio/ogg',
+  flac: 'audio/flac',
   mpg: 'video/mpeg',
   mpeg: 'video/mpeg',
   mp4: 'video/mp4',
@@ -52,22 +56,4 @@ export function extension(mimeType: string): string {
     if (value === mimeType) return key;
   }
   return mimeType.split('/')[1];
-}
-
-/** Recognizes only common raster signatures when an archive entry has no known extension. */
-export function rasterType(bytes: Uint8Array): string {
-  const starts = (signature: readonly number[]) => signature.every((value, index) => bytes[index] === value);
-  if (starts([137, 80, 78, 71, 13, 10, 26, 10])) return 'image/png';
-  if (starts([255, 216, 255])) return 'image/jpeg';
-  if (starts([71, 73, 70, 56, 55, 97]) || starts([71, 73, 70, 56, 57, 97])) return 'image/gif';
-  if (
-    bytes.length >= 12 &&
-    starts([82, 73, 70, 70]) &&
-    bytes[8] === 87 &&
-    bytes[9] === 69 &&
-    bytes[10] === 66 &&
-    bytes[11] === 80
-  )
-    return 'image/webp';
-  return '';
 }

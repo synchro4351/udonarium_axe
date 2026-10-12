@@ -1,4 +1,7 @@
 import { inject, Injectable } from '@angular/core';
+import { ChatReactionService } from '@axe/application/chat/chat-reaction.service';
+import { StampPackService } from '@axe/application/chat/stamp-pack.service';
+import { stampLabel } from '@axe/application/chat/stamp-words';
 import { decodeI18nMessage } from '@axe/application/i18n/i18n-message';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { Network } from '@axe/core/index';
@@ -18,16 +21,20 @@ import { PromiseQueue } from '@axe/core/util/promise-queue';
 import { xml2element } from '@axe/core/util/xml-util';
 import { StatusAilmentCatalog } from '@axe/domain/character/status-ailment-catalog';
 import { ChatLogImages, exportChatLog } from '@axe/domain/chat/chat-log-export';
-import { ChatLogImageSrcResolver, ChatLogTab, ChatLogTextDecoder } from '@axe/domain/chat/chat-log-exporter';
+import {
+  ChatLogExporter,
+  ChatLogImageSrcResolver,
+  ChatLogTab,
+  ChatLogTextDecoder,
+} from '@axe/domain/chat/chat-log-exporter';
 import { ChatLogLabels, ChatLogScope } from '@axe/domain/chat/chat-log-rich';
-import { ChatLogStyle } from '@axe/domain/chat/chat-log-style';
-import { ChatLogTextLabels, renderChatLogText } from '@axe/domain/chat/chat-log-text';
+import { ChatLogStyle, isPlainChatLogStyle } from '@axe/domain/chat/chat-log-style';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
+import { stampOf } from '@axe/domain/chat/stamp-catalog';
 import { DataSummarySetting } from '@axe/domain/data/data-summary-setting';
 import { AudioTagList } from '@axe/domain/media/audio-tag-list';
 import { carriedImagesOf } from '@axe/domain/media/carried-images';
 import { ImageTagList } from '@axe/domain/media/image-tag-list';
-import { StampPack } from '@axe/domain/media/stamp-pack';
 import { Config } from '@axe/domain/peer/config';
 import { Room } from '@axe/domain/peer/room';
 import { WhiteBoard } from '@axe/domain/tabletop/white-board';
@@ -46,6 +53,8 @@ const IMAGE_ATTRIBUTE = /ImageIdentifier$|^imageIdentifier$/;
 
 /** Several pictures under one name, which is its own spelling and read on its own terms. */
 const ATTACHMENT_IMAGE_ATTRIBUTE = 'attachmentImageIdentifiers';
+/** The attributes that name stamps, a line's own or those put on a line, a space between each. */
+const STAMP_ATTRIBUTE = /^stamps?$/;
 
 const CHAT_LOG_IMAGE_DECODE_LIMIT = 4;
 
@@ -61,6 +70,8 @@ export class SaveDataService {
   private readonly dataSummarySetting = inject(DataSummarySetting);
   private readonly statusAilmentCatalog = inject(StatusAilmentCatalog);
   private readonly translate = inject(TRANSLATE_FN);
+  private readonly chatReactions = inject(ChatReactionService);
+  private readonly stampPacks = inject(StampPackService);
 
   // The exporter would write a raw `@i18n:key:{params}` message, as system notices are,
   // so the translated text is substituted before it gets there.
@@ -142,7 +153,7 @@ export class SaveDataService {
 
     const images: ImageFile[] = this.withCarried(
       [...this.searchImageFiles(roomXml), ...this.searchImageFiles(chatXml)],
-      [...ObjectStore.instance.getObjects(WhiteBoard), ...ObjectStore.instance.getObjects(StampPack)]
+      ObjectStore.instance.getObjects(WhiteBoard)
     );
     for (const image of images) {
       const file = this.createImageArchiveFile(image);
@@ -250,8 +261,13 @@ export class SaveDataService {
 
     for (const element of Array.from(xmlElement.ownerDocument.querySelectorAll('*'))) {
       for (const { name, value } of Array.from(element.attributes)) {
-        if (!value || !IMAGE_ATTRIBUTE.test(name)) continue;
-        images[value] = this.imageStorage.get(value);
+        if (!value) continue;
+        if (IMAGE_ATTRIBUTE.test(name)) images[value] = this.imageStorage.get(value);
+        if (!STAMP_ATTRIBUTE.test(name)) continue;
+        for (const stampId of value.split(/\s+/)) {
+          const ref = stampOf(stampId);
+          if (ref?.kind === 'image') images[ref.imageIdentifier] = this.imageStorage.get(ref.imageIdentifier);
+        }
       }
       const attachmentImageIdentifiers = element.getAttribute(ATTACHMENT_IMAGE_ATTRIBUTE) ?? '';
       for (const attachmentImageIdentifier of this.parseAttachmentImageIdentifiers(attachmentImageIdentifiers)) {
@@ -281,22 +297,32 @@ export class SaveDataService {
     return rawValue.split(/\n+/);
   }
 
-  /** Downloads chat tabs as an HTML log named after the room, with portraits and attachments shrunk and embedded. */
+  /**
+   * Downloads chat tabs as an HTML log named after the room, with portraits and attachments shrunk
+   * and embedded, or as a `.txt` file of plain text for the `text` style.
+   *
+   * Asked to leave out deleted lines, it leaves out their pictures as well.
+   */
   async saveChatLog(
     style: ChatLogStyle,
     scope: ChatLogScope,
     tabs: readonly ChatLogTab[],
-    label: string
+    label: string,
+    options: { omitDeleted?: boolean } = {}
   ): Promise<void> {
-    const images = await this.prepareChatLogImages(tabs);
-    const text = this.renderChatLog(style, scope, tabs, images);
+    const logTabs = options.omitDeleted ? ChatLogExporter.withoutDeleted(tabs) : tabs;
+    const plain = isPlainChatLogStyle(style);
+    const images = plain ? SaveDataService.NO_CHAT_LOG_IMAGES : await this.prepareChatLogImages(logTabs);
+    const text = this.renderChatLog(style, scope, logTabs, images);
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    downloadBlob(blob, this.appendTimestamp(`${this.chatLogRoomName()}_log_${label}`) + '.html');
+    downloadBlob(blob, this.appendTimestamp(`${this.chatLogRoomName()}_log_${label}`) + (plain ? '.txt' : '.html'));
   }
 
+  private static readonly NO_CHAT_LOG_IMAGES: ChatLogImages = { resolver: () => '', registryScript: '' };
+
   /**
-   * Renders chat tabs as HTML log text, using images already prepared by `prepareChatLogImages`,
-   * without downloading anything.
+   * Renders chat tabs as a log, an HTML page using images already prepared by `prepareChatLogImages`
+   * or plain text for the `text` style, without downloading anything.
    */
   renderChatLog(style: ChatLogStyle, scope: ChatLogScope, tabs: readonly ChatLogTab[], images: ChatLogImages): string {
     const body = exportChatLog(style, scope, tabs, {
@@ -307,25 +333,15 @@ export class SaveDataService {
       labels: this.chatLogLabels(),
       lang: document.documentElement.lang || undefined,
       exportedAt: Date.now(),
+      reactionsOf: (messageIdentifier) =>
+        this.chatReactions.talliesOf(messageIdentifier).map((tally) => ({
+          label: stampLabel(tally.stampId, this.translate, (imageIdentifier) =>
+            this.stampPacks.nameOf(imageIdentifier)
+          ),
+          count: tally.count,
+        })),
     });
-    return SaveDataService.injectImageRegistry(body, images.registryScript);
-  }
-
-  /** Downloads chat tabs as a plain UTF-8 text log named after the room, naming pictures rather than holding them. */
-  saveChatLogText(scope: ChatLogScope, tabs: readonly ChatLogTab[], label: string): void {
-    const text = this.renderChatLogText(scope, tabs);
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    downloadBlob(blob, this.appendTimestamp(`${this.chatLogRoomName()}_log_${label}`) + '.txt');
-  }
-
-  /** Renders chat tabs as a plain text log, without downloading anything. */
-  renderChatLogText(scope: ChatLogScope, tabs: readonly ChatLogTab[]): string {
-    return renderChatLogText(scope, tabs, {
-      textDecoder: this.chatLogTextDecoder,
-      roomName: Network.peerContext?.roomName || undefined,
-      labels: this.chatLogTextLabels(),
-      exportedAt: Date.now(),
-    });
+    return isPlainChatLogStyle(style) ? body : SaveDataService.injectImageRegistry(body, images.registryScript);
   }
 
   private chatLogRoomName(): string {
@@ -338,6 +354,7 @@ export class SaveDataService {
     return {
       secret: label('secret'),
       edited: label('edited'),
+      pseudoDeleted: label('pseudoDeleted'),
       quote: label('quote'),
       reply: label('reply'),
       critical: label('critical'),
@@ -348,15 +365,7 @@ export class SaveDataService {
       everyTab: label('everyTab'),
       messages: (count) => label('messages', { count }),
       exportedWith: label('exportedWith'),
-    };
-  }
-
-  private chatLogTextLabels(): ChatLogTextLabels {
-    return {
-      ...this.chatLogLabels(),
-      attachment: this.translate('feature.chat.log.labels.attachment'),
-      stamp: this.translate('feature.chat.log.labels.stamp'),
-      reactions: this.translate('feature.chat.log.labels.reactions'),
+      reactions: label('reactions'),
     };
   }
 
@@ -483,6 +492,9 @@ const AUDIO_EXTENSION_OF_TYPE: Readonly<Record<string, string>> = {
   'audio/mp4': 'm4a',
   'audio/x-m4a': 'm4a',
   'audio/ogg': 'ogg',
+  'audio/opus': 'opus',
+  'audio/flac': 'flac',
+  'audio/x-flac': 'flac',
 };
 
 /**

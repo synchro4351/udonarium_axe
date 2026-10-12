@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ChatBookmarkService } from '@axe/application/chat/chat-bookmark.service';
 import { ChatPreferencesService } from '@axe/application/chat/chat-preferences.service';
+import { ChatReactionService } from '@axe/application/chat/chat-reaction.service';
 import { ChatTickerSelectionService } from '@axe/application/chat/chat-ticker-selection.service';
 import {
   DEFAULT_SYSTEM_AVATAR_URL,
@@ -14,6 +16,7 @@ import { RolePermissionService } from '@axe/application/permission/role-permissi
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { TabletopDisplayService } from '@axe/application/tabletop/tabletop-display.service';
+import { ConfirmService } from '@axe/application/ui/confirm.service';
 import { ContextMenuAction, ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { ViewModePreferenceService } from '@axe/application/ui/view-mode-preference.service';
@@ -22,12 +25,16 @@ import { emitFileLoaded } from '@axe/core/event/domain-events';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
+import { ChatReaction } from '@axe/domain/chat/chat-reaction';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
+import { OPEN_STAMP_RULES, withStampsAllowed, withStampUseOn } from '@axe/domain/chat/stamp-rules';
+import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { TextNote } from '@axe/domain/tabletop/text-note';
 import { ChatMessageComponent } from '@axe/features/chat/chat-message/chat-message.component';
+import { StampPickerService } from '@axe/features/chat/stamp/stamp-picker.service';
 import { beMyself } from '@axe/testing/peer-context-stub';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 import type { MockInstance } from 'vitest';
@@ -50,6 +57,55 @@ describe('ChatMessageComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  /**
+   * The menu a button on the toolbar over the line opens, as handed to the context menu, or none
+   * where the toolbar or the button is not there.
+   */
+  function menuFrom(button: 'more' | 'bookmark'): ContextMenuAction[] {
+    const open = vi.spyOn(TestBed.inject(ContextMenuService), 'open').mockImplementation(() => undefined);
+    try {
+      const host = fixture.nativeElement as HTMLElement;
+      host.querySelector<HTMLElement>(`[data-testid="chat-message-action-${button}"]`)?.click();
+      return open.mock.calls.at(-1)?.[1] ?? [];
+    } finally {
+      open.mockRestore();
+    }
+  }
+
+  /** The item of a menu by the key of its name, or undefined where the menu does not offer it. */
+  function itemOf(actions: readonly ContextMenuAction[], key: string): ContextMenuAction | undefined {
+    const name = TestBed.inject(TRANSLATE_FN)(key);
+    return actions.find((action) => action.name === name);
+  }
+
+  describe('the dice of a roll', () => {
+    function lineFrom(from: string, tag: string): void {
+      const message = new ChatMessage();
+      message.initialize();
+      message.from = from;
+      message.to = '';
+      message.name = 'テスト';
+      message.tag = tag;
+      message.imageIdentifier = '';
+      message.messColor = '#000000';
+      message.text = '1D20 → 17';
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+    }
+
+    it('have a stage under the dice bot’s answer, for the dice thrown for it', () => {
+      lineFrom('System-BCDice', 'system');
+
+      expect(fixture.nativeElement.querySelector('dice-roll-stage')).toBeTruthy();
+    });
+
+    it('have no stage under an ordinary line', () => {
+      lineFrom('test-user', '');
+
+      expect(fixture.nativeElement.querySelector('dice-roll-stage')).toBeNull();
+    });
   });
 
   it('shows a picture attached to a line inside it', () => {
@@ -76,68 +132,6 @@ describe('ChatMessageComponent', () => {
     }
   });
 
-  describe('a stamp', () => {
-    function stampMessage(imageIdentifier: string): ChatMessage {
-      const message = new ChatMessage();
-      message.initialize();
-      message.from = 'test-user';
-      message.name = 'テスト';
-      message.messColor = '#000000';
-      message.text = '';
-      message.stampName = 'やったね';
-      message.attachmentImageIdentifiers = JSON.stringify([imageIdentifier]);
-      return message;
-    }
-
-    it('shows its picture at a stamp’s size, named by the stamp, with no words beside it', () => {
-      const image = ImageStorage.instance.add('stamp-picture.png');
-      try {
-        fixture.componentRef.setInput('chatMessage', stampMessage(image.identifier));
-        fixture.detectChanges();
-
-        const stamps = fixture.nativeElement.querySelectorAll('[data-testid="chat-message-stamp"]');
-        expect(stamps).toHaveLength(1);
-        expect(stamps[0].getAttribute('alt')).toBe('やったね');
-        expect(stamps[0].getAttribute('src')).toBe('stamp-picture.png');
-        expect(stamps[0].className).toContain('max-h-20');
-        expect(fixture.nativeElement.querySelector('.msg-text').textContent.trim()).toBe('');
-      } finally {
-        ImageStorage.instance.delete(image.identifier);
-      }
-    });
-
-    it('is drawn smaller in the compact layout, still as a picture', () => {
-      const image = ImageStorage.instance.add('stamp-picture.png');
-      try {
-        fixture.componentRef.setInput('chatSimpleDispFlag', true);
-        fixture.componentRef.setInput('chatMessage', stampMessage(image.identifier));
-        fixture.detectChanges();
-
-        const stamp = fixture.nativeElement.querySelector('[data-testid="chat-message-stamp"]');
-        expect(stamp.className).toContain('max-h-14');
-      } finally {
-        ImageStorage.instance.delete(image.identifier);
-      }
-    });
-
-    it('shows its name until its picture arrives', () => {
-      fixture.componentRef.setInput('chatMessage', stampMessage('not-yet-here'));
-      fixture.detectChanges();
-
-      expect(fixture.nativeElement.querySelector('[data-testid="chat-message-stamp-pending"]').textContent).toBe(
-        '[やったね]'
-      );
-    });
-
-    it('offers its sender no pencil, having no words to edit', () => {
-      beMyself('test-user');
-      fixture.componentRef.setInput('chatMessage', stampMessage('any'));
-      fixture.detectChanges();
-
-      expect(component.canChange).toBe(false);
-    });
-  });
-
   describe('a line of emoji only', () => {
     function line(text: string, overrides: Partial<ChatMessage> = {}): ChatMessage {
       const message = new ChatMessage();
@@ -158,7 +152,6 @@ describe('ChatMessageComponent', () => {
     it('is drawn large', () => {
       fixture.componentRef.setInput('chatMessage', line('🎉👍'));
       fixture.detectChanges();
-
       expect(largeBody()?.className).toContain('text-[3em]');
     });
 
@@ -183,6 +176,98 @@ describe('ChatMessageComponent', () => {
 
       expect(largeBody()).toBeNull();
     });
+  });
+
+  describe('a line answering a secret roll', () => {
+    const made: ChatMessage[] = [];
+
+    function line(fields: Partial<ChatMessage>): ChatMessage {
+      const message = new ChatMessage();
+      message.initialize();
+      message.to = '';
+      message.imageIdentifier = '';
+      message.messColor = '#000000';
+      Object.assign(message, fields);
+      made.push(message);
+      return message;
+    }
+
+    function secretRoll(): ChatMessage {
+      return line({
+        from: 'someone-else',
+        originFrom: 'someone-else',
+        name: '<Secret-BCDice：テスト>',
+        tag: 'system secret',
+        text: 'DiceBot : (1d100) → 3',
+      });
+    }
+
+    function answering(field: 'replyTo' | 'quoteOf', target: ChatMessage): void {
+      const answer = line({
+        from: 'someone-else',
+        name: 'テスト',
+        tag: '',
+        text: 'どうだった？',
+        [field]: target.identifier,
+      });
+      fixture.componentRef.setInput('chatMessage', answer);
+      fixture.detectChanges();
+    }
+
+    afterEach(() => {
+      for (const message of made) message.destroy();
+      made.length = 0;
+    });
+
+    it('shows a reader kept from the roll what stands in for it when replied to', () => {
+      vi.spyOn(TestBed.inject(RolePermissionService), 'canSeeHidden', 'get').mockReturnValue(false);
+      answering('replyTo', secretRoll());
+
+      expect(component.replyPreview()?.text).toBe(TestBed.inject(TRANSLATE_FN)('feature.chat.message.secretDice'));
+      expect(fixture.nativeElement.textContent).not.toContain('→ 3');
+    });
+
+    it('shows a reader kept from the roll what stands in for it when quoted', () => {
+      vi.spyOn(TestBed.inject(RolePermissionService), 'canSeeHidden', 'get').mockReturnValue(false);
+      answering('quoteOf', secretRoll());
+
+      expect(component.quotePreview()?.text).toBe(TestBed.inject(TRANSLATE_FN)('feature.chat.message.secretDice'));
+      expect(fixture.nativeElement.textContent).not.toContain('→ 3');
+    });
+
+    it('shows the roll to a reader who may see what is hidden', () => {
+      vi.spyOn(TestBed.inject(RolePermissionService), 'canSeeHidden', 'get').mockReturnValue(true);
+      answering('replyTo', secretRoll());
+
+      expect(component.replyPreview()?.text).toBe('DiceBot : (1d100) → 3');
+    });
+  });
+
+  it('keeps a secret line sent with a stamp covered, stamp and all, from all but whoever may see it', () => {
+    vi.spyOn(TestBed.inject(RolePermissionService), 'canSeeHidden', 'get').mockReturnValue(false);
+    const message = new ChatMessage();
+    message.initialize();
+    message.from = 'someone-else';
+    message.originFrom = 'someone-else';
+    message.to = '';
+    message.name = 'テスト';
+    message.tag = 'secret';
+    message.imageIdentifier = '';
+    message.messColor = '#000000';
+    message.text = 'S1D100<=50\n［クリティカル!］';
+    message.stamp = 'roll:critical';
+    try {
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).not.toContain('S1D100');
+      expect(fixture.nativeElement.textContent).toContain(
+        TestBed.inject(TRANSLATE_FN)('feature.chat.message.secretDice')
+      );
+      expect(fixture.nativeElement.querySelector('[data-testid="chat-message-stamp"]')).toBeNull();
+    } finally {
+      message.destroy();
+    }
   });
 
   it('drops the cover on a secret roll as soon as the tag loses it', () => {
@@ -612,9 +697,8 @@ describe('ChatMessageComponent', () => {
   });
 
   describe('clickShareAsMemo', () => {
-    function memoIcon(): Element | null {
-      const icons = [...(fixture.nativeElement as HTMLElement).querySelectorAll('i.material-icons')];
-      return icons.find((icon) => icon.textContent?.trim() === 'sticky_note_2') ?? null;
+    function memoIcon(): ContextMenuAction | null {
+      return itemOf(menuFrom('more'), 'feature.chat.message.shareAsMemo') ?? null;
     }
 
     it('turns a line into a note and puts it in the store', () => {
@@ -1126,11 +1210,11 @@ describe('ChatMessageComponent', () => {
       fixture.detectChanges();
 
       expect(component.canShowInTicker()).toBe(false);
-      expect(fixture.nativeElement.querySelector('[data-testid="chat-message-ticker"]')).toBeNull();
+      expect(itemOf(menuFrom('more'), 'feature.chat.message.ticker')).toBeUndefined();
       message.destroy();
     });
 
-    it('shows after the other actions and broadcasts an ordinary public message', () => {
+    it('is offered among what passes the line on, and broadcasts an ordinary public message', () => {
       const message = new ChatMessage('ticker-action-message');
       message.initialize();
       message.from = 'tester';
@@ -1144,13 +1228,12 @@ describe('ChatMessageComponent', () => {
       TestBed.inject(TabletopDisplayService).set({ multiAngleTickerEnabled: true });
 
       fixture.detectChanges();
-      const action = fixture.nativeElement.querySelector('[data-testid="chat-message-ticker"]') as HTMLElement | null;
+      const menu = menuFrom('more');
+      const ticker = itemOf(menu, 'feature.chat.message.ticker');
 
       expect(component.canShowInTicker()).toBe(true);
-      expect(action?.title).toBe('ティッカー');
-      expect(action?.textContent?.trim()).toBe('campaign');
-      expect(Array.from(action?.parentElement?.querySelectorAll('.material-icons') ?? []).at(-1)).toBe(action);
-      action?.click();
+      expect(menu.indexOf(ticker!)).toBe(menu.indexOf(itemOf(menu, 'feature.chat.message.shareAsMemo')!) + 1);
+      ticker?.action?.();
       expect(spy).toHaveBeenCalledWith(message.identifier);
     });
 
@@ -1171,7 +1254,7 @@ describe('ChatMessageComponent', () => {
       fixture.detectChanges();
 
       expect(component.canShowInTicker()).toBe(false);
-      expect(fixture.nativeElement.querySelector('[data-testid="chat-message-ticker"]')).toBeNull();
+      expect(itemOf(menuFrom('more'), 'feature.chat.message.ticker')).toBeUndefined();
     });
   });
 
@@ -1187,9 +1270,8 @@ describe('ChatMessageComponent', () => {
       return kept;
     }
 
-    function copyIcon(): Element | null {
-      const icons = [...(fixture.nativeElement as HTMLElement).querySelectorAll('i.material-icons')];
-      return icons.find((icon) => icon.textContent?.trim() === 'move_to_inbox') ?? null;
+    function copyIcon(): ContextMenuAction | null {
+      return itemOf(menuFrom('more'), 'feature.chat.message.copyToTab') ?? null;
     }
 
     function spoken(tab: ChatTab): ChatMessage {
@@ -1264,16 +1346,16 @@ describe('ChatMessageComponent', () => {
       expect(here.chatMessages).toHaveLength(1);
     });
 
-    it('closes the list once a tab is chosen', () => {
+    it('lists the tabs under one item of the menu, and says the line again in the one chosen', () => {
       const here = makeTab('メイン');
       const there = makeTab('雑談');
       spoken(here);
 
-      component.toggleCopyPicker();
-      expect(component.isCopyPickerOpen()).toBe(true);
+      const copy = copyIcon()!;
+      expect(copy.subActions?.map((tab) => tab.name)).toEqual(['雑談']);
+      copy.subActions?.[0].action?.();
 
-      component.copyToTab(there);
-      expect(component.isCopyPickerOpen()).toBe(false);
+      expect(there.chatMessages.at(-1)?.text).toBe('こんばんは');
     });
 
     it('copies nothing into a tab the reader may not speak in', () => {
@@ -1311,6 +1393,529 @@ describe('ChatMessageComponent', () => {
       const spy = vi.spyOn(ui, 'requestChatInputText');
       component.clickQuote();
       expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the after-the-fact whisper', () => {
+    let tab: ChatTab;
+    let noa: PeerCursor;
+
+    const host = () => fixture.nativeElement as HTMLElement;
+
+    /** Changes reach the view through the versions a microtask later, as they do in the room. */
+    async function settle(): Promise<void> {
+      await Promise.resolve();
+      fixture.detectChanges();
+    }
+
+    function shown(from: string, extra: Partial<ChatMessage> = {}): ChatMessage {
+      const message = tab.addMessage({
+        from,
+        name: 'アリア',
+        text: '扉の向こうから声がした',
+        timestamp: 1000,
+        ...extra,
+      });
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+      return message;
+    }
+
+    beforeEach(() => {
+      beMyself('me');
+      PeerCursor.createMyCursor();
+      noa = new PeerCursor();
+      noa.initialize();
+      noa.userId = 'noa';
+      noa.name = 'ノア';
+      tab = ChatTabList.instance.addChatTab('メイン');
+    });
+
+    afterEach(() => {
+      tab.destroy();
+      noa.destroy();
+    });
+
+    it('whispers the reader’s own line to the one picked from the menu, as any whisper is shown, and puts it back', async () => {
+      const message = shown('me');
+
+      const whisper = itemOf(menuFrom('more'), 'feature.chat.message.afterWhisper')!;
+      expect(whisper.subActions?.map((peer) => peer.name)).toEqual(['ノア']);
+      whisper.subActions?.[0].action?.();
+      await settle();
+
+      expect(message.to).toBe('noa');
+      expect(host().querySelector('.msg-name')?.textContent).toBe('アリア > ノア');
+      expect(host().textContent).not.toContain('あとから秘話');
+
+      itemOf(menuFrom('more'), 'feature.chat.message.undoAfterWhisper')!.action?.();
+      await settle();
+
+      expect(message.isAfterWhisper).toBe(false);
+      expect(message.isDirect).toBe(false);
+      expect(host().querySelector('.msg-name')?.textContent).toBe('アリア');
+    });
+
+    it('says when there is nobody else in the room to whisper to, offering nothing to press', () => {
+      noa.destroy();
+      shown('me');
+
+      const nobody = itemOf(menuFrom('more'), 'feature.chat.message.afterWhisperNobody');
+
+      expect(nobody?.enabled).toBe(false);
+    });
+
+    it('offers no after-the-fact whisper of somebody else’s line', () => {
+      shown('noa');
+
+      expect(itemOf(menuFrom('more'), 'feature.chat.message.afterWhisper')).toBeUndefined();
+    });
+
+    it('stops showing a line through an answer to it once it is whispered to somebody else', async () => {
+      const original = tab.addMessage({ from: 'noa', name: 'ノア', text: '秘密の合言葉', timestamp: 900 });
+      shown('third', { replyTo: original.identifier, quoteOf: original.identifier } as Partial<ChatMessage>);
+      expect(fixture.nativeElement.textContent).toContain('秘密の合言葉');
+
+      original.makeAfterWhisper('third', 'サード', 2000);
+      await settle();
+
+      expect(fixture.nativeElement.textContent).not.toContain('秘密の合言葉');
+    });
+  });
+
+  describe('following a line back to the one it answers', () => {
+    let tab: ChatTab;
+
+    beforeEach(() => {
+      beMyself('me');
+      tab = ChatTabList.instance.addChatTab('メイン');
+    });
+
+    afterEach(() => tab.destroy());
+
+    it('is offered while the original is shown, and not once it is kept from the reader', async () => {
+      const original = tab.addMessage({ from: 'someone', name: 'ノア', text: '元の発言', timestamp: 900 });
+      const answer = tab.addMessage({
+        from: 'third',
+        name: 'サード',
+        text: '返事',
+        timestamp: 1000,
+        replyTo: original.identifier,
+      });
+      fixture.componentRef.setInput('chatMessage', answer);
+      fixture.detectChanges();
+      expect(itemOf(menuFrom('more'), 'feature.chat.message.jumpToOriginal')).toBeTruthy();
+
+      original.pseudoDelete(2000);
+      await Promise.resolve();
+      fixture.detectChanges();
+
+      expect(itemOf(menuFrom('more'), 'feature.chat.message.jumpToOriginal')).toBeUndefined();
+    });
+  });
+
+  describe('deleting a line', () => {
+    let tab: ChatTab;
+
+    async function settle(): Promise<void> {
+      await Promise.resolve();
+      fixture.detectChanges();
+    }
+
+    function shown(from: string, extra: Partial<ChatMessage> = {}): ChatMessage {
+      const message = tab.addMessage({ from, name: 'アリア', text: '言い間違い', timestamp: 1000, ...extra });
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+      return message;
+    }
+
+    beforeEach(() => {
+      beMyself('me');
+      tab = ChatTabList.instance.addChatTab('メイン');
+    });
+
+    afterEach(() => tab.destroy());
+
+    it('deletes the reader’s own line once they say they are sure, asking as for something not put back', async () => {
+      const message = shown('me');
+      const ask = vi.spyOn(TestBed.inject(ConfirmService), 'ask').mockResolvedValue(true);
+
+      itemOf(menuFrom('more'), 'feature.chat.message.deleteLine')!.action?.();
+      await vi.waitFor(() => expect(message.isPseudoDeleted).toBe(true));
+
+      expect(ask).toHaveBeenCalledWith(expect.objectContaining({ danger: true }));
+    });
+
+    it('leaves the line as it was when the reader thinks better of it', async () => {
+      const message = shown('me');
+      const ask = vi.spyOn(TestBed.inject(ConfirmService), 'ask').mockResolvedValue(false);
+
+      itemOf(menuFrom('more'), 'feature.chat.message.deleteLine')!.action?.();
+      await vi.waitFor(() => expect(ask).toHaveBeenCalled());
+      await settle();
+
+      expect(message.isPseudoDeleted).toBe(false);
+    });
+
+    it('offers no deleting of somebody else’s line', () => {
+      shown('someone');
+
+      expect(itemOf(menuFrom('more'), 'feature.chat.message.deleteLine')).toBeUndefined();
+    });
+
+    it('offers deleting last in the menu, apart from the rest', () => {
+      shown('me');
+
+      const menu = menuFrom('more');
+
+      expect(menu.at(-1)).toBe(itemOf(menu, 'feature.chat.message.deleteLine'));
+      expect(menu.at(-2)?.name).toBe('');
+    });
+
+    it('stops showing a deleted line through an answer to it', async () => {
+      const original = tab.addMessage({ from: 'someone', name: 'ノア', text: '取り消された話', timestamp: 900 });
+      shown('third', { replyTo: original.identifier } as Partial<ChatMessage>);
+      expect(fixture.nativeElement.textContent).toContain('取り消された話');
+
+      original.pseudoDelete(2000);
+      await settle();
+
+      expect(fixture.nativeElement.textContent).not.toContain('取り消された話');
+    });
+  });
+
+  describe('the room’s mark', () => {
+    let tab: ChatTab;
+
+    const testId = (id: string) =>
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(`[data-testid="${id}"]`);
+
+    /** Changes reach the view through the versions a microtask later, as they do in the room. */
+    async function settle(): Promise<void> {
+      await Promise.resolve();
+      fixture.detectChanges();
+    }
+
+    function shown(from: string): ChatMessage {
+      const message = tab.addMessage({ from, name: 'アリア', text: '扉の向こうから声がした', timestamp: 1000 });
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+      return message;
+    }
+
+    beforeEach(() => {
+      beMyself('me');
+      PeerCursor.createMyCursor();
+      PeerCursor.myCursor.role = PeerRole.Player;
+      tab = ChatTabList.instance.addChatTab('メイン');
+    });
+
+    afterEach(() => tab.destroy());
+
+    it('marks a line for the room from its button, and shows the mark with the name it was given', async () => {
+      const message = shown('someone');
+      expect(testId('chat-message-bookmark-mark')).toBeNull();
+
+      itemOf(menuFrom('bookmark'), 'feature.chat.message.bookmarks.shared.add')!.action?.();
+      message.renameBookmark('事件の証言A');
+      await settle();
+
+      expect(message.isBookmarked).toBe(true);
+      const mark = testId('chat-message-bookmark-mark')!;
+      expect(mark.dataset['kind']).toBe('shared');
+      expect(mark.title).toContain('事件の証言A');
+    });
+
+    it('marks a line for the reader alone, with a mark of its own, leaving the line as it was', async () => {
+      const message = shown('someone');
+
+      itemOf(menuFrom('bookmark'), 'feature.chat.message.bookmarks.personal.add')!.action?.();
+      await settle();
+
+      expect(message.isBookmarked).toBe(false);
+      expect(TestBed.inject(ChatBookmarkService).isBookmarked(message, 'personal')).toBe(true);
+      expect(testId('chat-message-bookmark-mark')?.dataset['kind']).toBe('personal');
+    });
+
+    it('lets a guest keep a mark of their own but not put the room’s on', async () => {
+      const message = shown('someone');
+      message.bookmark(1000);
+      PeerCursor.myCursor.role = PeerRole.Guest;
+      await settle();
+
+      expect(testId('chat-message-bookmark-mark')?.dataset['kind']).toBe('shared');
+      const menu = menuFrom('bookmark');
+      expect(itemOf(menu, 'feature.chat.message.bookmarks.shared.add')).toBeUndefined();
+      expect(itemOf(menu, 'feature.chat.message.bookmarks.shared.remove')).toBeUndefined();
+      expect(itemOf(menu, 'feature.chat.message.bookmarks.personal.add')).toBeTruthy();
+    });
+  });
+
+  describe('the toolbar over the line', () => {
+    let tab: ChatTab;
+
+    const actionsShown = () =>
+      [
+        ...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          '[data-testid^="chat-message-action-"]'
+        ),
+      ].map((button) => button.dataset['testid']!.replace('chat-message-action-', ''));
+
+    function shown(from: string): ChatMessage {
+      const message = tab.addMessage({ from, name: 'アリア', text: '扉の向こうから声がした', timestamp: 1000 });
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+      return message;
+    }
+
+    beforeEach(() => {
+      beMyself('me');
+      PeerCursor.createMyCursor();
+      PeerCursor.myCursor.role = PeerRole.Player;
+      tab = ChatTabList.instance.addChatTab('メイン');
+    });
+
+    afterEach(() => tab.destroy());
+
+    it('holds answering, marking, editing and deleting the reader’s own line, then everything else', () => {
+      shown('me');
+
+      expect(actionsShown()).toEqual(['reply', 'quote', 'react', 'bookmark', 'edit', 'delete', 'more']);
+    });
+
+    it('holds no editing or deleting of somebody else’s line', () => {
+      shown('someone');
+
+      expect(actionsShown()).toEqual(['reply', 'quote', 'react', 'bookmark', 'more']);
+    });
+
+    it('asks before deleting from its button, and deletes once the reader is sure', async () => {
+      const message = shown('me');
+      const ask = vi.spyOn(TestBed.inject(ConfirmService), 'ask').mockResolvedValue(true);
+
+      (fixture.nativeElement as HTMLElement)
+        .querySelector<HTMLElement>('[data-testid="chat-message-action-delete"]')!
+        .click();
+
+      await vi.waitFor(() => expect(message.isPseudoDeleted).toBe(true));
+      expect(ask).toHaveBeenCalledWith(expect.objectContaining({ danger: true }));
+    });
+
+    it('is not there over a line nothing can be done with', () => {
+      // A notice meant for the reader alone, with no words: nothing to answer, mark, change or copy.
+      const notice = tab.addMessage({
+        from: 'me',
+        to: 'me',
+        name: 'System',
+        text: '',
+        tag: 'to-pl-system-message',
+        timestamp: 1000,
+      });
+      fixture.componentRef.setInput('chatMessage', notice);
+      fixture.detectChanges();
+
+      expect(actionsShown()).toEqual([]);
+    });
+
+    it('holds only the menu over a notice whose words may be copied', () => {
+      const notice = tab.addMessage({
+        from: 'System',
+        name: 'System',
+        text: 'ラウンド2',
+        tag: 'system-message',
+        timestamp: 1000,
+      });
+      PeerCursor.myCursor.role = PeerRole.Guest;
+      fixture.componentRef.setInput('chatMessage', notice);
+      fixture.detectChanges();
+
+      expect(actionsShown()).toEqual(['bookmark', 'more']);
+    });
+
+    it('is not there over a line only to be read, nor over one being edited', () => {
+      shown('me');
+      fixture.componentRef.setInput('readOnly', true);
+      fixture.detectChanges();
+      expect(actionsShown()).toEqual([]);
+
+      fixture.componentRef.setInput('readOnly', false);
+      component.startEdit();
+      fixture.detectChanges();
+      expect(actionsShown()).toEqual([]);
+    });
+
+    it('opens its menus for a guest too, holding only what a guest may do', () => {
+      shown('someone');
+      PeerCursor.myCursor.role = PeerRole.Guest;
+      TestBed.inject(ViewModePreferenceService).choose('flat');
+      TestBed.inject(TabletopDisplayService).set({ multiAngleTickerEnabled: true });
+      fixture.detectChanges();
+      const open = vi.spyOn(TestBed.inject(ContextMenuService), 'open').mockImplementation(() => undefined);
+
+      (fixture.nativeElement as HTMLElement)
+        .querySelector<HTMLElement>('[data-testid="chat-message-action-more"]')!
+        .click();
+
+      const [, actions, , options] = open.mock.calls[0];
+      expect(options?.forGuests).toBe(true);
+      expect(itemOf(actions, 'feature.chat.message.copyText')).toBeTruthy();
+      expect(itemOf(actions, 'feature.chat.message.bookmarks.personal.add')).toBeTruthy();
+      expect(itemOf(actions, 'feature.chat.message.bookmarks.shared.add')).toBeUndefined();
+      expect(itemOf(actions, 'feature.chat.message.shareAsMemo')).toBeUndefined();
+      expect(itemOf(actions, 'feature.chat.message.ticker')).toBeUndefined();
+    });
+
+    it('stands on the bubble itself in either layout, so it floats over the line it belongs to', () => {
+      shown('me');
+      const toolbar = () =>
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-testid="chat-message-toolbar"]')!;
+      expect(toolbar().parentElement!.classList).toContain('relative');
+
+      fixture.componentRef.setInput('chatSimpleDispFlag', true);
+      fixture.detectChanges();
+
+      expect(toolbar().parentElement!.classList).toContain('relative');
+    });
+
+    it('opens under its last button the same menu as a right click, titled with the speaker', () => {
+      shown('me');
+      const open = vi.spyOn(TestBed.inject(ContextMenuService), 'open').mockImplementation(() => undefined);
+      vi.spyOn(TestBed.inject(PointerDeviceService), 'isAllowedToOpenContextMenu', 'get').mockReturnValue(true);
+      vi.spyOn(TestBed.inject(ViewportService), 'isTouch').mockReturnValue(false);
+
+      (fixture.nativeElement as HTMLElement)
+        .querySelector<HTMLElement>('[data-testid="chat-message-action-more"]')!
+        .click();
+      (fixture.nativeElement as HTMLElement)
+        .querySelector('.msg-text')!
+        .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+
+      const [fromButton, fromRightClick] = open.mock.calls;
+      expect(fromButton[1].map((action) => action.name)).toEqual(fromRightClick[1].map((action) => action.name));
+      expect(fromButton[2]).toBe('アリア');
+    });
+  });
+
+  describe('the history of an edited line', () => {
+    let tab: ChatTab;
+
+    const testId = (id: string) =>
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(`[data-testid="${id}"]`);
+
+    async function settle(): Promise<void> {
+      await Promise.resolve();
+      fixture.detectChanges();
+    }
+
+    function shown(from: string, text: string): ChatMessage {
+      const message = tab.addMessage({ from, name: 'アリア', text, timestamp: 1000 });
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+      return message;
+    }
+
+    beforeEach(() => {
+      beMyself('me');
+      tab = ChatTabList.instance.addChatTab('メイン');
+    });
+
+    afterEach(() => tab.destroy());
+
+    it('keeps what the line said before when the speaker edits it in place', async () => {
+      const message = shown('me', 'こんばんわ');
+
+      component.startEdit();
+      component.onEditInput('こんばんは');
+      component.saveEdit();
+      await settle();
+
+      expect(message.versions.map((version) => version.text)).toEqual(['こんばんわ', 'こんばんは']);
+    });
+
+    it('opens every wording under the line from its edited mark, for anyone who sees it, and closes again', async () => {
+      const message = shown('someone', 'こんばんわ');
+      message.edit('こんばんは', '', 2000);
+      message.edit('こんばんは！', '', 3000);
+      await settle();
+      expect(testId('chat-message-history')).toBeNull();
+
+      testId('chat-message-history-toggle')!.click();
+      fixture.detectChanges();
+
+      const versions = [
+        ...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          '[data-testid="chat-message-history-version"]'
+        ),
+      ];
+      expect(versions.map((version) => version.lastElementChild?.textContent)).toEqual([
+        'こんばんわ',
+        'こんばんは',
+        'こんばんは！',
+      ]);
+
+      testId('chat-message-history-toggle')!.click();
+      fixture.detectChanges();
+      expect(testId('chat-message-history')).toBeNull();
+    });
+
+    it('keeps every wording of a secret line from a reader kept from its words', async () => {
+      vi.spyOn(TestBed.inject(RolePermissionService), 'canSeeHidden', 'get').mockReturnValue(false);
+      const message = shown('someone', 'S1d100 黒幕を疑う');
+      message.tag = 'secret';
+      message.edit('S1d100 犯人を疑う', '', 2000);
+      await settle();
+
+      expect(component.versions()).toEqual([]);
+      expect(testId('chat-message-history-toggle')).toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('黒幕');
+      expect(fixture.nativeElement.textContent).not.toContain('犯人');
+    });
+
+    it('does not call the wording of a line edited before histories were kept what it first said', async () => {
+      const t = TestBed.inject(TRANSLATE_FN);
+      const message = shown('someone', '二度目の文面');
+      message.fixd = true;
+      message.edit('三度目の文面', '', 3000);
+      await settle();
+
+      testId('chat-message-history-toggle')!.click();
+      fixture.detectChanges();
+
+      const history = testId('chat-message-history')!.textContent!;
+      expect(history).toContain(t('feature.chat.message.history.beforeKept'));
+      expect(history).not.toContain(t('feature.chat.message.history.original'));
+    });
+
+    it('only marks a line edited before its history was kept', async () => {
+      const message = shown('someone', 'こんばんは');
+      message.fixd = true;
+      await settle();
+
+      expect(fixture.nativeElement.textContent).toContain(TestBed.inject(TRANSLATE_FN)('feature.chat.message.edited'));
+      expect(testId('chat-message-history-toggle')).toBeNull();
+    });
+  });
+
+  describe('lighting a line up', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('stays lit for the whole moment from the last time it was lit, however often that was', () => {
+      vi.useFakeTimers();
+      const message = new ChatMessage();
+      message.initialize();
+      message.text = '光る発言';
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+
+      component.flash();
+      vi.advanceTimersByTime(1500);
+      component.flash();
+      vi.advanceTimersByTime(1500);
+      expect(component.isHighlighted()).toBe(true);
+
+      vi.advanceTimersByTime(400);
+      expect(component.isHighlighted()).toBe(false);
+      message.destroy();
     });
   });
 
@@ -1444,44 +2049,263 @@ describe('ChatMessageComponent', () => {
     });
   });
 
-  describe('reactions', () => {
+  describe('stamps put on the line', () => {
     let tab: ChatTab;
+    const host = () => fixture.nativeElement as HTMLElement;
+
+    function chip(stampId: string): HTMLButtonElement | null {
+      return host().querySelector(`[data-testid="chat-message-reaction-${stampId}"]`);
+    }
+
+    function count(stampId: string): string | undefined {
+      return chip(stampId)?.querySelector('[data-reaction-count]')?.textContent?.trim();
+    }
+
+    function shown(): ChatMessage {
+      const message = tab.addMessage({ from: 'someone', name: 'GM', text: '扉の向こうで音がした', timestamp: 1000 });
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+      return message;
+    }
+
+    function answered(message: ChatMessage, userId: string, name: string, stamps: string): void {
+      ChatReaction.create(message.identifier, userId, name).stamps = stamps;
+    }
+
+    async function settle(): Promise<void> {
+      await Promise.resolve();
+      fixture.detectChanges();
+    }
 
     beforeEach(() => {
-      beMyself('alice');
-      vi.spyOn(TestBed.inject(RolePermissionService), 'myRole', 'get').mockReturnValue(PeerRole.Player);
-      tab = new ChatTab();
-      tab.initialize();
+      beMyself('me');
+      PeerCursor.createMyCursor();
+      PeerCursor.myCursor.userId = 'me';
+      PeerCursor.myCursor.name = 'わたし';
+      tab = ChatTabList.instance.addChatTab('メイン');
     });
 
     afterEach(() => {
+      for (const reaction of ObjectStore.instance.getObjects<ChatReaction>(ChatReaction)) reaction.destroy();
       tab.destroy();
     });
 
-    const said = (extra: Partial<Record<'to' | 'tag', string>> = {}) =>
-      tab.addMessage({ from: 'bob', name: 'ボブ', text: 'やあ', timestamp: 1000, messColor: '#000000', ...extra });
+    it('shows each stamp on the line with how many put it on, and marks the one the reader put on', async () => {
+      const message = shown();
+      answered(message, 'other', 'あいて', 'sfx:creepy seal:ok');
+      answered(message, 'me', 'わたし', 'sfx:creepy');
+      await settle();
 
-    it('opens the picker under the line from the button over it', () => {
-      fixture.componentRef.setInput('chatMessage', said());
-      fixture.detectChanges();
-
-      (fixture.nativeElement.querySelector('[data-testid="chat-message-react"]') as HTMLElement).click();
-      fixture.detectChanges();
-
-      expect(fixture.nativeElement.querySelector('[data-testid="chat-reaction-picker"]')).toBeTruthy();
+      expect(count('sfx:creepy')).toBe('2');
+      expect(chip('sfx:creepy')!.getAttribute('aria-pressed')).toBe('true');
+      expect(chip('seal:ok')!.getAttribute('aria-pressed')).toBe('false');
+      expect(chip('sfx:creepy')!.title).toContain('あいて');
     });
 
-    it('offers no button on a whisper between others, nor in a window that only reads', () => {
-      fixture.componentRef.setInput('chatMessage', said({ to: 'carol' }));
-      fixture.detectChanges();
-      expect(component.canReact()).toBe(false);
-      expect(fixture.nativeElement.querySelector('[data-testid="chat-message-react"]')).toBeNull();
+    it('puts the reader\u2019s stamp on and takes it off from its chip', async () => {
+      const message = shown();
+      answered(message, 'other', 'あいて', 'seal:ok');
+      await settle();
 
-      fixture.componentRef.setInput('chatMessage', said());
-      fixture.componentRef.setInput('readOnly', true);
+      chip('seal:ok')!.click();
+      await settle();
+      expect(count('seal:ok')).toBe('2');
+
+      chip('seal:ok')!.click();
+      await settle();
+      expect(count('seal:ok')).toBe('1');
+    });
+
+    it('opens the stamps under the toolbar button, and puts the one picked on the line', async () => {
+      const message = shown();
+      const toggle = vi.spyOn(TestBed.inject(StampPickerService), 'toggle').mockImplementation(() => undefined);
+
+      const button = host().querySelector<HTMLButtonElement>('[data-testid="chat-message-action-react"]')!;
+      button.click();
+      expect(toggle).toHaveBeenCalledWith(button, 'reaction', expect.any(Function));
+
+      toggle.mock.calls[0][2]('seal:god');
+      await settle();
+      expect(TestBed.inject(ChatReactionService).talliesOf(message.identifier)).toEqual([
+        expect.objectContaining({ stampId: 'seal:god', mine: true }),
+      ]);
+      expect(chip('seal:god')).not.toBeNull();
+    });
+
+    it('offers no stamps to put on where the room turned reactions off, and keeps those already on', async () => {
+      const message = shown();
+      answered(message, 'other', 'あいて', 'seal:ok');
+      Config.instance.stampRules = withStampUseOn(OPEN_STAMP_RULES, 'reaction', false);
+      try {
+        TestBed.inject(ObjectChangeService).notifyChanged('Config');
+        await settle();
+
+        expect(host().querySelector('[data-testid="chat-message-action-react"]')).toBeNull();
+        expect(chip('seal:ok')).not.toBeNull();
+        expect(chip('seal:ok')!.disabled).toBe(true);
+      } finally {
+        Config.instance.stampRules = OPEN_STAMP_RULES;
+      }
+    });
+
+    it('lets the reader take back a stamp the room has since denied, but not add one', async () => {
+      const message = shown();
+      answered(message, 'other', 'あいて', 'seal:ok seal:god');
+      answered(message, 'me', 'わたし', 'seal:god');
+      Config.instance.stampRules = withStampsAllowed(OPEN_STAMP_RULES, 'reaction', ['seal:ok', 'seal:god'], false);
+      try {
+        TestBed.inject(ObjectChangeService).notifyChanged('Config');
+        await settle();
+
+        expect(chip('seal:ok')!.disabled).toBe(true);
+        expect(chip('seal:god')!.disabled).toBe(false);
+        chip('seal:god')!.click();
+        await settle();
+        expect(count('seal:god')).toBe('1');
+      } finally {
+        Config.instance.stampRules = OPEN_STAMP_RULES;
+      }
+    });
+
+    it('draws a line sent as a stamp as the stamp, large, in place of its words, and offers no editing', () => {
+      const message = tab.addMessage({
+        from: 'me',
+        name: 'わたし',
+        text: '［ゾワッ］',
+        timestamp: 1000,
+        stamp: 'sfx:creepy',
+      });
+      fixture.componentRef.setInput('chatMessage', message);
       fixture.detectChanges();
-      expect(component.canReact()).toBe(false);
-      expect(fixture.nativeElement.querySelector('[data-testid="chat-message-react"]')).toBeNull();
+
+      const drawn = host().querySelector('[data-testid="chat-message-stamp"] [data-stamp]') as HTMLElement;
+      expect(drawn.dataset['stampId']).toBe('sfx:creepy');
+      expect(drawn.style.height).toBe('96px');
+      expect(host().querySelector('[data-chat-search-text]')).toBeNull();
+      expect(host().querySelector('[data-testid="chat-message-action-edit"]')).toBeNull();
+    });
+
+    it('draws a line sent as a picture larger, so the words in it read', () => {
+      const message = tab.addMessage({
+        from: 'me',
+        name: 'わたし',
+        text: '［クリティカル!］',
+        timestamp: 1000,
+        stamp: 'roll:critical',
+      });
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+
+      const drawn = host().querySelector('[data-testid="chat-message-stamp"] [data-stamp]') as HTMLElement;
+      expect(drawn.style.height).toBe('128px');
+    });
+
+    it('draws what was said with a stamp above it, without the words standing in for the stamp', () => {
+      const message = tab.addMessage({
+        from: 'me',
+        name: 'わたし',
+        text: 'いくぞ！\n［クリティカル!］',
+        timestamp: 1000,
+        stamp: 'roll:critical',
+      });
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+
+      const said = host().querySelector('[data-testid="chat-message-said-with-stamp"]') as HTMLElement;
+      expect(said.textContent).toBe('いくぞ！');
+      expect(host().textContent).not.toContain('［クリティカル!］');
+      expect(host().querySelector('[data-testid="chat-message-stamp"] [data-stamp]')).not.toBeNull();
+    });
+
+    it('shows a line sent with a picture from the room that is not here as its words, stand-in and all', () => {
+      const message = tab.addMessage({
+        from: 'me',
+        name: 'わたし',
+        text: 'これ\n［ナイス］',
+        timestamp: 1000,
+        stamp: 'image:not-here',
+      });
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+
+      expect(host().querySelector('[data-testid="chat-message-stamp"]')).toBeNull();
+      expect(host().textContent).toContain('［ナイス］');
+    });
+
+    it('shows the pictures said with a stamp, leaving out the one drawn as the stamp', () => {
+      const storage = TestBed.inject(ImageStorage);
+      for (const identifier of ['said-picture', 'stamp-picture']) {
+        storage.add({
+          identifier,
+          name: `${identifier}.png`,
+          type: 'image/png',
+          blob: null,
+          url: `blob:${identifier}`,
+          thumbnail: { type: '', blob: null, url: '' },
+        });
+      }
+      try {
+        const message = tab.addMessage({
+          from: 'me',
+          name: 'わたし',
+          text: 'これ\n［ナイス］',
+          timestamp: 1000,
+          stamp: 'image:stamp-picture',
+          attachmentImageIdentifiers: JSON.stringify(['said-picture', 'stamp-picture']),
+        });
+        fixture.componentRef.setInput('chatMessage', message);
+        fixture.detectChanges();
+
+        const attached = [...host().querySelectorAll<HTMLImageElement>('img.message-attachment-image')];
+        expect(attached.map((image) => image.getAttribute('src'))).toEqual(['blob:said-picture']);
+        expect(host().querySelector('[data-testid="chat-message-stamp"] img')!.getAttribute('src')).toBe(
+          'blob:stamp-picture'
+        );
+      } finally {
+        storage.delete('said-picture');
+        storage.delete('stamp-picture');
+      }
+    });
+
+    it('draws nothing above a stamp sent on its own', () => {
+      const message = tab.addMessage({
+        from: 'me',
+        name: 'わたし',
+        text: '［ゾワッ］',
+        timestamp: 1000,
+        stamp: 'sfx:creepy',
+      });
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+
+      expect(host().querySelector('[data-testid="chat-message-said-with-stamp"]')).toBeNull();
+      expect(host().textContent).not.toContain('［ゾワッ］');
+    });
+
+    it('shows the words of a line sent as a stamp from a newer version', () => {
+      const message = tab.addMessage({
+        from: 'someone',
+        name: 'GM',
+        text: '［新しいスタンプ］',
+        timestamp: 1000,
+        stamp: 'sfx:from-a-newer-version',
+      });
+      fixture.componentRef.setInput('chatMessage', message);
+      fixture.detectChanges();
+
+      expect(host().querySelector('[data-testid="chat-message-stamp"]')).toBeNull();
+      expect(host().textContent).toContain('［新しいスタンプ］');
+    });
+
+    it('shows no stamps on a line taken out of the chat', async () => {
+      const message = shown();
+      answered(message, 'other', 'あいて', 'seal:ok');
+      await settle();
+      expect(chip('seal:ok')).not.toBeNull();
+
+      message.pseudoDelete(2000);
+      await settle();
+      expect(chip('seal:ok')).toBeNull();
     });
   });
 });

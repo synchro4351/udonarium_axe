@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
-import { objectChanged$ } from '@axe/core/sync/object-event-extension';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
@@ -196,6 +196,15 @@ describe('CutInStageComponent', () => {
     expect(whole.style.clipPath).toBe('');
   });
 
+  it('draws a layer whole under an outline it does not know', () => {
+    const scene = makeScene();
+    addLayer(scene, { clip: 'trapezoid' as never });
+
+    show(scene);
+
+    expect(layerElements()[0].style.clipPath).toBe('');
+  });
+
   it('leans a layer the way it was told to', () => {
     const scene = makeScene();
     addLayer(scene, { skewXDeg: 20 });
@@ -251,19 +260,17 @@ describe('CutInStageComponent', () => {
     expect(words.style.letterSpacing).toBe('-10px');
   });
 
-  it('writes the words exactly, with no spaces the template would add around them', () => {
+  it('writes a text layer as it was typed, with nothing before or after it', () => {
     const scene = makeScene();
-    addLayer(scene, { kind: 'text', text: '成' });
+    addLayer(scene, { kind: 'text', text: 'ドン\nッ！' });
 
     show(scene, false, 0);
 
-    // The words keep their own line breaks, so a space around them would be a line of its own
-    // in a box no wider than one letter, and drop the letter half a line.
     const words = fixture.nativeElement.querySelector('.whitespace-pre-wrap') as HTMLElement;
-    expect(words.textContent).toBe('成');
+    expect(words.textContent).toBe('ドン\nッ！');
   });
 
-  it('keeps the line breaks written into the words', () => {
+  it('keeps line breaks and spaces written into a text layer', () => {
     const scene = makeScene();
     addLayer(scene, { kind: 'text', text: '一行目\n  二行目' });
 
@@ -271,6 +278,126 @@ describe('CutInStageComponent', () => {
 
     const words = fixture.nativeElement.querySelector('.whitespace-pre-wrap') as HTMLElement;
     expect(words.textContent).toBe('一行目\n  二行目');
+  });
+  it('draws a layer whose letters come on one at a time a letter to a span, each on the layer\u2019s clock', () => {
+    const animate = stubAnimate();
+    const scene = makeScene(2000);
+    addLayer(scene, { kind: 'text', text: 'いく\nぞ', letterMotion: 'fade', letterStaggerMs: 100, startMs: 500 });
+
+    show(scene, false, 700);
+
+    const letters = [...fixture.nativeElement.querySelectorAll('[data-letter-rank]')] as HTMLElement[];
+    expect(letters.map((letter) => [letter.textContent, letter.dataset['letterRank']])).toEqual([
+      ['い', '0'],
+      ['く', '1'],
+      ['ぞ', '2'],
+    ]);
+    expect(fixture.nativeElement.querySelectorAll('.whitespace-pre-wrap br')).toHaveLength(1);
+
+    const letterCalls = animate.mock.calls.filter((_, at) => animate.mock.contexts[at] instanceof HTMLSpanElement);
+    expect(letterCalls).toHaveLength(3);
+    const [frames, options] = letterCalls[1] as [{ offset: number; opacity: number }[], KeyframeAnimationOptions];
+    expect(options.duration).toBe(2000);
+    expect(frames.find((frame) => frame.offset === 600 / 2000)!.opacity).toBe(0);
+
+    const handles = animate.mock.results.map(
+      (result) => result.value as { pause: ReturnType<typeof vi.fn>; currentTime: number }
+    );
+    expect(handles.every((handle) => handle.pause.mock.calls.length > 0 && handle.currentTime === 700)).toBe(true);
+  });
+
+  it('writes a layer with a motion this version does not know as it was typed', () => {
+    const scene = makeScene();
+    addLayer(scene, { kind: 'text', text: 'ドン', letterMotion: 'from-a-newer-version' });
+
+    show(scene, false, 0);
+
+    expect(fixture.nativeElement.querySelector('[data-letter-rank]')).toBeNull();
+    expect((fixture.nativeElement.querySelector('.whitespace-pre-wrap') as HTMLElement).textContent).toBe('ドン');
+  });
+
+  describe('a cut-in played for a speaker', () => {
+    const speaker = { characterId: 'hero', imageIdentifier: 'hero-face', name: 'ヒロ' };
+
+    beforeEach(() => {
+      for (const identifier of ['hero-face', 'stand-in']) {
+        ImageStorage.instance.add({
+          identifier,
+          name: `${identifier}.png`,
+          type: 'image/png',
+          blob: null,
+          url: `blob:${identifier}`,
+          thumbnail: { type: '', blob: null, url: '' },
+        });
+      }
+    });
+
+    afterEach(() => {
+      ImageStorage.instance.delete('hero-face');
+      ImageStorage.instance.delete('stand-in');
+    });
+
+    function picture(): string | null {
+      return (fixture.nativeElement.querySelector('img') as HTMLImageElement | null)?.getAttribute('src') ?? null;
+    }
+
+    it('shows the speaker\u2019s portrait in a portrait\u2019s place, and the layer\u2019s own picture otherwise', () => {
+      const scene = makeScene();
+      addLayer(scene, { kind: 'image', portraitSlot: true, imageIdentifier: 'stand-in' });
+
+      fixture.componentRef.setInput('speaker', speaker);
+      show(scene, false, 0);
+      expect(picture()).toBe('blob:hero-face');
+
+      fixture.componentRef.setInput('speaker', null);
+      fixture.detectChanges();
+      expect(picture()).toBe('blob:stand-in');
+    });
+
+    it('shows a grey head and shoulders where there is neither, and leaves an ordinary layer as it was', () => {
+      const scene = makeScene();
+      const slot = addLayer(scene, { kind: 'image', portraitSlot: true });
+      show(scene, false, 0);
+      expect(picture()).toMatch(/^data:image\/svg\+xml/);
+
+      slot.portraitSlot = false;
+      slot.imageIdentifier = 'stand-in';
+      fixture.componentRef.setInput('speaker', speaker);
+      TestBed.inject(ObjectChangeService).notifyChanged(slot.identifier);
+      fixture.detectChanges();
+      expect(picture()).toBe('blob:stand-in');
+    });
+
+    it('sets the speaker\u2019s portrait as they fitted it, and leaves the stand-in to the layer\u2019s framing', () => {
+      const scene = makeScene();
+      addLayer(scene, { kind: 'image', portraitSlot: true, imageIdentifier: 'stand-in', objectFit: 'cover' });
+      const fitted = () => fixture.nativeElement.querySelector('img[data-portrait-fit]') as HTMLImageElement | null;
+
+      fixture.componentRef.setInput('speaker', { ...speaker, fit: { scale: 2, x: 0.1, y: -0.25 } });
+      show(scene, false, 0);
+      expect(fitted()?.style.transform).toBe('translate(10%, -25%) scale(2)');
+      expect(fitted()?.parentElement?.classList).toContain('overflow-hidden');
+
+      fixture.componentRef.setInput('speaker', { ...speaker, imageIdentifier: 'gone', fit: { scale: 2, x: 0, y: 0 } });
+      fixture.detectChanges();
+      expect(fitted()).toBeNull();
+      expect(picture()).toBe('blob:stand-in');
+      expect((fixture.nativeElement.querySelector('img') as HTMLImageElement).style.objectFit).toBe('cover');
+    });
+
+    it('says the speaker\u2019s name where a text layer asks for it, and a stand-in where there is nobody', () => {
+      const scene = makeScene();
+      addLayer(scene, { kind: 'text', text: '{character}、参戦！' });
+
+      fixture.componentRef.setInput('speaker', speaker);
+      show(scene, false, 0);
+      const words = () => (fixture.nativeElement.querySelector('.whitespace-pre-wrap') as HTMLElement).textContent;
+      expect(words()).toBe('ヒロ、参戦！');
+
+      fixture.componentRef.setInput('speaker', null);
+      fixture.detectChanges();
+      expect(words()).toBe('？？？、参戦！');
+    });
   });
 
   it('refuses to let the browser drag a layer picture away', () => {
@@ -294,223 +421,5 @@ describe('CutInStageComponent', () => {
 
     expect(fixture.componentInstance.fit()).toEqual({ scale: 1, offsetX: 0, offsetY: 0 });
     expect(fixture.componentInstance.sceneTransform()).toBe('translate(0px, 0px) scale(1)');
-  });
-
-  describe('the portrait a cut-in was launched with', () => {
-    const face = 'https://example.test/stage-portrait.png';
-
-    beforeEach(() => TestBed.inject(ImageStorage).add(face));
-    afterEach(() => TestBed.inject(ImageStorage).delete(face));
-
-    function slot(): { box: HTMLElement; image: HTMLImageElement } {
-      const found = fixture.nativeElement.querySelector('[data-testid="cut-in-portrait-slot"]') as HTMLElement;
-      return { box: found.firstElementChild as HTMLElement, image: found.querySelector('img') as HTMLImageElement };
-    }
-
-    function launch(fit: object) {
-      fixture.componentRef.setInput('portrait', {
-        characterIdentifier: 'hero',
-        imageIdentifier: face,
-        fit,
-        characterName: '',
-      });
-    }
-
-    it('draws the whole picture in the frame, moved and sized the way the fit says', () => {
-      const scene = makeScene();
-      addLayer(scene, { kind: 'image', portraitSlot: true, objectFit: 'cover', width: 340, height: 400 });
-      launch({ scale: 0.5, x: -170, y: 40 });
-
-      show(scene, false, 0);
-
-      const { box, image } = slot();
-      expect(box.style.width).toBe('340px');
-      expect(box.style.height).toBe('400px');
-      expect(image.classList).toContain('object-contain');
-      expect(image.style.transform).toBe('translate(-50%, 10%) scale(0.5)');
-    });
-
-    it('covers a slot of another shape with the frame, centred', () => {
-      const scene = makeScene();
-      addLayer(scene, { kind: 'image', portraitSlot: true, width: 680, height: 400 });
-      launch({ scale: 1, x: 0, y: 0 });
-
-      show(scene, false, 0);
-
-      const { box } = slot();
-      expect(box.style.width).toBe('680px');
-      expect(box.style.height).toBe('800px');
-      expect(box.style.top).toBe('-200px');
-    });
-  });
-
-  describe('the name of the character a cut-in was launched for', () => {
-    function launchedFor(characterName: string) {
-      return { characterIdentifier: 'hero', imageIdentifier: '', fit: { scale: 1, x: 0, y: 0 }, characterName };
-    }
-
-    it('shows the name the launch carried in place of the token', () => {
-      const scene = makeScene();
-      addLayer(scene, { kind: 'text', text: '{character}\n参戦！' });
-      fixture.componentRef.setInput('portrait', launchedFor('アリス'));
-
-      show(scene, false, 0);
-
-      const words = fixture.nativeElement.querySelector('.whitespace-pre-wrap') as HTMLElement;
-      expect(words.textContent).toBe('アリス\n参戦！');
-    });
-
-    it('shows the stand-in when the launch named nobody', () => {
-      const scene = makeScene();
-      addLayer(scene, { kind: 'text', text: '{character}参戦！' });
-
-      show(scene, false, 0);
-
-      expect((fixture.nativeElement.querySelector('.whitespace-pre-wrap') as HTMLElement).textContent).toBe(
-        '？？？参戦！'
-      );
-    });
-  });
-
-  describe('letters that move or lean on their own', () => {
-    type LetterCall = [{ offset: number; opacity: number; transform: string }[], KeyframeAnimationOptions];
-
-    /** The animations set going for letters, which come after the one for their layer. */
-    function letterCalls(animate: ReturnType<typeof vi.fn>): LetterCall[] {
-      return (animate.mock.calls as unknown as LetterCall[]).slice(1);
-    }
-
-    it('lets exit-only letters leave on the scene clock, gone by the time the layer goes', () => {
-      const animate = stubAnimate();
-      const scene = makeScene(2000);
-      addLayer(scene, { kind: 'text', text: 'AB', letterExit: 'fade', endMs: 1000 });
-
-      show(scene, true);
-
-      expect(animate).toHaveBeenCalledTimes(3);
-      for (const [frames, options] of letterCalls(animate)) {
-        expect(frames.find((frame) => frame.offset === 0.5)?.opacity).toBe(0);
-        expect(options.duration).toBe(2000);
-      }
-    });
-
-    it('brings the letters in from the end, counting the launched name and a joined emoji', () => {
-      const animate = stubAnimate();
-      const scene = makeScene(2000);
-      addLayer(scene, {
-        kind: 'text',
-        text: '{character}\n👍🏽!',
-        letterMotion: 'fade',
-        letterOrder: 'reverse',
-        letterIntervalMs: 100,
-        letterDurationMs: 100,
-      });
-      fixture.componentRef.setInput('portrait', {
-        characterIdentifier: '',
-        imageIdentifier: '',
-        fit: { scale: 1, x: 0, y: 0 },
-        characterName: 'Bo',
-      });
-
-      show(scene, true);
-
-      // B, o, 👍🏽 and !: the last is in first, each a hundred ms after the one after it.
-      const fullAt = letterCalls(animate).map(([frames]) => frames.find((frame) => frame.opacity === 1)!.offset * 2000);
-      expect(fullAt.map(Math.round)).toEqual([400, 300, 200, 100]);
-    });
-
-    it('runs the letters from where a replay picks the scene up, and holds them at the scrubber', () => {
-      const animate = stubAnimate();
-      const scene = makeScene(2000);
-      addLayer(scene, { kind: 'text', text: 'AB', letterMotion: 'slide' });
-
-      show(scene, true, 0, 500);
-      expect(letterCalls(animate).every(([, options]) => options.delay === -500)).toBe(true);
-
-      animate.mockClear();
-      show(scene, false, 250);
-      const handles = animate.mock.results.slice(1).map((result) => result.value);
-      expect(handles).toHaveLength(2);
-      for (const handle of handles) {
-        expect(handle.pause).toHaveBeenCalled();
-        expect(handle.currentTime).toBe(250);
-      }
-    });
-
-    it('sets the letters going again when a control is changed elsewhere in the room', () => {
-      const animate = stubAnimate();
-      const scene = makeScene(2000);
-      const layer = addLayer(scene, { kind: 'text', text: 'AB', letterMotion: 'fade', letterIntervalMs: 100 });
-      show(scene, true);
-      const before = letterCalls(animate).map(([frames]) => frames.find((frame) => frame.opacity === 1)!.offset);
-
-      animate.mockClear();
-      layer.letterOrder = 'reverse';
-      objectChanged$.emit({ identifier: layer.identifier, aliasName: layer.aliasName, isSendFromSelf: false });
-      fixture.detectChanges();
-
-      const after = letterCalls(animate).map(([frames]) => frames.find((frame) => frame.opacity === 1)!.offset);
-      expect(after).toEqual([...before].reverse());
-    });
-
-    it('draws each letter apart, keeping line breaks and joined emoji, and leans every other one', () => {
-      const scene = makeScene();
-      addLayer(scene, { kind: 'text', text: '{character}\n👍🏽!', letterTiltDeg: 10 });
-      fixture.componentRef.setInput('portrait', {
-        characterIdentifier: '',
-        imageIdentifier: '',
-        fit: { scale: 1, x: 0, y: 0 },
-        characterName: 'Bo',
-      });
-
-      show(scene, false, 0);
-
-      const letters = [...fixture.nativeElement.querySelectorAll('[data-letter]')] as HTMLElement[];
-      expect(letters.map((letter) => letter.textContent)).toEqual(['B', 'o', '👍🏽', '!']);
-      expect(letters.map((letter) => letter.style.transform)).toEqual([
-        'rotate(-10deg)',
-        'rotate(10deg)',
-        'rotate(-10deg)',
-        'rotate(10deg)',
-      ]);
-      expect(fixture.nativeElement.querySelectorAll('[data-testid="cut-in-letters"] br')).toHaveLength(1);
-    });
-
-    it('leans every letter the same way when asked', () => {
-      const scene = makeScene();
-      addLayer(scene, { kind: 'text', text: 'ABC', letterTiltDeg: 10, letterTiltMode: 'uniform' });
-
-      show(scene, false, 0);
-
-      const letters = [...fixture.nativeElement.querySelectorAll('[data-letter]')] as HTMLElement[];
-      expect(letters.map((letter) => letter.style.transform)).toEqual([
-        'rotate(10deg)',
-        'rotate(10deg)',
-        'rotate(10deg)',
-      ]);
-    });
-
-    it('sets each moving letter going on the scene clock, alongside its layer', () => {
-      const animate = stubAnimate();
-      const scene = makeScene(2000);
-      addLayer(scene, { kind: 'text', text: 'ABC', letterMotion: 'pop', startMs: 300 });
-
-      show(scene, true);
-
-      // One for the layer and one for each of its three letters, all over the scene's own length.
-      expect(animate).toHaveBeenCalledTimes(4);
-      for (const call of animate.mock.calls as unknown as [unknown, KeyframeAnimationOptions][]) {
-        expect(call[1].duration).toBe(2000);
-      }
-    });
-
-    it('keeps an ordinary text layer as one run of text', () => {
-      const scene = makeScene();
-      addLayer(scene, { kind: 'text', text: '一行目' });
-
-      show(scene, false, 0);
-
-      expect(fixture.nativeElement.querySelector('[data-letter]')).toBeNull();
-    });
   });
 });

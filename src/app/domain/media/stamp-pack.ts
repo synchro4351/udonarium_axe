@@ -1,8 +1,4 @@
-import { Attributes } from '@axe/core/sync/attributes';
-import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
-import { GameObject } from '@axe/core/sync/game-object';
-import { parseAttributesKeepingIdentifier, toAttributesKeepingIdentifier } from '@axe/core/sync/persisted-identifier';
-import { CarriesImages } from '@axe/domain/media/carried-images';
+export { StampPack } from '@axe/domain/chat/stamp-pack';
 
 /** One picture in a pack: what it is called, the picture itself and the words it is found by. */
 export interface StampItem {
@@ -168,60 +164,4 @@ export function serializeStampItems(items: readonly StampItem[]): string {
   return JSON.stringify(
     items.map((item) => ({ id: item.id, name: item.name, imageIdentifier: item.imageIdentifier, words: item.words }))
   );
-}
-
-/**
- * A set of picture stamps the whole room shares.
- *
- * The stamps ride in one field as written text, so a pack goes to the others, into a saved room
- * and into a pack file as one object. Their pictures are named inside that text, where a walk of
- * the XML does not look, so the pack says which pictures it carries.
- */
-@SyncObject('stamp-pack')
-export class StampPack extends GameObject implements CarriesImages {
-  @SyncVar() name: string = '';
-  @SyncVar() stamps: string = '[]';
-
-  private parsedFrom: string | null = null;
-  private parsed: StampItem[] = [];
-
-  /** The stamps in the pack, in the order they are shown. */
-  get items(): readonly StampItem[] {
-    if (this.parsedFrom !== this.stamps) {
-      this.parsed = parseStampItems(this.stamps);
-      this.parsedFrom = this.stamps;
-    }
-    return this.parsed;
-  }
-
-  /** Replaces the stamps in the pack, keeping only what a pack may hold. */
-  setItems(items: readonly StampItem[]): void {
-    this.stamps = serializeStampItems(parseStampItems(serializeStampItems(items)));
-  }
-
-  /** The stamp with this id, or null. */
-  itemOf(id: string): StampItem | null {
-    return this.items.find((item) => item.id === id) ?? null;
-  }
-
-  get carriedImageIdentifiers(): readonly string[] {
-    return [...new Set(this.items.map((item) => item.imageIdentifier))];
-  }
-
-  /**
-   * The identifier is written out with the rest, since it is how a pack read in again is known
-   * for the same pack.
-   */
-  toAttributes(): Attributes {
-    return toAttributesKeepingIdentifier(this);
-  }
-
-  /**
-   * Reads the pack back, taking up the identifier written with it. Dropped into a room that
-   * already has that pack, it comes in beside it as a copy: replacing one is asked about first,
-   * and only the stamp panel asks.
-   */
-  parseAttributes(attributes: NamedNodeMap): void {
-    parseAttributesKeepingIdentifier(this, attributes, { whenTaken: 'copy' });
-  }
 }

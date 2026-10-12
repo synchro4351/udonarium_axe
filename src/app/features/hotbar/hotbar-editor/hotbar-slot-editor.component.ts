@@ -45,10 +45,8 @@ import { CHARACTER_PANELS, DEFAULT_CHARACTER_PANEL, panelLabelKey } from '@axe/d
 import { findSlotActor } from '@axe/features/hotbar/hotbar-actor';
 import { HotbarRunnerService } from '@axe/features/hotbar/hotbar-runner.service';
 import { selectControllableCharacters } from '@axe/features/pl-tools/owned-character-list/owned-characters';
-import { NgSelectWindowDirective } from '@axe/ui/directives/ng-select-window.directive';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
-import { NgLabelTemplateDirective, NgOptionTemplateDirective, NgSelectComponent } from '@ng-select/ng-select';
 
 /**
  * A trial belongs to no cell of the bar, so what it lays out is its own to take down again.
@@ -65,15 +63,7 @@ const DEFAULT_STEP_DELAY_MS = 300;
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'hotbar-slot-editor',
   templateUrl: './hotbar-slot-editor.component.html',
-  imports: [
-    FormsModule,
-    TranslocoModule,
-    NgSelectComponent,
-    NgOptionTemplateDirective,
-    NgLabelTemplateDirective,
-    NgSelectWindowDirective,
-    SafePipe,
-  ],
+  imports: [FormsModule, SafePipe, TranslocoModule],
 })
 export class HotbarSlotEditorComponent {
   private readonly panelService = inject(PanelService);
@@ -124,14 +114,10 @@ export class HotbarSlotEditorComponent {
   ];
 
   /** What a slot of this kind can point at, so nothing has to be typed from memory. */
-  protected readonly choices = computed<{ value: string; name: string; glyph?: string }[]>(() => {
+  protected readonly choices = computed<{ value: string; name: string }[]>(() => {
     switch (this.kind()) {
       case 'effect':
-        return this.effectLibrary.presets().map((preset) => ({
-          value: preset.name,
-          name: preset.name,
-          glyph: kindGlyphSvg(preset.effectKind, { core: preset.colorPrimary, edge: preset.colorSecondary }),
-        }));
+        return this.effectLibrary.presets().map((preset) => ({ value: preset.name, name: preset.name }));
       case 'sound':
         this.objectChange.fileVersion();
         return [...this.audioStorage.audios]
@@ -153,6 +139,16 @@ export class HotbarSlotEditorComponent {
   });
 
   protected readonly picksFromList = computed(() => this.choices().length > 0);
+
+  /** The effects a slot can play, each with the mark the effect library draws for its shape. */
+  protected readonly effectChoices = computed<{ value: string; name: string; glyph: string }[]>(() => {
+    if (this.kind() !== 'effect') return [];
+    return this.effectLibrary.presets().map((preset) => ({
+      value: preset.name,
+      name: preset.name,
+      glyph: kindGlyphSvg(preset.effectKind, { core: preset.colorPrimary, edge: preset.colorSecondary }),
+    }));
+  });
 
   /** Who the slot speaks as while it is being written, so its palette is the one on offer. */
   private readonly actingCharacter = computed<GameCharacter | null>(() => {

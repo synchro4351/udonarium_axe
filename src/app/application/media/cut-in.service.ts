@@ -2,28 +2,18 @@ import { DestroyRef, inject, Injectable } from '@angular/core';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
-import { launchPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { CutInLauncher } from '@axe/domain/media/cut-in-launcher';
-import { type CutInPortraitSnapshot, makePortraitSnapshot, portraitFrameOf } from '@axe/domain/media/cut-in-portrait';
+import { portraitFitFor } from '@axe/domain/media/cut-in-portrait-fit';
+import type { CutInSpeaker } from '@axe/domain/media/cut-in-speaker';
 import { Jukebox } from '@axe/domain/media/jukebox';
 import { parseCutInIdentifiers, pickCutInIdentifier, rollCutIn } from '@axe/domain/media/table-cut-in';
+import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { GameTable } from '@axe/domain/tabletop/game-table';
 
 const CHAT_TAIL_PATTERN = /\s(@?)(\S+)$/i;
-
-/** Whose picture a launch brings for a template's portrait slot. An empty picture shows the silhouette. */
-export interface CutInPortraitPick {
-  characterIdentifier: string;
-  imageIdentifier: string;
-  /**
-   * The name `{character}` shows. Left out, it is the named character's own name; a player
-   * speaking as themself gives the name they speak under.
-   */
-  characterName?: string;
-}
 
 /**
  * How lately a line has to have been said for its cut-in to still be meant.
@@ -50,8 +40,26 @@ export class CutInService {
       if (!message.isSendFromSelf) return;
       // A line older than this arrived by sync or by loading a room, and was not just said.
       if (Date.now() - message.timestamp > JUST_SAID_MS) return;
-      this.activateFromChatText(message.text, message.to ?? '', this.speakerPortraitOf(message));
+      this.activateFromChatText(message.text, message.to ?? '', this.speakerOf(message));
     }, this.destroyRef);
+  }
+
+  /**
+   * Who a line was said by, for a cut-in it sets off to be played for: the character or the
+   * person speaking, with the portrait the line was said with and how the character set it in a
+   * portrait slot.
+   */
+  speakerOf(message: ChatMessage): CutInSpeaker {
+    const speaker = this.objectStore.get(message.sendFrom);
+    const isCharacter = speaker instanceof GameCharacter;
+    const name = isCharacter || speaker instanceof PeerCursor ? speaker.name : message.name;
+    const imageIdentifier = message.imageIdentifier ?? '';
+    return {
+      characterId: isCharacter ? speaker.identifier : '',
+      imageIdentifier,
+      name: name ?? '',
+      fit: isCharacter ? portraitFitFor(speaker.cutInPortraitFits, imageIdentifier) : null,
+    };
   }
 
   /**
@@ -60,10 +68,9 @@ export class CutInService {
    * Only cut-ins set to start from chat answer, and a last word written with `@` plays the cut-in's
    * sound alone. `sendTo` is the user id a direct line was sent to, or empty for a line to everyone.
    * It goes onto the launcher, so the other peers leave the cut-in to that one user, while this peer
-   * plays it as well. `portrait` is the picture the line was spoken with, for a template's portrait
-   * slot.
+   * plays it as well. The cut-in is played for `speaker` where given.
    */
-  activateFromChatText(text: string, sendTo: string, portrait: CutInPortraitPick | null = null): void {
+  activateFromChatText(text: string, sendTo: string, speaker: CutInSpeaker | null = null): void {
     const matches = ` ${text}`.match(CHAT_TAIL_PATTERN);
     if (!matches) return;
 
@@ -79,7 +86,7 @@ export class CutInService {
     if (isSoundOnly) {
       launcher.startSoundOnlyCutIn(target, sendTo);
     } else {
-      this.launch(target, sendTo, portrait);
+      this.launch(target, sendTo, speaker);
     }
   }
 
@@ -99,56 +106,26 @@ export class CutInService {
   }
 
   /**
-   * Plays a cut-in for everyone, handling the music the same way a chat-started one does.
-   *
-   * A template with a portrait slot shows the picked portrait, or the silhouette without one. The
-   * picture and the character's fit for it are read here, once, and travel with the launch.
+   * Plays a cut-in for everyone, handling the music the same way a chat-started one does, for
+   * `speaker` where given.
    */
-  launch(cutIn: CutIn, sendTo = '', portrait: CutInPortraitPick | null = null): boolean {
+  launch(cutIn: CutIn, sendTo = '', speaker: CutInSpeaker | null = null): boolean {
     const launcher = this.objectStore.get<CutInLauncher>('CutInLauncher');
     if (!launcher) return false;
 
     if (this.isCutInBgmUploaded(cutIn.audioIdentifier) && cutIn.tagName === '') {
       this.objectStore.get<Jukebox>('Jukebox')?.stop();
     }
-    launcher.startCutIn(cutIn, sendTo, this.snapshotOf(cutIn, portrait));
+    launcher.startCutIn(cutIn, sendTo, speaker);
     return true;
   }
 
-  /** Plays a cut-in on this screen alone, with the picked portrait in its slot. */
-  launchForMyself(cutIn: CutIn, portrait: CutInPortraitPick | null = null): boolean {
+  /** Plays a cut-in on this screen alone, with the chosen speaker where given. */
+  launchForMyself(cutIn: CutIn, speaker: CutInSpeaker | null = null): boolean {
     const launcher = this.objectStore.get<CutInLauncher>('CutInLauncher');
     if (!launcher) return false;
-
-    launcher.startCutInMySelf(cutIn, this.snapshotOf(cutIn, portrait));
+    launcher.startCutInMySelf(cutIn, speaker);
     return true;
-  }
-
-  /**
-   * The name and the fit are read here, once, so every peer shows what the character had at launch.
-   * The fit is the character's own for the picture and the slot's frame.
-   */
-  private snapshotOf(cutIn: CutIn, portrait: CutInPortraitPick | null): CutInPortraitSnapshot | null {
-    const scene = cutIn.scene;
-    const characterIdentifier = portrait?.characterIdentifier ?? '';
-    const found = characterIdentifier ? this.objectStore.get(characterIdentifier) : null;
-    const character = found instanceof GameCharacter ? found : null;
-    const characterName = portrait?.characterName ?? String(character?.name ?? '');
-    const imageIdentifier = portrait?.imageIdentifier ?? '';
-    const fit = scene ? launchPortraitFitOf(character, portraitFrameOf(scene.layers), imageIdentifier) : undefined;
-    return makePortraitSnapshot(scene, characterIdentifier, imageIdentifier, characterName, fit);
-  }
-
-  /**
-   * The character a line was spoken as and the picture it was spoken with. A player speaking as
-   * themself brings no picture, only the name they spoke under.
-   */
-  private speakerPortraitOf(message: ChatMessage): CutInPortraitPick | null {
-    const speaker = this.objectStore.get(message.sendFrom ?? '');
-    if (!(speaker instanceof GameCharacter)) {
-      return { characterIdentifier: '', imageIdentifier: '', characterName: message.name ?? '' };
-    }
-    return { characterIdentifier: speaker.identifier, imageIdentifier: message.imageIdentifier ?? '' };
   }
 
   /** Plays only what a cut-in sounds like, the way a chat line ending in `@` asks for. */

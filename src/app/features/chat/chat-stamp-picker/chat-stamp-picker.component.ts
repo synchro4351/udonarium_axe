@@ -10,21 +10,9 @@ import {
   signal,
 } from '@angular/core';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
-import { ObjectChangeService } from '@axe/application/sync/object-change.service';
-import { ImageStorage } from '@axe/core/storage/image-storage';
-import { ObjectStore } from '@axe/core/sync/object-store';
 import { chatSyntaxExample, ChatSyntaxSnippet, chatSyntaxSnippets } from '@axe/domain/chat/chat-syntax-snippet';
-import { builtinStampPack, StampPackView } from '@axe/domain/media/builtin-stamps';
-import { StampItem, stampLabelOf, StampPack } from '@axe/domain/media/stamp-pack';
 import { CATALOG_EMOJIS } from '@axe/features/chat/chat-message-reactions/reaction-emoji-catalog';
-import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
-
-/** A stamp picked to be sent, with the pack it came from. */
-export interface PickedStamp {
-  readonly pack: StampPackView;
-  readonly item: StampItem;
-}
 
 /** The tab of emoji every room has, whatever packs it holds. */
 export const EMOJI_TAB = '';
@@ -33,8 +21,8 @@ export const EMOJI_TAB = '';
 export const SYNTAX_TAB = 'chat-syntax';
 
 /**
- * What the chat input's stamp button opens: a tab of emoji, one of the chat's own ways of writing
- * and one of the tool's own stamps, always there, and a tab for each of the room's stamp packs.
+ * What the chat input's writing-tools button opens: a tab of emoji and one of the chat's own ways
+ * of writing. Stamps are chosen from the shared picker beside the send button.
  *
  * Picking an emoji, a way of writing or a stamp reports it and leaves what happens next to the
  * input. The tabs step with the arrow keys, and Escape reports the picker closed. Focus goes to the
@@ -45,25 +33,20 @@ export const SYNTAX_TAB = 'chat-syntax';
   selector: 'chat-stamp-picker',
   templateUrl: './chat-stamp-picker.component.html',
   host: { class: 'block', '(keydown.escape)': 'close($event)' },
-  imports: [SafePipe, TranslocoModule],
+  imports: [TranslocoModule],
 })
 export class ChatStampPickerComponent {
-  private readonly objectStore = inject(ObjectStore);
-  private readonly objectChange = inject(ObjectChangeService);
-  private readonly imageStorage = inject(ImageStorage);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly t = inject(TRANSLATE_FN);
 
   readonly emojiPicked = output<string>();
   readonly syntaxPicked = output<ChatSyntaxSnippet>();
-  readonly stampPicked = output<PickedStamp>();
   readonly closed = output<void>();
 
   protected readonly emojiTab = EMOJI_TAB;
   protected readonly syntaxTab = SYNTAX_TAB;
   protected readonly emojis = CATALOG_EMOJIS;
-  protected readonly labelOf = stampLabelOf;
   protected readonly exampleOf = chatSyntaxExample;
 
   protected readonly snippets = chatSyntaxSnippets({
@@ -74,31 +57,13 @@ export class ChatStampPickerComponent {
     effectName: this.t('feature.chat.syntax.placeholder.effectName'),
   });
 
-  private readonly builtinPack = builtinStampPack(this.t('feature.media.stamp.builtinPack'));
-
-  /**
-   * The tool's own stamps, then the room's packs, followed through additions, removals and
-   * changes to their stamps.
-   */
-  readonly packs = computed<StampPackView[]>(() => {
-    this.objectChange.collectionOf(StampPack.aliasName)();
-    const packs = this.objectStore.getObjects(StampPack);
-    for (const pack of packs) this.objectChange.versionOf(pack.identifier)();
-    return [this.builtinPack, ...packs];
-  });
-
   private readonly selectedTab = signal(EMOJI_TAB);
 
-  /** The tab open: the one picked, or the emoji when that pack has gone. */
-  readonly activeTab = computed(() => {
-    const tab = this.selectedTab();
-    return tab === SYNTAX_TAB || this.packs().some((pack) => pack.identifier === tab) ? tab : EMOJI_TAB;
-  });
-
-  readonly activePack = computed(() => this.packs().find((pack) => pack.identifier === this.activeTab()) ?? null);
+  /** The text tool open: syntax, or emoji when none is. */
+  readonly activeTab = computed(() => (this.selectedTab() === SYNTAX_TAB ? SYNTAX_TAB : EMOJI_TAB));
 
   constructor() {
-    this.focusAfterRender('[data-testid="chat-emoji-choice"], [data-testid="chat-stamp-choice"]');
+    this.focusAfterRender('[data-testid="chat-emoji-choice"], [data-testid="chat-syntax-choice"]');
   }
 
   /** The element the picker is drawn in, for the input to tell a press inside it from one elsewhere. */
@@ -110,13 +75,6 @@ export class ChatStampPickerComponent {
     this.selectedTab.set(tab);
   }
 
-  /** The picture to show for a stamp, the thumbnail where there is one, or nothing until it arrives. */
-  protected imageUrlOf(item: StampItem): string {
-    this.objectChange.fileVersion();
-    const image = this.imageStorage.get(item.imageIdentifier);
-    return image?.thumbnail.url || image?.url || '';
-  }
-
   protected pickEmoji(emoji: string): void {
     this.emojiPicked.emit(emoji);
   }
@@ -125,13 +83,9 @@ export class ChatStampPickerComponent {
     this.syntaxPicked.emit(snippet);
   }
 
-  protected pickStamp(pack: StampPackView, item: StampItem): void {
-    this.stampPicked.emit({ pack, item });
-  }
-
   /** The left and right arrows, and Home and End, move between the tabs and open the one reached. */
   protected onTabKeydown(event: KeyboardEvent): void {
-    const tabs = [EMOJI_TAB, SYNTAX_TAB, ...this.packs().map((pack) => pack.identifier)];
+    const tabs = [EMOJI_TAB, SYNTAX_TAB];
     const index = tabs.indexOf(this.activeTab());
     const next =
       event.key === 'ArrowRight'

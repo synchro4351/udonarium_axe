@@ -2,6 +2,15 @@
 
 バージョンごとのユーザー向け変更点です。
 
+- [v1.64.0](/release-notes/v1.64.0) — 2026-10-10
+- [v1.63.0](/release-notes/v1.63.0) — 2026-10-09
+- [v1.62.3](/release-notes/v1.62.3) — 2026-10-08
+- [v1.62.2](/release-notes/v1.62.2) — 2026-10-08
+- [v1.62.1](/release-notes/v1.62.1) — 2026-10-08
+- [v1.62.0](/release-notes/v1.62.0) — 2026-10-08
+- [v1.61.1](/release-notes/v1.61.1) — 2026-10-06
+- [v1.61.0](/release-notes/v1.61.0) — 2026-10-04
+- [v1.60.0](/release-notes/v1.60.0) — 2026-10-02
 - [v1.59.0](/release-notes/v1.59.0) — 2026-10-01
 - [v1.58.0](/release-notes/v1.58.0) — 2026-09-29
 - [v1.57.1](/release-notes/v1.57.1) — 2026-09-20
@@ -70,9 +79,9 @@
 - [v1.11.0](/release-notes/v1.11.0) — 2026-06-03
 - [v1.10.0](/release-notes/v1.10.0) — 2026-06-02
 
-過去の全変更や開発者向けの詳細は GitHub で公開しています。
+過去の全変更や開発者向けの詳細はGitHubで公開しています。
 
 - **[GitHub Releases](https://github.com/Xelltis/udonarium_axe/releases)** — 配布物（`axe_x.y.z.zip`）とリリースごとの概要
-- **[CHANGELOG.md](https://github.com/Xelltis/udonarium_axe/blob/main/CHANGELOG.md)** — Conventional Commits から生成された全変更履歴
+- **[CHANGELOG.md](https://github.com/Xelltis/udonarium_axe/blob/main/CHANGELOG.md)** — Conventional Commitsから生成された全変更履歴
 
-> リリースは `package.json` の `version` を基準に管理されています。
+> リリースは`package.json`の`version`を基準に管理されています。

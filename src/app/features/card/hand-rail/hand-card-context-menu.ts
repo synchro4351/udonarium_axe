@@ -21,3 +21,14 @@ export function buildHandCardContextMenu(
   }
   return menu;
 }
+
+/**
+ * The two ways a card dragged out of your hand can be laid where it was dropped, face up first, as
+ * the hand's own buttons offer them.
+ */
+export function buildPlayDroppedCardMenu(play: (faceUp: boolean) => void, t: TranslateFn): ContextMenuAction[] {
+  return [
+    { name: t('feature.card.hand.playFaceUp'), action: () => play(true) },
+    { name: t('feature.card.hand.playFaceDown'), action: () => play(false) },
+  ];
+}

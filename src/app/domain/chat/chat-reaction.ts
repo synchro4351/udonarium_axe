@@ -1,131 +1,73 @@
 import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
-import { ObjectNode } from '@axe/core/sync/object-node';
-
-/** The emoji offered first when a reader reacts to a line. */
-export const DEFAULT_REACTION_EMOJIS: readonly string[] = [
-  '👍',
-  '❤️',
-  '😂',
-  '😮',
-  '😢',
-  '🙏',
-  '🎉',
-  '👀',
-  '🤔',
-  '👏',
-  '🔥',
-  '✅',
-];
-
-/** How many different emoji one reader may leave on one line. */
-export const MAX_REACTIONS_PER_READER = 20;
-
-const MAX_EMOJI_LENGTH = 32;
-const PICTOGRAPHIC = /[\p{Extended_Pictographic}\p{Regional_Indicator}]/u;
-const WHITESPACE = /\s/u;
+import { GameObject } from '@axe/core/sync/game-object';
+import { ObjectStore } from '@axe/core/sync/object-store';
+import { emojiStampId, isReactionEmoji } from '@axe/domain/chat/stamp-catalog';
 
 /**
- * Whether a string can stand as a reaction: one short run of emoji with no spaces or letters of
- * the alphabet, so a reaction written by hand or by a stranger's build cannot carry text.
- */
-export function isReactionEmoji(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
-  if (value.length === 0 || value.length > MAX_EMOJI_LENGTH) return false;
-  if (WHITESPACE.test(value) || /[\p{L}\p{N}]/u.test(value.replace(/[#*0-9]️?⃣/gu, ''))) return false;
-  return PICTOGRAPHIC.test(value) || /⃣/u.test(value);
-}
-
-/**
- * The reactions one reader left on one chat line.
+ * The stamps one participant has put on one line of chat.
  *
- * Every reader keeps their own node under the line and only ever writes to that one. Sync settles a
- * clash by keeping the whole of whichever copy is newer, so were the reactions kept on the line
- * itself, two readers reacting at once would have one of them lost; kept apart like this, no two
- * readers ever write to the same object. Deleting the line deletes the nodes beneath it.
+ * Each participant keeps a record of their own for each line they answer, and writes only to that,
+ * so two people answering the same line at the same moment never write over each other. It points
+ * at the line by the line's identifier, which a line keeps through a save, and is kept with the
+ * room rather than under the line: a line with anything under it would be read back without its
+ * words.
  */
 @SyncObject('chat-reaction')
-export class ChatReaction extends ObjectNode {
-  /** The user id of the reader whose reactions these are. */
-  @SyncVar() owner: string;
-  /** The emoji, in the order they were left, separated by spaces. */
-  @SyncVar() emojiList: string;
+export class ChatReaction extends GameObject {
+  @SyncVar() messageIdentifier: string = '';
+  @SyncVar() userId: string = '';
+  /** The name they went by when they last answered, for the room to see whose it is once they leave. */
+  @SyncVar() userName: string = '';
+  /** The stamps, by identifier, in the order they were put on, a space between each. */
+  @SyncVar() stamps: string = '';
 
-  /** The emoji this reader left, in the order they were left, leaving out anything that is not one. */
-  get emojis(): string[] {
-    const raw = typeof this.emojiList === 'string' ? this.emojiList : '';
-    const seen = new Set<string>();
-    for (const emoji of raw.split(' ')) {
-      if (isReactionEmoji(emoji)) seen.add(emoji);
+  /** The stamps put on, once each, in the order they were put on. Empty for none. */
+  get stampIds(): string[] {
+    return [...new Set(`${this.stamps ?? ''}`.split(/\s+/).filter((id) => id.length > 0))];
+  }
+
+  /** Whether the stamp is among those put on. */
+  has(stampId: string): boolean {
+    return this.stampIds.includes(stampId);
+  }
+
+  /** Puts the stamp on, or takes it off where it is on already. Whether it is now on. */
+  toggle(stampId: string): boolean {
+    const ids = this.stampIds;
+    const on = !ids.includes(stampId);
+    this.stamps = (on ? [...ids, stampId] : ids.filter((id) => id !== stampId)).join(' ');
+    return on;
+  }
+
+  /** Makes a record of one participant's answer to a line and adds it to the room. */
+  static create(messageIdentifier: string, userId: string, userName: string): ChatReaction {
+    const reaction = new ChatReaction();
+    reaction.messageIdentifier = messageIdentifier;
+    reaction.userId = userId;
+    reaction.userName = userName;
+    reaction.initialize();
+    return reaction;
+  }
+
+  /** Converts one old line child into a separate canonical room record, if it is not present yet. */
+  static importLegacy(
+    messageIdentifier: string,
+    userId: string,
+    userName: string,
+    emojiList: string
+  ): ChatReaction | null {
+    if (!messageIdentifier || !userId) return null;
+    if (
+      ObjectStore.instance
+        .getObjects(ChatReaction)
+        .some((reaction) => reaction.messageIdentifier === messageIdentifier && reaction.userId === userId)
+    ) {
+      return null;
     }
-    return [...seen].slice(0, MAX_REACTIONS_PER_READER);
+    const stampIds = [...new Set(`${emojiList ?? ''}`.split(/\s+/).filter(isReactionEmoji).map(emojiStampId))];
+    if (stampIds.length < 1) return null;
+    const reaction = ChatReaction.create(messageIdentifier, userId, userName || userId);
+    reaction.stamps = stampIds.join(' ');
+    return reaction;
   }
-
-  /** Whether this reader left the emoji. */
-  has(emoji: string): boolean {
-    return this.emojis.includes(emoji);
-  }
-
-  /**
-   * Leaves the emoji, or takes it back when already left. Answers whether it is now left.
-   *
-   * An emoji that is not one, or one past the limit a reader may leave, changes nothing.
-   */
-  toggle(emoji: string): boolean {
-    if (!isReactionEmoji(emoji)) return false;
-    const emojis = this.emojis;
-    const index = emojis.indexOf(emoji);
-    if (index >= 0) {
-      emojis.splice(index, 1);
-    } else {
-      if (emojis.length >= MAX_REACTIONS_PER_READER) return false;
-      emojis.push(emoji);
-    }
-    this.emojiList = emojis.join(' ');
-    return index < 0;
-  }
-}
-
-/** One emoji left on a line, with how many readers left it and whether the reader is one of them. */
-export interface ChatReactionCount {
-  readonly emoji: string;
-  readonly count: number;
-  readonly mine: boolean;
-}
-
-/**
- * Counts the reactions on a line, one vote per reader for each emoji.
- *
- * Emoji come in the order they first appear, going through the readers in the order given, so
- * every seat lists them alike. A reader found twice, as when two windows of theirs both reacted
- * before hearing of each other, still counts once. `me` marks the reader's own.
- */
-export function tallyReactions(
-  votes: readonly { readonly owner: string; readonly emojis: readonly string[] }[],
-  me?: string
-): ChatReactionCount[] {
-  const voters = new Map<string, Set<string>>();
-  for (const vote of votes) {
-    if (!vote.owner) continue;
-    for (const emoji of vote.emojis) {
-      let owners = voters.get(emoji);
-      if (!owners) {
-        owners = new Set();
-        voters.set(emoji, owners);
-      }
-      owners.add(vote.owner);
-    }
-  }
-  return [...voters].map(([emoji, owners]) => ({
-    emoji,
-    count: owners.size,
-    mine: me != null && me.length > 0 && owners.has(me),
-  }));
-}
-
-/** The counts as one short line, such as `👍 2・❤️ 1`, for a log. Empty when nobody reacted. */
-export function formatReactionSummary(reactions: readonly ChatReactionCount[] | undefined): string {
-  return (reactions ?? [])
-    .filter((reaction) => reaction.count > 0)
-    .map((reaction) => `${reaction.emoji} ${reaction.count}`)
-    .join('・');
 }

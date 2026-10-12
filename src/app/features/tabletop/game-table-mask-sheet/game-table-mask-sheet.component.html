@@ -130,6 +130,15 @@
       <h3
         class="text-ui-accent border-ui-border-panel m-0 mb-2.5 flex items-center gap-1.5 border-b pb-1.5 text-[13px] font-semibold [&_.material-icons]:text-[16px]!"
       >
+        <i class="material-icons">text_fields</i>
+        {{ 'feature.tabletop.maskSheet.textSection' | transloco }}
+      </h3>
+    </section>
+
+    <section class="bg-ui-accent-bg border-ui-border-panel rounded-ui-sm box-border border p-3">
+      <h3
+        class="text-ui-accent border-ui-border-panel m-0 mb-2.5 flex items-center gap-1.5 border-b pb-1.5 text-[13px] font-semibold [&_.material-icons]:text-[16px]!"
+      >
         <i class="material-icons">grid_on</i>
         {{ 'feature.tabletop.maskSheet.scratchedSection' | transloco }}
       </h3>
@@ -222,6 +231,7 @@
         <textarea
           class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent w-full resize-y border border-solid px-2 py-1 text-[0.78em] outline-none"
           rows="4"
+          data-field="mask-text"
           data-testid="map-mask-text"
           [attr.aria-label]="'feature.inventory.sheet.mapMaskText' | transloco"
           [placeholder]="maskTextFormat() === 'formatted' ? ('feature.textNote.format.placeholder' | transloco) : ''"
@@ -237,6 +247,7 @@
             <input
               class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent w-20 border border-solid px-2 py-1 outline-none"
               type="number"
+              data-field="mask-text-size"
               min="1"
               max="120"
               [value]="mask.fontSize"
@@ -248,7 +259,8 @@
             <input
               class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent h-8 w-14 cursor-pointer border border-solid p-0.5 outline-none"
               type="color"
-              [value]="mask.color"
+              data-field="mask-text-color"
+              [value]="mask.textColor"
               (input)="onMapMaskColor($event)"
             />
           </label>
@@ -257,6 +269,7 @@
             <input
               class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent h-8 w-14 cursor-pointer border border-solid p-0.5 outline-none"
               type="color"
+              data-field="mask-bgcolor"
               [value]="mask.bgcolor"
               (input)="onMapMaskBgColor($event)"
             />
@@ -265,6 +278,7 @@
             <input
               class="accent-ui-accent size-4 cursor-pointer"
               type="checkbox"
+              data-field="mask-text-outline"
               [checked]="mask.textOutline"
               (change)="onMapMaskOutline($event)"
             />
@@ -276,6 +290,7 @@
               <input
                 class="bg-ui-input border-ui-border-panel rounded-ui-sm focus:border-ui-accent h-8 w-14 cursor-pointer border border-solid p-0.5 outline-none"
                 type="color"
+                data-field="mask-outline-color"
                 [value]="mask.outlineColor"
                 (input)="onMapMaskOutlineColor($event)"
               />

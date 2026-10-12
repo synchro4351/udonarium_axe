@@ -14,6 +14,8 @@ import { basename, join, resolve } from 'path';
 
 Logger.setLevel(LogLevel.NONE);
 
+import { CHAT_PERSONAL_BOOKMARKS_STORAGE_KEY } from '@axe/application/chat/chat-personal-bookmark.store';
+import { PERSONAL_VOLUME_STORAGE_KEY } from '@axe/application/media/personal-volumes';
 import { COMPASS_FACE_STORAGE_KEY } from '@axe/application/ui/compass-face.service';
 import { LOCAL_MODE_STORAGE_KEY } from '@axe/application/ui/local-mode-preference.service';
 import { PIECE_OVERLAY_STORAGE_KEY } from '@axe/application/ui/piece-overlay-preference.service';
@@ -104,6 +106,12 @@ if (typeof globalThis.AudioContext === 'undefined') {
     setTargetAtTime() {
       return this;
     }
+    linearRampToValueAtTime() {
+      return this;
+    }
+    cancelScheduledValues() {
+      return this;
+    }
   }
   class FakeGainNode {
     readonly gain = new FakeAudioParam();
@@ -122,6 +130,19 @@ if (typeof globalThis.AudioContext === 'undefined') {
       return this;
     }
   }
+  class FakeBufferSource {
+    buffer: unknown = null;
+    loop = false;
+    onended: (() => void) | null = null;
+    connect() {
+      return this;
+    }
+    disconnect() {
+      return this;
+    }
+    start() {}
+    stop() {}
+  }
   class FakeAudioContext {
     currentTime = 0;
     destination: object = {};
@@ -139,6 +160,12 @@ if (typeof globalThis.AudioContext === 'undefined') {
     }
     createMediaElementSource() {
       return new FakeMediaElementSource();
+    }
+    createBufferSource() {
+      return new FakeBufferSource();
+    }
+    decodeAudioData(_data: ArrayBuffer, resolve: (buffer: object) => void) {
+      resolve({ duration: 1, length: 44100, numberOfChannels: 2 });
     }
   }
   (globalThis as unknown as Record<string, unknown>)['AudioContext'] = FakeAudioContext;
@@ -302,6 +329,25 @@ function applyConfigureTestingModuleWrapper(): void {
   TestBed.configureTestingModule = wrapped as typeof TestBed.configureTestingModule;
 }
 
+// vi.waitFor gives up after a second unless it is told otherwise. A step that takes a moment on its
+// own can take longer than that while every spec runs at once on a busy machine, and the wait then
+// fails with what it saw first. A wait that names no time is given ten seconds, well inside a
+// test's own thirty; one that names its time keeps it.
+const WAIT_FOR_MS = 10_000;
+
+function applyWaitForDefault(): void {
+  if ((vi.waitFor as unknown as Record<string, unknown>)[WRAPPER_SENTINEL]) return;
+  const waitFor = vi.waitFor;
+  const wrapped = ((callback, options) =>
+    waitFor(
+      callback,
+      typeof options === 'number' ? options : { timeout: WAIT_FOR_MS, ...options }
+    )) as typeof vi.waitFor;
+  (wrapped as unknown as Record<string, unknown>)[WRAPPER_SENTINEL] = true;
+  vi.waitFor = wrapped;
+}
+applyWaitForDefault();
+
 // Vitest runs setup once per test file; swallow the "already initialized" throw on re-entry.
 try {
   TestBed.initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting());
@@ -334,7 +380,7 @@ function forgetMyCursor(): void {
 // asks for a flat screen must not leave the next one's otherwise ordinary table lying down. The
 // same goes for what a seat shows: a spec that puts a toolbar away, folds one or hides the bars
 // over the pieces writes that choice to the browser, and the file after it builds its services
-// from whatever is left there.
+// from whatever is left there. A reader's own bookmarks on chat lines are kept there too.
 function forgetSeatPreferences(): void {
   localStorage.removeItem(TABLETOP_DISPLAY_STORAGE_KEY);
   localStorage.removeItem(VIEW_MODE_STORAGE_KEY);
@@ -343,6 +389,8 @@ function forgetSeatPreferences(): void {
   localStorage.removeItem(TOOLBAR_FOLD_STORAGE_KEY);
   localStorage.removeItem(PIECE_OVERLAY_STORAGE_KEY);
   localStorage.removeItem(COMPASS_FACE_STORAGE_KEY);
+  localStorage.removeItem(PERSONAL_VOLUME_STORAGE_KEY);
+  localStorage.removeItem(CHAT_PERSONAL_BOOKMARKS_STORAGE_KEY);
 }
 
 beforeAll(async () => {

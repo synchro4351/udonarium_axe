@@ -132,14 +132,13 @@ export class TextNoteComponent {
     this.objectChange.versionOf(note.identifier)();
     return decorateChatStyleText(this._text());
   });
-  /** Whether the note is set to show its body formatted rather than as typed. */
-  readonly isFormatted = computed(() => {
+  /** Whether the note is drawn with formatting, as whoever wrote it chose. */
+  readonly formatted = computed(() => {
     const note = this.textNote();
     this.objectChange.versionOf(note.identifier)();
-    return note.format === 'formatted';
+    return note.isFormatted;
   });
-  /** The body as formatted HTML. Unlike {@link decoratedHtml} it is not linkified. */
-  readonly formattedHtml = computed(() => formatNoteText(this._text()));
+  readonly formattedHtml = computed(() => (this.formatted() ? formatNoteText(this._text()) : ''));
   readonly maskedHtml = computed(() => {
     const note = this.textNote();
     this.objectChange.versionOf(note.identifier)();

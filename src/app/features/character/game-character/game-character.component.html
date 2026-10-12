@@ -425,6 +425,7 @@
                     [style.width.px]="rollHandleSizePx()"
                     [style.height.px]="rollHandleSizePx()"
                     [style.pointer-events]="partFrame() ? 'auto' : null"
+                    [style.top]="rollHandlesBeside() ? '50%' : null"
                     [ngStyle]="{ transform: rollHandleHeadTransform() }"
                   >
                     <i
@@ -439,6 +440,8 @@
                     [style.width.px]="rollHandleSizePx()"
                     [style.height.px]="rollHandleSizePx()"
                     [style.pointer-events]="partFrame() ? 'auto' : null"
+                    [style.top]="rollHandlesBeside() ? '50%' : null"
+                    [style.bottom]="rollHandlesBeside() ? 'auto' : null"
                     [ngStyle]="{ transform: rollHandleFootTransform() }"
                   >
                     <i
@@ -587,48 +590,36 @@
                     </div>
                   </div>
                 }
-                @if (overheadSpeech(); as bubble) {
+                @if (speechBubble(); as bubble) {
                   <div
-                    class="pointer-events-none absolute bottom-0 left-0 [-webkit-transform-style:preserve-3d] transform-3d"
+                    class="pointer-events-none absolute top-0 left-0 [-webkit-transform-style:preserve-3d] transform-3d"
+                    aria-hidden="true"
                     [appBillboard]="speechOrbitFacing()"
                   >
                     <div
-                      data-testid="overhead-speech-stack"
                       class="absolute bottom-0 left-0 origin-bottom-left [-webkit-transform-style:preserve-3d] transform-3d"
                       [style.font-size.px]="decorFontSizePx"
                       [appBillboard]="speechStackFacing()"
                     >
                       @for (shown of [bubble]; track shown.key) {
                         <div
-                          data-testid="overhead-speech"
-                          class="animate-vn-pop relative w-max max-w-[18em] rounded-[0.9em] border border-solid border-black/25 bg-white/95 px-[0.7em] py-[0.35em] text-[#222] shadow-[0_0.15em_0.4em_rgba(0,0,0,0.55)]"
-                          [attr.data-kind]="shown.speech.kind"
+                          data-testid="speech-bubble"
+                          class="animate-speech-pop relative mb-[0.7em] flex w-max max-w-[16em] origin-bottom flex-col items-center gap-[0.3em] rounded-[0.8em] border-[0.1em] border-solid border-[#333] bg-white px-[0.7em] py-[0.45em] text-[1.3em] leading-snug text-[#222]"
+                          [ngClass]="speechShadow()"
                         >
-                          @switch (shown.speech.kind) {
-                            @case ('stamp') {
-                              @if (overheadStampImage(); as image) {
-                                <img
-                                  data-testid="overhead-speech-stamp"
-                                  class="block max-h-[7em] max-w-[9em] object-contain"
-                                  [src]="image.url | safe: 'resourceUrl'"
-                                  [alt]="shown.speech.name"
-                                />
-                              } @else {
-                                <span class="text-[1.3em] leading-snug text-[#666]">[{{ shown.speech.name }}]</span>
-                              }
-                            }
-                            @case ('emoji') {
-                              <span class="block text-[2.6em] leading-none">{{ shown.speech.text }}</span>
-                            }
-                            @case ('text') {
-                              <span
-                                class="line-clamp-4 text-[1.3em] leading-snug wrap-break-word whitespace-pre-line"
-                                >{{ shown.speech.text }}</span
-                              >
+                          @if (shown.stamp) {
+                            @defer (on immediate) {
+                              <ui-stamp [stampId]="shown.stamp" [size]="speechStampPx" />
                             }
                           }
+                          @if (shown.text) {
+                            <span class="text-center wrap-anywhere whitespace-pre-wrap">{{ shown.text }}</span>
+                          }
                           <span
-                            class="absolute top-full left-1/2 ml-[-0.45em] size-0 border-x-[0.45em] border-t-[0.55em] border-solid border-x-transparent border-t-white/95"
+                            class="absolute top-full left-1/2 size-0 -translate-x-1/2 border-x-[0.55em] border-t-[0.7em] border-solid border-x-transparent border-t-[#333]"
+                          ></span>
+                          <span
+                            class="absolute top-full left-1/2 mt-[-0.14em] size-0 -translate-x-1/2 border-x-[0.42em] border-t-[0.55em] border-solid border-x-transparent border-t-white"
                           ></span>
                         </div>
                       }

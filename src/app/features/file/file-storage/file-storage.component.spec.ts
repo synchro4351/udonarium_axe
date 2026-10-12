@@ -833,9 +833,10 @@ describe('FileStorageComponent', () => {
 
     it('has a message for every outcome and label in every language', () => {
       const labels = [
-        'feature.file.fileStorage.paste.boxLabel',
-        'feature.file.fileStorage.paste.hint',
-        'feature.file.fileStorage.paste.read',
+        'feature.file.fileStorage.pasteHint',
+        'feature.file.fileStorage.addImageHintTouch',
+        'feature.file.fileStorage.paste',
+        'feature.file.imageIntake.failed',
         'feature.file.fileStorage.pending.confirm',
         'feature.file.fileStorage.pending.add',
         'feature.file.fileStorage.pending.cancel',

@@ -1,18 +1,24 @@
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TabletopDisplayService } from '@axe/application/tabletop/tabletop-display.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { ViewModePreferenceService } from '@axe/application/ui/view-mode-preference.service';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
-import { ChatStampOutgoing } from '@axe/domain/chat/chat-outgoing';
+import { OPEN_STAMP_RULES, withStampsAllowed, withStampUseOn } from '@axe/domain/chat/stamp-rules';
 import { DataElement } from '@axe/domain/data/data-element';
+import { DiceStage } from '@axe/domain/dice/dice-3d/dice-stage';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
 import { StampItem, StampPack } from '@axe/domain/media/stamp-pack';
+import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import { PeerRole } from '@axe/domain/peer/peer-role';
 import { ChatComposeService } from '@axe/features/chat/chat-compose.service';
 import { ChatInputComponent } from '@axe/features/chat/chat-input/chat-input.component';
+import { StampPickerService } from '@axe/features/chat/stamp/stamp-picker.service';
+import { RoomPanelService } from '@axe/features/panels/room-panel.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
 type Outgoing = Parameters<Parameters<ChatInputComponent['chat']['subscribe']>[0]>[0];
@@ -253,6 +259,56 @@ describe('ChatInputComponent', () => {
     });
   });
 
+  describe('the button to choose how this seat’s dice look', () => {
+    const button = () =>
+      fixture.nativeElement.querySelector('[data-testid="chat-my-dice"]') as HTMLButtonElement | null;
+    let stageBefore: DiceStage;
+
+    beforeEach(() => {
+      stageBefore = Config.instance.diceStage;
+    });
+
+    afterEach(() => {
+      Config.instance.diceStage = stageBefore;
+    });
+
+    it('is offered only while the room shows its rolls’ dice', async () => {
+      Config.instance.diceStage = 'off';
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(button()).toBeNull();
+
+      Config.instance.diceStage = 'frame';
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(button()).not.toBeNull();
+    });
+
+    it('is not offered to a guest, who is not offered the panel', async () => {
+      const role = PeerCursor.myCursor.role;
+      PeerCursor.myCursor.role = PeerRole.Guest;
+      try {
+        Config.instance.diceStage = 'frame';
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(button()).toBeNull();
+      } finally {
+        PeerCursor.myCursor.role = role;
+      }
+    });
+
+    it('opens the panel for it', async () => {
+      const open = vi.spyOn(TestBed.inject(RoomPanelService), 'open').mockImplementation(() => undefined);
+      Config.instance.diceStage = 'both';
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      button()!.click();
+
+      expect(open).toHaveBeenCalledWith('myDice');
+    });
+  });
+
   describe('showing who is typing', () => {
     it('keeps no fixed strip for it under the box', () => {
       fixture.detectChanges();
@@ -288,6 +344,21 @@ describe('ChatInputComponent', () => {
         toTicker: false,
       });
       expect(component.text).toBe('');
+    });
+
+    it('empties the box when Enter comes before the typing has been drawn', async () => {
+      fixture.componentRef.setInput('canSpeak', true);
+      await fixture.whenStable();
+      const box = (fixture.nativeElement as HTMLElement).querySelector<HTMLTextAreaElement>('textarea.chat-input')!;
+      const outgoing = sent();
+
+      box.value = '雑談1';
+      box.dispatchEvent(new Event('input'));
+      box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      await fixture.whenStable();
+
+      expect((await outgoing).text).toBe('雑談1');
+      expect(box.value).toBe('');
     });
 
     it('hands the line to the dice bot, which decides whether it must wait for the system', async () => {
@@ -362,6 +433,99 @@ describe('ChatInputComponent', () => {
       expect(component.colorSelectNo()).toBe(0);
     });
 
+    it('opens the stamps beside the send button, and sends the one picked on its own from an empty box', () => {
+      fixture.componentRef.setInput('canSpeak', true);
+      fixture.detectChanges();
+      component.text = '';
+      const toggle = vi.spyOn(TestBed.inject(StampPickerService), 'toggle').mockImplementation(() => undefined);
+      const emitted: Outgoing[] = [];
+      component.chat.subscribe((value) => emitted.push(value));
+
+      const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+        '[data-testid="chat-input-stamp"]'
+      )!;
+      button.click();
+      expect(toggle).toHaveBeenCalledWith(button, 'line', expect.any(Function));
+      toggle.mock.calls[0][2]('seal:ok');
+
+      expect(emitted).toEqual([
+        expect.objectContaining({
+          text: '',
+          stamp: { id: 'seal:ok', words: expect.any(String) },
+          gameSystem: null,
+          replyTo: '',
+          toTicker: false,
+        }),
+      ]);
+      expect(emitted[0].stamp!.words.length).toBeGreaterThan(0);
+    });
+
+    it('sends the one picked under the words in the box, as the send button sends them, and clears the box', async () => {
+      fixture.componentRef.setInput('canSpeak', true);
+      fixture.detectChanges();
+      component.text = 'いくぞ！';
+      const outgoing = sent();
+
+      component.sendStamp('roll:critical');
+
+      expect(component.text).toBe('');
+      expect(await outgoing).toEqual(
+        expect.objectContaining({
+          text: 'いくぞ！',
+          gameSystem,
+          stamp: { id: 'roll:critical', words: expect.any(String) },
+        })
+      );
+      expect(DiceBot.gameSystemForLineAsync).toHaveBeenCalledWith(component.gameType, 'いくぞ！');
+    });
+
+    it('keeps the picker button visible when room rules deny all stamps, and sends none it denies', () => {
+      fixture.componentRef.setInput('canSpeak', true);
+      const config = Config.instance;
+      config.stampRules = withStampsAllowed(OPEN_STAMP_RULES, 'line', ['roll:critical'], false);
+      try {
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[data-testid="chat-input-stamp"]')).not.toBeNull();
+        const emitted = vi.fn();
+        component.chat.subscribe(emitted);
+        component.text = 'いくぞ！';
+
+        component.sendStamp('roll:critical');
+        expect(emitted).not.toHaveBeenCalled();
+        expect(component.text).toBe('いくぞ！');
+
+        config.stampRules = withStampUseOn(OPEN_STAMP_RULES, 'line', false);
+        TestBed.inject(ObjectChangeService).notifyChanged('Config');
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[data-testid="chat-input-stamp"]')).toBeNull();
+      } finally {
+        config.stampRules = OPEN_STAMP_RULES;
+      }
+    });
+
+    it('sends no stamp from a seat that may not speak', () => {
+      fixture.componentRef.setInput('canSpeak', false);
+      fixture.detectChanges();
+      component.text = 'いくぞ！';
+      const emitted = vi.fn();
+      component.chat.subscribe(emitted);
+
+      component.sendStamp('roll:critical');
+
+      expect(emitted).not.toHaveBeenCalled();
+      expect(component.text).toBe('いくぞ！');
+    });
+
+    it('sends no stamp this version does not know', () => {
+      fixture.componentRef.setInput('canSpeak', true);
+      const emitted = vi.fn();
+      component.chat.subscribe(emitted);
+
+      component.sendStamp('sfx:from-a-newer-version');
+
+      expect(emitted).not.toHaveBeenCalled();
+    });
+
     it('sends on enter alone and never on another key or mid-composition', async () => {
       fixture.detectChanges();
       component.text = 'hello';
@@ -414,14 +578,13 @@ describe('ChatInputComponent', () => {
 
   describe('stamps and emoji', () => {
     const packs: StampPack[] = [];
-    let stamps: ChatStampOutgoing[];
     let lines: Outgoing[];
 
     function makePack(name: string, items: StampItem[]): StampPack {
       const pack = new StampPack();
       pack.name = name;
-      pack.setItems(items);
       pack.initialize();
+      pack.setItems(items);
       packs.push(pack);
       return pack;
     }
@@ -463,13 +626,12 @@ describe('ChatInputComponent', () => {
       return event;
     }
 
+    const sentStamps = () => lines.filter((line) => line.stamp !== undefined);
     const suggestionNames = () =>
       findAll('[data-testid="chat-stamp-suggestion"]').map((row) => row.textContent!.replace(/\s+/g, ' ').trim());
 
     beforeEach(async () => {
-      stamps = [];
       lines = [];
-      component.stamp.subscribe((stamp) => stamps.push(stamp));
       component.chat.subscribe((line) => lines.push(line));
       makePack('Faces', [stampItem('smile', 'Smile', ['smile', 'happy']), stampItem('smirk', 'Smirk', ['smirk'])]);
       makePack('Animals', [stampItem('cat', 'Cat smile', ['smile'])]);
@@ -481,184 +643,64 @@ describe('ChatInputComponent', () => {
       for (const pack of packs.splice(0)) pack.destroy();
     });
 
-    it('offers no stamp button to a host that has not asked for stamps, such as the palette', async () => {
+    it('keeps the shared stamp picker separate from inline suggestions when a host has not asked for suggestions', async () => {
       fixture.componentRef.setInput('offersStamps', false);
       await settle();
 
-      expect(find('[data-testid="chat-stamp-button"]')).toBeNull();
+      expect(find('[data-testid="chat-input-stamp"]')).not.toBeNull();
       await type(':smi');
       expect(find('[data-testid="chat-stamp-suggestions"]')).toBeNull();
     });
 
-    it('offers neither the button nor suggestions to a seat that may not speak', async () => {
+    it('offers no inline suggestions to a seat that may not speak', async () => {
       await type(':smi');
       fixture.componentRef.setInput('canSpeak', false);
       await settle();
 
-      expect(find('[data-testid="chat-stamp-button"]')).toBeNull();
+      expect(find('[data-testid="chat-input-stamp"]')).toBeNull();
       expect(component.stampSuggestions()).toEqual([]);
     });
 
-    describe('the picker', () => {
-      async function openPicker(): Promise<void> {
-        find<HTMLButtonElement>('[data-testid="chat-stamp-button"]')!.click();
+    describe('writing tools', () => {
+      async function openTools(): Promise<void> {
+        find<HTMLButtonElement>('[data-testid="chat-writing-tools"]')!.click();
         await settle();
       }
 
-      async function openTab(name: string): Promise<void> {
-        findAll('[data-testid="chat-stamp-tab"]')
-          .find((tab) => tab.textContent!.trim() === name)!
-          .click();
-        await settle();
-      }
-
-      it('opens on the emoji, with the syntax, the tool’s own stamps and then a tab for each of the room’s packs', async () => {
-        await openPicker();
-
-        const tabs = findAll('[data-testid="chat-stamp-tab"]');
-        expect(tabs.map((tab) => tab.textContent!.trim())).toEqual([
+      it('offers the emoji and syntax tabs without a second stamp picker', async () => {
+        await openTools();
+        expect(findAll('[data-testid="chat-stamp-tab"]').map((tab) => tab.textContent!.trim())).toEqual([
           '絵文字',
           '特殊記法',
-          'プリセット',
-          'Faces',
-          'Animals',
         ]);
-        expect(tabs[0].getAttribute('aria-selected')).toBe('true');
         expect(findAll('[data-testid="chat-emoji-choice"]').length).toBeGreaterThan(20);
-        expect(find('[data-testid="chat-stamp-button"]')!.getAttribute('aria-expanded')).toBe('true');
-      });
-
-      it('shows a pack’s stamps when its tab is chosen, and moves between tabs with the arrows', async () => {
-        await openPicker();
-        await openTab('Faces');
-
-        // A stamp is shown by its first search word.
-        expect(findAll('[data-testid="chat-stamp-choice"]').map((one) => one.getAttribute('title'))).toEqual([
-          'smile',
-          'smirk',
-        ]);
-
-        find('[role="tablist"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-        await settle();
-        expect(findAll('[data-testid="chat-stamp-choice"]').map((one) => one.getAttribute('title'))).toEqual(['smile']);
-      });
-
-      it('sends one of the tool’s own stamps by its phrase', async () => {
-        await openPicker();
-        await openTab('プリセット');
-
-        expect(findAll('[data-testid="chat-stamp-choice"]')).toHaveLength(10);
-        findAll('[data-testid="chat-stamp-choice"]')[0].click();
-        await settle();
-
-        expect(stamps).toEqual([
-          expect.objectContaining({ stampName: 'いいね！', imageIdentifier: 'assets/images/stamps/iine.png' }),
-        ]);
+        expect(findAll('[data-testid="chat-stamp-choice"]')).toHaveLength(0);
       });
 
       it('puts an emoji into the line where the caret stood, and sends nothing', async () => {
         await type('ab', 1);
-        await openPicker();
+        await openTools();
         find<HTMLButtonElement>('[data-testid="chat-emoji-choice"][aria-label="🎲"]')!.click();
         await settle();
 
         expect(component.text).toBe('a🎲b');
-        expect(stamps).toEqual([]);
         expect(lines).toEqual([]);
         expect(component.isStampPickerOpen()).toBe(false);
       });
 
-      it('sends a picture stamp at once, once, and leaves the words being written alone', async () => {
-        const target = speaker('勇者');
-        component.sendFrom = target.identifier;
-        component.sendTo = PeerCursor.myCursor.identifier;
-        await type('まだ途中');
-        await openPicker();
-        await openTab('Faces');
-        findAll('[data-testid="chat-stamp-choice"]')[0].click();
-        await settle();
-
-        expect(stamps).toEqual([
-          expect.objectContaining({
-            stampName: 'smile',
-            imageIdentifier: 'image-smile',
-            sendFrom: target.identifier,
-            sendTo: PeerCursor.myCursor.identifier,
-            messColor: '#111111',
-            messBubbleLight: '#aaaaaa',
-          }),
-        ]);
-        expect(lines).toEqual([]);
-        expect(component.text).toBe('まだ途中');
-        expect(component.isStampPickerOpen()).toBe(false);
-        target.destroy();
-      });
-
-      it('answers the reply being written, and lets it go once sent', async () => {
-        const replied = new ChatMessage();
-        replied.initialize();
-        component.replyTarget.set(replied);
-        await openPicker();
-        await openTab('Animals');
-        findAll('[data-testid="chat-stamp-choice"]')[0].click();
-        await settle();
-
-        expect(stamps[0].replyTo).toBe(replied.identifier);
-        expect(component.replyTarget()).toBeNull();
-        replied.destroy();
-      });
-
-      it('closes on Escape without sending, handing focus back to its button', async () => {
-        await openPicker();
-        find('chat-stamp-picker')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-        await settle();
-
-        expect(component.isStampPickerOpen()).toBe(false);
-        expect(document.activeElement).toBe(find('[data-testid="chat-stamp-button"]'));
-        expect(stamps).toEqual([]);
-      });
-
-      it('closes on a press anywhere else, but not on a press inside it', async () => {
-        await openPicker();
-        find('[data-testid="chat-stamp-tab"]')!.dispatchEvent(new Event('pointerdown', { bubbles: true }));
-        await settle();
-        expect(component.isStampPickerOpen()).toBe(true);
-
-        document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
-        await settle();
-        expect(component.isStampPickerOpen()).toBe(false);
-        expect(stamps).toEqual([]);
-      });
-
-      it('toggles from its own button without the press closing it first', async () => {
-        const button = find<HTMLButtonElement>('[data-testid="chat-stamp-button"]')!;
-        button.dispatchEvent(new Event('pointerdown', { bubbles: true }));
-        button.click();
-        await settle();
-        expect(component.isStampPickerOpen()).toBe(true);
-
-        button.dispatchEvent(new Event('pointerdown', { bubbles: true }));
-        button.click();
-        await settle();
-        expect(component.isStampPickerOpen()).toBe(false);
-      });
-
-      it('writes ruby around the words picked out from the syntax tab, and sends nothing', async () => {
+      it('inserts syntax around the selected words without sending', async () => {
         await type('今日は晴天です', 5);
         textBox().setSelectionRange(3, 5);
-        await openPicker();
-        await openTab('特殊記法');
+        await openTools();
+        findAll('[data-testid="chat-stamp-tab"]')[1].click();
+        await settle();
         find<HTMLButtonElement>('[data-testid="chat-syntax-choice"][data-syntax="ruby"]')!.click();
         await settle();
 
         expect(component.text).toBe('今日は|晴天<かんじ>です');
-        expect(textBox().value.slice(textBox().selectionStart, textBox().selectionEnd)).toBe('かんじ');
-        expect(component.isStampPickerOpen()).toBe(false);
-        expect(stamps).toEqual([]);
         expect(lines).toEqual([]);
       });
     });
-
     describe('suggestions for a plain word', () => {
       it('offers a stamp saved under the whole word, with no colon', async () => {
         await type('smirk');
@@ -680,7 +722,7 @@ describe('ChatInputComponent', () => {
         await press('Enter');
 
         expect((await line).text).toBe('smirk');
-        expect(stamps).toEqual([]);
+        expect(sentStamps()).toEqual([]);
       });
 
       it('sends the stamp picked out with the arrows, taking the word out of the line', async () => {
@@ -689,8 +731,7 @@ describe('ChatInputComponent', () => {
         await press('Enter');
         await Promise.resolve();
 
-        expect(stamps.map((stamp) => stamp.stampName)).toEqual(['smirk']);
-        expect(lines).toEqual([]);
+        expect(sentStamps().map((line) => line.stamp?.id)).toEqual(['image:image-smirk']);
         expect(component.text).toBe('');
       });
 
@@ -731,7 +772,7 @@ describe('ChatInputComponent', () => {
 
         expect(component.text).toBe('2d6 回避');
         expect(lines).toEqual([]);
-        expect(stamps).toEqual([]);
+        expect(sentStamps()).toEqual([]);
         expect(find('[data-testid="chat-stamp-suggestions"]')).toBeNull();
 
         const line = sent();
@@ -790,7 +831,7 @@ describe('ChatInputComponent', () => {
         await press('Enter');
 
         expect((await line).text).toBe('hi :smile');
-        expect(stamps).toEqual([]);
+        expect(sentStamps()).toEqual([]);
       });
 
       it('sends the stamp picked out with the arrows on Enter, once, in place of the :word', async () => {
@@ -800,10 +841,10 @@ describe('ChatInputComponent', () => {
         await Promise.resolve();
 
         expect(down.defaultPrevented).toBe(true);
-        expect(stamps).toHaveLength(1);
-        expect(stamps[0].stampName).toBe('smirk');
-        expect(lines).toEqual([]);
-        expect(component.text).toBe('hi');
+        expect(sentStamps()).toHaveLength(1);
+        expect(sentStamps()[0].stamp?.id).toBe('image:image-smirk');
+        expect(sentStamps()[0].text).toBe('hi');
+        expect(component.text).toBe('');
       });
 
       it('sends the stamp tapped in the list', async () => {
@@ -811,7 +852,7 @@ describe('ChatInputComponent', () => {
         find<HTMLButtonElement>('[data-testid="chat-stamp-suggestion"]')!.click();
         await settle();
 
-        expect(stamps.map((stamp) => stamp.stampName)).toEqual(['smile']);
+        expect(sentStamps().map((line) => line.stamp?.id)).toEqual(['image:image-smile']);
         expect(component.text).toBe('');
       });
 
@@ -820,7 +861,7 @@ describe('ChatInputComponent', () => {
         await press('ArrowDown');
         await press('Enter', { isComposing: true });
 
-        expect(stamps).toEqual([]);
+        expect(sentStamps()).toEqual([]);
         expect(component.text).toBe(':smirk');
       });
 

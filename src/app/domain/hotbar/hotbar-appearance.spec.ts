@@ -14,9 +14,9 @@ describe('how a hotbar slot shows itself', () => {
       expect(hotbarSlotIcon('chat', 'こんばんは')).toBe('chat_bubble');
     });
 
-    it('does not take the reading of a ruby for an effect', () => {
-      expect(hotbarSlotIcon('chat', '|魔法《まほう》を唱える')).toBe('chat_bubble');
-      expect(hotbarSlotIcon('chat', '|魔法《まほう》《炎》')).toBe('auto_awesome');
+    it('takes no ruby for an effect', () => {
+      expect(hotbarSlotIcon('chat', '|炎《ほのお》よ')).toBe('chat_bubble');
+      expect(hotbarSlotIcon('chat', '|炎《ほのお》よ《爆炎》')).toBe('auto_awesome');
     });
 
     it('goes by the kind for everything else', () => {

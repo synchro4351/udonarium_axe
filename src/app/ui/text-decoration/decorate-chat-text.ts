@@ -4,6 +4,8 @@
 
 import { replaceRubyNotation, rubyNotationRuns } from '@axe/domain/chat/ruby-notation';
 
+import { RUBY_NOTATION } from '@axe/domain/chat/chat-ruby-notation';
+
 const HTML_ESCAPE_MAP: Readonly<Record<string, string>> = {
   '&': '&amp;',
   "'": '&#x27;',

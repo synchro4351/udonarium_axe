@@ -184,19 +184,19 @@ describe('GameTableMaskComponent', () => {
     afterEach(() => mask.destroy());
 
     it('renders escaped ruby text with line breaks in an inline child', () => {
-      const text = fixture.nativeElement.querySelector('.z-1 span') as HTMLElement | null;
+      const text = fixture.nativeElement.querySelector('[data-mask-text] span') as HTMLElement | null;
       expect(text).toBeTruthy();
       expect(text?.querySelector('ruby')?.textContent).toBe('bc');
       expect(text?.querySelector('script')).toBeNull();
       expect(text?.textContent).toBe('abcd\n<script>second</script>');
       expect(text?.parentElement?.children.length).toBe(1);
-      expect(text?.parentElement?.style.fontSize).toBe('27px');
+      expect(text?.parentElement?.style.fontSize).toBe('24px');
     });
 
     it('keeps the ordinary display for a normal mask, so a heading mark stays as typed', () => {
       mask.text = '# 見出し\n- 項目';
       fixture.detectChanges();
-      const text = fixture.nativeElement.querySelector('.z-1 span') as HTMLElement;
+      const text = fixture.nativeElement.querySelector('[data-mask-text] span') as HTMLElement;
       expect(text.querySelector('h1, ul')).toBeNull();
       expect(text.classList.contains('note-formatted')).toBe(false);
     });
@@ -206,7 +206,7 @@ describe('GameTableMaskComponent', () => {
       mask.textFormat = 'formatted';
       await fixture.whenStable();
       fixture.detectChanges();
-      const text = fixture.nativeElement.querySelector('.z-1 span') as HTMLElement;
+      const text = fixture.nativeElement.querySelector('[data-mask-text] span') as HTMLElement;
 
       expect(text.classList.contains('note-formatted')).toBe(true);
       expect(text.querySelector('h1')?.textContent).toBe('見出し');
@@ -220,11 +220,11 @@ describe('GameTableMaskComponent', () => {
       mask.owner = 'someone';
       await fixture.whenStable();
       fixture.detectChanges();
-      expect(fixture.nativeElement.querySelector('.z-1 span')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-mask-text] span')).toBeNull();
       mask.owner = '';
       await fixture.whenStable();
       fixture.detectChanges();
-      expect(fixture.nativeElement.querySelector('.z-1 span')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('[data-mask-text] span')).toBeTruthy();
     });
 
     it('uses eight centered shadows derived from the rendered font size', () => {
@@ -239,7 +239,7 @@ describe('GameTableMaskComponent', () => {
       TestBed.inject(UiSignalService).notifyTableViewRotation(50, 20, 180);
       await fixture.whenStable();
       fixture.detectChanges();
-      const text = fixture.nativeElement.querySelector('.z-1 span') as HTMLElement;
+      const text = fixture.nativeElement.querySelector('[data-mask-text] span') as HTMLElement;
       expect(text.textContent).toBe('updated');
       expect(text.parentElement?.style.transform).toBe('rotateZ(180deg)');
     });
@@ -319,6 +319,49 @@ describe('GameTableMaskComponent', () => {
       component.scratched();
 
       expect(mask.scratchedGrids).toBe('0:0');
+    });
+  });
+
+  describe('the words written across it', () => {
+    let mask: GameTableMask;
+
+    function words(): HTMLElement | null {
+      return fixture.nativeElement.querySelector('[data-mask-text]');
+    }
+
+    beforeEach(() => {
+      mask = GameTableMask.create('testMask', 2, 1, 100);
+      fixture.componentRef.setInput('gameTableMask', mask);
+    });
+
+    afterEach(() => {
+      mask.destroy();
+    });
+
+    it('draws nothing on a mask with no words', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(words()).toBeNull();
+    });
+
+    it('draws the words as written, in their size and colour, outlined unless told not to be', async () => {
+      mask.text = '立入禁止\n鍵がかかっている';
+      mask.textSize = 30;
+      mask.textColor = '#ffcc00';
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(words()!.textContent).toBe('立入禁止\n鍵がかかっている');
+      expect(words()!.style.fontSize).toBe('30px');
+      expect(words()!.style.color).toBe('#ffcc00');
+      expect(words()!.style.textShadow).not.toBe('');
+
+      mask.textOutline = false;
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(words()!.style.textShadow).toBe('');
     });
   });
 

@@ -1,6 +1,8 @@
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { OverheadSpeechService } from '@axe/application/chat/overhead-speech.service';
+import { ChatMessageService } from '@axe/application/chat/chat-message.service';
+import { SPEECH_BUBBLE_WAIT_MS, SpeechBubbleService } from '@axe/application/chat/speech-bubble.service';
 import { EffectPlaybackService } from '@axe/application/effect/effect-playback.service';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
@@ -11,15 +13,16 @@ import { TabletopDisplayService } from '@axe/application/tabletop/tabletop-displ
 import { BillboardFacing, BillboardFrameService } from '@axe/application/ui/billboard-frame.service';
 import { BuffViewPreferenceService } from '@axe/application/ui/buff-view-preference.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
+import { MobileLayoutService } from '@axe/application/ui/mobile-layout.service';
 import { PieceOverlayPreferenceService } from '@axe/application/ui/piece-overlay-preference.service';
 import { TabletopOverlapService } from '@axe/application/ui/tabletop-overlap.service';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { ViewModePreferenceService } from '@axe/application/ui/view-mode-preference.service';
+import { VolumeType } from '@axe/core/storage/audio-player';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { PERF_HEX_PEDESTAL_OUTLINE, perfCounters } from '@axe/core/util/perf-counters';
 import { GameCharacter } from '@axe/domain/character/game-character';
-import { ChatMessageContext } from '@axe/domain/chat/chat-message';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { DataElement, DataElementAttribute, DataElementType } from '@axe/domain/data/data-element';
@@ -1402,8 +1405,10 @@ describe('GameCharacterComponent', () => {
       const objectChange = TestBed.inject(ObjectChangeService);
       const hp = DataElement.findElementByReference(character.rootDataElement!, 'HP')!;
       const played: string[] = [];
-      vi.spyOn(SoundEffect, 'playLocal').mockImplementation((arg) => {
+      const kinds: (VolumeType | undefined)[] = [];
+      vi.spyOn(SoundEffect, 'playLocal').mockImplementation((arg, kind) => {
         played.push(typeof arg === 'string' ? arg : arg.identifier);
+        kinds.push(kind);
       });
 
       try {
@@ -1422,6 +1427,7 @@ describe('GameCharacterComponent', () => {
         await fixture.whenStable();
 
         expect(played).toEqual([PresetSound.damageSmall, PresetSound.damageMedium, PresetSound.damageLarge]);
+        expect(kinds).toEqual([VolumeType.EFFECT, VolumeType.EFFECT, VolumeType.EFFECT]);
       } finally {
         character.destroy();
       }
@@ -1553,122 +1559,52 @@ describe('GameCharacterComponent', () => {
     expect(typeof component.isTargeted).toBe('function');
   });
 
-  describe('what the piece says over its head', () => {
+  describe('what the character says', () => {
     let tab: ChatTab;
-    let character: GameCharacter;
-    const bubbleOf = (): HTMLElement | null => fixture.nativeElement.querySelector('[data-testid="overhead-speech"]');
-    const say = (context: ChatMessageContext) => {
-      const line = tab.addMessage({
-        timestamp: Date.now(),
-        from: 'someone',
-        sendFrom: character.identifier,
-        ...context,
-      });
-      TestBed.inject(OverheadSpeechService).show(line);
-      fixture.detectChanges();
-    };
 
     beforeEach(() => {
-      Config.instance.showsOverheadSpeech = true;
+      vi.useFakeTimers();
       ChatTabList.instance.initialize();
       tab = new ChatTab();
       tab.initialize();
       ChatTabList.instance.appendChild(tab);
-      character = GameCharacter.create('speaker', 1, '');
-      fixture.componentRef.setInput('gameCharacter', character);
-      fixture.detectChanges();
+      vi.spyOn(TestBed.inject(ChatMessageService), 'getTime').mockImplementation(() => Date.now());
     });
 
     afterEach(() => {
-      TestBed.inject(OverheadSpeechService).clear();
-      Config.instance.showsOverheadSpeech = false;
-      character.destroy();
-      tab.destroy();
+      TestBed.inject(SpeechBubbleService).clear();
+      for (const chatTab of [...ChatTabList.instance.chatTabs]) chatTab.destroy();
+      localStorage.removeItem('ui-piece-overlay');
+      vi.useRealTimers();
     });
 
-    it('shows the quoted words without covering anything a touch could reach', () => {
-      expect(bubbleOf()).toBeNull();
-      say({ text: '剣を抜く。「来い！」' });
-      const bubble = bubbleOf()!;
-      expect(bubble.textContent).toContain('来い！');
-      expect(bubble.textContent).not.toContain('剣を抜く');
-      expect(bubble.closest('.pointer-events-none')).not.toBeNull();
-    });
+    const bubbleOf = () => fixture.nativeElement.querySelector('[data-testid="speech-bubble"]') as HTMLElement | null;
 
-    it('shows an emoji-only line and a stamp picture', () => {
-      say({ text: '🎉' });
-      expect(bubbleOf()!.dataset['kind']).toBe('emoji');
-      expect(bubbleOf()!.textContent).toContain('🎉');
+    it('shows over the piece, kept from a screen reader, and not while this seat hides it', () => {
+      const character = GameCharacter.create('話者', 1, '');
+      fixture.componentRef.setInput('gameCharacter', character);
 
-      const image = TestBed.inject(ImageStorage).add('overhead-stamp-image');
-      say({ text: '', stampName: 'いいね', attachmentImageIdentifiers: JSON.stringify([image.identifier]) });
-      const stamp = fixture.nativeElement.querySelector('[data-testid="overhead-speech-stamp"]') as HTMLImageElement;
-      expect(stamp).not.toBeNull();
-      expect(stamp.alt).toBe('いいね');
-    });
+      try {
+        fixture.detectChanges();
+        tab.addMessage({
+          from: 'me',
+          sendFrom: character.identifier,
+          name: '話者',
+          text: '手を振る。「やあ」',
+          timestamp: Date.now(),
+        });
+        vi.advanceTimersByTime(SPEECH_BUBBLE_WAIT_MS);
+        fixture.detectChanges();
 
-    it('leaves the piece bare once the bubble is taken down', () => {
-      say({ text: '「hi」' });
-      expect(bubbleOf()).not.toBeNull();
-      TestBed.inject(OverheadSpeechService).clear();
-      fixture.detectChanges();
-      expect(bubbleOf()).toBeNull();
-    });
+        expect(bubbleOf()?.textContent?.trim()).toBe('やあ');
+        expect(bubbleOf()?.closest('[aria-hidden="true"]')).toBeTruthy();
 
-    it('stays close to the piece rather than climbing above the target marker', () => {
-      const before = at(component.speechOrbitFacing());
-      character.targeted = true;
-      TestBed.inject(UiSignalService).notifyTargetChange(character.identifier, character.aliasName);
-      fixture.detectChanges();
-      expect(at(component.speechOrbitFacing())).toBe(before);
-    });
-
-    it('sits below the target marker, over the gauges and buffs, while it is shown', () => {
-      const lift = (facing: BillboardFacing) => {
-        const match = /translateY\((-?[\d.]+)px\)/.exec(at(facing));
-        return match ? Number(match[1]) : NaN;
-      };
-      character.targeted = true;
-      TestBed.inject(UiSignalService).notifyTargetChange(character.identifier, character.aliasName);
-      fixture.detectChanges();
-      expect(lift(component.speechOrbitFacing())).toBeGreaterThan(lift(component.targetOrbitFacing()));
-    });
-
-    it('is drawn in front of the gauges, buffs and target marker it shares a 3D context with', () => {
-      character.buffDataElement!.appendChild(DataElement.create('加護', 2, { type: DataElementType.NUMBER_RESOURCE }));
-      character.targeted = true;
-      const uiSignal = TestBed.inject(UiSignalService);
-      uiSignal.notifyTargetChange(character.identifier, character.aliasName);
-      // A shallow tilt from the far side, where the labels' push back along the table comes nearer the viewer.
-      uiSignal.notifyTableViewRotation(25, 0, 190);
-      say({ text: '「前へ」' });
-
-      const root = fixture.nativeElement as HTMLElement;
-      const stack = root.querySelector<HTMLElement>('[data-testid="overhead-speech-stack"]')!;
-      for (const id of ['piece-gauge', 'buff-plate', 'target-marker']) {
-        const other = root.querySelector<HTMLElement>(`[data-testid="${id}"]`);
-        expect(other, id).not.toBeNull();
-        // Every frame up to the one they share keeps a single 3D context, so depth orders them, not z-index.
-        let frame = stack.parentElement!;
-        while (!frame.contains(other)) {
-          expect(frame.classList.contains('transform-3d'), id).toBe(true);
-          frame = frame.parentElement!;
-        }
-        expect(frame.classList.contains('transform-3d'), id).toBe(true);
-        expect(other!.compareDocumentPosition(stack) & Node.DOCUMENT_POSITION_FOLLOWING, id).toBeTruthy();
+        TestBed.inject(PieceOverlayPreferenceService).toggleSpeech();
+        fixture.detectChanges();
+        expect(bubbleOf()).toBeNull();
+      } finally {
+        character.destroy();
       }
-
-      const number = (pattern: RegExp, css: string) => Number(pattern.exec(css)?.[1] ?? NaN);
-      // How far a lifted label can reach from the piece: up by its lift, back by its billboard's push.
-      const reach = (orbit: BillboardFacing, stackFacing: BillboardFacing) =>
-        Math.hypot(
-          number(/translateY\((-?[\d.]+)px\)/, at(orbit)),
-          number(/^translateZ\((-?[\d.]+)px\)/, at(stackFacing))
-        );
-      const forward = number(/rotateY\([^)]*\) translateZ\((-?[\d.]+)px\) scale/, stack.style.transform);
-      expect(forward).toBeGreaterThan(reach(component.gaugeOrbitFacing(), component.gaugeStackFacing()));
-      expect(forward).toBeGreaterThan(reach(component.buffOrbitFacing(), component.buffStackFacing()));
-      expect(forward).toBeGreaterThan(reach(component.floatOrbitFacing(), component.floatStackFacing()));
     });
   });
 
@@ -1946,6 +1882,68 @@ describe('GameCharacterComponent', () => {
         expect(component.rollHandleFootTransform()).toBe(
           'translateX(-50%) translateX(25px) translateY(100%) translateY(7px)'
         );
+      } finally {
+        character.destroy();
+      }
+    });
+
+    describe('on a phone', () => {
+      beforeEach(() => {
+        Object.defineProperty(TestBed.inject(MobileLayoutService), 'isActive', {
+          value: signal(true),
+          configurable: true,
+        });
+      });
+
+      it('stands the head handle off to the right of the picture and the foot one off to its left, halfway up', () => {
+        const character = GameCharacter.create('roll-grab-phone', 1, '');
+        fixture.componentRef.setInput('gameCharacter', character);
+
+        try {
+          fixture.detectChanges();
+          // Half the picture (25) and half the handle (14), then the gap (7).
+          expect(component.rollHandleHeadTransform()).toBe(
+            'translateX(-50%) translateX(25px) translateX(46px) translateY(-50%)'
+          );
+          expect(component.rollHandleFootTransform()).toBe(
+            'translateX(-50%) translateX(25px) translateX(-46px) translateY(-50%)'
+          );
+          expect(headOf()?.style.top).toBe('50%');
+          expect(footOf()?.style.top).toBe('50%');
+          expect(footOf()?.style.bottom).toBe('auto');
+        } finally {
+          character.destroy();
+        }
+      });
+
+      it('stands them clear of a picture whose height was set apart from the ground, however wide that is', async () => {
+        const character = GameCharacter.create('roll-grab-phone-tall', 1, '');
+        character.specifyKomaImageFlag = true;
+        character.komaImageHeight = 100;
+        fixture.componentRef.setInput('gameCharacter', character);
+
+        try {
+          component.imageView.onImageLoad({ target: { naturalWidth: 200, naturalHeight: 100 } } as unknown as Event);
+          await fixture.whenStable();
+
+          // The picture stands 100 high and so 200 wide: half of it (100), half the handle (14), the gap (7).
+          expect(component.rollHandleHeadTransform()).toContain('translateX(121px)');
+          expect(component.rollHandleFootTransform()).toContain('translateX(-121px)');
+        } finally {
+          character.destroy();
+        }
+      });
+    });
+
+    it('stands the handles at the head and feet off a phone', () => {
+      const character = GameCharacter.create('roll-grab-desk', 1, '');
+      fixture.componentRef.setInput('gameCharacter', character);
+
+      try {
+        fixture.detectChanges();
+        expect(component.rollHandlesBeside()).toBe(false);
+        expect(headOf()?.style.top).toBe('');
+        expect(footOf()?.style.bottom).toBe('');
       } finally {
         character.destroy();
       }

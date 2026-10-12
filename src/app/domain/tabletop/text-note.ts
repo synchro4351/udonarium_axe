@@ -4,11 +4,7 @@ import { TextFormat, toTextFormat } from '@axe/domain/data/text-format';
 import { OwnedTabletopObject } from '@axe/domain/tabletop/owned-tabletop-object';
 import { moveToTopmost } from '@axe/domain/tabletop/tabletop-object-util';
 
-/** How a note's body is shown; the same two formats every formatted text field uses. */
 export type TextNoteFormat = TextFormat;
-
-/** Reads a stored or received format, taking anything other than `formatted` as `normal`. */
-export const toTextNoteFormat = toTextFormat;
 
 @SyncObject('text-note')
 export class TextNote extends OwnedTabletopObject {
@@ -25,16 +21,26 @@ export class TextNote extends OwnedTabletopObject {
   @SyncVar() limitHeight: boolean = false;
   @SyncVar() overViewWidth: number = 250;
   @SyncVar() overViewMaxHeight: number = 250;
+  /**
+   * How the body is drawn: empty as it was typed, `formatted` with headings, lists, quotes and code
+   * read from the marks that start its lines. The body itself is the same either way.
+   */
+  @SyncVar() textFormat: string = '';
 
-  /** The body's display format as saved and synced; read it through {@link format}. */
-  @SyncVar() textFormat: string = 'normal';
-
-  /** How the body is shown; an unknown stored value counts as `normal`. */
-  get format(): TextNoteFormat {
-    return toTextNoteFormat(this.textFormat);
+  /** Whether the body is drawn with formatting; anything but `formatted` is drawn as typed. */
+  get isFormatted(): boolean {
+    return this.textFormat === 'formatted';
   }
-  set format(format: TextNoteFormat) {
-    this.textFormat = toTextNoteFormat(format);
+  set isFormatted(formatted: boolean) {
+    this.textFormat = formatted ? 'formatted' : '';
+  }
+
+  /** The common free-text format, for sheets shared with cards and character notes. */
+  get format(): TextFormat {
+    return toTextFormat(this.textFormat);
+  }
+  set format(format: TextFormat) {
+    this.textFormat = format === 'formatted' ? 'formatted' : '';
   }
 
   /** How many grid cells wide the note is, kept in its common data. */

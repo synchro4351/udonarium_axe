@@ -13,7 +13,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { OverheadSpeechService } from '@axe/application/chat/overhead-speech.service';
+import { SpeechBubbleService } from '@axe/application/chat/speech-bubble.service';
 import { CharacterDiceService } from '@axe/application/dice/character-dice.service';
 import { EffectAutoPlayService } from '@axe/application/effect/effect-auto-play.service';
 import { EffectCastService } from '@axe/application/effect/effect-cast.service';
@@ -38,10 +38,12 @@ import { VisionService } from '@axe/application/tabletop/vision.service';
 import { BillboardFacing, facesAlways, NOT_TURNED } from '@axe/application/ui/billboard-frame.service';
 import { BuffViewPreferenceService } from '@axe/application/ui/buff-view-preference.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
+import { MobileLayoutService } from '@axe/application/ui/mobile-layout.service';
 import { buildOverlapContextMenu } from '@axe/application/ui/overlap-context-menu';
 import { PanelOption, PanelService } from '@axe/application/ui/panel.service';
 import { PieceContextMenuService } from '@axe/application/ui/piece-context-menu.service';
 import { PieceOverlayPreferenceService } from '@axe/application/ui/piece-overlay-preference.service';
+import { RenderLiteService } from '@axe/application/ui/render-lite.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { sheetPanelBox } from '@axe/application/ui/sheet-panel';
 import { sheetPanelTitle } from '@axe/application/ui/sheet-panel';
@@ -51,6 +53,7 @@ import { transientSignal } from '@axe/application/ui/transient-signal';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { callResourceChange, resourceChange$ } from '@axe/core/event/domain-events';
 import { getPeerContext } from '@axe/core/network/peer-context-source';
+import { VolumeType } from '@axe/core/storage/audio-player';
 import { imageFileEqual } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
@@ -111,6 +114,7 @@ import { GameDataElementBuffComponent } from '@axe/features/character/game-data-
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { buildConcealMenu } from '@axe/features/tabletop/board-switch/concealment-context-menu';
 import { LightSettingsComponent } from '@axe/features/tabletop/light-settings/light-settings.component';
+import { StampComponent } from '@axe/ui/components/stamp/stamp.component';
 import { BillboardDirective } from '@axe/ui/directives/billboard.directive';
 import { MovableOption } from '@axe/ui/directives/movable.directive';
 import { MovableDirective } from '@axe/ui/directives/movable.directive';
@@ -166,12 +170,14 @@ const HIT_FLASH_MS = 420;
 const HEAL_AURA_MS = 760;
 const GAUGE_STACK_GAP_PX = 32;
 const BUFF_STACK_GAP_PX = 40;
-const TARGET_STACK_GAP_PX = 52;
+const FLOAT_STACK_GAP_PX = 56;
 const SPEECH_LIFT_PX = 36;
 const SPEECH_LIFT_2D_PX = 66;
 const SPEECH_POSTER_LIFT_PX = 16;
 const SPEECH_DEPTH_MARGIN_PX = 8;
-const FLOAT_STACK_GAP_PX = 56;
+const TARGET_STACK_GAP_PX = 52;
+/** How large a stamp shows in a bubble, before the labels' supersampling. */
+const SPEECH_STAMP_PX = 56;
 const BUFF_DETAIL_ROW_HEIGHT_PX = 12;
 const BUFF_BADGE_ROW_HEIGHT_PX = 22;
 const BUFF_BADGES_PER_ROW = 5;
@@ -203,6 +209,7 @@ interface PieceRightDrag {
     NgTemplateOutlet,
     GameDataElementBuffComponent,
     SafePipe,
+    StampComponent,
     TranslocoModule,
   ],
   host: {
@@ -227,6 +234,7 @@ export class GameCharacterComponent {
   private readonly selectionSignalService = inject(SelectionSignalService);
   private readonly inventoryService = inject(GameObjectInventoryService);
   private readonly uiSignalService = inject(UiSignalService);
+  private readonly mobileLayout = inject(MobileLayoutService);
   private readonly buffViewPreference = inject(BuffViewPreferenceService);
   private readonly overlay = inject(PieceOverlayPreferenceService);
   private readonly objectChange = inject(ObjectChangeService);
@@ -245,10 +253,11 @@ export class GameCharacterComponent {
   private readonly rolePermission = inject(RolePermissionService);
   private readonly disclosureService = inject(DisclosureService);
   private readonly visionService = inject(VisionService);
-  private readonly overheadSpeechService = inject(OverheadSpeechService);
   private readonly imageStorage = inject(ImageStorage);
   private readonly multipart = inject(MultipartCharacterService);
   private readonly partGroups = inject(MultipartGroupService);
+  private readonly speechBubbles = inject(SpeechBubbleService);
+  private readonly renderLite = inject(RenderLiteService);
 
   readonly isTargeted = computed(() => {
     this.uiSignalService.targetChange();
@@ -658,11 +667,40 @@ export class GameCharacterComponent {
 
   private readonly rollHandleGapPx = computed(() => Math.round(this.rollHandleSizePx() * ROLL_HANDLE_GAP_RATIO));
 
-  readonly rollHandleHeadTransform = computed(() => this.pieceCenterShift());
+  /** How wide the picture stands: as wide as the ground, unless its height was set apart from it. */
+  private readonly pictureWidthPx = computed(() => {
+    const ground = this.size() * this.gridSize;
+    if (!this.specifyKomaImageFlag() || this.imageView.fitsInCell()) return ground;
+    const natural = this.imageView.naturalSize();
+    return natural ? (this.komaImageHeightSignal() * natural.width) / natural.height : ground;
+  });
 
-  readonly rollHandleFootTransform = computed(
-    () => `${this.pieceCenterShift()} translateY(100%) translateY(${this.rollHandleGapPx()}px)`
+  /**
+   * Whether the handles that tip the piece over stand either side of the picture rather than at its
+   * head and feet.
+   *
+   * On a phone they stay out for good, there being no hover to wait for, and the one at the head
+   * sat over the face. Beside the picture, halfway up, they keep clear of it and of the name and
+   * bars above it.
+   */
+  readonly rollHandlesBeside = computed(() => this.mobileLayout.isActive());
+
+  /** Where the handle at the head stands: inside the top of the picture, or off to its right. */
+  readonly rollHandleHeadTransform = computed(() =>
+    this.rollHandlesBeside() ? this.rollHandleBeside(1) : this.pieceCenterShift()
   );
+
+  /** Where the handle at the feet stands: clear below the picture, or off to its left. */
+  readonly rollHandleFootTransform = computed(() =>
+    this.rollHandlesBeside()
+      ? this.rollHandleBeside(-1)
+      : `${this.pieceCenterShift()} translateY(100%) translateY(${this.rollHandleGapPx()}px)`
+  );
+
+  private rollHandleBeside(side: 1 | -1): string {
+    const aside = this.pictureWidthPx() / 2 + this.rollHandleSizePx() / 2 + this.rollHandleGapPx();
+    return `${this.pieceCenterShift()} translateX(${side * aside}px) translateY(-50%)`;
+  }
 
   readonly mode2dEnabled = computed(() => {
     if (this.isPoster()) return true;
@@ -1041,19 +1079,20 @@ export class GameCharacterComponent {
     this.labelStackFacing(this.isPoster() ? NOT_TURNED : this.billboardFacing(0))
   );
 
-  /** What the piece has just said in chat, over its head for a moment; null while it says nothing. */
-  readonly overheadSpeech = computed(() => {
-    const char = this.gameCharacter();
-    return char ? this.overheadSpeechService.bubbleOf(char.identifier) : null;
+  /**
+   * What the character is saying, over its piece; none while the room or this seat hides it, or the
+   * screen is in novel mode.
+   */
+  readonly speechBubble = computed(() => {
+    const character = this.gameCharacter();
+    if (!character || !this.overlay.speech() || !this.speechBubbles.showsHere()) return null;
+    return this.speechBubbles.bubbleOf(character.identifier)();
   });
 
-  /** The picture a stamp said over the piece shows, once it has arrived. */
-  readonly overheadStampImage = computed(() => {
-    const speech = this.overheadSpeech()?.speech;
-    if (speech?.kind !== 'stamp') return null;
-    this.objectChange.fileVersion();
-    return this.imageStorage.get(speech.imageIdentifier);
-  });
+  protected readonly speechStampPx = SPEECH_STAMP_PX * DECOR_SUPERSAMPLE;
+
+  /** The shadow under a bubble, left off where the table is drawn the lighter way. */
+  readonly speechShadow = computed(() => (this.renderLite.active() ? '' : 'shadow-[0_0.15em_0.4em_rgba(0,0,0,0.45)]'));
 
   readonly speechOrbitFacing = computed<BillboardFacing>(() => {
     const stand = `translateX(${(this.size() * this.gridSize) / 2}px) `;
@@ -1508,7 +1547,9 @@ export class GameCharacterComponent {
     const loudest = loudestChange(heard);
     // One line is heard, so all three of what is heard come from it. Taken apart, a point of
     // damage alongside a large heal would play as a large hurt, in the heal's own voice.
-    if (loudest) SoundEffect.playLocal(resourceChangeSound(loudest.kind, loudest.ratio, loudest.soundSet));
+    if (loudest) {
+      SoundEffect.playLocal(resourceChangeSound(loudest.kind, loudest.ratio, loudest.soundSet), VolumeType.EFFECT);
+    }
 
     const shown = entries.filter((entry) => entry.playsEffect);
     const char = this.gameCharacter();

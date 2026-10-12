@@ -51,6 +51,15 @@ export function parseAttributesKeepingIdentifier(
   // The context is the one place an identifier belongs; it is no part of what is synchronised.
   delete syncData[IDENTIFIER_ATTRIBUTE];
   gameObject.apply(context);
+  applyPersistedIdentifier(gameObject, persisted, options);
+}
+
+/** Applies an identifier saved alongside a custom object's attributes. */
+export function applyPersistedIdentifier(
+  gameObject: GameObject,
+  persisted: unknown,
+  options: KeepIdentifierOptions = {}
+): void {
   if (
     typeof persisted === 'string' &&
     persisted.length > 0 &&

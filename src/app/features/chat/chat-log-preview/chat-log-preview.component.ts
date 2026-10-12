@@ -8,7 +8,12 @@ import { PanelService } from '@axe/application/ui/panel.service';
 import { ChatLogImages } from '@axe/domain/chat/chat-log-export';
 import { ChatLogExporter, ChatLogTab } from '@axe/domain/chat/chat-log-exporter';
 import { ChatLogScope } from '@axe/domain/chat/chat-log-rich';
-import { CHAT_LOG_STYLE_SWATCHES, CHAT_LOG_STYLES, ChatLogStyle } from '@axe/domain/chat/chat-log-style';
+import {
+  CHAT_LOG_STYLE_SWATCHES,
+  CHAT_LOG_STYLES,
+  ChatLogStyle,
+  isPlainChatLogStyle,
+} from '@axe/domain/chat/chat-log-style';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { buildChatLogPreviewSample } from '@axe/features/chat/chat-log-preview/chat-log-preview-sample';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
@@ -44,6 +49,8 @@ export class ChatLogPreviewComponent {
   readonly styles = CHAT_LOG_STYLES;
   readonly swatches = CHAT_LOG_STYLE_SWATCHES;
   readonly style = this.preference.style;
+  /** Whether the log leaves out deleted lines. */
+  readonly omitDeleted = this.preference.omitDeleted;
   readonly tab = signal<ChatTab | null>(null);
   readonly scope = signal<ChatLogScope>('tab');
   readonly format = signal<ChatLogFormat>('html');
@@ -56,6 +63,8 @@ export class ChatLogPreviewComponent {
     this.style() === 'coc' && this.isSystemTab() ? 'standard' : this.style()
   );
   readonly effectiveScope = computed<ChatLogScope>(() => (this.isSystemTab() ? 'tab' : this.scope()));
+  /** Whether the log is previewed as the plain text it is saved as, rather than as a page. */
+  readonly isPlain = computed(() => isPlainChatLogStyle(this.effectiveStyle()));
 
   readonly html = computed(() => {
     const prepared = this.prepared();
@@ -71,7 +80,10 @@ export class ChatLogPreviewComponent {
   readonly text = computed(() => {
     const prepared = this.prepared();
     if (!prepared || this.format() !== 'text') return '';
-    return this.saveDataService.renderChatLogText(this.effectiveScope(), prepared.tabs);
+    return this.saveDataService.renderChatLog('text', this.effectiveScope(), prepared.tabs, {
+      resolver: () => '',
+      registryScript: '',
+    });
   });
 
   readonly note = computed(() => {
@@ -86,7 +98,8 @@ export class ChatLogPreviewComponent {
     effect(() => {
       const tab = this.tab();
       const scope = this.effectiveScope();
-      untracked(() => void this.load(tab, scope));
+      const omitDeleted = this.omitDeleted();
+      untracked(() => void this.load(tab, scope, omitDeleted));
     });
   }
 
@@ -102,6 +115,11 @@ export class ChatLogPreviewComponent {
   /** Switches between the styled html log and plain text, leaving the style picked as it is. */
   chooseFormat(format: ChatLogFormat): void {
     this.format.set(format);
+  }
+
+  /** Sets whether the log leaves out deleted lines, remembering it as this player's preference. */
+  setOmitDeleted(omit: boolean): void {
+    this.preference.setOmitDeleted(omit);
   }
 
   /** Switches between saving the one tab and saving every tab; a system tab always saves alone. */
@@ -123,9 +141,11 @@ export class ChatLogPreviewComponent {
     try {
       const label = scope === 'all' ? this.t('feature.chat.tabSetting.allTabsLogName') : tabs[0].name;
       if (this.format() === 'text') {
-        this.saveDataService.saveChatLogText(scope, tabs, label);
+        await this.saveDataService.saveChatLog('text', scope, tabs, label, { omitDeleted: this.omitDeleted() });
       } else {
-        await this.saveDataService.saveChatLog(this.effectiveStyle(), scope, tabs, label);
+        await this.saveDataService.saveChatLog(this.effectiveStyle(), scope, tabs, label, {
+          omitDeleted: this.omitDeleted(),
+        });
       }
     } finally {
       this.isSaving.set(false);
@@ -137,12 +157,13 @@ export class ChatLogPreviewComponent {
     return tab ? [tab] : [];
   }
 
-  private async load(tab: ChatTab | null, scope: ChatLogScope): Promise<void> {
+  private async load(tab: ChatTab | null, scope: ChatLogScope, omitDeleted: boolean): Promise<void> {
     const count = ++this.loadCount;
     this.prepared.set(null);
 
     const source = this.sourceTabs(tab, scope);
-    const spoken = scope === 'all' ? ChatLogExporter.spokenTabs(source) : source;
+    const shown = scope === 'all' ? ChatLogExporter.spokenTabs(source) : source;
+    const spoken = omitDeleted ? ChatLogExporter.withoutDeleted(shown) : shown;
     const trimmed: ChatLogTab[] = spoken.map((each) => ({
       name: each.name,
       isSystemTab: each.isSystemTab,

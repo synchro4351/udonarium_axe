@@ -114,6 +114,7 @@ describe('stamp pack', () => {
   describe('StampPack', () => {
     it('keeps its stamps through setItems and reads them back', () => {
       const pack = new StampPack();
+      pack.initialize();
       pack.setItems([stamp('a'), stamp('b')]);
       expect(pack.items.map((item) => item.id)).toEqual(['a', 'b']);
       expect(pack.itemOf('b')?.name).toBe('stamp b');
@@ -122,6 +123,7 @@ describe('stamp pack', () => {
 
     it('says which pictures it carries, each once', () => {
       const pack = new StampPack();
+      pack.initialize();
       pack.setItems([stamp('a'), stamp('b', { imageIdentifier: 'image-a' }), stamp('c')]);
       expect(carriedImagesOf(pack)).toEqual(['image-a', 'image-c']);
     });
@@ -129,15 +131,20 @@ describe('stamp pack', () => {
     it('comes back from its XML as the same pack', () => {
       const pack = new StampPack();
       pack.name = 'いつもの';
+      pack.initialize();
       pack.setItems([stamp('a', { words: ['ok', 'いいね'] })]);
       const xml = pack.toXml();
+      const identifier = pack.identifier;
+      const items = pack.items;
+      pack.destroy();
+      ObjectStore.instance.clearDeleteHistory();
 
       const read = ObjectSerializer.instance.parseXml(xml) as StampPack;
 
       expect(read).toBeInstanceOf(StampPack);
-      expect(read.identifier).toBe(pack.identifier);
+      expect(read.identifier).toBe(identifier);
       expect(read.name).toBe('いつもの');
-      expect(read.items).toEqual(pack.items);
+      expect(read.items).toEqual(items);
     });
 
     it('comes in beside a pack the room already has, as a copy', () => {

@@ -1,6 +1,9 @@
 import { ChangeDetectorRef } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { CHAT_LOG_STYLE_STORAGE_KEY } from '@axe/application/chat/chat-log-style-preference.service';
+import {
+  CHAT_LOG_OMIT_DELETED_STORAGE_KEY,
+  CHAT_LOG_STYLE_STORAGE_KEY,
+} from '@axe/application/chat/chat-log-style-preference.service';
 import { SaveDataService } from '@axe/application/file/save-data.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
@@ -125,11 +128,13 @@ describe('ChatTabSettingComponent', () => {
 
     beforeEach(() => {
       localStorage.removeItem(CHAT_LOG_STYLE_STORAGE_KEY);
+      localStorage.removeItem(CHAT_LOG_OMIT_DELETED_STORAGE_KEY);
       saveData = TestBed.inject(SaveDataService);
     });
 
     afterEach(() => {
       localStorage.removeItem(CHAT_LOG_STYLE_STORAGE_KEY);
+      localStorage.removeItem(CHAT_LOG_OMIT_DELETED_STORAGE_KEY);
       vi.restoreAllMocks();
     });
 
@@ -143,6 +148,24 @@ describe('ChatTabSettingComponent', () => {
       component.saveLog();
 
       expect(spy.mock.calls[0][0]).toBe('washi');
+    });
+
+    it('keeps deleted lines in until asked to leave them out, for one tab or all', () => {
+      const tab = new ChatTab();
+      tab.initialize();
+      component.selectedTab.set(tab);
+      const spy = vi.spyOn(saveData, 'saveChatLog').mockResolvedValue(undefined);
+
+      component.saveLog();
+      component.setOmitDeleted(true);
+      component.saveLog();
+      component.saveAllLog();
+
+      expect(spy.mock.calls.map((call) => call[4])).toEqual([
+        { omitDeleted: false },
+        { omitDeleted: true },
+        { omitDeleted: true },
+      ]);
     });
 
     it('writes the standard layout for the system tab in place of the one other tools read', () => {
@@ -179,26 +202,23 @@ describe('ChatTabSettingComponent', () => {
       const tab = new ChatTab();
       tab.initialize();
       component.selectedTab.set(tab);
-      const html = vi.spyOn(saveData, 'saveChatLog').mockResolvedValue(undefined);
-      const text = vi.spyOn(saveData, 'saveChatLogText').mockImplementation(() => undefined);
+      const save = vi.spyOn(saveData, 'saveChatLog').mockResolvedValue(undefined);
 
       component.chooseLogStyle('text');
       component.saveLog();
 
       expect(component.logChoice).toBe('text');
-      expect(html).not.toHaveBeenCalled();
-      expect(text).toHaveBeenCalledWith('tab', [tab], tab.name);
+      expect(save).toHaveBeenCalledWith('text', 'tab', [tab], tab.name, { omitDeleted: false });
     });
 
     it('saves every tab as plain text when text is picked', () => {
-      const text = vi.spyOn(saveData, 'saveChatLogText').mockImplementation(() => undefined);
+      const save = vi.spyOn(saveData, 'saveChatLog').mockResolvedValue(undefined);
 
       component.chooseLogStyle('text');
       component.saveAllLog();
 
-      expect(text).toHaveBeenCalledOnce();
-      expect(text.mock.calls[0][0]).toBe('all');
-      expect(text.mock.calls[0][1]).toEqual(component.chatTabs);
+      expect(save).toHaveBeenCalledOnce();
+      expect(save).toHaveBeenCalledWith('text', 'all', component.chatTabs, expect.any(String), { omitDeleted: false });
     });
 
     it('keeps the remembered html style when text is picked, and returns to html on a style', () => {
@@ -216,7 +236,7 @@ describe('ChatTabSettingComponent', () => {
       tab.initialize();
       tab.addMessage({ from: 'someone', name: '誰か', text: 'こんにちは', timestamp: 1000 });
       component.selectedTab.set(tab);
-      const download = vi.spyOn(saveData, 'saveChatLogText');
+      const download = vi.spyOn(saveData, 'saveChatLog');
       const created: Blob[] = [];
       const createUrl = vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
         created.push(blob as Blob);
@@ -232,6 +252,7 @@ describe('ChatTabSettingComponent', () => {
       component.saveLog();
 
       expect(download).toHaveBeenCalledOnce();
+      expect(download).toHaveBeenCalledWith('text', 'tab', [tab], tab.name, { omitDeleted: false });
       expect(createUrl).toHaveBeenCalled();
       expect(names[0]).toMatch(/\.txt$/);
       expect(created[0].type).toContain('text/plain');

@@ -176,7 +176,7 @@ describe('HotbarBarComponent', () => {
 
       expect(openSheet).not.toHaveBeenCalled();
       expect(focusOn).not.toHaveBeenCalled();
-      expect(reason()).toBe('動かせるキャラがいません（発言者か「誰として」を確認）');
+      expect(reason()).toBe('操作対象のキャラクターがいません');
     });
 
     it('opens the sheet of, and looks at, whoever the chat speaks as', async () => {

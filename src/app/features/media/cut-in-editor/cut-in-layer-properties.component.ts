@@ -25,9 +25,18 @@ import {
   MAX_FILL_SCALE_PX,
   MIN_FILL_SCALE_PX,
 } from '@axe/domain/media/cut-in-fill';
+import { CUT_IN_FONT_PRESETS, type CutInFontPreset } from '@axe/domain/media/cut-in-font-presets';
 import { CUT_IN_TRACKS, type CutInTrackName } from '@axe/domain/media/cut-in-keyframe';
 import { CUT_IN_TEXT_ALIGNS, CutInLayer, type CutInTextAlign, isCutInTextAlign } from '@axe/domain/media/cut-in-layer';
 import { applyLayerPreset, CUT_IN_LAYER_PRESETS } from '@axe/domain/media/cut-in-layer-presets';
+import {
+  LETTER_DURATION_MAX_MS,
+  LETTER_DURATION_MIN_MS,
+  LETTER_STAGGER_MAX_MS,
+  type LetterMotion,
+  letterMotionOf,
+} from '@axe/domain/media/cut-in-letter-motion';
+import { SPEAKER_NAME_TOKEN } from '@axe/domain/media/cut-in-speaker';
 import {
   CUT_IN_LETTER_DIRECTIONS,
   CUT_IN_LETTER_EXITS,
@@ -35,7 +44,6 @@ import {
   CUT_IN_LETTER_ORDERS,
   CUT_IN_LETTER_TILTS,
   type CutInLetterControls,
-  type CutInLetterMotion,
   type CutInLetterSettings,
   isCutInLetterMotion,
   LETTER_TIMING_LIMITS,
@@ -92,7 +100,7 @@ export class CutInLayerPropertiesComponent {
   readonly commit = output<void>();
 
   readonly textAligns = CUT_IN_TEXT_ALIGNS;
-  readonly letterMotions = CUT_IN_LETTER_MOTIONS;
+  readonly letterMotions: readonly string[] = [...CUT_IN_LETTER_MOTIONS, 'type'];
   readonly letterPresets = CUT_IN_LETTER_PRESETS;
   readonly letterSelects = [
     { key: 'letterOrder' as const, choices: CUT_IN_LETTER_ORDERS },
@@ -109,6 +117,7 @@ export class CutInLayerPropertiesComponent {
   readonly easings = CUT_IN_EASING_NAMES;
   readonly fillShapes = CUT_IN_FILL_SHAPES;
   readonly clips = CUT_IN_CLIPS;
+  readonly fontPresets = CUT_IN_FONT_PRESETS;
   readonly wipes = CUT_IN_WIPES;
   readonly entrances = CUT_IN_ENTRANCES;
   readonly exits = CUT_IN_EXITS;
@@ -324,6 +333,11 @@ export class CutInLayerPropertiesComponent {
     this.write((layer) => (layer.text = text));
   }
 
+  /** Adds the mark that says the speaker's name to the end of a text layer's words. */
+  insertSpeakerName(): void {
+    this.write((layer) => (layer.text = `${layer.text}${SPEAKER_NAME_TOKEN}`));
+  }
+
   /** A text layer's font size in pixels, never set below 1. */
   get fontSizePx(): number {
     return Math.round(this.layer()?.fontSizePx ?? 32);
@@ -353,6 +367,11 @@ export class CutInLayerPropertiesComponent {
   }
   set selectedFontOption(option: string) {
     if (option !== 'custom') this.fontFamily = option;
+  }
+
+  /** Sets a text layer in one of the kinds of lettering offered, or back to the default. */
+  useFontPreset(preset: CutInFontPreset): void {
+    this.fontFamily = preset.fontFamily;
   }
 
   /** A text layer's letter colour. */
@@ -403,9 +422,13 @@ export class CutInLayerPropertiesComponent {
     this.write((layer) => (layer.skewYDeg = Math.min(80, Math.max(-80, Number(skewYDeg) || 0))));
   }
 
-  /** The shape the layer is cut to; an unknown value is written as none. */
+  /**
+   * The shape the layer is cut to, shown as none under a name this version does not know, as the
+   * stage draws it; an unknown value is written as none.
+   */
   get clip(): CutInClip {
-    return this.layer()?.clip ?? 'none';
+    const clip = this.layer()?.clip;
+    return isCutInClip(clip) ? clip : 'none';
   }
   set clip(clip: CutInClip) {
     this.write((layer) => (layer.clip = isCutInClip(clip) ? clip : 'none'));
@@ -483,15 +506,6 @@ export class CutInLayerPropertiesComponent {
     this.write((layer) => (layer.vertical = vertical));
   }
 
-  /** How the letters move one at a time. */
-  get letterMotion(): CutInLetterMotion {
-    const motion = this.layer()?.letterMotion;
-    return isCutInLetterMotion(motion) ? motion : 'none';
-  }
-  set letterMotion(motion: CutInLetterMotion) {
-    this.write((layer) => (layer.letterMotion = isCutInLetterMotion(motion) ? motion : 'none'));
-  }
-
   /** The detailed letter controls as they play, with a missing or unknown value read as its default. */
   get letterControls(): CutInLetterControls {
     const layer = this.layer();
@@ -500,10 +514,7 @@ export class CutInLayerPropertiesComponent {
     return letterSettingsOf(layer);
   }
 
-  /**
-   * Whether a detailed letter control can be changed: by an editor, and only while it changes
-   * anything for the motion and exit as they stand. A control shut this way keeps its value.
-   */
+  /** Whether a detailed letter control can be changed and still have an effect. */
   letterControlEnabled(key: keyof CutInLetterControls): boolean {
     const layer = this.layer();
     if (!layer || !this.isEditable()) return false;
@@ -514,7 +525,10 @@ export class CutInLayerPropertiesComponent {
   /** Writes one detailed letter control, held to the values and range it allows. */
   setLetterControl(key: keyof CutInLetterSettings, value: string | number | null): void {
     const held = letterSettingsOf({ [key]: value ?? undefined } as CutInLetterSettings)[key];
-    this.write((layer) => Object.assign(layer, { [key]: held }));
+    this.write((layer) => {
+      Object.assign(layer, { [key]: held });
+      if (key === 'letterIntervalMs') layer.letterStaggerMs = held as number;
+    });
   }
 
   /** One of the simple looks: every detailed control goes back to its default before the look is laid on. */
@@ -534,6 +548,61 @@ export class CutInLayerPropertiesComponent {
     const tilt = Number(degrees);
     const held = Number.isFinite(tilt) ? Math.min(MAX_LETTER_TILT_DEG, Math.max(-MAX_LETTER_TILT_DEG, tilt)) : 0;
     this.write((layer) => (layer.letterTiltDeg = held));
+  }
+
+  /** How a text layer's letters come on, including the custom all-at-once motion. */
+  get letterMotion(): string {
+    const motion = this.layer()?.letterMotion;
+    return isCutInLetterMotion(motion) ? motion : (letterMotionOf(motion) ?? 'none');
+  }
+  set letterMotion(motion: string) {
+    this.write(
+      (layer) => (layer.letterMotion = isCutInLetterMotion(motion) ? motion : (letterMotionOf(motion) ?? 'none'))
+    );
+  }
+
+  /** How far apart official motions bring the letters on, in ms; 0 uses the motion's own timing. */
+  get letterStaggerMs(): number {
+    return this.layer()?.letterStaggerMs ?? 0;
+  }
+  set letterStaggerMs(ms: number) {
+    const held = Math.min(LETTER_STAGGER_MAX_MS, Math.max(0, Math.round(Number(ms) || 0)));
+    this.write((layer) => {
+      layer.letterStaggerMs = held;
+      if (held > 0) layer.letterIntervalMs = held;
+    });
+  }
+
+  /** How long one letter takes to come on, in ms, 0 for the motion's own. */
+  get letterDurationMs(): number {
+    return this.layer()?.letterDurationMs ?? 0;
+  }
+  set letterDurationMs(ms: number) {
+    const asked = Math.round(Number(ms) || 0);
+    const held = asked <= 0 ? 0 : Math.min(LETTER_DURATION_MAX_MS, Math.max(LETTER_DURATION_MIN_MS, asked));
+    this.write((layer) => (layer.letterDurationMs = held));
+  }
+
+  /** Whether the chosen official motion has a stagger control. */
+  get letterTakesStagger(): boolean {
+    const motion = letterMotionOf(this.letterMotion);
+    return motion !== null && motion !== 'shake';
+  }
+
+  /** Whether the chosen official motion has a duration control. */
+  get letterTakesDuration(): boolean {
+    const motion = letterMotionOf(this.letterMotion);
+    return motion !== null && motion !== 'type' && motion !== 'shake';
+  }
+
+  /** Picks an official motion with its own timing defaults. */
+  useLetterPreset(motion: LetterMotion): void {
+    this.write((layer) => {
+      layer.letterMotion = motion;
+      layer.letterStaggerMs = 0;
+      layer.letterDurationMs = 0;
+      layer.letterIntervalMs = motion === 'type' ? 70 : 60;
+    });
   }
 
   /** Whether the fill chosen repeats, and so has a size worth setting. */

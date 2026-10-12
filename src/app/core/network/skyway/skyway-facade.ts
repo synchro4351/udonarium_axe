@@ -1,5 +1,10 @@
 import { Logger as AppLogger } from '@axe/core/logging/logger';
 import { IPeerContext, PeerContext } from '@axe/core/network/peer-context';
+import {
+  joinUnderOwnName,
+  SAME_NAME_MEMBER_WAIT_MS,
+  SameNameWaitCancelledError,
+} from '@axe/core/network/skyway/same-name-member';
 import { SkyWayBackend } from '@axe/core/network/skyway/skyway-backend';
 import { sha256Base64Url } from '@axe/core/util/crypto-util';
 import {
@@ -14,9 +19,6 @@ import {
   SkyWayStreamFactory,
   Subscription,
 } from '@skyway-sdk/core';
-
-// The SDK's default heartbeat and grace period can retain an unloaded member for 60 seconds.
-const PREVIOUS_MEMBER_TIMEOUT_MS = 65_000;
 
 export class SkyWayFacade {
   url = '';
@@ -34,6 +36,10 @@ export class SkyWayFacade {
     return this.peer.isOpen;
   }
   private isDestroyed = false;
+  /** Calls off the waits of the open under way, when it is closed or another open begins. */
+  private openAbort: AbortController | null = null;
+  /** When joining stops waiting for a member left under this peer's name, for the room and lobby alike. */
+  private joinDeadline = 0;
 
   onOpen: ((peer: IPeerContext) => void) | null = null;
   onClose: ((peer: IPeerContext) => void) | null = null;
@@ -45,11 +51,19 @@ export class SkyWayFacade {
   /**
    * Creates a SkyWay context with a backend token, then joins the room and a lobby as the peer.
    *
-   * An open session is closed first. Failures are reported through onFatalError, not thrown, and
-   * onOpen fires at the end. A peer that is not in a room gets a context but joins no channel.
+   * An open session is closed first, and an open still under way is called off. Failures are
+   * reported through onFatalError, not thrown, and onOpen fires at the end. A peer that is not in a
+   * room gets a context but joins no channel.
+   *
+   * A member left in a channel under this peer's name, as a reload leaves one, is waited out
+   * before joining, for as long as the SDK can take to drop it.
    */
   async open(peer: IPeerContext) {
     if (this.isOpen) await this.close();
+    this.openAbort?.abort();
+    const abort = new AbortController();
+    this.openAbort = abort;
+    this.joinDeadline = Date.now() + SAME_NAME_MEMBER_WAIT_MS;
     try {
       this.peer = PeerContext.parse(peer.peerId);
       this.peer.userId = peer.userId;
@@ -58,16 +72,14 @@ export class SkyWayFacade {
       this.isDestroyed = false;
 
       await this.createContext();
-      const joinDeadline = Date.now() + PREVIOUS_MEMBER_TIMEOUT_MS;
-      await this.joinRoom(joinDeadline);
-      await this.joinLobby(joinDeadline);
-      if (this.isDestroyed) return;
+      await this.joinRoom();
+      await this.joinLobby();
 
       this.peer.isOpen = true;
 
       this.onOpen?.(this.peer);
     } catch (err) {
-      if (this.isDestroyed) return;
+      if (abort.signal.aborted || err instanceof SameNameWaitCancelledError) return;
       AppLogger.error('[SkyWay] open失敗', err);
       this.onFatalError?.(this.peer, (err as Error).name, (err as Error).message, err as Error);
     }
@@ -76,6 +88,8 @@ export class SkyWayFacade {
   /** Leaves the lobby and room and disposes the context; errors are logged, not thrown. */
   async close() {
     try {
+      this.openAbort?.abort();
+      this.openAbort = null;
       this.peer = PeerContext.parse('???');
       this.isDestroyed = true;
 
@@ -115,6 +129,7 @@ export class SkyWayFacade {
         this.publication.onSubscribed.removeAllListeners();
         this.publication = null;
       }
+      this.joinDeadline = Date.now() + SAME_NAME_MEMBER_WAIT_MS;
       await this.joinRoomPerson();
       await this.createRoomDataStream();
       await this.joinLobbyPerson();
@@ -174,9 +189,9 @@ export class SkyWayFacade {
     this.context = context;
   }
 
-  private async joinLobby(deadline = Date.now() + PREVIOUS_MEMBER_TIMEOUT_MS) {
+  private async joinLobby() {
     await this.joinLobbyChannel();
-    await this.joinLobbyPerson(deadline);
+    await this.joinLobbyPerson();
   }
 
   private async joinLobbyChannel() {
@@ -210,16 +225,24 @@ export class SkyWayFacade {
     this.lobby = joinLobby;
   }
 
-  private async joinLobbyPerson(deadline = Date.now() + PREVIOUS_MEMBER_TIMEOUT_MS) {
+  private async joinLobbyPerson() {
     await this.leaveLobbyPerson();
     if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.lobby == null) return;
-    if (!(await this.waitForPreviousMember(this.lobby, deadline))) return;
 
-    const lobbyPerson = await this.lobby.join({
-      name: this.peer.peerId,
-      metadata: JSON.stringify({ roomName: this.peer.roomName }),
-      preventAutoLeaveOnBeforeUnload: true,
-    });
+    const lobby = this.lobby;
+    const name = this.peer.peerId;
+    const lobbyPerson = await joinUnderOwnName(
+      lobby,
+      name,
+      () =>
+        lobby.join({
+          name,
+          metadata: JSON.stringify({ roomName: this.peer.roomName }),
+          preventAutoLeaveOnBeforeUnload: true,
+        }),
+      this.joinDeadline,
+      this.openAbort?.signal
+    );
 
     lobbyPerson.onLeft.add(() => {});
 
@@ -230,9 +253,9 @@ export class SkyWayFacade {
     this.lobbyPerson = lobbyPerson;
   }
 
-  private async joinRoom(deadline = Date.now() + PREVIOUS_MEMBER_TIMEOUT_MS) {
+  private async joinRoom() {
     await this.joinRoomChannel();
-    await this.joinRoomPerson(deadline);
+    await this.joinRoomPerson();
     await this.createRoomDataStream();
   }
 
@@ -256,16 +279,24 @@ export class SkyWayFacade {
     this.room = room;
   }
 
-  private async joinRoomPerson(deadline = Date.now() + PREVIOUS_MEMBER_TIMEOUT_MS) {
+  private async joinRoomPerson() {
     await this.leaveRoomPerson();
     if (this.isDestroyed || !this.peer.isRoom || !this.context || this.context?.disposed || this.room == null) return;
-    if (!(await this.waitForPreviousMember(this.room, deadline))) return;
 
-    const roomPerson = await this.room.join({
-      name: this.peer.peerId,
-      metadata: JSON.stringify({ roomName: this.peer.roomName }),
-      preventAutoLeaveOnBeforeUnload: true,
-    });
+    const room = this.room;
+    const name = this.peer.peerId;
+    const roomPerson = await joinUnderOwnName(
+      room,
+      name,
+      () =>
+        room.join({
+          name,
+          metadata: JSON.stringify({ roomName: this.peer.roomName }),
+          preventAutoLeaveOnBeforeUnload: true,
+        }),
+      this.joinDeadline,
+      this.openAbort?.signal
+    );
 
     roomPerson.onFatalError.add((err) => {
       AppLogger.error('[SkyWay] ルーム致命的エラー', err);
@@ -277,17 +308,6 @@ export class SkyWayFacade {
     });
 
     this.roomPerson = roomPerson;
-  }
-
-  private async waitForPreviousMember(channel: Channel, deadline: number): Promise<boolean> {
-    // Do not evict a matching member: a duplicated tab may still be using it.
-    // Poll the SDK's local member list, not the server, and stop promptly when this attempt closes.
-    while (channel.members.some((member) => member.name === this.peer.peerId)) {
-      if (this.isDestroyed) return false;
-      if (Date.now() >= deadline) throw new Error('Timed out waiting for the previous SkyWay membership');
-      await new Promise<void>((resolve) => setTimeout(resolve, 250));
-    }
-    return !this.isDestroyed;
   }
 
   private async createRoomDataStream() {

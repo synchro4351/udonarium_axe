@@ -63,6 +63,31 @@ describe('cut-in scene snapshots', () => {
   });
 
   describe('restoreScene()', () => {
+    it('restores custom letter order, tilt and exit alongside official timing', () => {
+      const scene = makeScene();
+      const layer = addLayer(scene, 'Text');
+      const settings = {
+        letterMotion: 'wave',
+        letterOrder: 'center',
+        letterIntervalMs: 90,
+        letterStaggerMs: 90,
+        letterDurationMs: 500,
+        letterTiltDeg: 12,
+        letterTiltMode: 'alternate',
+        letterExit: 'slide',
+        letterExitDurationMs: 350,
+        letterDirection: 'left',
+      };
+      Object.assign(layer, settings);
+      const before = snapshotScene(scene);
+      layer.letterOrder = 'reverse';
+      layer.letterTiltDeg = 0;
+      layer.letterExit = 'none';
+      layer.letterDirection = 'down';
+      restoreScene(scene, before);
+      expect(layer).toMatchObject(settings);
+    });
+
     it('puts a value back', () => {
       const scene = makeScene();
       const layer = addLayer(scene, '立ち絵');

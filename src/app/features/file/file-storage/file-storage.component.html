@@ -42,7 +42,7 @@
     tabindex="0"
     role="group"
     data-testid="paste-box"
-    [attr.aria-label]="'feature.file.fileStorage.paste.boxLabel' | transloco"
+    [attr.aria-label]="'feature.file.fileStorage.pasteHint' | transloco"
     (paste)="onPaste($event)"
   >
     <div class="flex items-center gap-2">
@@ -50,7 +50,7 @@
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span class="text-ui-text text-[13px] font-medium">{{ 'feature.file.fileStorage.addImage' | transloco }}</span>
         <span class="leading-snug">{{
-          (isCompact() ? 'feature.file.fileStorage.addImageHintTouch' : 'feature.file.fileStorage.paste.hint')
+          (isCompact() ? 'feature.file.fileStorage.addImageHintTouch' : 'feature.file.fileStorage.pasteHint')
             | transloco
         }}</span>
       </div>
@@ -73,7 +73,7 @@
         (click)="readFromClipboard()"
       >
         <i class="material-icons" aria-hidden="true">content_paste_go</i>
-        {{ 'feature.file.fileStorage.paste.read' | transloco }}
+        {{ 'feature.file.fileStorage.paste' | transloco }}
       </button>
       <span class="ml-auto text-[11px]">{{ 'feature.file.fileStorage.maxSize' | transloco }}</span>
     </div>

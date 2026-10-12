@@ -1,268 +1,50 @@
-import { decorateChatStyleText } from '@axe/ui/text-decoration/decorate-chat-text';
-import { decorateTextByFormat, formatNoteText } from '@axe/ui/text-decoration/format-note-text';
+import { formatNoteText } from '@axe/ui/text-decoration/format-note-text';
 
-const RUBY = '<ruby class="chat-ruby"><rb>漢字</rb><rt>かんじ</rt></ruby>';
-
-/** The output with the line breaks between block elements taken out, for shorter expectations. */
-function format(text: string): string {
-  return formatNoteText(text).replace(/>\n/g, '>').trim();
-}
-
-describe('formatNoteText', () => {
-  describe('headings', () => {
-    it('reads one to three hashes followed by a space as a heading', () => {
-      expect(format('# 大見出し')).toBe('<h1>大見出し</h1>');
-      expect(format('## 中見出し')).toBe('<h2>中見出し</h2>');
-      expect(format('### 小見出し')).toBe('<h3>小見出し</h3>');
-    });
-
-    it('leaves four or more hashes as text', () => {
-      expect(format('#### 見出し')).toBe('<p>#### 見出し</p>');
-    });
-
-    it('needs the space after the hashes', () => {
-      expect(format('#タグ')).toBe('<p>#タグ</p>');
-      expect(format('#')).toBe('<p>#</p>');
-    });
-
-    it('leaves a hash in the middle of a line alone', () => {
-      expect(format('第#1話')).toBe('<p>第#1話</p>');
-    });
+describe('a shared note drawn with formatting', () => {
+  it('reads headings, lists and quotes from the marks that start their lines', () => {
+    expect(formatNoteText('# 洞窟\n## 入口\n### 罠')).toBe('<h1>洞窟</h1><h2>入口</h2><h3>罠</h3>');
+    expect(formatNoteText('- たいまつ\n- ロープ')).toBe('<ul><li>たいまつ</li><li>ロープ</li></ul>');
+    expect(formatNoteText('1. 扉を調べる\n2. 開ける')).toBe('<ol><li>扉を調べる</li><li>開ける</li></ol>');
+    expect(formatNoteText('> 古い碑文\n> 二行目')).toBe('<blockquote>古い碑文<br>二行目</blockquote>');
   });
 
-  describe('lists', () => {
-    it('reads "- " lines as a bulleted list', () => {
-      expect(format('- 剣\n- 盾')).toBe('<ul><li>剣</li><li>盾</li></ul>');
-    });
-
-    it('reads "1. " lines as a numbered list', () => {
-      expect(format('1. 起きる\n2. 戦う')).toBe('<ol><li>起きる</li><li>戦う</li></ol>');
-    });
-
-    it('keeps the starting number of a numbered list', () => {
-      expect(format('3. 三番目')).toBe('<ol start="3"><li>三番目</li></ol>');
-    });
-
-    it('leaves "* " and "+ " bullets and "1)" numbers as text', () => {
-      expect(format('* 星')).toBe('<p>* 星</p>');
-      expect(format('+ 足す')).toBe('<p>+ 足す</p>');
-      expect(format('1) 括弧')).toBe('<p>1) 括弧</p>');
-    });
-
-    it('ends the list at an ordinary line instead of folding it into the last item', () => {
-      expect(format('- 項目\n普通の行')).toBe('<ul><li>項目</li></ul><p>普通の行</p>');
-    });
-
-    it('ends a "-" list at a "*" line, which stays text', () => {
-      expect(format('- 項目\n* 星')).toBe('<ul><li>項目</li></ul><p>* 星</p>');
-    });
-
-    it('starts a list on the line after ordinary text, a numbered one only from 1', () => {
-      expect(format('持ち物\n- 剣')).toBe('<p>持ち物</p><ul><li>剣</li></ul>');
-      expect(format('手順\n1. 起きる')).toBe('<p>手順</p><ol><li>起きる</li></ol>');
-      expect(format('手順\n2. 戦う')).toBe('<p>手順<br>2. 戦う</p>');
-    });
-
-    it('nests an indented item', () => {
-      expect(format('- 親\n  - 子')).toBe('<ul><li>親<ul><li>子</li></ul></li></ul>');
-    });
-
-    it('does not turn a negative number or a subtraction into a list', () => {
-      expect(format('-3')).toBe('<p>-3</p>');
-      expect(format('HP-1')).toBe('<p>HP-1</p>');
-    });
+  it('keeps a single break as a break, starts a paragraph at a blank line, and ends a list at the next plain line', () => {
+    expect(formatNoteText('一行目\n二行目\n\n次の段落')).toBe('<p>一行目<br>二行目</p><p>次の段落</p>');
+    expect(formatNoteText('- 一つ\nふつうの行')).toBe('<ul><li>一つ</li></ul><p>ふつうの行</p>');
   });
 
-  describe('quotes', () => {
-    it('reads ">" lines as one quote', () => {
-      expect(format('> 一行目\n> 二行目')).toBe('<blockquote><p>一行目<br>二行目</p></blockquote>');
-    });
-
-    it('ends the quote at the first line without ">"', () => {
-      expect(format('> 引用\n地の文')).toBe('<blockquote><p>引用</p></blockquote><p>地の文</p>');
-    });
-
-    it('leaves ">" in the middle of a line as an escaped character', () => {
-      expect(format('5 > 3')).toBe('<p>5 &gt; 3</p>');
-    });
+  it('keeps code as it was typed, in a line or a fenced block, with no ruby read inside it', () => {
+    expect(formatNoteText('判定は `2d6+3` で')).toBe('<p>判定は <code>2d6+3</code> で</p>');
+    expect(formatNoteText('```\n|炎《ほのお》\n  <b>\n```')).toBe('<pre><code>|炎《ほのお》\n  &lt;b&gt;</code></pre>');
   });
 
-  describe('code', () => {
-    it('shows inline code literally, without ruby', () => {
-      expect(format('`|漢字《かんじ》`')).toBe('<p><code>|漢字《かんじ》</code></p>');
-    });
-
-    it('escapes markup inside inline code', () => {
-      expect(format('`<b>太字</b>`')).toBe('<p><code>&lt;b&gt;太字&lt;/b&gt;</code></p>');
-    });
-
-    it('shows a fenced block literally, with its marks and line breaks', () => {
-      expect(format('```\n# 見出しではない\n- リストではない\n|漢字《かんじ》\n<script>x</script>\n```')).toBe(
-        '<pre><code># 見出しではない\n- リストではない\n|漢字《かんじ》\n&lt;script&gt;x&lt;/script&gt;</code></pre>'
-      );
-    });
-
-    it('drops the language name of a fenced block', () => {
-      expect(format('```"><img src=x>\ncode\n```')).toBe('<pre><code>code</code></pre>');
-    });
-
-    it('does not treat an indented line as code', () => {
-      expect(format('    字下げ')).toBe('<p>    字下げ</p>');
-    });
+  it('gives a line its ruby, and leaves stars and underscores as they are', () => {
+    expect(formatNoteText('|炎《ほのお》の剣')).toContain('<ruby class="chat-ruby"><rb>炎</rb><rt>ほのお</rt></ruby>');
+    expect(formatNoteText('ダメージは 2*3_4')).toBe('<p>ダメージは 2*3_4</p>');
   });
 
-  describe('ordinary text', () => {
-    it('keeps each line break', () => {
-      expect(format('一行目\n二行目\n三行目')).toBe('<p>一行目<br>二行目<br>三行目</p>');
-    });
+  it('lets nothing written run or load anything', () => {
+    const html = formatNoteText(
+      '<script>alert(1)</script>\n<img src=x onerror=alert(1)>\n# <b>見出し</b>\n- javascript:alert(1)'
+    );
 
-    it('splits paragraphs at a blank line', () => {
-      expect(format('段落一\n\n段落二')).toBe('<p>段落一</p><p>段落二</p>');
-    });
-
-    it('applies the ruby notation to text, headings and list items', () => {
-      expect(format('|漢字《かんじ》')).toBe(`<p>${RUBY}</p>`);
-      expect(format('# |漢字《かんじ》')).toBe(`<h1>${RUBY}</h1>`);
-      expect(format('- ｜漢字《かんじ》')).toBe(
-        '<ul><li><ruby class="chat-ruby"><rb>漢字</rb><rt>かんじ</rt></ruby></li></ul>'
-      );
-    });
-
-    it('applies the angle-bracket ruby to text, headings, list items and quotes', () => {
-      expect(format('|漢字<かんじ>')).toBe(`<p>${RUBY}</p>`);
-      expect(format('## 第一章 |漢字<かんじ>')).toBe(`<h2>第一章 ${RUBY}</h2>`);
-      expect(format('- |漢字<かんじ>\n1. ｜漢字<かんじ>')).toBe(`<ul><li>${RUBY}</li></ul><ol><li>${RUBY}</li></ol>`);
-      expect(format('> |漢字<かんじ>')).toBe(`<blockquote><p>${RUBY}</p></blockquote>`);
-      expect(format('前|漢字<かんじ>後と|漢字《かんじ》')).toBe(`<p>前${RUBY}後と${RUBY}</p>`);
-    });
-
-    it('keeps the angle-bracket ruby literal inside code', () => {
-      expect(format('`|漢字<かんじ>`')).toBe('<p><code>|漢字&lt;かんじ&gt;</code></p>');
-      expect(format('```\n|漢字<かんじ>\n```')).toBe('<pre><code>|漢字&lt;かんじ&gt;</code></pre>');
-    });
-
-    it('leaves comparisons and incomplete notation as escaped text', () => {
-      expect(format('1 < 2 > 0 と |x|<3> と |漢字<かんじ')).toBe(
-        '<p>1 &lt; 2 &gt; 0 と |x|&lt;3&gt; と |漢字&lt;かんじ</p>'
-      );
-      expect(format('|漢字<かん\nじ>')).toBe('<p>|漢字&lt;かん<br>じ&gt;</p>');
-    });
-
-    it('lets a backslash before the bracket keep the angle-bracket notation as text', () => {
-      expect(format('|漢字\\<かんじ>')).toBe('<p>|漢字&lt;かんじ&gt;</p>');
-    });
-
-    it('turns "\\s" into a space as the normal display does', () => {
-      expect(format('a\\sb')).toBe('<p>a b</p>');
-    });
-
-    it('leaves asterisks and underscores as typed, so arithmetic and dice stay readable', () => {
-      expect(format('2*3*4 = 24')).toBe('<p>2*3*4 = 24</p>');
-      expect(format('**強調しない** と _斜体にしない_')).toBe('<p>**強調しない** と _斜体にしない_</p>');
-      expect(format('2D6*2')).toBe('<p>2D6*2</p>');
-    });
-
-    it('leaves the table commands as typed', () => {
-      expect(format('{HP}\n:HP-1\n&バフ')).toBe('<p>{HP}<br>:HP-1<br>&amp;バフ</p>');
-    });
-
-    it('shows an entity as typed rather than decoding it', () => {
-      expect(format('&lt;')).toBe('<p>&amp;lt;</p>');
-    });
-
-    it('lets a backslash keep a mark as text', () => {
-      expect(format('\\# 見出しにしない')).toBe('<p># 見出しにしない</p>');
-    });
-
-    it('leaves rules and tables as text', () => {
-      expect(format('---')).toBe('<p>---</p>');
-      expect(format('| a | b |\n| - | - |\n| 1 | 2 |')).toBe('<p>| a | b |<br>| - | - |<br>| 1 | 2 |</p>');
-    });
-
-    it('gives nothing for an empty note', () => {
-      expect(format('')).toBe('');
-    });
+    expect(html).not.toMatch(/<script|<img|<b>/);
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).not.toContain('href="javascript');
   });
 
-  describe('safety', () => {
-    it('escapes raw HTML in a block and inline', () => {
-      expect(format('<script>alert(1)</script>')).toBe('<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>');
-      expect(format('文中の<img src=x onerror=alert(1)>')).toBe('<p>文中の&lt;img src=x onerror=alert(1)&gt;</p>');
-    });
+  it('turns an address into a link outside code, and leaves one in code as text', () => {
+    const html = formatNoteText('https://example.com\n`https://example.org`');
 
-    it('does not make links, images or automatic links', () => {
-      const html = formatNoteText(
-        [
-          '[押す](javascript:alert(1))',
-          '![画像](https://example.com/a.png)',
-          '<https://example.com>',
-          'https://example.com',
-          'www.example.com',
-          '[参照]: https://example.com',
-          '[参照]',
-        ].join('\n')
-      );
-      expect(html).not.toMatch(/<a[\s>]|<img|href=|src=/);
-      expect(html).toContain('[押す](javascript:alert(1))');
-      expect(html).toContain('https://example.com');
-    });
-
-    it('produces no tag outside the allowed set for a mixed input', () => {
-      const html = formatNoteText(
-        [
-          '# 見出し <b>',
-          '- 項目 <i onclick="x">',
-          '> 引用 <svg onload=x>',
-          '1. 番号 `<u>`',
-          '```html',
-          '<iframe src="https://example.com"></iframe>',
-          '```',
-          '<div onclick="x">ブロック</div>',
-          '| 表 |',
-          '**強調**',
-          '- [x] 済み',
-          '|<b>太字</b> と |a<script>alert(1)</script> と |b<img src=x onerror=alert(1)>',
-        ].join('\n')
-      );
-      const tags = [...html.matchAll(/<\/?([a-z0-9]+)/g)].map((match) => match[1]);
-      const allowed = ['h1', 'h2', 'h3', 'p', 'br', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'ruby', 'rb', 'rt'];
-      expect(tags.filter((tag) => !allowed.includes(tag))).toEqual([]);
-      expect(html).not.toMatch(/\son[a-z]+="/);
-    });
-  });
-});
-
-describe('decorateTextByFormat', () => {
-  it('keeps the ordinary decoration, with legacy marks, for the normal format', () => {
-    expect(decorateTextByFormat('> 引用\n# 見出し', 'normal')).toBe(decorateChatStyleText('> 引用\n# 見出し'));
-    expect(decorateTextByFormat('# 見出し', 'normal')).not.toContain('<h1');
+    expect(html).toContain('<a href="https://example.com" target="_blank" rel="noopener noreferrer">');
+    expect(html).toContain('<code>https://example.org</code>');
   });
 
-  it('reads headings, lists, quotes and code for the formatted format, from the same renderer as notes', () => {
-    const text = '# 見出し\n- 項目\n\n> 引用\n\n`a|b<c>`';
-    const html = decorateTextByFormat(text, 'formatted');
-    expect(html).toBe(formatNoteText(text));
-    expect(html).toContain('<h1');
-    expect(html).toContain('<li>');
-    expect(html).toContain('<blockquote>');
-  });
+  it('shows what was typed, ampersands and brackets included, as text', () => {
+    const box = document.createElement('div');
+    box.innerHTML = formatNoteText('A & B <b>太字</b> &lt;');
 
-  it('applies both ruby notations outside code and keeps code literal', () => {
-    const html = decorateTextByFormat('|漢字《かんじ》 |word<ruby>\n\n`|漢字《かんじ》 |a<b>`', 'formatted');
-    expect(html.match(/<ruby/g)).toHaveLength(2);
-    expect(html).toContain('<code>|漢字《かんじ》 |a&lt;b&gt;</code>');
-  });
-
-  it('keeps comparisons and arithmetic as typed', () => {
-    const html = decorateTextByFormat('1 <2 >0 and 2*3+4', 'formatted');
-    expect(html).toContain('1 &lt;2 &gt;0 and 2*3+4');
-    expect(html).not.toContain('<em>');
-  });
-
-  it('escapes script, images and malicious links in both formats', () => {
-    const text = '<img src=x onerror=alert(1)>\n[x](javascript:alert(1)) <script>1</script>';
-    for (const format of ['normal', 'formatted'] as const) {
-      expect(decorateTextByFormat(text, format)).not.toMatch(/<(img|script|a)\b/);
-    }
+    expect(box.textContent).toBe('A & B <b>太字</b> &lt;');
+    expect(box.querySelector('b')).toBeNull();
   });
 });

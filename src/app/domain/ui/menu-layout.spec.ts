@@ -144,7 +144,13 @@ describe('how a menu is arranged', () => {
     it('gathers the images, the music, the cut-ins, the stamps and the effects under media', () => {
       const media = DEFAULT_MENU_LAYOUTS.fab.nodes.find((node) => node.id === 'media') as MenuGroup;
 
-      expect(media.items.map((item) => item.command)).toEqual(['images', 'jukebox', 'cutIn', 'stamp', 'effectLibrary']);
+      expect(media.items.map((item) => item.command)).toEqual([
+        'images',
+        'jukebox',
+        'cutIn',
+        'stampPacks',
+        'effectLibrary',
+      ]);
     });
 
     it('keeps the hand among what the game is played with', () => {

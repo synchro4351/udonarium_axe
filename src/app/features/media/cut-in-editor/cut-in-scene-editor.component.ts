@@ -20,12 +20,11 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { ModalService } from '@axe/application/ui/modal.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { EditHistory } from '@axe/core/util/edit-history';
-import { launchPortraitFitOf } from '@axe/domain/character/character-portrait-fit';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { KEY_TOLERANCE_MS } from '@axe/domain/media/cut-in-keyframe';
 import { CutInLayer, type CutInLayerKind } from '@axe/domain/media/cut-in-layer';
-import { type CutInPortraitSnapshot, makePortraitSnapshot, portraitFrameOf } from '@axe/domain/media/cut-in-portrait';
+import { portraitFitFor } from '@axe/domain/media/cut-in-portrait-fit';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
 import {
   cloneSceneSnapshot,
@@ -42,6 +41,7 @@ import {
   soundIndexAt,
   upsertSound,
 } from '@axe/domain/media/cut-in-sound';
+import { type CutInSpeaker } from '@axe/domain/media/cut-in-speaker';
 import { CutInBgmComponent } from '@axe/features/media/cut-in-bgm/cut-in-bgm.component';
 import {
   addLayer,
@@ -388,7 +388,7 @@ export class CutInSceneEditorComponent {
    *
    * The fit is only read here. It is the character's, and is set on the character's sheet.
    */
-  protected readonly previewPortrait = computed<CutInPortraitSnapshot | null>(() => {
+  protected readonly previewSpeaker = computed<CutInSpeaker | null>(() => {
     const scene = this.scene();
     if (!scene || !this.takesCharacter()) return null;
     this.objectChange.versionOf(scene.identifier)();
@@ -397,14 +397,13 @@ export class CutInSceneEditorComponent {
     if (choice.characterIdentifier) this.objectChange.versionOf(choice.characterIdentifier)();
     const found = this.objectStore.get(choice.characterIdentifier);
     const character = found instanceof GameCharacter ? found : null;
-    const fit = launchPortraitFitOf(character, portraitFrameOf(scene.layers), choice.imageIdentifier);
-    return makePortraitSnapshot(
-      scene,
-      choice.characterIdentifier,
-      choice.imageIdentifier,
-      String(character?.name ?? ''),
-      fit
-    );
+    if (!character) return null;
+    return {
+      characterId: character.identifier,
+      imageIdentifier: choice.imageIdentifier,
+      name: String(character.name ?? ''),
+      fit: portraitFitFor(character.cutInPortraitFits, choice.imageIdentifier),
+    };
   });
 
   constructor() {

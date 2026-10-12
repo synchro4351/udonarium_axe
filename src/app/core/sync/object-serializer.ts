@@ -2,7 +2,7 @@ import { Logger } from '@axe/core/logging/logger';
 import { Attributes } from '@axe/core/sync/attributes';
 import { GameObject, ObjectContext } from '@axe/core/sync/game-object';
 import { ObjectFactory } from '@axe/core/sync/object-factory';
-import { decodeEntityReference, encodeEntityReference, xml2element } from '@axe/core/util/xml-util';
+import { decodeEntityReference, encodeAttributeValue, xml2element } from '@axe/core/util/xml-util';
 
 export interface XmlAttributes extends GameObject {
   toAttributes(): Attributes;
@@ -191,16 +191,6 @@ export class ObjectSerializer {
     }
     return { obj, key };
   }
-}
-
-/**
- * Escapes a value for an attribute, writing tabs and line breaks as character references.
- *
- * A parser turns a tab or line break it meets as it is inside an attribute into a space, so
- * multiline text would come back on one line. A reference survives as the character itself.
- */
-function encodeAttributeValue(value: string): string {
-  return encodeEntityReference(value).replace(/[\t\n\r]/g, (char) => `&#${char.charCodeAt(0)};`);
 }
 
 /**

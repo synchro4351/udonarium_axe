@@ -1,3 +1,4 @@
+import { VolumeType } from '@axe/core/storage/audio-player';
 import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
 import { ObjectContext } from '@axe/core/sync/game-object';
 import { ObjectNode } from '@axe/core/sync/object-node';
@@ -8,7 +9,16 @@ import {
   readControllerResourcePick,
   writeControllerResourcePick,
 } from '@axe/domain/character/controller-resource-pick';
+import { readStampRules, StampRules, writeStampRules } from '@axe/domain/chat/stamp-rules';
+import { asDiceStage, DiceStage } from '@axe/domain/dice/dice-3d/dice-stage';
 import { Jukebox } from '@axe/domain/media/jukebox';
+import {
+  readRoomVolumes,
+  RoomVolumeKind,
+  roomVolumeKindOf,
+  RoomVolumes,
+  writeRoomVolumes,
+} from '@axe/domain/media/room-volumes';
 import { allowsDiagonal, asDiagonalMove, DiagonalMove } from '@axe/domain/tabletop/move/diagonal-move';
 import {
   readRuleFlag,
@@ -30,6 +40,7 @@ import {
 export class Config extends ObjectNode implements InnerXml {
   @SyncVar('_defaultDiceBot') private _defaultDiceBot: string = 'DiceBot';
   @SyncVar('_roomVolume') private _roomVolume: number = 1.0;
+  @SyncVar('_roomKindVolumes') private _roomKindVolumes: string = '';
   @SyncVar('_systemAvatarIdentifier') private _systemAvatarIdentifier: string = '';
   @SyncVar('_systemDiceAvatarIdentifier') private _systemDiceAvatarIdentifier: string = '';
   @SyncVar('_hideSystemAvatar') private _hideSystemAvatar: string = '';
@@ -40,8 +51,8 @@ export class Config extends ObjectNode implements InnerXml {
   @SyncVar('_handGiveForbidden') private _handGiveForbidden: string = '';
   @SyncVar('_handVisibilityMode') private _handVisibilityMode: string = '';
   @SyncVar('_allowPlayerCardEdit') private _allowPlayerCardEdit: string = '';
-  // Blank is off, so a room saved before this existed does not start putting words over heads.
-  @SyncVar('_overheadSpeech') private _overheadSpeech: string = '';
+  @SyncVar('_stampRules') private _stampRules: string = '';
+  @SyncVar('_speechBubbles') private _speechBubbles: string = '';
 
   // How the round is taken, which is the room's own decision rather than a table's.
   @SyncVar('_turnOrderMode') private _turnOrderMode: string = '';
@@ -80,6 +91,21 @@ export class Config extends ObjectNode implements InnerXml {
   @SyncVar('_engagementCountsSize') private _engagementCountsSize: string = '';
   @SyncVar('_facingMark') private _facingMark: string = '';
   @SyncVar('_pieceImageInCell') private _pieceImageInCell: string = '';
+  @SyncVar('_diceStage') private _diceStage: string = '';
+
+  /**
+   * Where the room shows the dice of a chat roll tumbling: in the frame of the line that gives the
+   * result, on the table, or nowhere.
+   *
+   * Nowhere unless the room chose otherwise, so a room saved before the setting was there, or sent
+   * by an older version that knows nothing of it, stays as it was.
+   */
+  get diceStage(): DiceStage {
+    return asDiceStage(this._diceStage);
+  }
+  set diceStage(stage: DiceStage) {
+    this._diceStage = stage === 'off' ? '' : stage;
+  }
 
   /** The game system the room rolls dice with by default; blank reads as the generic `DiceBot`. */
   get defaultDiceBot(): string {
@@ -139,14 +165,16 @@ export class Config extends ObjectNode implements InnerXml {
   }
 
   /**
-   * Whether what a piece says in chat pops up over it on the table for a moment; off until the GM
-   * turns it on.
+   * What the room lets its stamps be used for, with every stamp usable for everything until the room
+   * says otherwise.
+   *
+   * @see StampRules
    */
-  get showsOverheadSpeech(): boolean {
-    return this._overheadSpeech === '1';
+  get stampRules(): StampRules {
+    return readStampRules(this._stampRules);
   }
-  set showsOverheadSpeech(shown: boolean) {
-    this._overheadSpeech = shown ? '1' : '';
+  set stampRules(rules: StampRules) {
+    this._stampRules = writeStampRules(rules);
   }
 
   /** The room's master volume, shared by every peer; a change applied to the config updates the jukebox at once. */
@@ -155,6 +183,34 @@ export class Config extends ObjectNode implements InnerXml {
   }
   set roomVolume(volume: number) {
     this._roomVolume = volume;
+  }
+
+  /**
+   * The room's own volume for each kind of sound, shared by every peer, on top of the master
+   * {@link roomVolume}.
+   *
+   * Full for every kind until the room turns one down, so a room saved before these were there, or
+   * sent by an older version that knows nothing of them, sounds as it did.
+   */
+  get roomVolumes(): RoomVolumes {
+    return readRoomVolumes(this._roomKindVolumes);
+  }
+  set roomVolumes(volumes: RoomVolumes) {
+    this._roomKindVolumes = writeRoomVolumes(volumes);
+  }
+
+  /** Sets the room's volume for one kind of sound, leaving the other kinds as they are. */
+  setRoomVolumeOf(kind: RoomVolumeKind, volume: number): void {
+    this.roomVolumes = { ...this.roomVolumes, [kind]: volume };
+  }
+
+  /**
+   * What the sound on one channel is scaled by in this room: the master room volume times the
+   * room's volume for that channel's kind. Previews take the master room volume alone.
+   */
+  roomScaleFor(type: VolumeType): number {
+    const kind = roomVolumeKindOf(type);
+    return this.roomVolume * (kind ? this.roomVolumes[kind] : 1);
   }
 
   /**
@@ -183,6 +239,17 @@ export class Config extends ObjectNode implements InnerXml {
   }
   set isSystemAvatarVisible(visible: boolean) {
     this._hideSystemAvatar = visible ? '' : '1';
+  }
+
+  /**
+   * Whether what a character says shows in a bubble over its piece; on unless the room turned it
+   * off, which is the one value that does.
+   */
+  get speechBubblesEnabled(): boolean {
+    return this._speechBubbles !== 'off';
+  }
+  set speechBubblesEnabled(enabled: boolean) {
+    this._speechBubbles = enabled ? '' : 'off';
   }
 
   /**
@@ -528,6 +595,14 @@ export class Config extends ObjectNode implements InnerXml {
     return Config._instance;
   }
 
+  /** Maps the former overhead speech switch to the current speech bubble setting on saved rooms. */
+  override parseAttributes(attributes: NamedNodeMap): void {
+    super.parseAttributes(attributes);
+    const names = new Set(Array.from(attributes, (attribute) => attribute.name));
+    if (names.has('_speechBubbles') || !names.has('_overheadSpeech')) return;
+    this.setAttribute('_speechBubbles', this.getAttribute('_overheadSpeech') === '1' ? '' : 'off');
+  }
+
   /**
    * Loading a saved room copies the saved settings onto the room's existing config and discards this copy.
    *
@@ -543,12 +618,13 @@ export class Config extends ObjectNode implements InnerXml {
     this.destroy();
   }
 
-  /** Takes in synced settings, and passes a changed master volume on to the jukebox straight away. */
+  /** Takes in synced settings, and passes a changed room volume on to the jukebox straight away. */
   override apply(context: ObjectContext) {
     const _roomVolume = this._roomVolume;
+    const _roomKindVolumes = this._roomKindVolumes;
     const _defaultDiceBot = this._defaultDiceBot;
     super.apply(context);
-    if (_roomVolume !== this._roomVolume) {
+    if (_roomVolume !== this._roomVolume || _roomKindVolumes !== this._roomKindVolumes) {
       this.jukebox.setNewVolume();
     }
   }

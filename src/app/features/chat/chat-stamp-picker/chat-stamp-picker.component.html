@@ -35,22 +35,6 @@
     >
       {{ 'feature.chat.syntax.tab' | transloco }}
     </button>
-    @for (pack of packs(); track pack.identifier) {
-      <button
-        type="button"
-        role="tab"
-        data-testid="chat-stamp-tab"
-        class="rounded-ui-sm hover:bg-ui-hover min-h-8 max-w-40 shrink-0 cursor-pointer truncate border-0 bg-transparent px-2 text-[12px] whitespace-nowrap transition-colors"
-        [class.bg-ui-accent-bg]="activeTab() === pack.identifier"
-        [class.text-ui-accent]="activeTab() === pack.identifier"
-        [attr.aria-selected]="activeTab() === pack.identifier"
-        [attr.tabindex]="activeTab() === pack.identifier ? 0 : -1"
-        [title]="pack.name"
-        (click)="selectTab(pack.identifier)"
-      >
-        {{ pack.name || ('feature.chat.stamp.unnamed' | transloco) }}
-      </button>
-    }
   </div>
   <div role="tabpanel" class="min-h-0 overflow-y-auto">
     @if (activeTab() === syntaxTab) {
@@ -71,31 +55,6 @@
           </button>
         }
       </div>
-    } @else if (activePack(); as pack) {
-      @if (pack.items.length === 0) {
-        <p class="text-ui-dim m-0 p-2 text-[12px]" data-testid="chat-stamp-empty">
-          {{ 'feature.chat.stamp.emptyPack' | transloco }}
-        </p>
-      } @else {
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(60px,1fr))] gap-1">
-          @for (item of pack.items; track item.id) {
-            <button
-              type="button"
-              data-testid="chat-stamp-choice"
-              class="rounded-ui-sm hover:bg-ui-hover focus-visible:bg-ui-hover flex aspect-square min-w-0 cursor-pointer items-center justify-center overflow-hidden border-0 bg-transparent p-1 transition-colors"
-              [attr.aria-label]="'feature.chat.stamp.send' | transloco: { name: labelOf(item) || pack.name }"
-              [title]="labelOf(item)"
-              (click)="pickStamp(pack, item)"
-            >
-              @if (imageUrlOf(item); as url) {
-                <img class="size-full object-contain" alt="" [src]="url | safe: 'resourceUrl'" />
-              } @else {
-                <span class="text-ui-dim truncate text-[11px]">{{ labelOf(item) }}</span>
-              }
-            </button>
-          }
-        </div>
-      }
     } @else {
       <div class="flex flex-wrap gap-0.5">
         @for (emoji of emojis; track emoji) {

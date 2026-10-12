@@ -18,6 +18,9 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
+import { StampPackService } from '@axe/application/chat/stamp-pack.service';
+import { StampRulesService } from '@axe/application/chat/stamp-rules.service';
+import { stampWords } from '@axe/application/chat/stamp-words';
 import { DiceBotCatalogService } from '@axe/application/dice/dice-bot-catalog.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
@@ -38,15 +41,15 @@ import { portraitNameOf } from '@axe/domain/character/character-portrait';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatBubbleColors, chatBubbleOf, chatColorOf, DEFAULT_CHAT_COLOR } from '@axe/domain/chat/chat-color';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
-import { composeChatOutgoing } from '@axe/domain/chat/chat-outgoing';
-import { ChatOutgoing, ChatStampOutgoing } from '@axe/domain/chat/chat-outgoing';
+import { ChatOutgoing, composeChatOutgoing, composeStampOutgoing, OutgoingStamp } from '@axe/domain/chat/chat-outgoing';
 import { paletteLineText, suggestPaletteLines } from '@axe/domain/chat/chat-palette-suggestion';
 import { previewTextOf } from '@axe/domain/chat/chat-stamp-text';
 import { applyChatSyntax, ChatSyntaxSnippet } from '@axe/domain/chat/chat-syntax-snippet';
+import { imageStampId } from '@axe/domain/chat/stamp-catalog';
 import { DataElement } from '@axe/domain/data/data-element';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
 import { builtinStampPack, StampPackView } from '@axe/domain/media/builtin-stamps';
-import { StampItem, stampLabelOf, StampPack } from '@axe/domain/media/stamp-pack';
+import { stampLabelOf, StampPack } from '@axe/domain/media/stamp-pack';
 import {
   removeStampQuery,
   StampQuery,
@@ -57,15 +60,15 @@ import {
 } from '@axe/domain/media/stamp-suggestion';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import { PeerRole } from '@axe/domain/peer/peer-role';
 import { ChatColorSettingComponent } from '@axe/features/chat/chat-color-setting/chat-color-setting.component';
 import { ChatComposeService } from '@axe/features/chat/chat-compose.service';
 import { ChatInputDiceBotHelper } from '@axe/features/chat/chat-input/chat-input-dicebot';
 import { allowsChat } from '@axe/features/chat/chat-input/chat-input-helpers';
 import { ChatInputHistory } from '@axe/features/chat/chat-input/chat-input-history';
-import {
-  ChatStampPickerComponent,
-  PickedStamp,
-} from '@axe/features/chat/chat-stamp-picker/chat-stamp-picker.component';
+import { ChatStampPickerComponent } from '@axe/features/chat/chat-stamp-picker/chat-stamp-picker.component';
+import { StampPickerService } from '@axe/features/chat/stamp/stamp-picker.service';
+import { RoomPanelService } from '@axe/features/panels/room-panel.service';
 import { PortraitChoice, PortraitPickerComponent } from '@axe/ui/components/portrait-picker/portrait-picker.component';
 import { PortraitSliderComponent } from '@axe/ui/components/portrait-slider/portrait-slider.component';
 import { NgSelectWindowDirective } from '@axe/ui/directives/ng-select-window.directive';
@@ -130,12 +133,36 @@ export class ChatInputComponent {
   );
   readonly sendsToTicker = signal(false);
 
+  private readonly roomPanels = inject(RoomPanelService);
+
+  /**
+   * Whether the room shows its rolls' dice, which is when a seat has reason to choose how its own
+   * look; never for a guest, who is not offered the panel.
+   */
+  readonly showsMyDice = computed(() => {
+    this.objectChange.versionOf('Config')();
+    this.objectChange.trackMyCursor();
+    if (PeerCursor.myRole === PeerRole.Guest) return false;
+    return (this.objectStore.get<Config>('Config')?.diceStage ?? 'off') !== 'off';
+  });
+
+  /** Opens where this seat chooses how its dice look. */
+  openMyDice(): void {
+    this.roomPanels.open('myDice');
+  }
+
   /** Switches whether the lines this seat sends also run along the ticker band. */
   toggleTickerSend(): void {
     this.sendsToTicker.update((sends) => !sends);
   }
   private readonly batchService = inject(BatchService);
   private readonly t = inject(TRANSLATE_FN);
+  private readonly stampPicker = inject(StampPickerService);
+  private readonly stampPackService = inject(StampPackService);
+  private readonly stampRules = inject(StampRulesService);
+
+  /** Whether the room lets stamps be sent as lines, which puts the button for them beside the send button. */
+  protected readonly stampLinesOn = computed(() => this.stampRules.isOn('line'));
   private readonly objectChange = inject(ObjectChangeService);
   private readonly panelService = inject(PanelService);
   private readonly pointerDeviceService = inject(PointerDeviceService);
@@ -283,10 +310,8 @@ export class ChatInputComponent {
    * offered. A host that turns them on sends what `stamp` reports.
    */
   readonly offersStamps = input(false);
-  readonly stamp = output<ChatStampOutgoing>();
-
   private readonly injector = inject(Injector);
-  private readonly stampButtonRef = viewChild<ElementRef<HTMLButtonElement>>('stampButton');
+  private readonly writingToolsButtonRef = viewChild<ElementRef<HTMLButtonElement>>('writingToolsButton');
 
   /**
    * Whether the lines of the speaking character's chat palette that hold what is being written are
@@ -307,11 +332,16 @@ export class ChatInputComponent {
    * The room's packs and then the tool's own, while stamps are offered, so a word a room gave its
    * own stamp finds that one first.
    */
-  private readonly stampPacks = computed<StampPackView[]>(() => {
+  private readonly searchPacks = computed<StampPackView[]>(() => {
     if (!this.offersStamps()) return [];
     this.objectChange.collectionOf(StampPack.aliasName)();
-    const packs: StampPackView[] = this.objectStore.getObjects(StampPack);
-    for (const pack of packs) this.objectChange.versionOf(pack.identifier)();
+    const roomPacks = this.objectStore.getObjects(StampPack);
+    for (const pack of roomPacks) this.objectChange.versionOf(pack.identifier)();
+    const packs: StampPackView[] = roomPacks.map((pack) => ({
+      identifier: pack.identifier,
+      name: pack.name,
+      items: pack.items,
+    }));
     return [...packs, builtinStampPack(this.t('feature.media.stamp.builtinPack'))];
   });
 
@@ -333,7 +363,7 @@ export class ChatInputComponent {
    */
   readonly stampSuggestions = computed<StampSuggestion[]>(() => {
     const query = this.stampQuery();
-    return query ? suggestStamps(this.stampPacks(), query.word, query.bare === true) : [];
+    return query ? suggestStamps(this.searchPacks(), query.word, query.bare === true) : [];
   });
 
   /** The speaking character's palette, followed through its edits, or null for anyone else. */
@@ -402,7 +432,7 @@ export class ChatInputComponent {
   /** Closes the stamp picker without picking anything, handing focus back to the stamp button. */
   closeStampPicker(): void {
     this.isStampPickerOpen.set(false);
-    afterNextRender({ write: () => this.stampButtonRef()?.nativeElement.focus() }, { injector: this.injector });
+    afterNextRender({ write: () => this.writingToolsButtonRef()?.nativeElement.focus() }, { injector: this.injector });
   }
 
   /**
@@ -413,7 +443,7 @@ export class ChatInputComponent {
     if (!this.isStampPickerOpen()) return;
     const target = event.target;
     if (this.stampPickerRef()?.contains(target)) return;
-    if (target instanceof Node && this.stampButtonRef()?.nativeElement.contains(target)) return;
+    if (target instanceof Node && this.writingToolsButtonRef()?.nativeElement.contains(target)) return;
     this.isStampPickerOpen.set(false);
   }
 
@@ -448,13 +478,6 @@ export class ChatInputComponent {
     this.kickCalcFitHeight();
   }
 
-  /** Sends the stamp picked in the picker at once, leaving the words in the box as they are. */
-  sendPickedStamp(picked: PickedStamp): void {
-    this.isStampPickerOpen.set(false);
-    this.emitStamp(picked.item, picked.pack.name);
-    this.focusTextArea();
-  }
-
   /**
    * Acts on a suggestion chosen from the list: a stamp is sent, and the word that found it taken out
    * of the line; a palette line takes the box's place, to be sent, or changed first, as the writer
@@ -475,10 +498,12 @@ export class ChatInputComponent {
   /** Sends the stamp chosen from the suggestions and takes the word that found it out of the line. */
   sendSuggestion(suggestion: StampSuggestion): void {
     const query = this.stampQuery();
-    if (!query || !this.emitStamp(suggestion.item, suggestion.packName)) return;
+    const stampId = imageStampId(suggestion.item.imageIdentifier);
+    if (!query || !this.canSpeak() || !this.stampRules.allows('line', stampId)) return;
     const removed = removeStampQuery(this.text, query);
     this.text = removed.text;
     this.previousWritingLength = this.text.length;
+    this.sendStamp(stampId);
     this.focusTextArea(removed.caret);
     this.kickCalcFitHeight();
   }
@@ -503,32 +528,6 @@ export class ChatInputComponent {
   protected activeSuggestionId(): string | null {
     const index = this.activeSuggestion();
     return index >= 0 ? `${this.suggestionListId}-${index}` : null;
-  }
-
-  /**
-   * Reports a stamp to send, spoken by and to whoever a line would be, in the same colour and
-   * answering the same reply or quotation, which it then clears. Answers whether it was reported:
-   * not for a seat that may not speak.
-   */
-  private emitStamp(item: StampItem, packName: string): boolean {
-    if (!this.canSpeak() || !this.offersStamps()) return false;
-    if (!this.sendFrom.length) this.sendFrom = this.myPeer.identifier;
-    const bubbles = this.chatBubbles(this.colorSelectNo());
-    this.stamp.emit({
-      stampName: stampLabelOf(item) || packName || this.t('feature.chat.stamp.unnamed'),
-      imageIdentifier: item.imageIdentifier,
-      sendFrom: this.sendFrom,
-      sendTo: this.sendTo,
-      portraitIndex: this.portraitIndex,
-      messColor: this.selectChatColor,
-      messBubbleLight: bubbles.light,
-      messBubbleDark: bubbles.dark,
-      replyTo: this.replyTarget()?.identifier ?? '',
-      quoteOf: this.quoteTarget()?.identifier ?? '',
-    });
-    this.cancelReply();
-    this.cancelQuote();
-    return true;
   }
 
   /**
@@ -876,7 +875,8 @@ export class ChatInputComponent {
    * highlighted it asks the parent to apply that instead. The
    * message is emitted under the game system the dice bot hands over for the line, which does not
    * wait for the system's code when the line cannot be a secret roll; the draft, reply and quote are
-   * cleared at once.
+   * cleared at once. The box itself is emptied as well, since an Enter that comes before what was
+   * typed has been drawn leaves the binding holding the empty draft from before, with nothing to change.
    */
   sendChat(event: Event | null) {
     if (event) event.preventDefault();
@@ -897,6 +897,14 @@ export class ChatInputComponent {
       return;
     }
 
+    this.sendDraft();
+  }
+
+  /**
+   * Sends what the box holds, with a stamp under it where one is given, and clears the box, the reply
+   * and the quote.
+   */
+  private sendDraft(stamp?: OutgoingStamp): void {
     if (!this.sendFrom.length) this.sendFrom = this.myPeer.identifier;
 
     this.chatHistory.push(this.text);
@@ -911,15 +919,58 @@ export class ChatInputComponent {
       replyTo: this.replyTarget()?.identifier ?? '',
       quoteOf: this.quoteTarget()?.identifier ?? '',
       toTicker: this.showsTickerSwitch() && this.sendsToTicker(),
+      ...(stamp ? { stamp } : {}),
     };
     DiceBot.gameSystemForLineAsync(this.gameType, draft.text).then((gameSystem) => {
       this.chat.emit(composeChatOutgoing({ ...draft, gameSystem }));
     });
     this.text = '';
+    const box = this.textAreaElementRef()?.nativeElement;
+    if (box) box.value = '';
     this.previousWritingLength = this.text.length;
     this.kickCalcFitHeight();
     this.cancelReply();
     this.cancelQuote();
+  }
+
+  /** Opens the stamps under the button beside the send button, to send the one picked. */
+  protected openStamps(anchor: EventTarget | null): void {
+    if (!(anchor instanceof Element)) return;
+    this.stampPicker.toggle(anchor, 'line', (stampId) => this.sendStamp(stampId));
+  }
+
+  /**
+   * Sends a stamp, from whoever the box speaks as and to whoever it speaks to, in its colour. With
+   * words in the box it goes under them as one line, sent as the send button sends them, and the box
+   * is cleared; with the box empty it goes as a line of its own.
+   */
+  sendStamp(stampId: string): void {
+    if (!this.canSpeak() || !this.stampRules.allows('line', stampId)) return;
+    const words = stampWords(stampId, this.t, (imageIdentifier) => {
+      const item = this.searchPacks()
+        .flatMap((pack) => pack.items)
+        .find((one) => one.imageIdentifier === imageIdentifier);
+      return item ? stampLabelOf(item) : this.stampPackService.nameOf(imageIdentifier);
+    });
+    if (words.length < 1) return;
+    if (this.text.trim().length > 0) {
+      this.sendDraft({ id: stampId, words });
+      return;
+    }
+    if (!this.sendFrom.length) this.sendFrom = this.myPeer.identifier;
+    this.chat.emit(
+      composeStampOutgoing(
+        {
+          sendFrom: this.sendFrom,
+          sendTo: this.sendTo,
+          portraitIndex: this.portraitIndex,
+          color: this.selectChatColor,
+          bubbles: this.chatBubbles(this.colorSelectNo()),
+        },
+        stampId,
+        words
+      )
+    );
   }
 
   /**

@@ -222,12 +222,12 @@ describe('CardStackComponent', () => {
       const stack = makeStackWithCards(1);
       fixture.componentRef.setInput('cardStack', stack);
       try {
-        expect(component.cards).toHaveLength(1);
+        expect(component.cardCount()).toBe(1);
         expect(readThickness()).toBe(0);
 
         stack.putOnBottom(Card.create('added', '', '', 2));
         await fixture.whenStable();
-        expect(component.cards).toHaveLength(2);
+        expect(component.cardCount()).toBe(2);
         expect(readThickness()).toBe(2);
       } finally {
         stack.destroy();
@@ -262,6 +262,31 @@ describe('CardStackComponent', () => {
         expect(layers[1].bg).toBe('#2a1f0d');
         expect(layers[0].z).toBe(0);
         expect(layers[layers.length - 1].z).toBeCloseTo(thickness * ((layers.length - 1) / layers.length));
+      } finally {
+        stack.destroy();
+      }
+    });
+
+    it('follows a card put onto the stack and one drawn off it', async () => {
+      const stack = makeStackWithCards(3);
+      fixture.componentRef.setInput('cardStack', stack);
+      try {
+        expect(component.cardCount()).toBe(3);
+        expect(readThickness()).toBeCloseTo(3);
+        expect(readLayers()).toHaveLength(2);
+
+        stack.putOnTop(Card.create('joined', '', '', 2));
+        await fixture.whenStable();
+        expect(component.cardCount()).toBe(4);
+        expect(readThickness()).toBeCloseTo(4);
+        expect(readLayers()).toHaveLength(3);
+
+        stack.drawCard()?.destroy();
+        stack.drawCard()?.destroy();
+        await fixture.whenStable();
+        expect(component.cardCount()).toBe(2);
+        expect(readThickness()).toBeCloseTo(2);
+        expect(readLayers()).toHaveLength(1);
       } finally {
         stack.destroy();
       }

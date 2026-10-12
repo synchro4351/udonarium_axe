@@ -8,10 +8,12 @@ import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { appendPieceDataElements } from '@axe/domain/tabletop/piece-data-elements';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
 
+const TEXT_COLOR = /^#[0-9a-f]{6}$/i;
+
 @SyncObject('table-mask')
 export class GameTableMask extends TabletopObject {
-  static readonly DEFAULT_FONT_SIZE = 18;
-  static readonly DEFAULT_OUTLINE_COLOR = '#ffffff';
+  static readonly DEFAULT_TEXT_SIZE = 24;
+  static readonly DEFAULT_TEXT_COLOR = '#ffffff';
   @SyncVar() isLock: boolean = false;
   @SyncVar() dispLockMark: boolean = true;
 
@@ -42,89 +44,23 @@ export class GameTableMask extends TabletopObject {
     this.setCommonValue('height', height);
   }
 
-  get text(): string {
-    return `${this.getElement('text', this.commonDataElement)?.value ?? ''}`;
-  }
-  set text(value: string) {
-    this.setOrCreateTextElement('text', value, { type: DataElementType.NOTE, currentValue: value });
-  }
-
-  /** How the text is shown, kept on the text element; `normal` for a mask without one. */
-  get textFormat(): TextFormat {
-    return this.getElement('text', this.commonDataElement)?.textFormat ?? 'normal';
-  }
-  set textFormat(format: TextFormat) {
-    if (!this.getElement('text', this.commonDataElement)) {
-      if (toTextFormat(format) === 'normal') return;
-      this.text = '';
-    }
-    this.getElement('text', this.commonDataElement)?.setTextFormat(format);
-  }
-
-  get fontSize(): number {
-    const value = Number(this.getElement('fontsize', this.commonDataElement)?.value);
-    return Number.isFinite(value) ? Math.max(1, Math.min(120, Math.round(value))) : GameTableMask.DEFAULT_FONT_SIZE;
-  }
-  set fontSize(value: number) {
-    if (!Number.isFinite(value)) return;
-    this.setOrCreateTextElement('fontsize', Math.max(1, Math.min(120, Math.round(value))));
-  }
-
-  get textOutline(): boolean {
-    const raw = this.getElement('textoutline', this.commonDataElement)?.value;
-    return String(raw).toLowerCase() === '1' || String(raw).toLowerCase() === 'true';
-  }
-  set textOutline(value: boolean) {
-    this.setOrCreateTextElement('textoutline', value ? 1 : 0);
-  }
-
-  get outlineColor(): string {
-    const value = `${this.getElement('outlinecolor', this.commonDataElement)?.value ?? ''}`;
-    return /^#[0-9a-f]{6}$/i.test(value) ? value : GameTableMask.DEFAULT_OUTLINE_COLOR;
-  }
-  set outlineColor(value: string) {
-    this.setOrCreateTextElement(
-      'outlinecolor',
-      /^#[0-9a-f]{6}$/i.test(value) ? value : GameTableMask.DEFAULT_OUTLINE_COLOR
-    );
-  }
-
-  private setOrCreateTextElement(
-    name: string,
-    value: string | number,
-    attributes: Record<string, string | number> = {}
-  ): void {
-    const element = this.getElement(name, this.commonDataElement);
-    if (element) {
-      element.value = value;
-      if (name === 'text') element.currentValue = value;
-      return;
-    }
-    this.commonDataElement?.appendChild(DataElement.create(name, value, attributes, `${name}_${this.identifier}`));
-  }
-
   /**
-   * Fills the mask with a colour. Text-bearing masks keep their ink colour in the value;
-   * otherwise both values follow the upstream fill behaviour.
+   * Fills the mask with a colour, writing it as both the value and the current value of its colour
+   * element, so `color` and `bgcolor` read the same.
    *
    * A mask made from the menu carries no colour element; the first colour painted adds one.
    */
   paintColor(color: string): void {
     const element = this.getElement('color', this.commonDataElement);
     if (element) {
-      if (!this.text) element.value = color;
+      element.value = color;
       element.currentValue = color;
       return;
     }
     const common = this.commonDataElement;
     if (!common) return;
     common.appendChild(
-      DataElement.create(
-        'color',
-        this.text ? this.color : color,
-        { type: 'colors', currentValue: color },
-        `color_${this.identifier}`
-      )
+      DataElement.create('color', color, { type: 'colors', currentValue: color }, `color_${this.identifier}`)
     );
   }
 
@@ -166,6 +102,104 @@ export class GameTableMask extends TabletopObject {
     return ImageStorage.instance.get(identifier) ?? ImageFile.Empty;
   }
 
+  /**
+   * Words written across the mask, line breaks and all; empty for none, which is also what a mask
+   * that never had any reads.
+   *
+   * They live in the common data, as a card's face text does. Setting words adds the element when it
+   * is missing; setting none on such a mask adds nothing.
+   */
+  get text(): string {
+    const element = this.getElement('text', this.commonDataElement);
+    return element ? `${element.value ?? ''}` : '';
+  }
+  set text(text: string) {
+    const element = this.getElement('text', this.commonDataElement);
+    if (element) {
+      element.value = text;
+      return;
+    }
+    const common = this.commonDataElement;
+    if (!common || text.trim().length < 1) return;
+    common.appendChild(DataElement.create('text', text, { type: DataElementType.NOTE }, `text_${this.identifier}`));
+  }
+
+  /** How the words are shown, kept on the text element; `normal` for a mask without one (tyoitashi). */
+  get textFormat(): TextFormat {
+    return this.getElement('text', this.commonDataElement)?.textFormat ?? 'normal';
+  }
+  set textFormat(format: TextFormat) {
+    const element = this.getElement('text', this.commonDataElement);
+    if (element) {
+      element.setTextFormat(format);
+      return;
+    }
+    const common = this.commonDataElement;
+    if (!common || toTextFormat(format) === 'normal') return;
+    const created = DataElement.create('text', '', { type: DataElementType.NOTE }, `text_${this.identifier}`);
+    created.setTextFormat(format);
+    common.appendChild(created);
+  }
+
+  /**
+   * The size of the words in pixels, a whole number from 8 to 200; the default where none was set or
+   * what was set is not a size.
+   */
+  get textSize(): number {
+    const size = Number(this.optionalText('fontsize') || NaN);
+    return Number.isFinite(size) && size > 0
+      ? Math.max(8, Math.min(200, Math.round(size)))
+      : GameTableMask.DEFAULT_TEXT_SIZE;
+  }
+  set textSize(size: number) {
+    const normalized = Number.isFinite(size) && size > 0 ? Math.max(8, Math.min(200, Math.round(size))) : NaN;
+    this.writeOptionalText('fontsize', Number.isNaN(normalized) ? '' : `${normalized}`, DataElementType.TEXT);
+  }
+
+  get fontSize(): number {
+    return this.textSize;
+  }
+  set fontSize(size: number) {
+    this.textSize = size;
+  }
+
+  get outlineColor(): string {
+    const color = this.optionalText('outlinecolor');
+    return TEXT_COLOR.test(color) ? color : '#000000';
+  }
+  set outlineColor(color: string) {
+    this.writeOptionalText('outlinecolor', TEXT_COLOR.test(color) ? color : '', 'colors');
+  }
+
+  /** The colour of the words as `#rrggbb`; white where none was set or what was set is not one. */
+  get textColor(): string {
+    const color = this.optionalText('fontcolor');
+    return TEXT_COLOR.test(color) ? color : GameTableMask.DEFAULT_TEXT_COLOR;
+  }
+  set textColor(color: string) {
+    this.writeOptionalText('fontcolor', TEXT_COLOR.test(color) ? color : '', 'colors');
+  }
+
+  /**
+   * Whether the words are drawn with a dark outline, which keeps them readable over a picture; they
+   * are unless it was turned off. It is kept as a check, ticked or not.
+   */
+  get textOutline(): boolean {
+    return this.getElement('textoutline', this.commonDataElement)?.isChecked ?? true;
+  }
+  set textOutline(outline: boolean) {
+    const value = outline ? 1 : 0;
+    const element = this.getElement('textoutline', this.commonDataElement);
+    if (element) {
+      element.value = value;
+      return;
+    }
+    if (outline) return;
+    this.commonDataElement?.appendChild(
+      DataElement.create('textoutline', value, { type: DataElementType.CHECK }, `textoutline_${this.identifier}`)
+    );
+  }
+
   private optionalText(name: string): string {
     const element = this.getElement(name, this.commonDataElement);
     if (!element) return '';
@@ -185,27 +219,26 @@ export class GameTableMask extends TabletopObject {
   }
 
   /**
-   * The text colour stored in the colour element's value, compatible with Fly.
-   * Setting it creates the element if needed without changing an existing background colour.
+   * The `value` of the mask's `color` element; `#555555` when there is none. Setting it does
+   * nothing on a mask without that element.
+   *
+   * The mask is filled with `bgcolor`, the same element's current value, and map painting writes the
+   * two together. Nothing in the app reads this getter except the mask component's `color`, and
+   * nothing reads that.
    */
   get color(): string {
     const element = this.getElement('color', this.commonDataElement);
-    return element ? `${element.value}` : '#ffffff';
+    return element ? `${element.value}` : '#555555';
   }
   set color(color: string) {
-    const element = this.getElement('color', this.commonDataElement);
-    if (element) element.value = color;
-    else
-      this.commonDataElement?.appendChild(
-        DataElement.create('color', color, { type: 'colors', currentValue: '#0a0a0a' }, `color_${this.identifier}`)
-      );
+    this.setCommonValue('color', color);
   }
 
   /**
    * The fill shown where the mask has no picture, kept as the current value of its colour element;
    * `#0a0a0a` when there is none.
    *
-   * Setting it creates the element if needed without changing an existing text colour.
+   * Setting it does nothing on a mask without a colour element.
    */
   get bgcolor(): string {
     const element = this.getElement('color', this.commonDataElement);
@@ -214,10 +247,6 @@ export class GameTableMask extends TabletopObject {
   set bgcolor(bgcolor: string) {
     const element = this.getElement('color', this.commonDataElement);
     if (element) element.currentValue = bgcolor;
-    else
-      this.commonDataElement?.appendChild(
-        DataElement.create('color', '#ffffff', { type: 'colors', currentValue: bgcolor }, `color_${this.identifier}`)
-      );
   }
 
   /**

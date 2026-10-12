@@ -13,6 +13,7 @@ import {
 import { CardGameService } from '@axe/application/card/card-game.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { CoordinateService } from '@axe/application/input/coordinate.service';
+import type { PointerCoordinate } from '@axe/application/input/pointer-device.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
@@ -24,6 +25,7 @@ import { sheetPanelTitle } from '@axe/application/ui/sheet-panel';
 import { ViewportService } from '@axe/application/ui/viewport.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
+import { isHandCardOf } from '@axe/domain/card/hand-cards';
 import { findTrumpPairs } from '@axe/domain/card/trump-card';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { Config } from '@axe/domain/peer/config';
@@ -31,7 +33,10 @@ import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
 import { HandOverviewPanelComponent } from '@axe/features/card/hand-draw/hand-overview-panel.component';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
-import { buildHandCardContextMenu } from '@axe/features/card/hand-rail/hand-card-context-menu';
+import {
+  buildHandCardContextMenu,
+  buildPlayDroppedCardMenu,
+} from '@axe/features/card/hand-rail/hand-card-context-menu';
 import { autoSortHandCards, reorderHandCards, selectHandCards } from '@axe/features/card/hand-rail/hand-cards';
 import { HandDragService } from '@axe/features/card/hand-rail/hand-drag.service';
 import { handDropRecipientAt } from '@axe/features/card/hand-rail/hand-drop-target';
@@ -47,7 +52,6 @@ import {
   layoutHandFan,
 } from '@axe/features/card/hand-rail/hand-fan';
 import { HandRailService } from '@axe/features/card/hand-rail/hand-rail.service';
-import { handTransferActions } from '@axe/features/card/hand-rail/hand-transfer-context-menu';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { CardFacePreviewComponent } from '@axe/ui/components/card-face-preview/card-face-preview.component';
 import { DraggableDirective } from '@axe/ui/directives/draggable.directive';
@@ -185,6 +189,16 @@ export class HandRailComponent {
   protected readonly allowsGive = computed(() => {
     this.objectChange.versionOf('Config')();
     return this.cardGame.allowsHandGive();
+  });
+
+  /** The other seats that may receive a card, kept current as cursors join, leave or change role. */
+  protected readonly giveRecipients = computed(() => {
+    this.objectChange.collectionOf(PeerCursor.aliasName)();
+    this.objectChange.trackMyCursor();
+    for (const cursor of this.objectStore.getObjects<PeerCursor>(PeerCursor)) {
+      this.objectChange.versionOf(cursor.identifier)();
+    }
+    return this.cardGame.giveRecipients();
   });
 
   protected readonly confirmPublic = signal(false);
@@ -366,11 +380,10 @@ export class HandRailComponent {
 
   private giveActionsFor(card: Card): ContextMenuAction[] {
     if (!this.cardGame.canGiveCards()) return [];
-    return handTransferActions(
-      this.cardGame.giveRecipients(),
-      (userId) => this.cardGame.giveFromHand(card, userId),
-      this.t
-    );
+    return this.giveRecipients().map((recipient) => ({
+      name: recipient.name || this.t('feature.card.hand.unnamed'),
+      action: () => this.cardGame.giveFromHand(card, recipient.userId),
+    }));
   }
 
   /** Opens the card's editor, checking again in case the permission or the card moved since the menu opened. */
@@ -465,22 +478,24 @@ export class HandRailComponent {
       { x: event.clientX, y: event.clientY, z: 0 },
       surface
     );
-    const place = (faceUp: boolean) => {
-      if (!this.cards().includes(pending.card)) return;
-      pending.card.location.x = local.x - (pending.card.size * this.gridSize) / 2;
-      pending.card.location.y = local.y - (pending.card.size * this.gridSize) / 2;
-      pending.card.posZ = local.z;
-      if (faceUp) this.playFaceUp(pending.card, false);
-      else this.playFaceDown(pending.card, false);
-    };
-    this.contextMenu.open(
-      { x: event.clientX, y: event.clientY },
-      [
-        { name: this.t('feature.card.hand.playFaceUp'), action: () => place(true) },
-        { name: this.t('feature.card.hand.playFaceDown'), action: () => place(false) },
-      ],
-      this.t('feature.card.hand.chooseFaceAfterDrop')
-    );
+    const card = pending.card;
+    const menu = buildPlayDroppedCardMenu((faceUp) => this.playAt(card, local, faceUp), this.t);
+    this.contextMenu.open({ x: event.clientX, y: event.clientY }, menu, this.displayName(card));
+  }
+
+  /**
+   * Lays a card dragged out of the hand where it was dropped, face up or face down as was picked.
+   *
+   * Nothing is laid once the card has left the hand while the choice was open, as when somebody drew
+   * it.
+   */
+  private playAt(card: Card, at: PointerCoordinate, faceUp: boolean): void {
+    if (!isHandCardOf(card, this.cardGame.myUserId())) return;
+    card.location.x = at.x - (card.size * this.gridSize) / 2;
+    card.location.y = at.y - (card.size * this.gridSize) / 2;
+    card.posZ = at.z;
+    if (faceUp) this.playFaceUp(card, false);
+    else this.playFaceDown(card, false);
   }
 
   protected onCardPointerCancel(event: PointerEvent): void {

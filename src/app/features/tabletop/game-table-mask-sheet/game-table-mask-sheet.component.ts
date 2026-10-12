@@ -129,11 +129,11 @@ export class GameTableMaskSheetComponent {
   }
   onMapMaskColor(event: Event): void {
     const mask = this.gameTableMask;
-    if (mask) mask.color = (event.target as HTMLInputElement).value;
+    if (mask) mask.textColor = (event.target as HTMLInputElement).value;
   }
   onMapMaskBgColor(event: Event): void {
     const mask = this.gameTableMask;
-    if (mask) mask.bgcolor = (event.target as HTMLInputElement).value;
+    if (mask) mask.paintColor((event.target as HTMLInputElement).value);
   }
   onMapMaskOutline(event: Event): void {
     if (this.gameTableMask) this.gameTableMask.textOutline = (event.target as HTMLInputElement).checked;

@@ -1,4 +1,8 @@
-import { buildHandCardContextMenu } from '@axe/features/card/hand-rail/hand-card-context-menu';
+import type { TranslateFn } from '@axe/application/i18n/translate.token';
+import {
+  buildHandCardContextMenu,
+  buildPlayDroppedCardMenu,
+} from '@axe/features/card/hand-rail/hand-card-context-menu';
 import { createSyncTranslate } from '@axe/testing/transloco-testing';
 
 const t = createSyncTranslate('ja');
@@ -31,5 +35,17 @@ describe('buildHandCardContextMenu()', () => {
       'カードを編集',
     ]);
     expect(buildHandCardContextMenu({ giveActions: [], canEdit: false, onEdit: vi.fn() }, t)).toEqual([]);
+  });
+});
+
+describe('the menu of how a card dropped from the hand lies', () => {
+  it('offers face up, then face down', () => {
+    const play = vi.fn();
+    const menu = buildPlayDroppedCardMenu(play, ((key: string) => key) as TranslateFn);
+
+    expect(menu.map((entry) => entry.name)).toEqual(['feature.card.hand.playFaceUp', 'feature.card.hand.playFaceDown']);
+    menu[0].action!();
+    menu[1].action!();
+    expect(play.mock.calls).toEqual([[true], [false]]);
   });
 });

@@ -1,3 +1,386 @@
+## [1.64.0](https://github.com/Xelltis/udonarium_axe/compare/v1.63.0...v1.64.0) (2026-10-10)
+
+### ✨ Features
+
+* **card:** ask how a card dragged from the hand onto the table lies ([52c744f](https://github.com/Xelltis/udonarium_axe/commit/52c744f8caaaa4f8beb3ab10a2e4070c5d37fdea))
+* **card:** give a card from your hand to another participant ([1bed22a](https://github.com/Xelltis/udonarium_axe/commit/1bed22a04a309e75d5589a1fa873527659e638b9))
+* **card:** let the game master hand a departed player's hand on ([df16568](https://github.com/Xelltis/udonarium_axe/commit/df16568d5b7d58f1ec36bc80d4222e93fd5875b9))
+* **chat:** add battle stamps of the system character ([7c320a5](https://github.com/Xelltis/udonarium_axe/commit/7c320a5ee29e6e02ae48b6480edb982970ea32f3))
+* **chat:** add many more seals and sound effects ([e82f516](https://github.com/Xelltis/udonarium_axe/commit/e82f5161e07a00d1af4fa7d99a7c798da9c39a36))
+* **chat:** add table-talk stamps of the system character ([7cf7017](https://github.com/Xelltis/udonarium_axe/commit/7cf7017b68bdf00c965461736999dc8e72daff33))
+* **chat:** add ten more roll stamps of the system character ([ba990f2](https://github.com/Xelltis/udonarium_axe/commit/ba990f2fe324e1225173732be7e7a02fc0c2d124))
+* **chat:** add twelve more exploring stamps ([3af9c30](https://github.com/Xelltis/udonarium_axe/commit/3af9c30f4f9806d229a84d73379e869bdb2848d3))
+* **chat:** draw a line sent as a picture stamp larger ([45f6cac](https://github.com/Xelltis/udonarium_axe/commit/45f6cac99b6f8e8ff936a9e943d00a9a41af6e0e))
+* **chat:** draw stamps in three families and pick one from a popover ([b8a3069](https://github.com/Xelltis/udonarium_axe/commit/b8a3069b9a9505ee1e1e21549da0af27c8221bf2))
+* **chat:** finish the battle stamps and start the exploring ones ([1e74687](https://github.com/Xelltis/udonarium_axe/commit/1e74687285ccf8692498d8f46be278a8a8d263ab))
+* **chat:** finish the exploring stamps and start the feelings ([304ffd1](https://github.com/Xelltis/udonarium_axe/commit/304ffd1140991a3b06deefd5673f4b48060ecc30))
+* **chat:** finish the feeling stamps of the system character ([e680e9d](https://github.com/Xelltis/udonarium_axe/commit/e680e9d9a20ae2a17e801db2d8f9a98c5198f6d5))
+* **chat:** finish the table-talk stamps of the system character ([d525023](https://github.com/Xelltis/udonarium_axe/commit/d525023b069a45cd3953151aa1254f76cfdea890))
+* **chat:** let a room make sets of stamps from its own pictures ([a166491](https://github.com/Xelltis/udonarium_axe/commit/a1664910d78cabb052f268301d21118a008cffcf))
+* **chat:** let a room rule what its stamps may be used for ([e110e65](https://github.com/Xelltis/udonarium_axe/commit/e110e65707e749c39220d59e8345397b9a23dced))
+* **chat:** list the stamps put on a line in saved logs ([4f1cb86](https://github.com/Xelltis/udonarium_axe/commit/4f1cb8613f9d98fab7251d747d946db9f34ede72))
+* **chat:** offer stamps of the system character for rolls ([a16597a](https://github.com/Xelltis/udonarium_axe/commit/a16597a82c58b5047d33b52dedf74536118ebbe6))
+* **chat:** put stamps on lines of chat ([20c34c0](https://github.com/Xelltis/udonarium_axe/commit/20c34c0ca09b263ed5236692212f738a09de6a2e))
+* **chat:** put the picture stamps on a second row of picker tabs ([1b3ff76](https://github.com/Xelltis/udonarium_axe/commit/1b3ff7678662281ba830241391008f5e2053427c))
+* **chat:** save the chat log as plain text ([b7c410f](https://github.com/Xelltis/udonarium_axe/commit/b7c410f7b4d0972ccde99c4b00df5ffab1ddeeaa))
+* **chat:** send a stamp as a line of its own ([0038167](https://github.com/Xelltis/udonarium_axe/commit/00381679e698f8b39a060561f71870a66769d097))
+* **chat:** send a stamp together with the words being typed ([9bcdac6](https://github.com/Xelltis/udonarium_axe/commit/9bcdac6b778b206601e15558287dcaf0f40fb2f6))
+* **chat:** show what a character says in a bubble over its piece ([5e9e4f8](https://github.com/Xelltis/udonarium_axe/commit/5e9e4f81ef0a66029eea6735efbc65ae12555048))
+* **cut-in:** bring a text layer's letters on one at a time ([0861f11](https://github.com/Xelltis/udonarium_axe/commit/0861f1182e5a8a21a9d287a6e781ab8696ea6889))
+* **cut-in:** offer kinds of lettering for a text layer ([e6e60e7](https://github.com/Xelltis/udonarium_axe/commit/e6e60e76cad6e9ad8445edb06dafbc8dcbe98458))
+* **cut-in:** play a cut-in for the speaker, with their portrait and name ([1cdd0f1](https://github.com/Xelltis/udonarium_axe/commit/1cdd0f1c98ac9ead66e60c538d9ee5af4e75c2ae))
+* **cut-in:** set on the sheet how each portrait sits in a cut-in ([92d4aee](https://github.com/Xelltis/udonarium_axe/commit/92d4aee3b1c941d8d236b040480eb2034226f810))
+* **file:** paste a picture into the image list and clear its background ([4262925](https://github.com/Xelltis/udonarium_axe/commit/4262925bd2e387b4f0dc519be5973a0858f76a4d))
+* **hotbar:** pick a slot's effect by its mark as well as its name ([2a641ae](https://github.com/Xelltis/udonarium_axe/commit/2a641aed89ce7a15f89cba3b4bf9b46ec97ec364))
+* **room-settings:** add a stamps tab to rule what stamps may be used for ([e874dfc](https://github.com/Xelltis/udonarium_axe/commit/e874dfc382d9a09295439344e4e759e7e1310d3b))
+* **tabletop:** write words across a map mask ([c46e878](https://github.com/Xelltis/udonarium_axe/commit/c46e8787ef6a2ba221265bcb130b302ddc616a86))
+* **text-note:** draw a shared note with formatting where it is set to ([3c2192a](https://github.com/Xelltis/udonarium_axe/commit/3c2192ac7119395c06510eaf7803015322471659))
+* **white-board:** open a whiteboard out to fill the screen, as a card can ([7dfb23e](https://github.com/Xelltis/udonarium_axe/commit/7dfb23e9ae478bea5790a642612305276bb3ad11))
+
+### 🐛 Bug Fixes
+
+* **card:** redraw a deck's thickness when cards are put onto it ([8a447f0](https://github.com/Xelltis/udonarium_axe/commit/8a447f0e1626985653bdd5f5455405a84061815c))
+* **chat:** fit sound-effect stamps in their chips and centre the set panel ([b1274ae](https://github.com/Xelltis/udonarium_axe/commit/b1274aed821234ebc31edd6af11c3bd61fa664d4))
+* **chat:** keep a secret roll's result out of the lines answering it ([af1365a](https://github.com/Xelltis/udonarium_axe/commit/af1365aa5926ebc0b90778d03934491822c5e0e0))
+* **chat:** keep secret lines covered and draw stamp lines whole ([a5b6003](https://github.com/Xelltis/udonarium_axe/commit/a5b6003b8d1aee73523f25172e3847f0c5ada029))
+* **chat:** keep sound effects apart in the stamp picker ([11f8a44](https://github.com/Xelltis/udonarium_axe/commit/11f8a448504603e0f442f6c9b55bbdb4cd959705))
+* **chat:** keep speech bubbles out of sight while the screen is in novel mode ([4c6a421](https://github.com/Xelltis/udonarium_axe/commit/4c6a421393791de7be49665f14fcf75dfc02a427))
+* **chat:** keep the outer edge of a seal stamp's ring ([903e4cc](https://github.com/Xelltis/udonarium_axe/commit/903e4cccf86e8d203ce79eba095c0e411fbdcd63))
+* **chat:** make the words on a seal stamp easy to read ([bf38508](https://github.com/Xelltis/udonarium_axe/commit/bf385080b879620531c8cdb4fb3a412c2326657a))
+* **chat:** name a stamp under the pointer in the lists stamps are chosen from ([99f9c82](https://github.com/Xelltis/udonarium_axe/commit/99f9c8260bcd72ffce0a96901f23921e76669843))
+* **chat:** show palette lines without a space before and after them ([47a6561](https://github.com/Xelltis/udonarium_axe/commit/47a65614832fff1f0e9da2050f02da438b1a7ebb))
+* **chat:** show the stamp button as a face ([1f2df36](https://github.com/Xelltis/udonarium_axe/commit/1f2df36602e3a186a240993633e3b75e49b6248b))
+* **cut-in:** draw a layer whole under an outline name it does not know ([397e4e8](https://github.com/Xelltis/udonarium_axe/commit/397e4e8c6006e0a528f16d6ad2a603127c1900ae))
+* **cut-in:** show a text layer without a space before and after it ([f916898](https://github.com/Xelltis/udonarium_axe/commit/f916898f4c949ca8991c06cd2474ae0feb789d47))
+* **effect:** never take the reading of a ruby for an effect token ([d2cb25b](https://github.com/Xelltis/udonarium_axe/commit/d2cb25b026ef2b1c0bc889204df223f08f2ad66d))
+* **image-intake:** recover from a failed store and stay light on big pictures ([52d58a9](https://github.com/Xelltis/udonarium_axe/commit/52d58a913dcfa61b6d9fd955692338f457a70081))
+* **input:** keep a piece's drag when the chat field loses focus ([79646e9](https://github.com/Xelltis/udonarium_axe/commit/79646e9d8e8787a3a5cc73c540637939ded60b89))
+* **network:** wait for the previous connection to drop when rejoining after a reload ([3240ede](https://github.com/Xelltis/udonarium_axe/commit/3240ede5263684527f99f65adf3a7ff78a229eae))
+* **room:** keep the reactions when the room data brings none ([a4b1e47](https://github.com/Xelltis/udonarium_axe/commit/a4b1e47dea156ac3a605d460f963a2ddce1d29e8))
+* **save:** bundle the pictures stamps name ([ef8f567](https://github.com/Xelltis/udonarium_axe/commit/ef8f567de7bbeefdb426848278db612ff3b0b7ae))
+* **storage:** read an outside archive's room data under its stored picture ids ([11b3186](https://github.com/Xelltis/udonarium_axe/commit/11b31866f3e2552ae2cc30e481b03abe97d77223))
+* **storage:** take a picture in an archive whose name does not say so ([ea80567](https://github.com/Xelltis/udonarium_axe/commit/ea8056798dbd2e9dd2021d976911ff36c2b2bea6))
+* **sync:** keep line breaks and tabs in saved attribute values ([677ec2a](https://github.com/Xelltis/udonarium_axe/commit/677ec2a4d986a83bcbc7ae5b7deb329e3b8c1358))
+* **tabletop:** let the mask's text size be typed a digit at a time ([79d861c](https://github.com/Xelltis/udonarium_axe/commit/79d861c8ca5550205ef0a2e9ad837002e12fc3ea))
+
+### ⚡ Performance
+
+* **card:** look up the names of absent hand holders once per chat change ([89fd360](https://github.com/Xelltis/udonarium_axe/commit/89fd3601a14b3ece216be1c6a3401f0b4cf7a0b6))
+
+### ⏪ Reverts
+
+* **cut-in:** drop the third built-in sample ([d1b34c4](https://github.com/Xelltis/udonarium_axe/commit/d1b34c4af4dd865a67890b612bedf8bb5a152fa9))
+
+### 📝 Documentation
+
+* **website:** write up stamps, speech bubbles and the rest of v1.64.0 ([792d453](https://github.com/Xelltis/udonarium_axe/commit/792d453047408bcd28c45fa4b164ec94a8e4424c))
+* write up in the developer docs what came after the 3D dice ([e82ca84](https://github.com/Xelltis/udonarium_axe/commit/e82ca84d490bde9f4b71a7d65b32fb8261229979))
+
+### ♻️ Refactor
+
+* **card:** drop the event a deck sent when a card left it ([154316c](https://github.com/Xelltis/udonarium_axe/commit/154316c9ed8f7ec7120cd87347e98c026b9ef47e))
+* **chat:** drop the table-mark stamps ([5f1b8ae](https://github.com/Xelltis/udonarium_axe/commit/5f1b8ae51f84675d19d8ecc9245b18f6e167c104))
+* **chat:** name a stamp from the application layer ([b2d9396](https://github.com/Xelltis/udonarium_axe/commit/b2d939621a5b939c5f4422c63935233578a8a82f))
+* **chat:** read the ruby notation from one pattern ([e85ba5c](https://github.com/Xelltis/udonarium_axe/commit/e85ba5ca9af1d51c319dab548a6a45677a974725))
+* **chat:** send a stamp on its own from one place ([70c5e5a](https://github.com/Xelltis/udonarium_axe/commit/70c5e5a151433254af4cc3fac7e12d748d1a1dac))
+* **peer:** read the local user id in one place ([f2944af](https://github.com/Xelltis/udonarium_axe/commit/f2944afe9aa7db1718e5e921f691e7306b81ed70))
+* split text into the letters a reader sees in one place ([ec918e2](https://github.com/Xelltis/udonarium_axe/commit/ec918e2de29cb017687433c2be28efb604b65af5))
+* **storage:** name the type of picture bytes begin as ([e86fc22](https://github.com/Xelltis/udonarium_axe/commit/e86fc2224e93904220a8be3dd6cbf28615b1fd1c))
+* take a file's extension off in one place ([d96c34c](https://github.com/Xelltis/udonarium_axe/commit/d96c34c532a728ebbf1a6bfad033b50dd09e0cbc))
+
+## [1.63.0](https://github.com/Xelltis/udonarium_axe/compare/v1.62.3...v1.63.0) (2026-10-09)
+
+### ✨ Features
+
+* **chat-log:** leave deleted lines out of a saved log on request ([a4489f2](https://github.com/Xelltis/udonarium_axe/commit/a4489f2fd4a6393ade65ca26dbeaf9c646323990))
+* **chat:** delete a line from the chat while keeping it in the log ([0e77c2e](https://github.com/Xelltis/udonarium_axe/commit/0e77c2e0c714039003aac20ad6c8fdc3ab2073a1))
+* **chat:** gather what can be done with a line into a toolbar over it ([413881f](https://github.com/Xelltis/udonarium_axe/commit/413881ff961f4190d2bdd48b5450a28105c8d479))
+* **chat:** keep personal bookmarks apart from the room's shared ones ([731de25](https://github.com/Xelltis/udonarium_axe/commit/731de258d06755147b8e15c08f5f2358658adbae))
+* **chat:** keep the history of a line's edits ([3bbd3e1](https://github.com/Xelltis/udonarium_axe/commit/3bbd3e109af318ede8da69235af6d6b800dd7406))
+* **chat:** put deleting one's own line on the toolbar beside editing ([32d19bc](https://github.com/Xelltis/udonarium_axe/commit/32d19bc27cb68eb0824634d907f4d39e8859e0ba))
+* **chat:** share bookmarks on chat lines across the room ([aeae272](https://github.com/Xelltis/udonarium_axe/commit/aeae27240401a7de9b3c2872615ae8e781302d3e))
+* **chat:** whisper a line afterwards to someone chosen ([5d1a1a7](https://github.com/Xelltis/udonarium_axe/commit/5d1a1a70fecd155ca65c6beaa4eca3b87b94f57a))
+
+### 🐛 Bug Fixes
+
+* **chat:** count no deleted line as unread or as a line to draw ([4874aa3](https://github.com/Xelltis/udonarium_axe/commit/4874aa3fba21831c19fe41cd8515e0221034bd5c))
+* **chat:** keep a line's edit history true to when and by which edit ([ea4543b](https://github.com/Xelltis/udonarium_axe/commit/ea4543bb27384a332e382aa4fc63eedb6bf9b36e))
+* **chat:** keep personal bookmarks made in two windows of the app ([3766814](https://github.com/Xelltis/udonarium_axe/commit/3766814ebd7612fd1c88dc7720f5899bf615ffe3))
+* **chat:** keep the app's hover ring off the line toolbar and bookmark list ([f51bb9b](https://github.com/Xelltis/udonarium_axe/commit/f51bb9ba0bf3e4e5a6363688ff91da3660e8cb00))
+* **chat:** light a line up through the line's own flash ([44fd3cd](https://github.com/Xelltis/udonarium_axe/commit/44fd3cd3063aa00aca8e00ccf413935a44f97425))
+* **chat:** open a line's menus for a guest, with what a guest may do ([6036a16](https://github.com/Xelltis/udonarium_axe/commit/6036a16419ef1cfc369129475f26ba7cba6feb02))
+* **chat:** show nothing of a line kept from the reader through its history ([e99c738](https://github.com/Xelltis/udonarium_axe/commit/e99c73828edd4274fe115da4c1a86d722deadd8b))
+* **chat:** whisper a line afterwards only to someone who may read its tab ([d8b2494](https://github.com/Xelltis/udonarium_axe/commit/d8b249461092381dfb573ceab7d4ed4ef800f0b7))
+* **context-menu:** dim an item that is not enabled and ignore a press on it ([403d2dc](https://github.com/Xelltis/udonarium_axe/commit/403d2dc4490278a6bd27301fb463c3b02f52b4ef))
+
+### ⚡ Performance
+
+* **chat:** keep the bookmark list from reading the whole log ([e47c072](https://github.com/Xelltis/udonarium_axe/commit/e47c072752d48920764d12280064cabe75405db7))
+* **chat:** tell whether a line has a toolbar without building its menu ([0a8a8eb](https://github.com/Xelltis/udonarium_axe/commit/0a8a8ebd61b986d986b747e23edacbb882f5d44d))
+
+### 📝 Documentation
+
+* **website:** describe the line toolbar, bookmarks, edit history and more ([a24ec8c](https://github.com/Xelltis/udonarium_axe/commit/a24ec8cde54c954a8f8c2a795d62621423c6d111))
+* **website:** note a guest's line menu, the ticker and older edits ([ff62db7](https://github.com/Xelltis/udonarium_axe/commit/ff62db7085acc16f241fc471d55d3e15de6b1e99))
+* **website:** write the release notes for v1.63.0 ([fe0ddc5](https://github.com/Xelltis/udonarium_axe/commit/fe0ddc5ee81e223360c5b70541ffe733040451ec))
+
+### ♻️ Refactor
+
+* **chat:** build the bookmark choice menu in the line's menu file ([bddfdec](https://github.com/Xelltis/udonarium_axe/commit/bddfdec62dc71314acb609446d3afabb8c67da6b))
+
+## [1.62.3](https://github.com/Xelltis/udonarium_axe/compare/v1.62.2...v1.62.3) (2026-10-08)
+
+### 🐛 Bug Fixes
+
+* **panels:** keep the button for a window of its own in a narrow PC window ([b71125c](https://github.com/Xelltis/udonarium_axe/commit/b71125cb17d807981bec734854c87ef78ea3ad09))
+* **panels:** offer a window of its own again on a PC with a touch screen ([f358b50](https://github.com/Xelltis/udonarium_axe/commit/f358b50aff2ea23927abaf9730420fe84bfe96cc))
+* **room-settings:** erase this browser's data from a danger zone in the utility tab ([cff45ad](https://github.com/Xelltis/udonarium_axe/commit/cff45ad7e30d1ba47474645d8422f64296992def))
+* **storage:** wipe everything the app keeps in this browser on the next load ([51c001b](https://github.com/Xelltis/udonarium_axe/commit/51c001b1d7075e84b1ba062976468316fe9d785e))
+
+### 📝 Documentation
+
+* **website:** describe erasing this browser's data from the room settings ([6e7a7ee](https://github.com/Xelltis/udonarium_axe/commit/6e7a7ee2a588ed65ea448b947c7878883f40005c))
+* **website:** write the release notes for v1.62.3 ([d8e66c4](https://github.com/Xelltis/udonarium_axe/commit/d8e66c48d570dc12b7dbf4b6481659818d58d877))
+
+## [1.62.2](https://github.com/Xelltis/udonarium_axe/compare/v1.62.1...v1.62.2) (2026-10-08)
+
+### 🐛 Bug Fixes
+
+* **jukebox:** leave shuffle and repeat to the game master, and nothing to a guest ([c4fdcff](https://github.com/Xelltis/udonarium_axe/commit/c4fdcff5c8d3a746ae9f68f06e3243f2ac1765b0))
+* **jukebox:** write who turned shuffle or repeat to the system log ([2846d91](https://github.com/Xelltis/udonarium_axe/commit/2846d91369e66b7c9332b4a0e78eef9cc03bc035))
+
+### 📝 Documentation
+
+* **website:** add the jukebox's shuffle and repeat to the v1.62.1 release notes ([74dfd5d](https://github.com/Xelltis/udonarium_axe/commit/74dfd5d23aa03545f3ffb9de62038325bffd838f))
+* **website:** move the jukebox's shuffle and repeat to the v1.62.2 release notes ([e334190](https://github.com/Xelltis/udonarium_axe/commit/e3341904a03a1ea50c960b6746b471913c25daf2))
+* **website:** note who may play the jukebox and where its mode changes are logged ([12464ad](https://github.com/Xelltis/udonarium_axe/commit/12464add850750474c8cc7902cd37b171c021a94))
+
+## [1.62.1](https://github.com/Xelltis/udonarium_axe/compare/v1.62.0...v1.62.1) (2026-10-08)
+
+### 🐛 Bug Fixes
+
+* **cut-in:** play a YouTube cut-in again ([b982481](https://github.com/Xelltis/udonarium_axe/commit/b982481893f0cec4a22686a7b7607c368d23f476))
+
+### 📝 Documentation
+
+* **website:** write the release notes for v1.62.1 ([a016687](https://github.com/Xelltis/udonarium_axe/commit/a01668777639242668610aea45a87bdec957842e))
+
+## [1.62.0](https://github.com/Xelltis/udonarium_axe/compare/v1.61.1...v1.62.0) (2026-10-08)
+
+### ✨ Features
+
+* **audio:** add a background channel and a loop player that joins its seam ([5ffaa38](https://github.com/Xelltis/udonarium_axe/commit/5ffaa386e84b0fa924984d892baaa3a7e9f9b344))
+* **audio:** give cut-ins, notifications, handling and effects channels of their own ([7d2548e](https://github.com/Xelltis/udonarium_axe/commit/7d2548e3c7eebd8e8a6f4d5559293e48715172b3))
+* **audio:** read where a FLAC file asks to be looped ([06e31a3](https://github.com/Xelltis/udonarium_axe/commit/06e31a374239df268aa01381ec14c3ce861d374d))
+* **audio:** read where a track's file asks to be looped ([4fdbe04](https://github.com/Xelltis/udonarium_axe/commit/4fdbe045501d8f270feb375588c4f10a1da3ea86))
+* **audio:** send each kind of sound through its own channel, turned off at will ([4f19651](https://github.com/Xelltis/udonarium_axe/commit/4f19651b6338bb33c9cb24fb7fbe8bc3904ecbef))
+* **character:** give a narrow sheet a heading of its own ([12cd316](https://github.com/Xelltis/udonarium_axe/commit/12cd3160e87c117fd0f0ee73493027bd60f5d97c))
+* **character:** jump between a sheet's sections and fold them ([24e9cfd](https://github.com/Xelltis/udonarium_axe/commit/24e9cfdca54e6cd5ac0287282035f63d218bf8a3))
+* **character:** keep a phone's sheet laid out for it however it is held ([305e275](https://github.com/Xelltis/udonarium_axe/commit/305e275f075961d1ca1f718cc3e1663036060ed7))
+* **character:** lay the sheet out by its own width, with rows for a finger ([c46b05b](https://github.com/Xelltis/udonarium_axe/commit/c46b05b03ad7be15cf09676efb6fcab5131e5171))
+* **chat:** find words in a chat tab with Ctrl+F ([77c9535](https://github.com/Xelltis/udonarium_axe/commit/77c953599e8ce64077d80d8a4507496f39b1b251))
+* **data-element:** add a field from the end of its group on the phone ([6caec1f](https://github.com/Xelltis/udonarium_axe/commit/6caec1fd544747b9c5dd24124bc7299fd718db04))
+* **data-element:** drag rows by their handle with a finger ([7eb2b87](https://github.com/Xelltis/udonarium_axe/commit/7eb2b87b0a87fd6ab38ca5a8c65f1e7b3d86429f))
+* **data-element:** edit a field from a sheet on the phone ([99daebd](https://github.com/Xelltis/udonarium_axe/commit/99daebd56a58a829dd491048cb8006ec3f5cf55a))
+* **data-element:** edit a group or section from a sheet on the phone ([cefe21e](https://github.com/Xelltis/udonarium_axe/commit/cefe21e030bccb6e957d95cbb405a1eae24e8124))
+* **data-element:** keep a table's row headings in view as it scrolls ([7b3d904](https://github.com/Xelltis/udonarium_axe/commit/7b3d9045067b6c8b67f258e3a9113dd61e46b1d9))
+* **data-element:** let a deleted row or section be put back ([be5ddb5](https://github.com/Xelltis/udonarium_axe/commit/be5ddb53cdf0d8a76d58e59dd66be97ac83fecdd))
+* **data-element:** let a long text grow with what it holds on a phone ([eb52178](https://github.com/Xelltis/udonarium_axe/commit/eb5217806e4c5891e0e9a1ecfb01117d9b39610e))
+* **data-element:** make a field of a kind and list where it can move ([52e6fa9](https://github.com/Xelltis/udonarium_axe/commit/52e6fa93f24f9d1ccaad635fd37be89d18af11af))
+* **data-element:** step numbers and resources with ± buttons on a phone ([e37d653](https://github.com/Xelltis/udonarium_axe/commit/e37d653e39ae73ac297ce526b02bbdc867a0d999))
+* **domain:** take down a data element so it can be put back ([368c7d2](https://github.com/Xelltis/udonarium_axe/commit/368c7d2d40c42b4506cfdf965e8b2121a305e9ac))
+* **jukebox:** loop a track between its file's loop points on repeat one ([2a9d525](https://github.com/Xelltis/udonarium_axe/commit/2a9d525b27f36ce391fc565f755424cda7e9e45f))
+* **jukebox:** play, mix and stop background sounds from the jukebox ([bf846fa](https://github.com/Xelltis/udonarium_axe/commit/bf846fadb594f4bedab7fa313f64562982a23901))
+* **jukebox:** remember each listener's own volumes in the browser ([43bb21f](https://github.com/Xelltis/udonarium_axe/commit/43bb21f8a044a3d9243a93eba10e7fb0686d56ad))
+* **jukebox:** set the listener's own volumes apart from the room's ([0777a76](https://github.com/Xelltis/udonarium_axe/commit/0777a76a55880339625efe3d5c87ef96da1f7fc9))
+* **media:** let the room set a volume for each kind of sound ([5cdde1d](https://github.com/Xelltis/udonarium_axe/commit/5cdde1df8613698eb0b3fe0e818bee765d6f44d8))
+* **media:** loop background sounds between their file's loop points ([4e466e4](https://github.com/Xelltis/udonarium_axe/commit/4e466e4a131d4e867d0175ac8f6b73fb75873eda))
+* **media:** loop background sounds for the whole room under the music ([e5b015b](https://github.com/Xelltis/udonarium_axe/commit/e5b015b594adaf744937b25e0bf3572d2302b9a8))
+* **pl-tools:** offer the unclaimed characters in an empty list of one's own ([ba99a7c](https://github.com/Xelltis/udonarium_axe/commit/ba99a7c0c2ac4035f1adcb925d25fb0cd024719a))
+* **replay:** record background sounds and lay them into the video ([a8fb69e](https://github.com/Xelltis/udonarium_axe/commit/a8fb69e02682c13270370d9fddf716efd9d98afe))
+* **sound-settings:** add a panel holding every one of the listener's sound settings ([4868555](https://github.com/Xelltis/udonarium_axe/commit/48685558ae2bdbead1d35083c37f06cb2ccbb186))
+* **sound-settings:** list the room's volume for each kind of sound ([dd8b66c](https://github.com/Xelltis/udonarium_axe/commit/dd8b66c5aade3ba87f305f14987bd748b7a2beac))
+* **tabletop:** draw backdrops across the screen behind the table ([7d7bef2](https://github.com/Xelltis/udonarium_axe/commit/7d7bef271f08e68486084f3f88b7171f41df7df7))
+* **tabletop:** let a background layer stand behind the table as a backdrop ([c8dd859](https://github.com/Xelltis/udonarium_axe/commit/c8dd859d526c26cdb1f3241f0c2c62d1f4b0e2dd))
+* **tabletop:** move registered backdrops in the frame the camera moves in ([2ff5e7f](https://github.com/Xelltis/udonarium_axe/commit/2ff5e7f937dc75823ee1e41e469df05bd36cff33))
+* **tabletop:** set a backdrop's follow and height in the table settings ([7574896](https://github.com/Xelltis/udonarium_axe/commit/75748968009e75ffded915e108063cc399c1c49b))
+* **ui:** add a notice at the bottom of the screen with one action ([90c6520](https://github.com/Xelltis/udonarium_axe/commit/90c65203a3a7caeb8d475528b033373978bcbc8b))
+* **ui:** add a sheet that rises from the bottom of the screen ([04fd683](https://github.com/Xelltis/udonarium_axe/commit/04fd683e7d28a325833f45a496c40ab861b5e03f))
+
+### 🐛 Bug Fixes
+
+* **character:** keep the section picked from the row of sections lit ([8453048](https://github.com/Xelltis/udonarium_axe/commit/84530481b0ccd7905314e9485a4b24156c027d7a))
+* **chat:** empty the chat input when Enter comes before a redraw ([beadc35](https://github.com/Xelltis/udonarium_axe/commit/beadc35dd244a03af7f9dcbdf6b172848a2544a9))
+* **data-element:** carry a row on even where its finger cannot be captured ([f33b430](https://github.com/Xelltis/udonarium_axe/commit/f33b4304615a9f4d071e9229a4f66bf0d7ae1b60))
+* **data-element:** fit a resource's − 180 / 180 + on a 360px phone ([b695801](https://github.com/Xelltis/udonarium_axe/commit/b69580112ce098e74292b1b41968b1895051fba8))
+* **jukebox:** let only the game master move the room volume ([0f04c89](https://github.com/Xelltis/udonarium_axe/commit/0f04c89b930fff46f2146b2758ac03c8b4c69248))
+* **jukebox:** show no time beside the panel's seek bar while nothing is held ([e2d3e9a](https://github.com/Xelltis/udonarium_axe/commit/e2d3e9a1f8c9a0ac37be8ed1743d97afaa31a410))
+* **panels:** offer no window of its own on a phone or a tablet ([c327842](https://github.com/Xelltis/udonarium_axe/commit/c327842454a2ebe257da6caed80dda669a430d9f))
+* **storage:** read Opus, FLAC and AAC sounds from a zip, and type M4A as MP4 ([c77c954](https://github.com/Xelltis/udonarium_axe/commit/c77c9546b1138779374e60daf96892623d54605c))
+* **storage:** tell the reader which files were too large to take ([10fbcb1](https://github.com/Xelltis/udonarium_axe/commit/10fbcb10ea28096af0c321586ed9ed1f989a45ae))
+* **tabletop:** fade a backdrop's picture out at its top and foot ([26c794b](https://github.com/Xelltis/udonarium_axe/commit/26c794b1c086c5f9011cce963f3de86246373924))
+
+### 📝 Documentation
+
+* **website:** add a page on the sound settings ([bac67ae](https://github.com/Xelltis/udonarium_axe/commit/bac67ae69cd2b28eb20dd113290613b8c1734286))
+* **website:** describe backdrop layers in the table settings ([0e5fc67](https://github.com/Xelltis/udonarium_axe/commit/0e5fc6718a01f74b27247c08ddb5efd8bc3b9d95))
+* **website:** describe background sounds and remembered volumes ([f42e9b0](https://github.com/Xelltis/udonarium_axe/commit/f42e9b00cf6893945b14bf379e77aa7aff06d9e6))
+* **website:** describe finding lines in the chat ([c10a956](https://github.com/Xelltis/udonarium_axe/commit/c10a956d747a97385588c322ac9f38a156894d69))
+* **website:** describe looping a track between its loop points ([99a6b53](https://github.com/Xelltis/udonarium_axe/commit/99a6b53ec05fb4992c789c03ecc36442533678ec))
+* **website:** describe the character sheet on a phone ([2371e9b](https://github.com/Xelltis/udonarium_axe/commit/2371e9b1842dc75928c8cd577f18a33caca805d5))
+* **website:** describe the room's volume for each kind of sound ([6ac5867](https://github.com/Xelltis/udonarium_axe/commit/6ac58678cc713aff4dc8e78e3cdbe4ab3ab74d8e))
+* **website:** give the sound formats and file size limits ([a49d9a9](https://github.com/Xelltis/udonarium_axe/commit/a49d9a95d215a018b9432a1d3151bcc84f056698))
+* **website:** name FLAC among the files whose loop points are read ([44a93eb](https://github.com/Xelltis/udonarium_axe/commit/44a93eb43dabbee2989683605d0cd9eeac162ef9))
+* **website:** name the jukebox's own and room volume groups ([d716825](https://github.com/Xelltis/udonarium_axe/commit/d71682543f71bdbc2f505f00c53289009cec1856))
+* **website:** note that a backdrop's top and foot fade out ([54da960](https://github.com/Xelltis/udonarium_axe/commit/54da9605c3b7b1b15a26e5441570124dfc0234c6))
+* **website:** say the room volume is the game master's to move ([de87323](https://github.com/Xelltis/udonarium_axe/commit/de8732388c58530cc98337845036b65f95050137))
+* **website:** write the release notes for v1.62.0 ([477a368](https://github.com/Xelltis/udonarium_axe/commit/477a3689d6742210843b2aa8db178bcb713a4f18))
+
+### ♻️ Refactor
+
+* **character:** move portrait management into its own component ([5e4ff74](https://github.com/Xelltis/udonarium_axe/commit/5e4ff744ca898d9f03b726128a423e980456e68a))
+* **chat:** read a line's shown words and name from one place ([f87706e](https://github.com/Xelltis/udonarium_axe/commit/f87706e79d87daca8d620676633a4b0282a0ac6a))
+* **chat:** share the chat note settings and a volume row as ui parts ([cd7b495](https://github.com/Xelltis/udonarium_axe/commit/cd7b49521ad547474cc0d055f08a0b2258b93259))
+* **data-element:** build a row's actions from one pure function ([0788a50](https://github.com/Xelltis/udonarium_axe/commit/0788a50329f4e99939af1b7926661ec3b701f060))
+* **data-element:** list field types with their icons in one place ([140c6e4](https://github.com/Xelltis/udonarium_axe/commit/140c6e4e1dc3b46b5bc8bad1003394303cfcda55))
+* **data-element:** make changes to a sheet's shape through one service ([289449c](https://github.com/Xelltis/udonarium_axe/commit/289449c7a18a49e0ffee75c43d2f7d4b40f966c6))
+* **data-element:** move field and table settings into their own component ([9afca8a](https://github.com/Xelltis/udonarium_axe/commit/9afca8a35d435fbe20c14744433b4b7e1d0f5583))
+* **media:** send a new background sound out already playing ([f3ac734](https://github.com/Xelltis/udonarium_axe/commit/f3ac734fee470093a58a4cbdb4f8d90a9f54ba85))
+* **visual-novel:** join the overlay's class lists without spaces in the template ([92edae8](https://github.com/Xelltis/udonarium_axe/commit/92edae8f54ea063a7d73c243f271b72741a3100f))
+
+## [1.61.1](https://github.com/Xelltis/udonarium_axe/compare/v1.61.0...v1.61.1) (2026-10-06)
+
+### 🐛 Bug Fixes
+
+* **mobile:** let a finger move a resource slider in a piece's detail ([1ec9017](https://github.com/Xelltis/udonarium_axe/commit/1ec9017a53b89fe1da16b5b0990412d05469f41a))
+
+### 📝 Documentation
+
+* correct developer docs where they disagreed with the code ([5686969](https://github.com/Xelltis/udonarium_axe/commit/56869692df0a2caf614c2a08c01eeb5b906dd316))
+* drop the space between Japanese and Latin text ([fe04acf](https://github.com/Xelltis/udonarium_axe/commit/fe04acf60a0da546214e69099025f4e092d64d8a))
+* run the developer docs and README through yomiyasu ([04922d5](https://github.com/Xelltis/udonarium_axe/commit/04922d522791988fbaf3f96f5b62e39df51e5606))
+* spell the product name Axe instead of AXE ([8862521](https://github.com/Xelltis/udonarium_axe/commit/8862521b48948b747abcdaa43351972a40ca64d8))
+* **website:** correct manual and release-note statements ([a7e1287](https://github.com/Xelltis/udonarium_axe/commit/a7e12875ace768a1257610841446b345381464f2))
+* **website:** fix three manual links that pointed at missing anchors ([3ba47f4](https://github.com/Xelltis/udonarium_axe/commit/3ba47f4eabd6b26afeab3f3927f1637a5fac260d))
+* **website:** run the site through yomiyasu ([96809df](https://github.com/Xelltis/udonarium_axe/commit/96809dfb063e1a1b2cf03df25dd0c26ddd22989b))
+* **website:** settle the points left open by the yomiyasu pass ([86e0f9c](https://github.com/Xelltis/udonarium_axe/commit/86e0f9c07716afa9247fe28929c1322dbb2002aa))
+* **website:** write the release notes for v1.61.0 ([d93ac78](https://github.com/Xelltis/udonarium_axe/commit/d93ac78e99834067598e30383eb572ecbcfd93ea))
+* **website:** write the release notes for v1.61.1 ([9ccb17f](https://github.com/Xelltis/udonarium_axe/commit/9ccb17f083a59d264687bae28c495ccd3e7604cf))
+* write Japanese prose through yomiyasu ([9d40e8d](https://github.com/Xelltis/udonarium_axe/commit/9d40e8dbe7362e8068c3484a8371508c4431b4b3))
+
+## [1.61.0](https://github.com/Xelltis/udonarium_axe/compare/v1.60.0...v1.61.0) (2026-10-04)
+
+### ✨ Features
+
+* **dice:** add a panel to choose how one's own dice look ([b51aaea](https://github.com/Xelltis/udonarium_axe/commit/b51aaea2f2cdf2d9561a3140415e4119f002ae28))
+* **dice:** carry the roller's chosen dice look on their lines ([0673523](https://github.com/Xelltis/udonarium_axe/commit/067352308ea046488b2a47063118eaf936826744))
+* **dice:** choose a picture for one's dice in the My Dice panel ([6a1a4f6](https://github.com/Xelltis/udonarium_axe/commit/6a1a4f683d20c6c25b894eba20dfd6a7ba6043aa))
+* **dice:** draw dice in marble, metal and glass ([046052a](https://github.com/Xelltis/udonarium_axe/commit/046052a1fc19aaf32d33fd878f1f9b86a652df6d))
+* **dice:** draw dice in the picture their roller put on them ([d270940](https://github.com/Xelltis/udonarium_axe/commit/d2709402e451c132ab4c8855aaebba3fb4a55576))
+* **dice:** let a seat put a picture of its own on its dice ([7155ca0](https://github.com/Xelltis/udonarium_axe/commit/7155ca099878fc027ebffcb6d3f8bbb221171630))
+* **dice:** let more rolls tumble at once, counted by their dice ([97bd097](https://github.com/Xelltis/udonarium_axe/commit/97bd09711f8d0c1f120ffd3faaba416348001e64))
+* **dice:** show the dice of past rolls laid down in their lines ([d0301a3](https://github.com/Xelltis/udonarium_axe/commit/d0301a3e64e0afc529ffdfd8594ecb16c591a3d9))
+* **dice:** throw rolls of more than fifty dice on several trays ([6ecc03e](https://github.com/Xelltis/udonarium_axe/commit/6ecc03e9b094e7d49a380a0229041c8d5e1ad068))
+* **skin:** lay a dice mat of the skin's choosing under roll frames ([137b44f](https://github.com/Xelltis/udonarium_axe/commit/137b44f231b81f26aa127d2802ec1c4c847db086))
+
+### 🐛 Bug Fixes
+
+* **a11y:** end the rest of the animations at once when motion is stopped ([ec96093](https://github.com/Xelltis/udonarium_axe/commit/ec96093b2d36d7a6045f316b97ed50fa0cfacb9c))
+* **character:** hold a new piece still for a reader who keeps motion off ([2ae0398](https://github.com/Xelltis/udonarium_axe/commit/2ae0398fc25cb834c1a239e7babda4b73e45b4d2))
+* **dice:** build shaders ahead out of sight of the dice drawn meanwhile ([597ce03](https://github.com/Xelltis/udonarium_axe/commit/597ce030e6dfc88add8a5364402f066d80ef1c53))
+* **dice:** call drawing lightly by the name the setting has ([dacecae](https://github.com/Xelltis/udonarium_axe/commit/dacecaea86bd2b5caf349d47e818892ac35dba75))
+* **dice:** carry the dice on after a frame that took long to draw ([8a069fc](https://github.com/Xelltis/udonarium_axe/commit/8a069fc09c375cc6c6a00c017752b82ecb2acc04))
+* **dice:** count the dice thrown to try a look out as no roll ([341e19f](https://github.com/Xelltis/udonarium_axe/commit/341e19fe070d6b613dd9fd81c6041f0c14af03f2))
+* **dice:** do not read again a dice picture that could not be read ([a4129d2](https://github.com/Xelltis/udonarium_axe/commit/a4129d2e112c94c246dc47417452a7ea94bcd3dd))
+* **dice:** keep a dice picture in this browser before sharing it ([e525c7e](https://github.com/Xelltis/udonarium_axe/commit/e525c7e45c5702cd01f835863a25b5f3facd4945))
+* **dice:** keep a guest's dice picture out of the room's images ([2281683](https://github.com/Xelltis/udonarium_axe/commit/2281683d527a5d516603a1988370d946e1a29fc7))
+* **dice:** keep dice on the table their while though their recording is cut ([d5799e7](https://github.com/Xelltis/udonarium_axe/commit/d5799e78ae14be42fd0d937119dd06c8f7737cff))
+* **dice:** keep the material chosen under a picture on the dice ([ec233ad](https://github.com/Xelltis/udonarium_axe/commit/ec233addc69612dac8c0cf5b62ad6a188ae5b8e2))
+* **dice:** let go of dice pictures no kept throw wears ([aa35915](https://github.com/Xelltis/udonarium_axe/commit/aa359156351df74d91498b8637490d8d972258e8))
+* **dice:** let go of the copy kept for a dice picture that is replaced ([4cc0141](https://github.com/Xelltis/udonarium_axe/commit/4cc0141588b764e1c7f556a6391af74c810cb2d9))
+* **dice:** let lines scrolled back over go before rolls that tumbled ([9c413fe](https://github.com/Xelltis/udonarium_axe/commit/9c413fe26976b851f46cd69e0a40f0567dcfd8b9))
+* **dice:** put a dice picture back among the room's images only when needed ([94549fb](https://github.com/Xelltis/udonarium_axe/commit/94549fb20f65414d9825b5e96c23b73e96918976))
+* **dice:** put a dice picture back once a line of the seat's wants it ([3a69b9a](https://github.com/Xelltis/udonarium_axe/commit/3a69b9a194f14578b90c99155a508a0729e06dda))
+* **dice:** read a picture larger than dice pictures down to their size ([6995833](https://github.com/Xelltis/udonarium_axe/commit/699583311a1929ccee9d85e23e16b3ed47d6047b))
+* **dice:** seed each die's swirl from its roll, not its recording ([a7f36b2](https://github.com/Xelltis/udonarium_axe/commit/a7f36b2d15df8980f8269c06c3e648703ca0aa69))
+* **menu:** restore what the drawer did before it was arranged ([3ffe8c5](https://github.com/Xelltis/udonarium_axe/commit/3ffe8c57c84163e0cd12cad68f66ac292ed9c30f))
+* **skin:** lay the plain mat when a skin from before mats is read in ([170e563](https://github.com/Xelltis/udonarium_axe/commit/170e563f0d6f36d146f0c3dd05dd1192f6b9dbe1))
+* **skin:** show the fit and corner a picture is laid with ([31b7860](https://github.com/Xelltis/udonarium_axe/commit/31b7860d4e76906b8ff2c3e905cd03378c065fc1))
+* **skin:** show the mat picture of a skin that is read in ([dfe1d17](https://github.com/Xelltis/udonarium_axe/commit/dfe1d17691ce238b488b55353a6a0d80dbf3d2c3))
+* **storage:** keep files in IndexedDB as their bytes ([1cbaab2](https://github.com/Xelltis/udonarium_axe/commit/1cbaab2668050e8ba1e0e17172f95f45cef84c4e))
+
+### ⚡ Performance
+
+* **dice:** hand a line the same frames while nothing in them changes ([942788d](https://github.com/Xelltis/udonarium_axe/commit/942788db2ea1dc7a5e42b265798d1bf3503a665c))
+
+### 📝 Documentation
+
+* **dice:** move notes on keeping and dropping throws into doc comments ([2fa4633](https://github.com/Xelltis/udonarium_axe/commit/2fa4633f2402d0b9ec6b95068047394d196eaf0c))
+* **manual:** describe shared trays, past rolls, My Dice and the dice mat ([414b790](https://github.com/Xelltis/udonarium_axe/commit/414b790bfef506bfd7a001462ae3ec19362378a2))
+* **manual:** say the dice take back their material when the picture comes off ([1c159f9](https://github.com/Xelltis/udonarium_axe/commit/1c159f9c43f2c52f793c05abe9608c47015c3961))
+* **manual:** show how to put a picture on one's dice ([c78584e](https://github.com/Xelltis/udonarium_axe/commit/c78584e9bd035eb507a8684b7b472fcdafdaf9f8))
+
+### ♻️ Refactor
+
+* **storage:** keep the skin's picture database as one of a kind ([ecacf05](https://github.com/Xelltis/udonarium_axe/commit/ecacf05d760fc1a86ec9fc0d69dd7c94672be08d))
+
+## [1.60.0](https://github.com/Xelltis/udonarium_axe/compare/v1.59.0...v1.60.0) (2026-10-02)
+
+### ✨ Features
+
+* **character:** let a resource be moved with a slider in its sheet and popup ([1b3c1c8](https://github.com/Xelltis/udonarium_axe/commit/1b3c1c8f829478765f29349e76eceb4709d88d90))
+* **dice:** draw the thrown dice in 3D ([df7774f](https://github.com/Xelltis/udonarium_axe/commit/df7774f908546f20ffd73485e50d12b11532c4dc))
+* **dice:** flash the dice of a critical gold and of a fumble red ([964a152](https://github.com/Xelltis/udonarium_axe/commit/964a152cb99e2b21c7042c477959ad7a2afe7bf8))
+* **dice:** ground each die with a soft patch where it meets the floor ([4d76e15](https://github.com/Xelltis/udonarium_axe/commit/4d76e1581b7f4670c85a6c1abbda7d39ec8f9d7b))
+* **dice:** lay out the rounded dice and the numbers on their faces ([b49eeaa](https://github.com/Xelltis/udonarium_axe/commit/b49eeaabf0befb6d5572ccfb6e502290b4f7a89f))
+* **dice:** lay still dice down with their numbers upright ([0285a05](https://github.com/Xelltis/udonarium_axe/commit/0285a05a29390830e4a773ec8834259fb7031e09))
+* **dice:** throw the dice in over the tray's edge and turn each number to the viewer ([4240a52](https://github.com/Xelltis/udonarium_axe/commit/4240a52415adf7a5ac3acbceeea0495b4aeaf67e))
+* **dice:** throw up to fifty dice of a roll ([d77a100](https://github.com/Xelltis/udonarium_axe/commit/d77a10013838ef61f0322a3bde5179254b2a6798))
+* **dice:** tumble a roll's dice in its frame and on the table at once ([9db6df8](https://github.com/Xelltis/udonarium_axe/commit/9db6df8793033fcb2657f1dc3d9040a624581076))
+* **dice:** tumble the dice of a chat roll in the frame of its answer ([853db0c](https://github.com/Xelltis/udonarium_axe/commit/853db0cb23f306c40d053c1ff7e0d0e1d05266e5))
+* **dice:** tumble the dice of a chat roll on the table ([d968eaf](https://github.com/Xelltis/udonarium_axe/commit/d968eafaa18c7cb96ff2d651b15c534407b2eac9))
+* **dice:** work out how the dice of a chat roll land on the faces rolled ([7b6c7f1](https://github.com/Xelltis/udonarium_axe/commit/7b6c7f1ebb892b5d38099b2a154a30c9ce565e3e))
+* **dice:** work out how the dice of a chat roll tumble, away from the page ([6364d74](https://github.com/Xelltis/udonarium_axe/commit/6364d74a546df4810cc5e191722466b05c025f7c))
+* **jukebox:** keep several playlists and play them like a music player ([f2a417c](https://github.com/Xelltis/udonarium_axe/commit/f2a417c86cf22c047ef4e4e0a6904d2bab647849))
+
+### 🐛 Bug Fixes
+
+* **character:** stand the tilt handles beside the picture on a phone ([b327867](https://github.com/Xelltis/udonarium_axe/commit/b32786737375b2863ee1b1acc184b5a1663d4362))
+* **dice:** come to rest when the dice do on the screen ([ef18f4e](https://github.com/Xelltis/udonarium_axe/commit/ef18f4ea8df215baa281b238c36c6a9222a68d41))
+* **dice:** keep a throw on the table on the board ([d59f81d](https://github.com/Xelltis/udonarium_axe/commit/d59f81db45b31816db99fd595763ae8b03648c14))
+* **dice:** keep a throw put away when its dice are worked out after ([4cc24d5](https://github.com/Xelltis/udonarium_axe/commit/4cc24d5ea294008524f9da1b60d03c8ffdf9681f))
+* **dice:** keep the dice the colour the roll was said in ([a09e6f7](https://github.com/Xelltis/udonarium_axe/commit/a09e6f73bdaa46bdef458e5e6b9d5e8fd271211c))
+* **dice:** let a crowd of dice come to rest ([157fda4](https://github.com/Xelltis/udonarium_axe/commit/157fda4c21cb9a0913944a0766d321a2bda0bdcb))
+* **dice:** make every shape of die look one size ([846131b](https://github.com/Xelltis/udonarium_axe/commit/846131b170896f546e22396d3626001a85951b19))
+* **dice:** play a throw from the first frame it is drawn in ([3e6ebe0](https://github.com/Xelltis/udonarium_axe/commit/3e6ebe0e18d6f413aced920a20df2ae53b1a4934))
+* **dice:** put away the throws that come after the dice could not be drawn ([e9a39c1](https://github.com/Xelltis/udonarium_axe/commit/e9a39c1ce079fa8aa7aea8ea0e24fbcd4a76b2dc))
+* **jukebox:** hold the panel's seek bar where it is dragged ([1b7d99d](https://github.com/Xelltis/udonarium_axe/commit/1b7d99d02a23632603911b4434431344e6a3fc77))
+* **tabletop:** let a block of glass be taken hold of wherever it seems to be ([e02e973](https://github.com/Xelltis/udonarium_axe/commit/e02e973da993df47bbaa06d1fd4a33ce1f0271d4))
+
+### ⚡ Performance
+
+* **dice:** cut each shape's engraving once, ahead of the first roll ([b3d2399](https://github.com/Xelltis/udonarium_axe/commit/b3d2399868b201ba2d3c35916d067fb857801c0e))
+* **dice:** draw a frame again only when its own throw has changed ([2ba8a3f](https://github.com/Xelltis/udonarium_axe/commit/2ba8a3f5ca4a1210a5837f94cebae392b732ec6d))
+* **dice:** let a large roll's dice heap up instead of throwing it again ([3c3ea61](https://github.com/Xelltis/udonarium_axe/commit/3c3ea61a97ddcbd6e9d1590a6ec231a210acf1d0))
+* **dice:** start the physics worker before the first roll ([5a01ed5](https://github.com/Xelltis/udonarium_axe/commit/5a01ed5c9873e72f260a3c9a2bfa04bbb290b36f))
+* **dice:** step the physics finely only while the dice move fast ([bd5886b](https://github.com/Xelltis/udonarium_axe/commit/bd5886bdd548bef2b1b4fded3646d3b651202c80))
+* **dice:** warm the physics worker with a throw of its own ([cd27432](https://github.com/Xelltis/udonarium_axe/commit/cd274326de9cd236b9961aa65508a487b3197c83))
+
+### 📝 Documentation
+
+* say a room can show its rolls' dice in both places ([d3fd944](https://github.com/Xelltis/udonarium_axe/commit/d3fd944a17cfda7d158fa33c1563bb85d05065d6))
+* **website:** say a block of glass is taken hold of anywhere inside its outlines ([c752f72](https://github.com/Xelltis/udonarium_axe/commit/c752f72e531691f49fbb6391b55ba425dd8c8f46))
+* **website:** say where the tilt handles stand on a phone ([fd628c4](https://github.com/Xelltis/udonarium_axe/commit/fd628c4fd1ef3d040b0f7f5e30e97f763afb7778))
+* **website:** write the release notes for v1.60.0 ([61f7262](https://github.com/Xelltis/udonarium_axe/commit/61f7262dc93b71006e55eb50bfab4d8b8d133bee))
+* **website:** write up several playlists, shuffle and pause in the jukebox ([8190d6c](https://github.com/Xelltis/udonarium_axe/commit/8190d6c061df6fa740a40f4b602cd6f34eb16d75))
+* **website:** write up the slider on a resource ([6591a2a](https://github.com/Xelltis/udonarium_axe/commit/6591a2a795f4d2f68cd067f55853e64d0be4c033))
+* write up the 3D dice of chat rolls ([4793979](https://github.com/Xelltis/udonarium_axe/commit/4793979753495a7666320a453ee593cddbff4e59))
+
+### ♻️ Refactor
+
+* **inventory:** let the overview's slider ask the edit permission itself ([ebc3443](https://github.com/Xelltis/udonarium_axe/commit/ebc3443c101716cc2cba08bd3be3cffa4b2dbe63))
+* **jukebox:** read out a track's time the same way in the panel and the mini player ([536c37e](https://github.com/Xelltis/udonarium_axe/commit/536c37ea72b3d711eb73f12d170ccd8288c85c89))
+
 ## [1.59.0](https://github.com/Xelltis/udonarium_axe/compare/v1.58.0...v1.59.0) (2026-10-01)
 
 ### ✨ Features

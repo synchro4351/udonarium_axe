@@ -12,6 +12,8 @@ import {
   resolvePortraitIndex,
   stripPortraitCommand,
 } from '@axe/application/chat/chat-message-helpers';
+import { StampRulesService } from '@axe/application/chat/stamp-rules.service';
+import { MyDiceService } from '@axe/application/dice/my-dice.service';
 import { encodeI18nMessage } from '@axe/application/i18n/i18n-message';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { emitDiceTableMessage, emitResourceEditMessage, emitSendMessage } from '@axe/core/event/domain-events';
@@ -24,21 +26,21 @@ import { portraitNameOf } from '@axe/domain/character/character-portrait';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage, ChatMessageContext, ChatMessageTargetContext } from '@axe/domain/chat/chat-message';
 import { copiedMessageContext } from '@axe/domain/chat/chat-message-copy';
-import { ChatStampOutgoing } from '@axe/domain/chat/chat-outgoing';
+import { ChatOutgoing, OutgoingStamp } from '@axe/domain/chat/chat-outgoing';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
+import { canRoleSpeakTab, canRoleViewTab } from '@axe/domain/chat/chat-tab-permission';
 import { OUT_OF_STORY_TAG } from '@axe/domain/chat/constants';
 import { dieRollTag } from '@axe/domain/chat/die-roll-tag';
+import { stampOf } from '@axe/domain/chat/stamp-catalog';
+import { joinStampLine } from '@axe/domain/chat/stamp-line';
 import { DataElement, DataElementFieldType } from '@axe/domain/data/data-element';
+import { encodeDiceLook } from '@axe/domain/dice/dice-3d/dice-look';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
-import { normalizeStampName } from '@axe/domain/media/stamp-pack';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import GameSystemClass from 'bcdice/lib/game_system';
 
 const HOURS = 60 * 60 * 1000;
-
-/** What a stamp sent without a name is called, since a stamp is known by its name. */
-const STAMP_FALLBACK_NAME = '🖼️';
 
 @Injectable()
 export class ChatMessageService {
@@ -46,6 +48,8 @@ export class ChatMessageService {
   private readonly rolePermission = inject(RolePermissionService);
   private readonly imageStorage = inject(ImageStorage);
   private readonly chatTabList = inject(ChatTabList);
+  private readonly myDice = inject(MyDiceService);
+  private readonly stampRules = inject(StampRulesService);
 
   private calibrationTimer: ReturnType<typeof setTimeout> | null = null;
   private timeOffset: number = Date.now();
@@ -240,13 +244,82 @@ export class ChatMessageService {
   }
 
   /**
+   * Sends a stamp going out with nothing said with it as a line of its own, as `sendStamp` does;
+   * true where `value` was such a stamp, sent or refused, so the caller sends nothing more for it,
+   * and false for anything else, which the caller sends as a line.
+   */
+  sendLoneStamp(chatTab: ChatTab, value: ChatOutgoing): boolean {
+    if (!value.stamp || value.text.trim().length > 0) return false;
+    this.sendStamp(
+      chatTab,
+      value.stamp.id,
+      value.stamp.words,
+      value.sendFrom,
+      value.sendTo,
+      value.portraitIndex,
+      value.messColor,
+      { light: value.messBubbleLight ?? '', dark: value.messBubbleDark ?? '' }
+    );
+    return true;
+  }
+
+  /**
+   * Sends a stamp into a tab as a line of its own, from a piece or a peer, as a line of words is
+   * sent but with nothing read out of its words: no dice, no resources, no portrait command.
+   *
+   * `words` stand in for the stamp wherever it cannot be drawn: in a version that does not know it,
+   * in a log, in a video. A stamp that is a picture in the room carries the picture as well, for
+   * those to show. A stamp this version does not know, one the room does not let be sent, or one
+   * from a reader whose role may not speak in the tab, is not sent, and null comes back.
+   */
+  sendStamp(
+    chatTab: ChatTab,
+    stampId: string,
+    words: string,
+    sendFrom: string,
+    sendTo?: string,
+    portraitIndex?: number,
+    color?: string,
+    bubbles?: { light: string; dark: string }
+  ): ChatMessage | null {
+    const stamp = stampOf(stampId);
+    if (!stamp || !this.stampRules.allows('line', stampId)) return null;
+    if (!canRoleSpeakTab(chatTab, PeerCursor.myRole)) return null;
+
+    const imgIndex = resolvePortraitIndex(portraitIndex);
+    const chatMessage: ChatMessageContext = {
+      from: Network.peerContext.userId,
+      to: sendTo != null ? this.findId(sendTo) : undefined,
+      name: this.makeMessageName(sendFrom, sendTo),
+      imageIdentifier: this.findImageIdentifier(sendFrom, imgIndex),
+      timestamp: this.calcTimeStamp(chatTab),
+      text: words,
+      imagePos: this.findImagePos(sendFrom),
+      messColor: resolveMessageColor(color, '#000000'),
+      sendFrom,
+      senderRole: PeerCursor.myRole,
+      stamp: stampId,
+    };
+    if (stamp.kind === 'image') chatMessage.attachmentImageIdentifiers = JSON.stringify([stamp.imageIdentifier]);
+    if (bubbles?.light) chatMessage.messBubbleLight = bubbles.light;
+    if (bubbles?.dark) chatMessage.messBubbleDark = bubbles.dark;
+
+    this.setLastControlInfoToPeer(sendFrom, chatMessage.imageIdentifier ?? '', imgIndex, sendTo);
+    return chatTab.addMessage(chatMessage);
+  }
+
+  /**
    * Speaks a line into a tab as a piece or a peer, and tells the dice table and resource edits
    * about it.
    *
    * Image references to the speaker's data are lifted out into attachments, a trailing portrait
    * command picks the portrait and is removed from the text, and a line sent under a dice system is
-   * tagged with it. A line not whispered to anyone also records who this reader last spoke as,
-   * which `sendSystemMessageAsLastSpeaker` follows.
+   * tagged with it. A line from a seat that chose how its dice look carries that look, for the dice
+   * bot's answer to throw them in; a guest's carries no picture, since a guest may not add to the
+   * room's images. A line not whispered to anyone also records who this reader last spoke as, which
+   * `sendSystemMessageAsLastSpeaker` follows. A stamp sent with the line goes under it, with the
+   * words standing in for it on a last line of their own, after everything else has been read out of
+   * the line.
    */
   sendMessage(
     chatTab: ChatTab,
@@ -261,7 +334,8 @@ export class ChatMessageService {
     replyTo?: string,
     quoteOf?: string,
     bubbles?: { light: string; dark: string },
-    vnEmote?: string
+    vnEmote?: string,
+    stamp?: OutgoingStamp
   ): ChatMessage {
     const resolvedMessage = this.resolveAttachmentImageReferences(text, sendFrom, attachmentImageIdentifiers ?? []);
     text = resolvedMessage.text;
@@ -297,9 +371,17 @@ export class ChatMessageService {
     if (bubbles?.light) chatMessage.messBubbleLight = bubbles.light;
     if (bubbles?.dark) chatMessage.messBubbleDark = bubbles.dark;
     if (vnEmote) chatMessage.vnEmote = vnEmote;
+    const look = this.myDice.look();
+    const diceLook = encodeDiceLook(look);
+    if (diceLook) chatMessage.diceLook = diceLook;
+    if (look.picture && this.rolePermission.canEditTabletop) {
+      chatMessage.diceImageIdentifier = look.picture;
+      void this.myDice.ensureShared();
+    }
 
     const portrait = this.applyPortraitCommand(chatMessage, text, sendFrom, imgIndex);
     this.setLastControlInfoToPeer(sendFrom, portrait.identifier, portrait.index, sendTo);
+    if (stamp) this.attachStamp(chatMessage, stamp);
 
     const chat = chatTab.addMessage(chatMessage);
 
@@ -317,43 +399,6 @@ export class ChatMessageService {
     });
 
     return chat;
-  }
-
-  /**
-   * Sends a stamp into a tab: its picture as the line's one attachment and its name alongside,
-   * with no words.
-   *
-   * It goes to whoever a line would, under the same name, portrait and colour, and a whisper
-   * stays one. Nothing in it reaches the dice bot, the dice table or resource edits, since a stamp
-   * says nothing to roll or change. A seat from before stamps sees the picture as an attachment.
-   * Answers null, sending nothing, for a stamp with no picture.
-   */
-  sendStamp(chatTab: ChatTab, stamp: ChatStampOutgoing): ChatMessage | null {
-    const imageIdentifier = stamp.imageIdentifier.trim();
-    if (imageIdentifier.length === 0) return null;
-    const { sendFrom, sendTo } = stamp;
-    const imgIndex = resolvePortraitIndex(stamp.portraitIndex);
-    const chatMessage: ChatMessageContext = {
-      from: Network.peerContext.userId,
-      to: sendTo ? this.findId(sendTo) : undefined,
-      name: this.makeMessageName(sendFrom, sendTo),
-      imageIdentifier: this.findImageIdentifier(sendFrom, imgIndex),
-      timestamp: this.calcTimeStamp(chatTab),
-      tag: '',
-      text: '',
-      imagePos: this.findImagePos(sendFrom),
-      messColor: resolveMessageColor(stamp.messColor, '#000000'),
-      sendFrom,
-      senderRole: PeerCursor.myRole,
-      attachmentImageIdentifiers: JSON.stringify([imageIdentifier]),
-      stampName: normalizeStampName(stamp.stampName) || STAMP_FALLBACK_NAME,
-    };
-    if (stamp.replyTo) chatMessage.replyTo = stamp.replyTo;
-    if (stamp.quoteOf) chatMessage.quoteOf = stamp.quoteOf;
-    if (stamp.messBubbleLight) chatMessage.messBubbleLight = stamp.messBubbleLight;
-    if (stamp.messBubbleDark) chatMessage.messBubbleDark = stamp.messBubbleDark;
-    this.setLastControlInfoToPeer(sendFrom, chatMessage.imageIdentifier ?? '', imgIndex, sendTo);
-    return chatTab.addMessage(chatMessage);
   }
 
   /**
@@ -388,6 +433,24 @@ export class ChatMessageService {
     emitSendMessage({ messageIdentifier: chat.identifier, messageTarget: null });
     emitDiceTableMessage({ messageIdentifier: chat.identifier });
     return chat;
+  }
+
+  /**
+   * Puts a stamp under a line about to be said, with the words standing in for it on a last line; a
+   * picture from the room's sets also goes among the attachments, for a version that cannot draw it.
+   * A stamp this version does not know, or one the room does not let be sent, is left off.
+   */
+  private attachStamp(chatMessage: ChatMessageContext, stamp: OutgoingStamp): void {
+    const ref = stampOf(stamp.id);
+    if (!ref || !this.stampRules.allows('line', stamp.id)) return;
+    chatMessage.text = joinStampLine(chatMessage.text ?? '', stamp.words);
+    chatMessage.stamp = stamp.id;
+    if (ref.kind !== 'image') return;
+    const attached: string[] = chatMessage.attachmentImageIdentifiers
+      ? JSON.parse(chatMessage.attachmentImageIdentifiers)
+      : [];
+    if (!attached.includes(ref.imageIdentifier)) attached.push(ref.imageIdentifier);
+    chatMessage.attachmentImageIdentifiers = JSON.stringify(attached);
   }
 
   private resolveAttachmentImageReferences(
@@ -591,6 +654,71 @@ export class ChatMessageService {
     if (!(chatTab instanceof ChatTab)) return;
     message.disclosedAt = this.calcTimeStamp(chatTab);
     chatTab.appendChild(message);
+  }
+
+  /**
+   * Whether this reader may make the line an after-the-fact whisper, or whisper one to somebody
+   * else: they said it to everyone, and it is not a notice from the tool.
+   *
+   * A dice result is the dice bot's line, so a roll stays where the table saw it, and a line
+   * whispered from the start is a whisper already.
+   */
+  canMakeAfterWhisper(message: ChatMessage): boolean {
+    if (message.isDirect && !message.isAfterWhisper) return false;
+    return message.changeable;
+  }
+
+  /** Whether this reader may put a line they made an after-the-fact whisper back where it was. */
+  canUndoAfterWhisper(message: ChatMessage): boolean {
+    return message.isAfterWhisper && message.changeable;
+  }
+
+  /**
+   * The seats a line can be whispered to afterwards: everyone in the room but this reader, who said
+   * it and keeps it either way, and but those whose role may not read the tab it is in, who could
+   * never see it.
+   */
+  afterWhisperCandidates(message: ChatMessage): PeerCursor[] {
+    const me = PeerCursor.myCursor;
+    const tab = message.parent;
+    return this.objectStore
+      .getObjects(PeerCursor)
+      .filter((peer) => peer !== me && !!peer.userId)
+      .filter((peer) => !(tab instanceof ChatTab) || canRoleViewTab(tab, peer.role));
+  }
+
+  /**
+   * Makes a line an after-the-fact whisper to one seat, which with the speaker are then the only ones
+   * it reaches. Does nothing for a line this reader may not, or for a seat not in the room.
+   */
+  makeAfterWhisper(message: ChatMessage, peer: PeerCursor): void {
+    if (!this.canMakeAfterWhisper(message)) return;
+    if (!this.afterWhisperCandidates(message).includes(peer)) return;
+    message.makeAfterWhisper(peer.userId, peer.name, this.getTime());
+  }
+
+  /** Puts an after-the-fact whisper back where it was. Does nothing for a line this reader may not put back. */
+  undoAfterWhisper(message: ChatMessage): void {
+    if (!this.canUndoAfterWhisper(message)) return;
+    message.undoAfterWhisper();
+  }
+
+  /**
+   * Whether this reader may delete the line: they said it, and it is not a notice from the tool. A
+   * dice result is the dice bot's line, so a roll stays where the table saw it.
+   */
+  canPseudoDelete(message: ChatMessage): boolean {
+    return !message.isPseudoDeleted && message.changeable;
+  }
+
+  /**
+   * Deletes a line from everybody's chat as though it had never been said, leaving it in the room's
+   * data and its log; it is a pseudo-deletion, which is not put back. Does nothing for a line this
+   * reader may not delete.
+   */
+  pseudoDelete(message: ChatMessage): void {
+    if (!this.canPseudoDelete(message)) return;
+    message.pseudoDelete(this.getTime());
   }
 
   /**

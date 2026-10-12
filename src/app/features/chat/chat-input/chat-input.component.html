@@ -106,6 +106,18 @@
               <i class="material-icons align-middle text-[13px]! @max-[320px]:m-0 @max-[320px]:text-[14px]!">settings</i
               >{{ 'feature.chat.input.colorSetting' | transloco }}
             </button>
+            @if (showsMyDice()) {
+              <button
+                data-testid="chat-my-dice"
+                class="rounded-ui-sm border-ui-border-panel text-ui-muted hover:border-ui-accent hover:bg-ui-hover hover:text-ui-accent m-0 shrink-0 cursor-pointer border border-solid bg-transparent px-1 py-0.5 transition-colors hover:shadow-none"
+                type="button"
+                [title]="'feature.chat.input.myDice' | transloco"
+                [attr.aria-label]="'feature.chat.input.myDice' | transloco"
+                (click)="openMyDice()"
+              >
+                <i class="material-icons align-middle text-[14px]!">casino</i>
+              </button>
+            }
             @if (showsTickerSwitch()) {
               <button
                 data-testid="chat-send-to-ticker"
@@ -202,7 +214,6 @@
             class="absolute inset-x-0 bottom-full z-20 mb-1"
             (emojiPicked)="insertEmoji($event)"
             (syntaxPicked)="insertSyntax($event)"
-            (stampPicked)="sendPickedStamp($event)"
             (closed)="closeStampPicker()"
           />
         } @else if (suggestions().length > 0) {
@@ -294,23 +305,35 @@
           [attr.aria-activedescendant]="activeSuggestionId()"
           #textArea
         ></textarea>
-        @if (offersStamps()) {
+        @if (stampLinesOn()) {
           <button
             #stampButton
             type="button"
-            data-testid="chat-stamp-button"
+            data-testid="chat-input-stamp"
             class="border-ui-border-panel text-ui-muted hover:border-ui-accent hover:bg-ui-hover hover:text-ui-accent m-0 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-solid bg-transparent p-0 transition-colors hover:shadow-none [&_i]:text-[20px] [&_i]:leading-none"
-            [class.text-ui-accent]="isStampPickerOpen()"
-            [class.border-ui-accent]="isStampPickerOpen()"
-            [attr.aria-expanded]="isStampPickerOpen()"
-            aria-haspopup="dialog"
-            [attr.aria-label]="'feature.chat.stamp.open' | transloco"
-            [title]="'feature.chat.stamp.open' | transloco"
-            (click)="toggleStampPicker()"
+            aria-haspopup="listbox"
+            [attr.aria-label]="'feature.chat.input.stamp' | transloco"
+            [title]="'feature.chat.input.stamp' | transloco"
+            (click)="openStamps($event.currentTarget)"
           >
             <i aria-hidden="true" class="material-icons">emoji_emotions</i>
           </button>
         }
+        <button
+          #writingToolsButton
+          type="button"
+          class="border-ui-border-panel text-ui-muted hover:border-ui-accent hover:text-ui-accent m-0 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-solid bg-transparent p-0 transition-colors hover:shadow-none [&_i]:text-[18px]! [&_i]:leading-none"
+          data-testid="chat-writing-tools"
+          [class.text-ui-accent]="isStampPickerOpen()"
+          [class.border-ui-accent]="isStampPickerOpen()"
+          [attr.aria-expanded]="isStampPickerOpen()"
+          aria-haspopup="dialog"
+          [attr.aria-label]="'feature.chat.syntax.tab' | transloco"
+          [title]="'feature.chat.syntax.tab' | transloco"
+          (click)="toggleStampPicker()"
+        >
+          <i aria-hidden="true" class="material-icons">edit_note</i>
+        </button>
         <button
           type="submit"
           class="border-ui-accent bg-ui-accent hover:border-ui-accent hover:bg-ui-accent m-0 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-solid p-0 text-[12px] font-semibold text-white transition-[background,border-color,filter] hover:text-white hover:shadow-none hover:brightness-110 [&_i]:text-[18px] [&_i]:leading-none"

@@ -8,6 +8,7 @@ import {
   DataElementRole,
   DataElementViewMode,
 } from '@axe/domain/data/data-element';
+import { portraitFitFor } from '@axe/domain/media/cut-in-portrait-fit';
 import { LightCategory, LightPreset, VisionType } from '@axe/domain/tabletop/vision-types';
 
 describe('GameCharacter', () => {
@@ -21,6 +22,25 @@ describe('GameCharacter', () => {
     const allObjects = ObjectStore.instance.getObjects();
     allObjects.forEach((obj) => ObjectStore.instance.delete(obj, false));
     ObjectStore.instance.clearDeleteHistory();
+  });
+
+  it('migrates the old bust fit to shared cut-in data and retains unsupported raw frames', () => {
+    const legacy = JSON.stringify({
+      bust: {
+        'face-a': { scale: 1.5, x: 68, y: -100 },
+        'face-old-maximum': { scale: 12, x: 2210, y: -2600 },
+      },
+      fullBody: { 'face-a': { scale: 3, x: 100, y: 120 } },
+    });
+    const saved = legacy.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
+    const restored = ObjectSerializer.instance.parseXml(
+      `<character name="Hero" portraitFits="${saved}"></character>`
+    ) as GameCharacter;
+
+    expect(portraitFitFor(restored.cutInPortraitFits, 'face-a')).toEqual({ scale: 1.5, x: 0.2, y: -0.25 });
+    expect(portraitFitFor(restored.cutInPortraitFits, 'face-old-maximum')).toEqual({ scale: 12, x: 6.5, y: -6.5 });
+    expect(restored.portraitFits).toBe(legacy);
+    expect(restored.toXml()).toContain('portraitFits=');
   });
 
   // ----------------------------------------------------------------

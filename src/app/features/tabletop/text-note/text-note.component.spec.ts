@@ -1,7 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
-import { DisclosureService } from '@axe/application/permission/disclosure.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { PieceContextMenuService } from '@axe/application/ui/piece-context-menu.service';
@@ -96,71 +95,51 @@ describe('TextNoteComponent', () => {
     });
   });
 
-  describe('display format', () => {
-    const SOURCE = '# 見出し\n- 項目\n`|漢字《かんじ》`\nhttps://example.com';
+  describe('a note drawn with formatting', () => {
     let note: TextNote;
 
+    function body(): HTMLElement {
+      return fixture.nativeElement.querySelector('[data-v]:not(textarea)') as HTMLElement;
+    }
+
     beforeEach(() => {
-      note = TextNote.create('整形メモ', SOURCE);
-      fixture.componentRef.setInput('textNote', note);
+      note = TextNote.create('メモ', '# 洞窟\n- たいまつ\n> 碑文');
     });
 
     afterEach(() => {
       note.destroy();
     });
 
-    async function body(): Promise<HTMLElement> {
+    it('draws a note set to be formatted with its headings, lists and quotes', () => {
+      note.isFormatted = true;
+      fixture.componentRef.setInput('textNote', note);
       fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-      return (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('div[data-v]')!;
-    }
 
-    it('shows a normal note as typed, with its address linked as before', async () => {
-      const shown = await body();
-
-      expect(shown.classList).toContain('whitespace-pre-line');
-      expect(shown.classList).not.toContain('note-formatted');
-      expect(shown.querySelector('h1')).toBeNull();
-      expect(shown.textContent).toContain('# 見出し');
-      expect(shown.querySelector('a')?.getAttribute('href')).toBe('https://example.com');
+      expect(body().classList).toContain('note-formatted');
+      expect(body().classList).not.toContain('whitespace-pre-line');
+      expect(body().querySelector('h1')!.textContent).toBe('洞窟');
+      expect(body().querySelector('ul li')!.textContent).toBe('たいまつ');
+      expect(body().querySelector('blockquote')!.textContent).toBe('碑文');
     });
 
-    it('formats a formatted note, without links and with code kept literal', async () => {
-      note.format = 'formatted';
-      const shown = await body();
-
-      expect(shown.classList).toContain('note-formatted');
-      expect(shown.classList).not.toContain('whitespace-pre-line');
-      expect(shown.querySelector('h1')?.textContent).toBe('見出し');
-      expect(shown.querySelector('ul li')?.textContent).toBe('項目');
-      expect(shown.querySelector('code')?.textContent).toBe('|漢字《かんじ》');
-      expect(shown.querySelector('ruby')).toBeNull();
-      expect(shown.querySelector('a')).toBeNull();
-      expect(shown.textContent).toContain('https://example.com');
-    });
-
-    it('masks a formatted note the same way to someone it is not shown to', async () => {
-      note.format = 'formatted';
-      vi.spyOn(TestBed.inject(DisclosureService), 'canView').mockReturnValue(false);
-      const shown = await body();
-
-      expect(shown.classList).toContain('whitespace-pre-line');
-      expect(shown.classList).not.toContain('note-formatted');
-      expect(shown.querySelector('h1')).toBeNull();
-      expect(shown.textContent).not.toContain('見出し');
-      expect(shown.textContent).toContain('█');
-    });
-
-    it('edits the source text, not the formatted display', async () => {
-      note.format = 'formatted';
-      await body();
-      component.enterEdit();
+    it('draws a note that was never set as it was typed, as before', () => {
+      fixture.componentRef.setInput('textNote', note);
       fixture.detectChanges();
-      await fixture.whenStable();
 
-      const textArea = (fixture.nativeElement as HTMLElement).querySelector('textarea')!;
-      expect(textArea.value).toBe(SOURCE);
+      expect(note.textFormat).toBe('');
+      expect(body().classList).toContain('whitespace-pre-line');
+      expect(body().querySelector('h1')).toBeNull();
+      expect(body().textContent).toContain('# 洞窟');
+    });
+
+    it('keeps a formatted note covered from whoever may not read it', () => {
+      note.isFormatted = true;
+      vi.spyOn(component, 'canView').mockReturnValue(false);
+      fixture.componentRef.setInput('textNote', note);
+      fixture.detectChanges();
+
+      expect(body().querySelector('h1')).toBeNull();
+      expect(body().textContent).not.toContain('洞窟');
     });
   });
 

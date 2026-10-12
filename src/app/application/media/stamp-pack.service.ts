@@ -13,6 +13,8 @@ import type { ZipEntry } from '@axe/core/storage/zip-archive-message';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { generateUuid } from '@axe/core/util/uuid';
 import { xml2element } from '@axe/core/util/xml-util';
+import { imageStampId } from '@axe/domain/chat/stamp-catalog';
+import { DataElement, DataElementType } from '@axe/domain/data/data-element';
 import { ImageTag } from '@axe/domain/media/image-tag';
 import {
   normalizeStampName,
@@ -21,6 +23,7 @@ import {
   STAMP_IMAGE_TAG,
   STAMP_LIMITS,
   StampItem,
+  stampLabelOf,
   StampPack,
 } from '@axe/domain/media/stamp-pack';
 
@@ -215,7 +218,8 @@ export class StampPackService {
     const identifier = root.getAttribute('identifier') ?? '';
     const name = normalizeStampName(root.getAttribute('name'));
     if (identifier.length === 0 || identifier.length > 128 || name.length === 0) return 'malformed';
-    const items = parseStampItemsStrict(root.getAttribute('stamps') ?? '');
+    const legacyManifest = root.getAttribute('stamps');
+    const items = legacyManifest ? parseStampItemsStrict(legacyManifest) : parseStampChildrenStrict(root);
     if (isStampProblem(items)) return items;
 
     const entryByIdentifier = new Map<string, ZipEntry>();
@@ -264,8 +268,8 @@ export class StampPackService {
     // One deleted here is brought back under a name of its own, or the others would delete it again.
     const pack = new StampPack(this.objectStore.isDeleted(archive.identifier) ? undefined : archive.identifier);
     pack.name = archive.name;
-    pack.setItems(archive.items);
     pack.initialize();
+    pack.setItems(archive.items);
     return pack;
   }
 
@@ -358,4 +362,38 @@ export class StampPackService {
       return 'unreadable';
     }
   }
+}
+
+/** Reads picture children from a current pack file, keeping metadata written by older packs. */
+function parseStampChildrenStrict(root: Element): StampItem[] | StampArchiveProblem {
+  const pictures = Array.from(root.children).filter(
+    (child) => child.tagName === DataElement.aliasName && child.getAttribute('type') === DataElementType.IMAGE
+  );
+  if (pictures.length > STAMP_LIMITS.stampsPerPack) return 'tooManyStamps';
+
+  const items: StampItem[] = [];
+  const seen = new Set<string>();
+  for (const picture of pictures) {
+    const imageIdentifier = (picture.textContent ?? '').trim();
+    if (!imageIdentifier) return 'malformed';
+    const rawWords = picture.getAttribute('tyoitashi-stamp-words') ?? '';
+    let words: unknown = [];
+    if (rawWords) {
+      try {
+        words = JSON.parse(rawWords);
+      } catch {
+        return 'malformed';
+      }
+    }
+    const item: StampItem = {
+      id: picture.getAttribute('tyoitashi-stamp-id') || imageStampId(imageIdentifier),
+      name: normalizeStampName(picture.getAttribute('name')),
+      imageIdentifier,
+      words: normalizeStampWords(words),
+    };
+    if (stampLabelOf(item).length === 0 || seen.has(item.id)) return 'malformed';
+    seen.add(item.id);
+    items.push(item);
+  }
+  return items;
 }

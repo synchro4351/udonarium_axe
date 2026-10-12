@@ -250,6 +250,14 @@ export class RoomPanelService {
             ),
           option: { width: 1180, height: 760, minWidth: 720, minHeight: 480 },
         };
+      case 'myDice':
+        return {
+          load: () =>
+            import('@axe/features/dice/my-dice-setting/my-dice-setting.component').then(
+              (m) => m.MyDiceSettingComponent
+            ),
+          option: { width: 440, height: 560, single: 'my-dice' },
+        };
       case 'diceTableSetting':
         return {
           load: () =>
@@ -270,6 +278,14 @@ export class RoomPanelService {
         return {
           load: () => import('@axe/features/skin/skin-panel/skin-panel.component').then((m) => m.SkinPanelComponent),
           option: { width: 720, height: 860, minWidth: 460, minHeight: 520 },
+        };
+      case 'soundSettings':
+        return {
+          load: () =>
+            import('@axe/features/sound-settings/sound-settings-panel/sound-settings-panel.component').then(
+              (m) => m.SoundSettingsPanelComponent
+            ),
+          option: { width: 440, height: 680, minWidth: 340, minHeight: 360 },
         };
     }
   }

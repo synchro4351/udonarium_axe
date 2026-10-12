@@ -23,6 +23,7 @@ import {
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { type ResourceCatalogEntry, resourceCatalogOf } from '@axe/domain/character/resource-catalog';
 import { DataSummarySetting } from '@axe/domain/data/data-summary-setting';
+import { asDiceStage, DICE_STAGES, DiceStage } from '@axe/domain/dice/dice-3d/dice-stage';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
 import { Party } from '@axe/domain/party/party';
 import { Config } from '@axe/domain/peer/config';
@@ -76,6 +77,8 @@ import {
 } from '@axe/domain/ui/room-settings-tab';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
 import { RoomSnapshotPanelComponent } from '@axe/features/room-archive/room-snapshot-panel/room-snapshot-panel.component';
+import { BrowserDataWipeService } from '@axe/features/room-settings/browser-data-wipe.service';
+import { StampRulesEditorComponent } from '@axe/features/room-settings/stamp-rules/stamp-rules-editor.component';
 import { SkinPickerComponent } from '@axe/features/skin/skin-picker/skin-picker.component';
 import { DisplayCalibrationComponent } from '@axe/ui/components/display-calibration/display-calibration.component';
 import { NgSelectWindowDirective } from '@axe/ui/directives/ng-select-window.directive';
@@ -104,6 +107,7 @@ type PiecePassageSide = 'samePartyPassage' | 'otherPartyPassage' | 'noPartyPassa
     NgSelectWindowDirective,
     RoomSnapshotPanelComponent,
     SkinPickerComponent,
+    StampRulesEditorComponent,
     TranslocoModule,
   ],
 })
@@ -120,6 +124,7 @@ export class RoomSettingsPanelComponent {
   private readonly t = inject(TRANSLATE_FN);
   private readonly roomSnapshot = inject(RoomSnapshotService);
   private readonly roomPanels = inject(RoomPanelService);
+  private readonly browserDataWipe = inject(BrowserDataWipeService);
 
   readonly tabs = ROOM_SETTINGS_TABS;
   readonly uiTabs = ROOM_SETTINGS_UI_TABS;
@@ -142,6 +147,14 @@ export class RoomSettingsPanelComponent {
    */
   openReplay(): void {
     this.roomPanels.open('replay');
+  }
+
+  /**
+   * Throws away everything the app keeps in this browser and loads the page again, once the reader
+   * has said they are sure. Anyone may, as it touches this browser alone.
+   */
+  wipeBrowserData(): void {
+    void this.browserDataWipe.wipe();
   }
 
   /**
@@ -626,6 +639,35 @@ export class RoomSettingsPanelComponent {
   }
 
   /**
+   * Whether what a character says shows in a bubble over its piece, read from the room's config.
+   *
+   * Only a user allowed to change the shared settings can set it.
+   */
+  get speechBubbles(): boolean {
+    this.objectChange.versionOf('Config')();
+    return this.config.speechBubblesEnabled;
+  }
+  set speechBubbles(enabled: boolean) {
+    if (!this.isSharedReadOnly()) this.config.speechBubblesEnabled = enabled;
+  }
+
+  /** Where the room can have its rolls' dice tumble. */
+  readonly diceStages: readonly DiceStage[] = DICE_STAGES;
+
+  /**
+   * Where the room has its rolls' dice tumble, read from its config.
+   *
+   * Only a user allowed to change the shared settings can set it.
+   */
+  get diceStage(): DiceStage {
+    this.objectChange.versionOf('Config')();
+    return this.config.diceStage;
+  }
+  set diceStage(stage: DiceStage) {
+    if (!this.isSharedReadOnly()) this.config.diceStage = asDiceStage(stage);
+  }
+
+  /**
    * Every value and resource the pieces in the room carry, by name, which is what a remote could
    * offer to show.
    *
@@ -715,19 +757,6 @@ export class RoomSettingsPanelComponent {
   }
   set allowPlayerCardEdit(allowed: boolean) {
     if (!this.isSharedReadOnly()) this.config.allowPlayerCardEdit = allowed;
-  }
-
-  /**
-   * Whether what a piece says in chat pops up over it on the table, read from the room's config.
-   *
-   * Only a user allowed to change the shared settings can set it.
-   */
-  get showsOverheadSpeech(): boolean {
-    this.objectChange.versionOf('Config')();
-    return this.config.showsOverheadSpeech;
-  }
-  set showsOverheadSpeech(shown: boolean) {
-    if (!this.isSharedReadOnly()) this.config.showsOverheadSpeech = shown;
   }
 
   /**

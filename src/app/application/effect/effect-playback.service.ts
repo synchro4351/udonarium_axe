@@ -3,6 +3,7 @@ import { MultipartGroupService } from '@axe/application/tabletop/multipart-group
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { MotionService } from '@axe/application/ui/motion.service';
 import { effectCast$ } from '@axe/core/event/domain-events';
+import { VolumeType } from '@axe/core/storage/audio-player';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { PERF_EFFECT_FRAME, perfCounters } from '@axe/core/util/perf-counters';
 import { GameCharacter } from '@axe/domain/character/game-character';
@@ -183,12 +184,12 @@ export class EffectPlaybackService {
   private scheduleLaunchSound(preset: EffectPreset): void {
     for (const delay of launchSoundTimes(preset)) {
       if (delay <= 0) {
-        SoundEffect.playLocal(preset.soundIdentifier);
+        SoundEffect.playLocal(preset.soundIdentifier, VolumeType.EFFECT);
         continue;
       }
       const timer = setTimeout(() => {
         this.impactTimers.delete(timer);
-        SoundEffect.playLocal(preset.soundIdentifier);
+        SoundEffect.playLocal(preset.soundIdentifier, VolumeType.EFFECT);
       }, delay);
       this.impactTimers.add(timer);
     }
@@ -199,7 +200,7 @@ export class EffectPlaybackService {
     for (const delay of impactSoundTimes(preset)) {
       const timer = setTimeout(() => {
         this.impactTimers.delete(timer);
-        SoundEffect.playLocal(preset.impactSoundIdentifier);
+        SoundEffect.playLocal(preset.impactSoundIdentifier, VolumeType.EFFECT);
       }, delay);
       this.impactTimers.add(timer);
     }

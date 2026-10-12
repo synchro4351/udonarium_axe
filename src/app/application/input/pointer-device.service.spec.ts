@@ -49,19 +49,27 @@ describe('PointerDeviceService', () => {
     expect(service.isDragging).toBe(false);
   });
 
-  it('keeps dragging when an input loses focus but stops when the window loses focus', () => {
-    const input = document.createElement('textarea');
-    document.body.appendChild(input);
+  it('stops dragging when the window loses focus', () => {
     service.isDragging = true;
 
-    input.dispatchEvent(new FocusEvent('blur'));
-    expect(service.isDragging).toBe(true);
+    window.dispatchEvent(new FocusEvent('blur'));
 
-    const onWindowBlur = (service as unknown as { callbackOnWindowBlur: (event: FocusEvent) => void })
-      .callbackOnWindowBlur;
-    onWindowBlur({ target: window } as unknown as FocusEvent);
     expect(service.isDragging).toBe(false);
-    input.remove();
+  });
+
+  it('keeps dragging when a field on the page loses focus to the press that started it', () => {
+    const field = document.createElement('textarea');
+    document.body.appendChild(field);
+    try {
+      field.focus();
+      service.isDragging = true;
+
+      field.blur();
+
+      expect(service.isDragging).toBe(true);
+    } finally {
+      field.remove();
+    }
   });
 
   it('stops dragging when the page is hidden', () => {

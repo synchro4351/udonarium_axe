@@ -11,6 +11,7 @@ import {
   untracked,
   viewChildren,
 } from '@angular/core';
+import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { MotionService } from '@axe/application/ui/motion.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
@@ -18,11 +19,13 @@ import { clipCss } from '@axe/domain/media/cut-in-clip';
 import { fillCss } from '@axe/domain/media/cut-in-fill';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import {
-  type CutInPortraitSnapshot,
-  type PortraitSlotCss,
-  portraitSlotCss,
-  resolvePortrait,
-} from '@axe/domain/media/cut-in-portrait';
+  letterFrames as officialLetterFrames,
+  letterMotionOf,
+  lettersOf,
+  letterTimingOf,
+  type PlacedLetter,
+} from '@axe/domain/media/cut-in-letter-motion';
+import { type CutInPortraitFit, portraitFitTransform } from '@axe/domain/media/cut-in-portrait-fit';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
 import {
   layerFilter,
@@ -35,17 +38,21 @@ import {
   toWebAnimationFrames,
   toWipeFrames,
 } from '@axe/domain/media/cut-in-scene-timeline';
+import { type CutInSpeaker, PORTRAIT_SILHOUETTE_URL, withSpeakerName } from '@axe/domain/media/cut-in-speaker';
 import {
   drawsLetters,
   isCutInLetterMotion,
-  letterFrames,
+  letterFrames as customLetterFrames,
+  letterRank,
+  letterSettingsOf,
   letterTiltOf,
-  resolveCharacterName,
-  splitLetters,
 } from '@axe/domain/media/cut-in-text';
 import { wipeCss } from '@axe/domain/media/cut-in-wipe';
 import { type StageFit, stageFit } from '@axe/features/media/cut-in-editor/cut-in-stage-geometry';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
+
+/** How many keyframes all the letters of one layer may have between them, before each gets fewer. */
+const LETTER_FRAME_BUDGET = 6000;
 
 /**
  * The layers of a cut-in, drawn and set going.
@@ -72,6 +79,7 @@ export class CutInStageComponent {
   private readonly motion = inject(MotionService);
   private readonly elementRef = inject(ElementRef<HTMLElement>);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly t = inject(TRANSLATE_FN);
 
   readonly scene = input<CutInScene | null>(null);
   /** The coordinates the layers were laid out in, which are the cut-in's own. */
@@ -84,17 +92,8 @@ export class CutInStageComponent {
   readonly playheadMs = input(0);
   /** How far the stage is leaned into, past the scale that fits the scene in. */
   readonly zoom = input(1);
-  /** The portrait the launch brought for the portrait slots. None shows the silhouette. */
-  readonly portrait = input<CutInPortraitSnapshot | null>(null);
-
-  /** What the portrait slots show, read off the launch rather than off the character as it stands now. */
-  readonly portraitFace = computed(() => {
-    this.objectChange.fileVersion();
-    return resolvePortrait(this.portrait(), (identifier) => this.imageStorage.get(identifier)?.url ?? '');
-  });
-
-  /** The name `{character}` shows, as the launch carried it. */
-  readonly characterName = computed(() => this.portrait()?.characterName ?? '');
+  /** Who the cut-in is played for: whose portrait and name its layers show where they ask. */
+  readonly speaker = input<CutInSpeaker | null>(null);
 
   private readonly layerElements = viewChildren<ElementRef<HTMLElement>>('layerElement');
   private readonly wipeElements = viewChildren<ElementRef<HTMLElement>>('wipeElement');
@@ -103,6 +102,8 @@ export class CutInStageComponent {
   private readonly wipeHandles = new Map<string, Animation>();
   private readonly crumbleHandles = new Map<string, Animation>();
   private readonly letterHandles = new Map<string, Animation[]>();
+  /** The letters each moving text layer was last drawn with, kept while its words stay the same. */
+  private readonly letterLines = new Map<string, { text: string; lines: PlacedLetter[][] }>();
   private readonly hostSize = signal({ width: 0, height: 0 });
 
   readonly layers = computed<CutInLayer[]>(() => {
@@ -163,8 +164,8 @@ export class CutInStageComponent {
       const startOffsetMs = this.startOffsetMs();
       // Every layer's own version, so a keyframe moved while the editor is open is picked up.
       for (const layer of layers) this.objectChange.versionOf(layer.identifier)();
-      // A different name is a different run of letters to set going.
-      this.characterName();
+      // A changed speaker name can change how many graphemes the text animation has.
+      this.speaker();
 
       this.build(layers, elements, this.wipeElements(), this.crumbleElements(), durationMs, loops, startOffsetMs);
       this.runTo(untracked(this.playing), untracked(this.playheadMs), layers, elements, durationMs, startOffsetMs);
@@ -215,38 +216,54 @@ export class CutInStageComponent {
     return wipeCss(layer.crumbleShape, sampleLayerAt(layer, this.playheadMs(), this.durationMs()).crumble) || null;
   }
 
-  /** How a portrait slot of this layer's size draws the launched picture. */
-  protected portraitCssOf(layer: CutInLayer): PortraitSlotCss {
-    this.objectChange.versionOf(layer.identifier)();
-    return portraitSlotCss(this.portraitFace().fit, { width: layer.width, height: layer.height });
-  }
-
+  /**
+   * The picture a layer shows. A portrait's place shows the speaker's portrait, else the layer's own
+   * picture, else a grey head and shoulders.
+   */
   protected imageUrl(layer: CutInLayer): string {
     this.objectChange.fileVersion();
-    return this.imageStorage.get(layer.imageIdentifier)?.url ?? '';
+    const own = this.imageStorage.get(layer.imageIdentifier)?.url ?? '';
+    if (!layer.portraitSlot) return own;
+    const portrait = this.speaker()?.imageIdentifier ?? '';
+    return (portrait ? this.imageStorage.get(portrait)?.url : '') || own || PORTRAIT_SILHOUETTE_URL;
+  }
+
+  /**
+   * How the speaker set the portrait a portrait's place shows, or null where they did not set it or
+   * the place shows something else, which leaves the picture to the layer's own framing.
+   */
+  protected portraitFitOf(layer: CutInLayer): CutInPortraitFit | null {
+    this.objectChange.fileVersion();
+    const speaker = this.speaker();
+    if (!layer.portraitSlot || !speaker?.fit || !speaker.imageIdentifier) return null;
+    return this.imageStorage.get(speaker.imageIdentifier)?.url ? speaker.fit : null;
+  }
+
+  protected readonly fitTransform = portraitFitTransform;
+
+  /** A text layer's words, with the speaker's name put in where it asks for it. */
+  protected textOf(layer: CutInLayer): string {
+    return withSpeakerName(layer.text, this.speaker()?.name, this.t('feature.media.cutIn.unknownSpeaker'));
+  }
+
+  /**
+   * The letters of a text layer whose letters come on one at a time, a line to a list; null for a
+   * layer whose words come on all at once.
+   */
+  protected letterLinesOf(layer: CutInLayer): PlacedLetter[][] | null {
+    this.objectChange.versionOf(layer.identifier)();
+    if (!letterMotionOf(layer.letterMotion) && !drawsLetters(layer)) return null;
+    const text = this.textOf(layer);
+    const kept = this.letterLines.get(layer.identifier);
+    if (kept?.text === text) return kept.lines;
+    const lines = lettersOf(text);
+    this.letterLines.set(layer.identifier, { text, lines });
+    return lines;
   }
 
   protected fillOf(layer: CutInLayer): string {
     this.objectChange.versionOf(layer.identifier)();
     return fillCss(layer.fill);
-  }
-
-  /** What a text layer says, with the launched character's name put in for `{character}`. */
-  protected textOf(layer: CutInLayer): string {
-    return resolveCharacterName(layer.text, this.characterName());
-  }
-
-  /**
-   * The words a letter at a time, for a layer whose letters move or lean on their own, with where
-   * each rests. Anything else is drawn as one run of text.
-   */
-  protected lettersOf(layer: CutInLayer): { text: string; newline: boolean; index: number; rest: string }[] | null {
-    this.objectChange.versionOf(layer.identifier)();
-    if (!drawsLetters(layer)) return null;
-    return splitLetters(this.textOf(layer)).map((letter) => ({
-      ...letter,
-      rest: letter.newline ? '' : `rotate(${letterTiltOf(letter.index, layer.letterTiltDeg, layer.letterTiltMode)}deg)`,
-    }));
   }
 
   protected textShadowOf(layer: CutInLayer): string | null {
@@ -299,32 +316,75 @@ export class CutInStageComponent {
         this.crumbleHandles.set(layer.identifier, crumbleElement.animate(crumbleFrames, options));
       }
 
-      // Letters that move ride on the same clock as their layer, each on an animation of its own,
-      // counted along the text as it is shown, with the launched character's name in.
-      if (layer.kind === 'text' && isCutInLetterMotion(layer.letterMotion) && drawsLetters(layer)) {
-        const letters = Array.from(element.querySelectorAll<HTMLElement>('[data-letter]'));
-        const { endMs } = layerWindow(layer, durationMs);
-        this.letterHandles.set(
-          layer.identifier,
-          letters.map((letter) =>
-            letter.animate(
-              letterFrames(
-                layer.letterMotion,
-                Number(letter.dataset['letter']) || 0,
+      this.animateLetters(element, layer, durationMs, options);
+    }
+  }
+
+  /**
+   * Sets each letter of a text layer whose letters come on one at a time going, on the same clock
+   * as the layer, from keyframes worked out by `letterFrames` so the replay video draws the same.
+   */
+  private animateLetters(
+    element: HTMLElement,
+    layer: CutInLayer,
+    durationMs: number,
+    options: KeyframeAnimationOptions
+  ): void {
+    const motion = letterMotionOf(layer.letterMotion);
+    const customMotion = isCutInLetterMotion(layer.letterMotion) ? layer.letterMotion : null;
+    if (!motion && !customMotion) return;
+    const letters = [...element.querySelectorAll<HTMLElement>('[data-letter-rank]')];
+    if (letters.length < 1) return;
+    const customSettings = letterSettingsOf(layer);
+    const hasCustomControls =
+      customSettings.letterOrder !== 'forward' ||
+      layer.letterTiltDeg !== 0 ||
+      customSettings.letterTiltMode !== 'alternate' ||
+      customSettings.letterExit !== 'none' ||
+      customSettings.letterDirection !== 'up';
+    if (customMotion && drawsLetters(layer) && (customMotion === 'none' || hasCustomControls)) {
+      const window = layerWindow(layer, durationMs);
+      const timing = motion ? letterTimingOf(motion, layer.letterStaggerMs, layer.letterDurationMs) : null;
+      const settings = timing
+        ? { ...layer, letterIntervalMs: timing.staggerMs, letterDurationMs: timing.durationMs }
+        : layer;
+      const handles = letters.map((letter) => {
+        const index = Number(letter.dataset['letterRank']);
+        const frames =
+          motion === 'type'
+            ? typeLetterFrames(index, letters.length, layer, window, durationMs)
+            : customLetterFrames(
+                customMotion,
+                index,
                 layer.letterTiltDeg,
                 layer.fontSizePx,
                 layer.startMs,
                 durationMs,
-                layer,
+                settings,
                 letters.length,
-                endMs
-              ),
-              options
-            )
-          )
+                window.endMs
+              );
+        return letter.animate(
+          frames.map((frame) => ({ ...frame })),
+          options
         );
-      }
+      });
+      this.letterHandles.set(layer.identifier, handles);
+      return;
     }
+    if (!motion) return;
+    const timing = letterTimingOf(motion, layer.letterStaggerMs, layer.letterDurationMs);
+    const window = layerWindow(layer, durationMs);
+    const budget = Math.max(30, Math.min(240, Math.floor(LETTER_FRAME_BUDGET / letters.length)));
+    const handles = letters.map((letter) => {
+      const rank = Number(letter.dataset['letterRank']);
+      const frames = officialLetterFrames(motion, rank, window, durationMs, layer.fontSizePx, timing, budget);
+      return letter.animate(
+        frames.map((frame) => ({ ...frame })),
+        options
+      );
+    });
+    this.letterHandles.set(layer.identifier, handles);
   }
 
   /** Lets the animations run, or holds every one of them at the same moment. */
@@ -406,4 +466,42 @@ export class CutInStageComponent {
 function stopAnimation(handle: Animation): void {
   handle.finished.catch(() => undefined);
   handle.cancel();
+}
+
+/** The official typewriter motion with custom ordering, tilt and exit controls. */
+function typeLetterFrames(
+  index: number,
+  count: number,
+  layer: CutInLayer,
+  window: { startMs: number; endMs: number },
+  sceneDurationMs: number
+): Keyframe[] {
+  if (sceneDurationMs <= 0) return [];
+  const settings = letterSettingsOf(layer);
+  const rank = letterRank(index, count, settings.letterOrder);
+  const staggerMs = layer.letterStaggerMs > 0 ? layer.letterStaggerMs : 70;
+  const revealAt = window.startMs + rank * staggerMs;
+  const tilt = letterTiltOf(index, layer.letterTiltDeg, settings.letterTiltMode);
+  const moments = new Set([0, window.startMs, revealAt, window.endMs, sceneDurationMs]);
+  if (settings.letterExit !== 'none')
+    moments.add(Math.max(window.startMs, window.endMs - settings.letterExitDurationMs));
+  return [...moments]
+    .filter((at) => at >= 0 && at <= sceneDurationMs)
+    .sort((left, right) => left - right)
+    .map((at) => {
+      const visible = at >= revealAt && at < window.endMs;
+      const exitStart = Math.max(window.startMs, window.endMs - settings.letterExitDurationMs);
+      const exitProgress =
+        settings.letterExit === 'none' || at <= exitStart
+          ? 0
+          : Math.min(1, (at - exitStart) / Math.max(1, window.endMs - exitStart));
+      const scale = settings.letterExit === 'shrink' ? 1 - exitProgress : 1;
+      const rise = settings.letterExit === 'rise' ? -layer.fontSizePx * 0.5 * exitProgress : 0;
+      const opacity = visible ? 1 - exitProgress : 0;
+      return {
+        offset: at / sceneDurationMs,
+        opacity,
+        transform: `translate(0px, ${rise}px) rotate(${tilt}deg) scale(${scale})`,
+      };
+    });
 }

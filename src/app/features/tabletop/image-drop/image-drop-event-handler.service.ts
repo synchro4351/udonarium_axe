@@ -34,9 +34,10 @@ export class ImageDropEventHandlerService {
   private createCharacter(event: ImageDroppedEvent): void {
     if (!this.rolePermission.canEditTabletop) return;
 
-    // A drop confirmed later is judged by where it landed, not by a panel since opened over it.
     const dropTarget = (
-      event.dropTarget?.isConnected ? event.dropTarget : document.elementFromPoint(event.dropPoint.x, event.dropPoint.y)
+      event.dropTarget !== undefined
+        ? event.dropTarget
+        : document.elementFromPoint(event.dropPoint.x, event.dropPoint.y)
     ) as HTMLElement | null;
     if (!isTabletopDropTarget(dropTarget)) return;
 

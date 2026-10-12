@@ -1,10 +1,7 @@
-import { signal, type WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
-import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ModalService } from '@axe/application/ui/modal.service';
-import { PanelService } from '@axe/application/ui/panel.service';
 import { Card, CardState } from '@axe/domain/card/card';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DataElement, DataElementAttribute, DataElementRole } from '@axe/domain/data/data-element';
@@ -12,10 +9,8 @@ import { DiceSymbol } from '@axe/domain/dice/dice-symbol';
 import { Config } from '@axe/domain/peer/config';
 import { Terrain } from '@axe/domain/tabletop/terrain';
 import { TextNote } from '@axe/domain/tabletop/text-note';
-import { CharacterPortraitFitComponent } from '@axe/features/character/character-portrait-fit/character-portrait-fit.component';
 import { GameCharacterSheetComponent } from '@axe/features/character/game-character-sheet/game-character-sheet.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
-import type { Mock } from 'vitest';
 
 describe('GameCharacterSheetComponent', () => {
   let component: GameCharacterSheetComponent;
@@ -270,6 +265,28 @@ describe('GameCharacterSheetComponent', () => {
       expect(dropped.stopPropagation).not.toHaveBeenCalled();
     } finally {
       character.destroy();
+    }
+  });
+
+  it('switches a note between as typed and formatted, and shows the formatted body under its text', () => {
+    const note = TextNote.create('メモ', '# 洞窟');
+    component.tabletopObject = note;
+    try {
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelector('[data-testid="text-note-format-preview"]')).toBeNull();
+
+      (root.querySelector('text-format-switch [data-format="formatted"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      expect(note.isFormatted).toBe(true);
+      expect(note.text).toBe('# 洞窟');
+      expect(root.querySelector('[data-testid="text-note-format-preview"] h1')!.textContent).toBe('洞窟');
+      expect(root.querySelector('text-format-switch [data-format="formatted"]')!.getAttribute('aria-checked')).toBe(
+        'true'
+      );
+    } finally {
+      note.destroy();
     }
   });
 
@@ -616,115 +633,6 @@ describe('GameCharacterSheetComponent', () => {
     it('saves without throwing', async () => {
       component.tabletopObject = null;
       await expect(component.saveToXML()).resolves.not.toThrow();
-    });
-  });
-
-  describe('naming a portrait', () => {
-    function makeCharacter(): GameCharacter {
-      const character = GameCharacter.create('立ち絵持ち', 1, '');
-      character.addExtendData();
-      character.imageDataElement!.appendChild(DataElement.create('imageIdentifier', 'img-1', { type: 'image' }, ''));
-      return character;
-    }
-
-    function changeEvent(value: string): Event {
-      return { target: { value } } as unknown as Event;
-    }
-
-    it('starts with no name on any portrait', () => {
-      const character = makeCharacter();
-      component.tabletopObject = character;
-
-      try {
-        expect(component.portraitName()).toBe('');
-        expect(component.portraitImages().map((portrait) => portrait.name)).toEqual(['', '']);
-      } finally {
-        character.destroy();
-      }
-    });
-
-    it('writes the name onto the portrait that is picked out', () => {
-      const character = makeCharacter();
-      component.tabletopObject = character;
-
-      try {
-        component.setKomaIndex(1);
-        component.setPortraitName(changeEvent('笑顔'));
-
-        expect(component.portraitName()).toBe('笑顔');
-        expect(component.portraitImages().map((portrait) => portrait.name)).toEqual(['', '笑顔']);
-      } finally {
-        character.destroy();
-      }
-    });
-
-    it('leaves the other portraits alone', () => {
-      const character = makeCharacter();
-      component.tabletopObject = character;
-
-      try {
-        component.setKomaIndex(0);
-        component.setPortraitName(changeEvent('通常'));
-        component.setKomaIndex(1);
-        component.setPortraitName(changeEvent('笑顔'));
-
-        expect(component.portraitImages().map((portrait) => portrait.name)).toEqual(['通常', '笑顔']);
-      } finally {
-        character.destroy();
-      }
-    });
-  });
-
-  describe('fitting portraits for cut-ins', () => {
-    function makeCharacter(): GameCharacter {
-      const character = GameCharacter.create('立ち絵持ち', 1, 'img-0');
-      character.addExtendData();
-      character.imageDataElement!.appendChild(DataElement.create('imageIdentifier', 'img-1', { type: 'image' }, ''));
-      return character;
-    }
-
-    function fakePanel(): { character: WritableSignal<GameCharacter | null>; selectImage: Mock } {
-      return { character: signal<GameCharacter | null>(null), selectImage: vi.fn() };
-    }
-
-    it('offers the fit beside the portraits and opens it on the portrait the sheet shows', () => {
-      const character = makeCharacter();
-      const panel = fakePanel();
-      const open = vi.spyOn(TestBed.inject(PanelService), 'open').mockReturnValue(panel as never);
-      component.tabletopObject = character;
-
-      try {
-        fixture.detectChanges();
-        component.setKomaIndex(1);
-        const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
-          '[data-testid="open-portrait-fit"]'
-        );
-        expect(button).not.toBeNull();
-
-        button!.click();
-
-        expect(open).toHaveBeenCalledWith(CharacterPortraitFitComponent, expect.anything());
-        expect(panel.character()).toBe(character);
-        expect(panel.selectImage).toHaveBeenCalledWith('img-1');
-      } finally {
-        character.destroy();
-      }
-    });
-
-    it('keeps the fit closed to a user who may not change the table', () => {
-      vi.spyOn(TestBed.inject(RolePermissionService), 'canEditTabletop', 'get').mockReturnValue(false);
-      const character = makeCharacter();
-      const open = vi.spyOn(TestBed.inject(PanelService), 'open');
-      component.tabletopObject = character;
-
-      try {
-        fixture.detectChanges();
-        component.openPortraitFit();
-
-        expect(open).not.toHaveBeenCalled();
-      } finally {
-        character.destroy();
-      }
     });
   });
 

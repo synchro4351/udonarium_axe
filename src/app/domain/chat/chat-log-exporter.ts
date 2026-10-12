@@ -1,7 +1,5 @@
 import type { ImageFile } from '@axe/core/storage/image-file';
 import type { ChatMessage } from '@axe/domain/chat/chat-message';
-import { formatReactionSummary } from '@axe/domain/chat/chat-reaction';
-import { previewTextOf } from '@axe/domain/chat/chat-stamp-text';
 import { replaceRubyNotation } from '@axe/domain/chat/ruby-notation';
 import { vnBodyOf } from '@axe/domain/visual-novel/vn-emote';
 
@@ -30,9 +28,18 @@ export type ChatLogLine = Pick<
   | 'isDicebot'
   | 'rollDetail'
   | 'isOutOfStory'
+  | 'isPseudoDeleted'
 > &
-  // a line from before reactions or stamps, or one drawn for a sample, may have none to give
-  Partial<Pick<ChatMessage, 'reactions' | 'stampName'>>;
+  Partial<Pick<ChatMessage, 'identifier'>> & { stampName?: string };
+
+/** A stamp on a line as a log writes it: what it is called, and how many put it on. */
+export interface ChatLogReaction {
+  readonly label: string;
+  readonly count: number;
+}
+
+/** The stamps on a line, by the line's identifier, in the order a log lists them. */
+export type ChatLogReactionResolver = (messageIdentifier: string) => readonly ChatLogReaction[];
 
 export interface ChatLogTab {
   readonly name: string;
@@ -81,11 +88,9 @@ export class ChatLogExporter {
     '.ai{max-width:180px;max-height:120px;width:auto;height:auto;object-fit:contain;border:1px solid #ccc;border-radius:4px;background:#fff;vertical-align:top;margin:2px 4px 2px 0}' +
     '.ai.st{max-width:90px;max-height:60px}' +
     '.aw{display:block;margin-top:6px;white-space:normal}' +
-    '.rx{display:block;margin-top:2px;color:#666;font-size:.85em}' +
     '</style>\n';
   /**
-   * Escapes a value for html and turns ruby markup, `|base<reading>` or `|base《reading》`, into
-   * `<ruby>` tags.
+   * Escapes a value for html and turns ruby markup, `|base《reading》`, into `<ruby>` tags.
    *
    * Every whitespace character, line breaks included, becomes a plain space. A value that is not a
    * string is turned into text as it is, without escaping.
@@ -94,6 +99,7 @@ export class ChatLogExporter {
     if (typeof value !== 'string') {
       return String(value);
     }
+    // ruby is read before escaping, so the tyoitashi ASCII form `|base<reading>` survives it
     const escape = ChatLogExporter.escapeAttribute;
     return replaceRubyNotation(
       value,
@@ -117,8 +123,8 @@ export class ChatLogExporter {
    * One line in the standard log layout: the tab name and the time when asked for, the portrait,
    * any quoted or replied-to line, then the name and text in the speaker's colour.
    *
-   * A secret roll the reader did not make shows as `（シークレットダイス）`, and an edited line is marked
-   * `(編集済)`. `userId` is the reader; without it, the local user.
+   * A secret roll the reader did not make shows as `（シークレットダイス）`, an edited line is marked
+   * `(編集済)`, and a deleted line `(削除済)`. `userId` is the reader; without it, the local user.
    */
   static formatMessageStandard(
     isTime: boolean,
@@ -126,7 +132,8 @@ export class ChatLogExporter {
     message: ChatLogLine,
     userId?: string,
     imageSrcResolver?: ChatLogImageSrcResolver,
-    textDecoder?: ChatLogTextDecoder
+    textDecoder?: ChatLogTextDecoder,
+    reactionsOf?: ChatLogReactionResolver
   ): string {
     if (!message) return '';
     let str = '<div class="m">';
@@ -160,12 +167,14 @@ export class ChatLogExporter {
       const decodedText = vnBodyOf(message.vnEmote, ChatLogExporter.decode(message.text, textDecoder));
       if (decodedText) str += ChatLogExporter.escapeHtmlLines(decodedText);
       str += ChatLogExporter.formatAttachmentImages(message, imageSrcResolver);
+      const reactions = ChatLogExporter.reactionSummary(message, reactionsOf);
+      if (reactions) str += ` 〔${ChatLogExporter.escapeHtml(reactions)}〕`;
     } else {
       str += '（シークレットダイス）';
     }
     if (message.fixd) str += ' (編集済)';
+    if (message.isPseudoDeleted) str += ' (削除済)';
     str += '</font>';
-    str += ChatLogExporter.formatReactions(message, !message.isSecret || canSee);
     str += '</div></div>\n';
     return str;
   }
@@ -174,8 +183,8 @@ export class ChatLogExporter {
    * One line in the classic layout other log tools can read: the tab name, the portrait, any quoted
    * or replied-to line, then the name and text in the speaker's colour.
    *
-   * Secret rolls and edits are marked as in the standard layout, and arrows in the text are written
-   * as `＞`.
+   * Secret rolls, edits and deleted lines are marked as in the standard layout, and arrows in the text
+   * are written as `＞`.
    */
   static formatMessageCoc(
     tabName: string,
@@ -205,26 +214,13 @@ export class ChatLogExporter {
       str += '（シークレットダイス）';
     }
     if (message.fixd) str += ' (編集済)';
+    if (message.isPseudoDeleted) str += ' (削除済)';
     str += '\n';
-    const reactions = ChatLogExporter.formatReactions(message, !message.isSecret || canSee);
-    if (reactions) str += `        ${reactions}\n`;
 
     str += '      </div>\n';
     str += '    </div>\n';
     str += '    \n';
     return str;
-  }
-
-  /**
-   * The counts of the reactions on a line, such as `👍 2・❤️ 1`, as a small block to follow it.
-   *
-   * Who reacted is not written. Nothing comes out for a line nobody reacted to, nor for one whose
-   * words are kept from the reader (`visible` false), whose reactions are kept from them as well.
-   */
-  static formatReactions(message: ChatLogLine, visible: boolean): string {
-    if (!visible) return '';
-    const summary = formatReactionSummary(message.reactions);
-    return summary ? `<span class="rx">${ChatLogExporter.escapeHtml(summary)}</span>` : '';
   }
 
   /**
@@ -245,14 +241,11 @@ export class ChatLogExporter {
   }
 
   /**
-   * Whether the reader may see what a line holds: a line they may see at all, and not a secret
-   * kept from them. Without `userId` the reader is the local user.
+   * Whether what a line says is kept from the reader, as a secret roll is from everyone but the one
+   * who made it. Without `userId` the reader is the local user.
    */
-  static isReadable(message: ChatLogLine, userId?: string): boolean {
-    return (
-      ChatLogExporter.isVisibleMessage(message, userId) &&
-      (!message.isSecret || ChatLogExporter.canSee(message, userId))
-    );
+  static isSealed(message: ChatLogLine, userId?: string): boolean {
+    return message.isSecret && !ChatLogExporter.canSee(message, userId);
   }
 
   /**
@@ -263,7 +256,8 @@ export class ChatLogExporter {
     tab: ChatLogTab,
     userId?: string,
     imageSrcResolver?: ChatLogImageSrcResolver,
-    textDecoder?: ChatLogTextDecoder
+    textDecoder?: ChatLogTextDecoder,
+    reactionsOf?: ChatLogReactionResolver
   ): string {
     const head = `<?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Transitional//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd'>
@@ -277,7 +271,9 @@ export class ChatLogExporter {
     const parts: string[] = [];
     for (const mess of tab.chatMessages) {
       if (!ChatLogExporter.isVisibleMessage(mess, userId)) continue;
-      parts.push(ChatLogExporter.formatMessageStandard(true, '', mess, userId, imageSrcResolver, textDecoder));
+      parts.push(
+        ChatLogExporter.formatMessageStandard(true, '', mess, userId, imageSrcResolver, textDecoder, reactionsOf)
+      );
     }
     return head + parts.join('') + '\n  </body>\n</html>';
   }
@@ -326,7 +322,8 @@ export class ChatLogExporter {
     showTime: number | boolean,
     userId?: string,
     imageSrcResolver?: ChatLogImageSrcResolver,
-    textDecoder?: ChatLogTextDecoder
+    textDecoder?: ChatLogTextDecoder,
+    reactionsOf?: ChatLogReactionResolver
   ): string {
     const head = `<?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Transitional//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd'>
@@ -340,7 +337,15 @@ export class ChatLogExporter {
     const main = ChatLogExporter.mergeTabMessages(
       ChatLogExporter.spokenTabs(tabs),
       (tabName, message) =>
-        ChatLogExporter.formatMessageStandard(!!showTime, tabName, message, userId, imageSrcResolver, textDecoder),
+        ChatLogExporter.formatMessageStandard(
+          !!showTime,
+          tabName,
+          message,
+          userId,
+          imageSrcResolver,
+          textDecoder,
+          reactionsOf
+        ),
       userId
     );
     return head + main + '\n  </body>\n</html>';
@@ -450,33 +455,34 @@ export class ChatLogExporter {
   }
 
   // The message quoted or replied to is put in front of the body as a small quotation,
-  // trimmed to about the length the chat itself previews. A line the reader may not read is
-  // left out altogether, name and all, and a sealed secret line shows no references.
+  // trimmed to about the length the chat itself previews. A sealed secret line shows no references.
   private static formatReferenceBlock(message: ChatLogLine, userId?: string, textDecoder?: ChatLogTextDecoder): string {
-    if (message.isSecret && !ChatLogExporter.canSee(message, userId)) return '';
-    const quote = message.quoteOf ? message.quoteOfMessage : null;
-    const reply = message.replyTo ? message.replyToMessage : null;
+    if (ChatLogExporter.isSealed(message, userId)) return '';
+    const quote = ChatLogExporter.referencedLine(message.quoteOf ? message.quoteOfMessage : null, userId);
+    const reply = ChatLogExporter.referencedLine(message.replyTo ? message.replyToMessage : null, userId);
     if (!quote && !reply) return '';
 
     const blocks: string[] = [];
-    if (quote && ChatLogExporter.isReadable(quote, userId)) {
+    if (quote) {
       blocks.push(
         ChatLogExporter.formatReferenceBlockBody({
           label: '引用',
           icon: '❝',
           target: quote,
           maxTextLength: 280,
+          userId,
           textDecoder,
         })
       );
     }
-    if (reply && ChatLogExporter.isReadable(reply, userId)) {
+    if (reply) {
       blocks.push(
         ChatLogExporter.formatReferenceBlockBody({
           label: '返信先',
           icon: '↩',
           target: reply,
           maxTextLength: 120,
+          userId,
           textDecoder,
         })
       );
@@ -485,12 +491,46 @@ export class ChatLogExporter {
   }
 
   /**
+   * A line quoted or replied to, as far as the reader's log may show it: a whisper the reader was
+   * not part of, an after-the-fact one included, does not live on in the answers to it, and nor does
+   * a pseudo-deleted line, which the room was shown as never said.
+   */
+  static referencedLine(target: ChatLogLine | null, userId?: string): ChatLogLine | null {
+    if (!target || target.isPseudoDeleted) return null;
+    return ChatLogExporter.isVisibleMessage(target, userId) ? target : null;
+  }
+
+  /**
+   * The stamps on a line as a log writes them, each with how many put it on, a space between each;
+   * empty for a line nobody answered so, or where nothing says what the stamps are.
+   */
+  static reactionSummary(message: ChatLogLine, reactionsOf?: ChatLogReactionResolver): string {
+    if (!reactionsOf || !message.identifier) return '';
+    return reactionsOf(message.identifier)
+      .map((reaction) => `${reaction.label}×${reaction.count}`)
+      .join(' ');
+  }
+
+  /**
+   * The tabs with their deleted lines left out, for a log that should not hold them.
+   * The tabs themselves are left as they are.
+   */
+  static withoutDeleted(tabs: readonly ChatLogTab[]): ChatLogTab[] {
+    return tabs.map((tab) => ({
+      name: tab.name,
+      isSystemTab: tab.isSystemTab,
+      chatMessages: tab.chatMessages.filter((message) => !message.isPseudoDeleted),
+    }));
+  }
+
+  /**
    * The text of a quoted or replied-to line folded onto one line and cut to `maxTextLength`
    * characters with an ellipsis, without the staging an older novel-mode line carries.
    */
   static referenceExcerpt(target: ChatLogLine, maxTextLength: number, textDecoder?: ChatLogTextDecoder): string {
-    const text = previewTextOf({ text: ChatLogExporter.decode(target.text, textDecoder), stampName: target.stampName });
-    const rawText = vnBodyOf(target.vnEmote, text).replace(/\s+/g, ' ').trim();
+    const rawText = vnBodyOf(target.vnEmote, ChatLogExporter.decode(target.text, textDecoder))
+      .replace(/\s+/g, ' ')
+      .trim();
     return rawText.length > maxTextLength ? rawText.slice(0, maxTextLength) + '…' : rawText;
   }
 
@@ -499,12 +539,15 @@ export class ChatLogExporter {
     icon: string;
     target: ChatLogLine;
     maxTextLength: number;
+    userId?: string;
     textDecoder?: ChatLogTextDecoder;
   }): string {
-    const { label, icon, target, maxTextLength, textDecoder } = opts;
+    const { label, icon, target, maxTextLength, userId, textDecoder } = opts;
     const rawName = ChatLogExporter.decode(target.name, textDecoder);
-    const truncated = ChatLogExporter.referenceExcerpt(target, maxTextLength, textDecoder);
-    const name = ChatLogExporter.escapeHtml(rawName || label);
+    const truncated = ChatLogExporter.isSealed(target, userId)
+      ? '（シークレットダイス）'
+      : ChatLogExporter.referenceExcerpt(target, maxTextLength, textDecoder);
+    const name = ChatLogExporter.escapeHtml(ChatLogExporter.isSealed(target, userId) ? label : rawName || label);
     const text = ChatLogExporter.escapeHtml(truncated);
     // It is drawn as a pale block with a rule down its left, so it reads apart from the body.
     // It sits compactly after the name, with the body on the next line.
@@ -524,9 +567,9 @@ export class ChatLogExporter {
       .map((image) => {
         const key = imageSrcResolver?.(image) ?? image.url;
         if (!key) return '';
+        const isStamp = !!message.stampName;
         const alt = message.stampName || image.name || '添付画像';
-        // A stamp is drawn at half an attachment's size, as it is a word said rather than a picture shown.
-        const classes = message.stampName ? 'ai st' : 'ai';
+        const classes = isStamp ? 'ai st' : 'ai';
         return `<img data-img-key="${ChatLogExporter.escapeAttribute(key)}" alt="${ChatLogExporter.escapeAttribute(alt)}" class="${classes}" />`;
       })
       .filter((imageTag) => imageTag.length > 0)

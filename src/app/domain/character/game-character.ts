@@ -16,6 +16,7 @@ import {
   type DataElementRoleValue,
   DataElementType,
 } from '@axe/domain/data/data-element';
+import { migrateLegacyBustPortraitFits } from '@axe/domain/media/cut-in-portrait-fit';
 import { OwnedTabletopObject } from '@axe/domain/tabletop/owned-tabletop-object';
 import { moveToBottommost, moveToTopmost } from '@axe/domain/tabletop/tabletop-object-util';
 import {
@@ -95,6 +96,11 @@ export class GameCharacter extends OwnedTabletopObject {
   @SyncVar() chatBubbleDark: string[] = [...DEFAULT_CHAT_BUBBLE_CODES];
   @SyncVar() overViewDataTags: string[] = [];
   @SyncVar() syncDummyCounter: number = 0;
+  /**
+   * How each of the character's portraits sits in a cut-in's portrait slot, as
+   * `cut-in-portrait-fit.ts` writes it. Empty leaves every portrait to the cut-in's own framing.
+   */
+  @SyncVar() cutInPortraitFits: string = '';
 
   /**
    * How the piece is getting about, as one of MOVE_MODES. Empty walks.
@@ -367,6 +373,7 @@ export class GameCharacter extends OwnedTabletopObject {
    */
   override parseInnerXml(element: Element): void {
     super.parseInnerXml(element);
+    this.cutInPortraitFits = migrateLegacyBustPortraitFits(this.cutInPortraitFits, this.portraitFits);
     this.normalizeDetailDataElementHierarchy();
     this.convertLegacyCheckTableData();
     this.migrateOverviewDataTagsToElementAttributes();

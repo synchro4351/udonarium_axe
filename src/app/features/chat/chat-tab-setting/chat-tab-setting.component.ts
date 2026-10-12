@@ -51,6 +51,8 @@ export class ChatTabSettingComponent {
   readonly logStyles = CHAT_LOG_STYLES;
   readonly logStyle = this.logStylePreference.style;
   readonly logFormat = signal<ChatLogFormat>('html');
+  /** Whether saved logs leave out deleted lines. */
+  readonly omitDeleted = this.logStylePreference.omitDeleted;
 
   /** The entry picked in the format list: plain text, or the html style in use. */
   get logChoice(): ChatLogChoice {
@@ -277,6 +279,11 @@ export class ChatTabSettingComponent {
     this.logStylePreference.choose(choice);
   }
 
+  /** Sets whether saved logs leave out deleted lines, remembered in this browser. */
+  setOmitDeleted(omit: boolean): void {
+    this.logStylePreference.setOmitDeleted(omit);
+  }
+
   /** Opens a panel previewing the selected tab's log in the chosen format. */
   openLogPreview(): void {
     const coordinate = this.pointerDeviceService.pointers[0];
@@ -304,11 +311,12 @@ export class ChatTabSettingComponent {
   }
 
   private writeLog(scope: ChatLogScope, tabs: readonly ChatTab[], label: string): void {
-    if (this.logFormat() === 'text') {
-      this.saveDataService.saveChatLogText(scope, tabs, label);
-    } else {
-      void this.saveDataService.saveChatLog(this.effectiveLogStyle, scope, tabs, label);
-    }
+    const style = this.logFormat() === 'text' ? 'text' : this.effectiveLogStyle;
+    void this.saveDataService.saveChatLog(style, scope, tabs, label, this.logOptions());
+  }
+
+  private logOptions(): { omitDeleted: boolean } {
+    return { omitDeleted: this.omitDeleted() };
   }
 
   /**

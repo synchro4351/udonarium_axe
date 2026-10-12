@@ -3,12 +3,12 @@ import {
   ChatLogExporter,
   ChatLogImageSrcResolver,
   ChatLogLine,
+  ChatLogReactionResolver,
   ChatLogTab,
   ChatLogTextDecoder,
 } from '@axe/domain/chat/chat-log-exporter';
 import type { RichChatLogStyle } from '@axe/domain/chat/chat-log-style';
 import { CHAT_LOG_BASE_CSS, CHAT_LOG_THEME_CSS } from '@axe/domain/chat/chat-log-theme-css';
-import { formatReactionSummary } from '@axe/domain/chat/chat-reaction';
 import type { DiceRollOutcome } from '@axe/domain/dice/dice-roll-detail';
 import { vnBodyOf } from '@axe/domain/visual-novel/vn-emote';
 
@@ -17,6 +17,7 @@ export type ChatLogScope = 'tab' | 'all';
 export interface ChatLogLabels {
   secret: string;
   edited: string;
+  pseudoDeleted: string;
   quote: string;
   reply: string;
   critical: string;
@@ -27,11 +28,13 @@ export interface ChatLogLabels {
   everyTab: string;
   messages: (count: number) => string;
   exportedWith: string;
+  reactions: string;
 }
 
 export const DEFAULT_CHAT_LOG_LABELS: ChatLogLabels = {
   secret: 'シークレットダイス',
   edited: '編集済',
+  pseudoDeleted: '削除済',
   quote: '引用',
   reply: '返信先',
   critical: 'クリティカル',
@@ -42,6 +45,7 @@ export const DEFAULT_CHAT_LOG_LABELS: ChatLogLabels = {
   everyTab: 'すべて',
   messages: (count) => `${count} 件の発言`,
   exportedWith: 'Udonarium Axe',
+  reactions: 'リアクション',
 };
 
 export interface ChatLogRenderOptions {
@@ -52,6 +56,8 @@ export interface ChatLogRenderOptions {
   labels?: Partial<ChatLogLabels>;
   lang?: string;
   exportedAt?: number;
+  /** The stamps put on each line, for the log to list under it. */
+  reactionsOf?: ChatLogReactionResolver;
 }
 
 type Kind = 'say' | 'roll' | 'system';
@@ -217,7 +223,7 @@ function renderRows(entries: readonly ChatLogEntry[], context: RenderContext): s
   let day = '';
   let previous: ChatLogEntry | null = null;
   for (const entry of entries) {
-    const entryDay = formatDate(entry.message.placedAt);
+    const entryDay = formatLogDate(entry.message.placedAt);
     if (entryDay !== day) {
       day = entryDay;
       parts.push(`<div class="day"><span>${entryDay}</span></div>\n`);
@@ -272,7 +278,9 @@ function renderSay(entry: ChatLogEntry, continuation: boolean, context: RenderCo
   const body = visible
     ? textHtml(vnBodyOf(message.vnEmote, decode(message.text, context))) + renderAttachments(message, context)
     : `<span class="seal">${esc(labels.secret)}</span>`;
-  const edited = message.fixd ? `<span class="ed">${esc(labels.edited)}</span>` : '';
+  const edited =
+    (message.fixd ? `<span class="ed">${esc(labels.edited)}</span>` : '') +
+    (message.isPseudoDeleted ? `<span class="ed">${esc(labels.pseudoDeleted)}</span>` : '');
 
   return (
     `<article class="${classes.join(' ')}" data-t="${entry.tabIndex}" style="--c:${colorOf(message.messColor)}">` +
@@ -281,7 +289,7 @@ function renderSay(entry: ChatLogEntry, continuation: boolean, context: RenderCo
     `<div class="hd"><span class="nm">${esc(name)}</span>${tabBadge(entry, context)}${timeOf(message)}</div>` +
     (visible ? renderReferences(message, context) : '') +
     `<div class="tx">${body}${edited}</div>` +
-    renderReactions(message, visible) +
+    (visible ? renderReactions(message, context) : '') +
     '</div></article>\n'
   );
 }
@@ -309,7 +317,7 @@ function renderRoll(entry: ChatLogEntry, context: RenderContext): string {
     '<div class="bd">' +
     `<div class="hd"><span class="nm">${esc(roller)}</span>${badge}${tabBadge(entry, context)}${timeOf(message)}</div>` +
     `<div class="tx">${body}</div>` +
-    renderReactions(message, visible) +
+    (visible ? renderReactions(message, context) : '') +
     '</div></article>\n'
   );
 }
@@ -323,7 +331,7 @@ function tabBadge(entry: ChatLogEntry, context: RenderContext): string {
 }
 
 function timeOf(message: ChatLogLine): string {
-  return `<time>${formatTime(message.timestamp)}</time>`;
+  return `<time>${formatLogTime(message.timestamp)}</time>`;
 }
 
 function renderPortrait(message: ChatLogLine, name: string, context: RenderContext): string {
@@ -334,18 +342,14 @@ function renderPortrait(message: ChatLogLine, name: string, context: RenderConte
   return `<span class="ini">${esc(initial)}</span>`;
 }
 
-// A quoted or replied-to line the reader may not read is left out altogether, name and all,
-// so a whisper or a secret roll cannot come out through a line that answers it.
 function renderReferences(message: ChatLogLine, context: RenderContext): string {
   const { labels } = context;
-  const { userId } = context.options;
-  const quote = message.quoteOf ? message.quoteOfMessage : null;
-  const reply = message.replyTo ? message.replyToMessage : null;
+  const userId = context.options.userId;
+  const quote = ChatLogExporter.referencedLine(message.quoteOf ? message.quoteOfMessage : null, userId);
+  const reply = ChatLogExporter.referencedLine(message.replyTo ? message.replyToMessage : null, userId);
   let html = '';
-  if (quote && ChatLogExporter.isReadable(quote, userId))
-    html += renderReference('❝', quote, 280, labels.quote, context);
-  if (reply && ChatLogExporter.isReadable(reply, userId))
-    html += renderReference('↩', reply, 120, labels.reply, context);
+  if (quote) html += renderReference('❝', quote, 280, labels.quote, context);
+  if (reply) html += renderReference('↩', reply, 120, labels.reply, context);
   return html;
 }
 
@@ -356,15 +360,24 @@ function renderReference(
   label: string,
   context: RenderContext
 ): string {
-  const name = decode(target.name, context) || label;
-  const excerpt = ChatLogExporter.referenceExcerpt(target, maxTextLength, context.options.textDecoder);
+  const sealed = ChatLogExporter.isSealed(target, context.options.userId);
+  const name = sealed ? label : decode(target.name, context) || label;
+  const excerpt = sealed
+    ? context.labels.secret
+    : ChatLogExporter.referenceExcerpt(target, maxTextLength, context.options.textDecoder);
   return `<div class="ref"><span class="rn">${icon} ${esc(name)}</span><span class="rt">${esc(excerpt)}</span></div>`;
 }
 
-/** The reaction counts under a line the reader may see, or nothing; see `ChatLogExporter.formatReactions`. */
-function renderReactions(message: ChatLogLine, visible: boolean): string {
-  const summary = visible ? formatReactionSummary(message.reactions) : '';
-  return summary ? `<div class="rx">${esc(summary)}</div>` : '';
+function renderReactions(message: ChatLogLine, context: RenderContext): string {
+  const { reactionsOf } = context.options;
+  if (!reactionsOf || !message.identifier) return '';
+  const reactions = reactionsOf(message.identifier);
+  if (reactions.length < 1) return '';
+  return (
+    `<div class="rx" aria-label="${attr(context.labels.reactions)}">` +
+    reactions.map((reaction) => `<span>${esc(reaction.label)} <b>${reaction.count}</b></span>`).join('') +
+    '</div>'
+  );
 }
 
 function renderAttachments(message: ChatLogLine, context: RenderContext): string {
@@ -418,7 +431,7 @@ function rangeOf(entries: readonly ChatLogEntry[]): string {
   const first = entries[0].message.placedAt;
   const last = entries[entries.length - 1].message.placedAt;
   const from = formatDateTime(first);
-  if (formatDate(first) === formatDate(last)) return `${from} – ${formatTime(last)}`;
+  if (formatLogDate(first) === formatLogDate(last)) return `${from} – ${formatLogTime(last)}`;
   return `${from} – ${formatDateTime(last)}`;
 }
 
@@ -426,16 +439,18 @@ function pad(value: number): string {
   return String(value).padStart(2, '0');
 }
 
-function formatDate(time: number): string {
+/** The day a moment falls on, as `yyyy/mm/dd`, as a log divides its lines by. */
+export function formatLogDate(time: number): string {
   const date = new Date(time);
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())}`;
 }
 
-function formatTime(time: number): string {
+/** The time of day of a moment, as `hh:mm`, as a log marks its lines with. */
+export function formatLogTime(time: number): string {
   const date = new Date(time);
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function formatDateTime(time: number): string {
-  return `${formatDate(time)} ${formatTime(time)}`;
+  return `${formatLogDate(time)} ${formatLogTime(time)}`;
 }

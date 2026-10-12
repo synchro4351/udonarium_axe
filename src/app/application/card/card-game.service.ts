@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
-import { getPeerContext, getPeerIds } from '@axe/core/network/peer-context-source';
+import { getPeerIds } from '@axe/core/network/peer-context-source';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { planDeal } from '@axe/domain/card/card-deal';
@@ -39,8 +39,7 @@ export class CardGameService {
 
   /** Your own user id. Outside a room it is not on the cursor yet, so the peer context answers instead. */
   myUserId(): string {
-    const fromCursor = PeerCursor.myCursor?.userId ?? '';
-    return fromCursor.length > 0 ? fromCursor : getPeerContext().userId;
+    return PeerCursor.myUserId;
   }
 
   /** Who can hold cards, judged the same way the hand rail judges it. */
