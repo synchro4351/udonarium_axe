@@ -1,6 +1,7 @@
 <p class="text-ui-muted mt-0 text-sm">
   {{ (character() ? 'feature.file.multipart.linkHint' : 'feature.file.multipart.hint') | transloco }}
 </p>
+<p class="text-ui-muted mt-0 text-xs">{{ 'feature.file.multipart.adjustHint' | transloco }}</p>
 @if (character()) {
   <label class="mb-2 flex items-center gap-2 text-sm">
     <span class="shrink-0">{{ 'feature.file.multipart.groupName' | transloco }}</span>
@@ -15,7 +16,7 @@
   </label>
 }
 @if (url()) {
-  <div class="bg-ui-input relative mx-auto w-fit max-w-full" data-testid="multipart-image">
+  <div class="bg-ui-input relative mx-auto w-fit max-w-full" data-testid="multipart-image" data-multipart-frame>
     <img class="block max-h-95 max-w-full" [src]="url()" alt="" draggable="false" />
     <svg
       class="absolute inset-0 size-full touch-none select-none"
@@ -35,9 +36,11 @@
           [attr.y]="part.y"
           [attr.width]="part.width"
           [attr.height]="part.height"
-          fill="#38bdf833"
-          stroke="#38bdf8"
-          stroke-width="2"
+          [attr.fill]="$index === selected() ? '#fbbf2433' : '#38bdf833'"
+          [attr.stroke]="$index === selected() ? '#fbbf24' : '#38bdf8'"
+          [attr.stroke-width]="$index === selected() ? 3 : 2"
+          [attr.data-selected]="$index === selected() ? '' : null"
+          data-testid="multipart-region"
           vector-effect="non-scaling-stroke"
         />
         <text
@@ -58,30 +61,70 @@
           [attr.y]="part.y"
           [attr.width]="part.width"
           [attr.height]="part.height"
-          [attr.fill]="draftBlocked() ? '#f8717133' : '#fbbf2433'"
-          [attr.stroke]="draftBlocked() ? '#f87171' : '#fbbf24'"
+          fill="#fbbf2433"
+          stroke="#fbbf24"
           stroke-width="2"
+          stroke-dasharray="6 4"
           vector-effect="non-scaling-stroke"
         />
       }
     </svg>
+    @if (selectedPart(); as selectedRegion) {
+      @for (handle of handles; track handle) {
+        <span
+          class="absolute size-3 -translate-1/2 touch-none rounded-full border border-sky-600 bg-white/90 shadow-sm after:absolute after:-inset-2.5 after:content-['']"
+          [class]="handleCursor[handle]"
+          [style.left]="handleStyle(selectedRegion, handle)['left']"
+          [style.top]="handleStyle(selectedRegion, handle)['top']"
+          [attr.data-handle]="handle"
+          [attr.aria-label]="'feature.file.multipart.handle' | transloco"
+          [attr.data-testid]="'multipart-handle-' + handle"
+          (pointerdown)="handleDown($event, handle)"
+          (pointermove)="pointerMove($event)"
+          (pointerup)="pointerUp($event)"
+          (pointercancel)="cancelPointer()"
+          (lostpointercapture)="cancelPointer()"
+        ></span>
+      }
+    }
   </div>
 }
 <div class="my-3 flex items-center justify-between gap-2 text-sm">
   <span>{{ 'feature.file.multipart.count' | transloco: { count: parts().length, limit: limit } }}</span>
-  <button
-    type="button"
-    (click)="clear()"
-    [disabled]="busy() || !canEdit || !parts().length"
-    class="border-ui-border-panel rounded-ui-sm border px-2 py-1 disabled:opacity-40"
-  >
-    {{ 'feature.file.multipart.clear' | transloco }}
-  </button>
+  <div class="flex gap-2">
+    @if (selected() !== null) {
+      <button
+        type="button"
+        data-testid="multipart-new-range"
+        (click)="select(null)"
+        [disabled]="busy() || !canEdit"
+        class="border-ui-border-panel rounded-ui-sm border px-2 py-1 disabled:opacity-40"
+      >
+        {{ 'feature.file.multipart.newRange' | transloco }}
+      </button>
+    }
+    <button
+      type="button"
+      (click)="clear()"
+      [disabled]="busy() || !canEdit || !parts().length"
+      class="border-ui-border-panel rounded-ui-sm border px-2 py-1 disabled:opacity-40"
+    >
+      {{ 'feature.file.multipart.clear' | transloco }}
+    </button>
+  </div>
 </div>
 <div class="max-h-40 overflow-y-auto">
   @for (part of parts(); track $index) {
     <div class="mb-1 flex items-center gap-2">
-      <span class="w-6 text-center text-sm">{{ $index + 1 }}</span>
+      <button
+        type="button"
+        class="rounded-ui-sm w-6 text-center text-sm"
+        [class.bg-ui-accent]="$index === selected()"
+        [class.text-ui-inverse]="$index === selected()"
+        (click)="select($index)"
+      >
+        {{ $index + 1 }}
+      </button>
       <input
         class="bg-ui-input border-ui-border-panel rounded-ui-sm min-w-0 flex-1 border px-2 py-1"
         maxlength="80"

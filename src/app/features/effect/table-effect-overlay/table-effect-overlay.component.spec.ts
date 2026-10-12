@@ -1,7 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { EffectPlaybackService } from '@axe/application/effect/effect-playback.service';
 import { FirstPersonService } from '@axe/application/tabletop/first-person.service';
+import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
+import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
+import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
@@ -167,6 +170,56 @@ describe('TableEffectOverlayComponent', () => {
       expect(host.querySelector('canvas')).not.toBeNull();
     }
   });
+  it('keeps a following effect on a linked region in the first-person view', () => {
+    // The overlay re-resolves a following target every frame, which overrode the cast's own anchor.
+    TestBed.inject(UiSignalService).tableViewRotation.set({ x: 0, y: 0, z: 0 });
+    vi.spyOn(TestBed.inject(FirstPersonService), 'showing').mockReturnValue(true);
+    fixture.componentRef.setInput('eye', { rotation: { x: 90, y: 0, z: -30 }, liftPx: 5, risePx: 40 });
+    const grid = TestBed.inject(TabletopService).gridSize();
+    const plain = GameCharacter.create('whole', 1, '');
+    const part = GameCharacter.create('right', 1, '');
+    for (const piece of [plain, part]) {
+      piece.location.x = 400;
+      piece.location.y = 300;
+    }
+    part.partGroup = 'g';
+    part.partRegion = '0.5 0 0.5 1 1';
+    part.altitude = 1.5;
+    part.specifyKomaImageFlag = true;
+    part.komaImageHeight = 60;
+    ObjectStore.instance.add(plain, false);
+    ObjectStore.instance.add(part, false);
+    preset.followTarget = true;
+
+    const placementFor = (identifier: string) => {
+      playback.play({ presetIdentifier: preset.identifier, targets: [{ identifier, x: 0, y: 0, z: 0 }], seed: 3 });
+      return component.canvases().at(-1)!;
+    };
+
+    const whole = placementFor(plain.identifier);
+    const region = placementFor(part.identifier);
+    const multipartGroup = TestBed.inject(MultipartGroupService);
+    const wholeAnchor = multipartGroup.anchorOf(plain, grid);
+    const partAnchor = multipartGroup.anchorOf(part, grid, {
+      mode2d: false,
+      yawDeg: -30,
+      pitchDeg: 90,
+      tiltDeg: 0,
+      contain: false,
+      specifiedHeightPx: 60,
+    });
+
+    // The eye-aware anchor follows the transparent part frame; the overlay then adds the eye's
+    // billboard rise and orientation to that part-specific world position.
+    expect(whole.transform).toContain(`translate3d(${wholeAnchor.x}px, ${wholeAnchor.y}px, ${wholeAnchor.z + 40}px)`);
+    expect(region.transform).toContain(`translate3d(${partAnchor.x}px, ${partAnchor.y}px, ${partAnchor.z + 40}px)`);
+    expect(partAnchor.x).not.toBeCloseTo(wholeAnchor.x);
+    expect(partAnchor.y).not.toBeCloseTo(wholeAnchor.y);
+    expect(region.transform).toContain('rotateZ(30deg) rotateX(-90deg) rotateY(0deg) translateZ(5px)');
+    ObjectStore.instance.remove(plain);
+    ObjectStore.instance.remove(part);
+  });
+
   it('writes a reaction as text over the target, with no canvas under it', () => {
     preset.kind = 'reactpop';
     preset.reactionText = 'ナイス！';

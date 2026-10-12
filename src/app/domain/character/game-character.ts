@@ -81,6 +81,8 @@ export class GameCharacter extends OwnedTabletopObject {
   @SyncVar() nonTalkFlag: boolean = false;
   @SyncVar() hideName: boolean = false;
   @SyncVar() hideBuff: boolean = false;
+  /** Where the name, bars and buffs sit; read through `labelPlacementOf`, so an empty or unknown value is the default. */
+  @SyncVar() labelPlacement: string = '';
   @SyncVar() isNpc: boolean = false;
   @SyncVar() disclosureMode: string = '';
   @SyncVar() disclosureUserIds: string[] = [];

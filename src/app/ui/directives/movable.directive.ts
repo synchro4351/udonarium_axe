@@ -259,6 +259,9 @@ export class MovableDirective implements MovableInteractionContext {
       set posY(v: number) {
         self.posY = v;
       },
+      setAnimatedTransition(enabled: boolean) {
+        self.setAnimatedTransition(enabled);
+      },
     };
     this.multiMovableService.register(this._multiAdapter);
   }

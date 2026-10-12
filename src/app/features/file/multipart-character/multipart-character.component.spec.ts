@@ -51,7 +51,7 @@ describe('MultipartCharacterComponent', () => {
     fixture.destroy();
   });
 
-  describe('non-overlapping selection', () => {
+  describe('region selection, overlap, move and resize', () => {
     // 400x200 source shown at 200x100 from (0,0): one display pixel is two source pixels.
     const setup = () => {
       const fixture = TestBed.createComponent(MultipartCharacterComponent);
@@ -73,64 +73,117 @@ describe('MultipartCharacterComponent', () => {
           preventDefault: vi.fn(),
           stopPropagation: vi.fn(),
         }) as unknown as PointerEvent;
+      const handleTarget = { closest: () => target, parentElement: target, setPointerCapture: vi.fn() };
+      const handleEvent = (x: number, y: number) =>
+        ({ ...event(x, y), currentTarget: handleTarget }) as unknown as PointerEvent;
       const drag = (from: [number, number], to: [number, number]) => {
         component.pointerDown(event(...from));
         component.pointerMove(event(...to));
         component.pointerUp(event(...to));
       };
-      return { fixture, component, drag };
+      return { fixture, component, drag, event, handleEvent };
     };
 
-    it('rejects overlapping forward and reverse drags and reports it', () => {
+    it('accepts overlapping forward and reverse drags, started inside or outside an existing region', () => {
       const { fixture, component, drag } = setup();
       drag([10, 10], [50, 50]);
-      expect(component.parts()).toHaveLength(1);
+      component.select(null);
       drag([60, 60], [30, 30]);
-      expect(component.parts()).toHaveLength(1);
-      expect(component.error()).toBe('feature.file.multipart.overlap');
+      component.select(null);
       drag([150, 90], [30, 30]);
-      expect(component.parts()).toHaveLength(1);
-      drag([0, 60], [100, 0]);
-      expect(component.parts()).toHaveLength(1);
-      fixture.destroy();
-    });
-
-    it('does not begin a selection inside an existing region and clears stale errors on a valid one', () => {
-      const { fixture, component, drag } = setup();
-      drag([10, 10], [50, 50]);
-      drag([20, 20], [90, 90]);
-      expect(component['pointer']).toBeNull();
-      expect(component.parts()).toHaveLength(1);
-      drag([60, 60], [30, 30]);
-      expect(component.error()).not.toBe('');
-      drag([60, 10], [90, 40]);
+      component.select(null);
+      drag([20, 20], [40, 40]);
+      expect(component.parts()).toHaveLength(4);
       expect(component.error()).toBe('');
-      expect(component.parts()).toHaveLength(2);
       fixture.destroy();
     });
 
-    it('allows edge-touching regions and reuses a freed region after deletion', () => {
+    it('selects a clicked region, deselects on empty space and creates nothing from a click', () => {
       const { fixture, component, drag } = setup();
       drag([10, 10], [50, 50]);
-      drag([50, 10], [90, 50]);
+      drag([60, 10], [90, 40]);
+      expect(component.selected()).toBe(1);
+      drag([20, 20], [21, 21]);
+      expect(component.selected()).toBe(0);
       expect(component.parts()).toHaveLength(2);
-      expect(component.parts()[1]).toMatchObject({ x: 100 });
-      drag([20, 20], [40, 40]);
+      drag([20, 80], [20, 80]);
+      expect(component.selected()).toBeNull();
       expect(component.parts()).toHaveLength(2);
-      component.remove(0);
-      drag([20, 20], [40, 40]);
-      expect(component.parts()).toHaveLength(2);
-      expect(component.parts()[1]).toMatchObject({ x: 40, y: 40, width: 40, height: 40 });
       fixture.destroy();
     });
 
-    it('marks an overlapping draft as blocked', () => {
-      const { fixture, component } = setup();
-      component.parts.set([{ name: 'A', x: 0, y: 0, width: 100, height: 100 }]);
-      component.draft.set({ name: '', x: 50, y: 50, width: 100, height: 100 });
-      expect(component.draftBlocked()).toBe(true);
-      component.draft.set({ name: '', x: 100, y: 0, width: 50, height: 50 });
-      expect(component.draftBlocked()).toBe(false);
+    it('selects the topmost region where regions overlap', () => {
+      const { fixture, component, drag } = setup();
+      drag([10, 10], [60, 60]);
+      component.select(null);
+      drag([40, 40], [90, 90]);
+      component.select(null);
+      drag([50, 50], [50, 50]);
+      expect(component.selected()).toBe(1);
+      fixture.destroy();
+    });
+
+    it('moves the selected region with the pointer and keeps it inside the image', () => {
+      const { fixture, component, drag } = setup();
+      drag([10, 10], [50, 50]);
+      expect(component.parts()[0]).toMatchObject({ x: 20, y: 20, width: 80, height: 80 });
+      drag([30, 30], [40, 35]);
+      expect(component.parts()[0]).toMatchObject({ x: 40, y: 30, width: 80, height: 80 });
+      drag([40, 40], [500, 500]);
+      expect(component.parts()[0]).toMatchObject({ x: 320, y: 120, width: 80, height: 80 });
+      expect(component.parts()).toHaveLength(1);
+      fixture.destroy();
+    });
+
+    it('restores a move that is cancelled', () => {
+      const { fixture, component, event } = setup();
+      component.parts.set([{ name: 'A', x: 20, y: 20, width: 80, height: 80 }]);
+      component.select(0);
+      component.pointerDown(event(30, 30));
+      component.pointerMove(event(60, 60));
+      expect(component.parts()[0]).toMatchObject({ x: 80, y: 80 });
+      component.cancelPointer();
+      expect(component.parts()[0]).toMatchObject({ x: 20, y: 20 });
+      fixture.destroy();
+    });
+
+    it('resizes from a handle, including past the opposite side, without creating a region', () => {
+      const { fixture, component, handleEvent } = setup();
+      component.parts.set([{ name: 'A', x: 20, y: 20, width: 80, height: 80 }]);
+      component.select(0);
+      component.handleDown(handleEvent(50, 50), 'se');
+      component.pointerMove(handleEvent(70, 60));
+      component.pointerUp(handleEvent(70, 60));
+      expect(component.parts()).toEqual([{ name: 'A', x: 20, y: 20, width: 120, height: 100 }]);
+      component.handleDown(handleEvent(70, 60), 'w');
+      component.pointerMove(handleEvent(100, 60));
+      component.pointerUp(handleEvent(100, 60));
+      expect(component.parts()[0]).toMatchObject({ x: 140, width: 60, y: 20, height: 100 });
+      expect(component.parts()).toHaveLength(1);
+      fixture.destroy();
+    });
+
+    it('ignores a handle press while nothing is selected or editing is not allowed', () => {
+      const { fixture, component, handleEvent } = setup();
+      component.parts.set([{ name: 'A', x: 20, y: 20, width: 80, height: 80 }]);
+      component.handleDown(handleEvent(50, 50), 'se');
+      expect(component['pointer']).toBeNull();
+      component.select(0);
+      vi.spyOn(service, 'mayUse').mockReturnValue(false);
+      component.handleDown(handleEvent(50, 50), 'se');
+      expect(component['pointer']).toBeNull();
+      fixture.destroy();
+    });
+
+    it('keeps the selection on the same region when an earlier one is removed', () => {
+      const { fixture, component, drag } = setup();
+      drag([10, 10], [30, 30]);
+      drag([60, 10], [90, 40]);
+      expect(component.selected()).toBe(1);
+      component.remove(0);
+      expect(component.selected()).toBe(0);
+      component.remove(0);
+      expect(component.selected()).toBeNull();
       fixture.destroy();
     });
   });

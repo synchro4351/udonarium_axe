@@ -209,4 +209,30 @@ describe('MultipartGroupService', () => {
     right.altitude = 2;
     expect(service.anchorOf(right, 50).z).toBeCloseTo(150);
   });
+
+  it('projects linked image frames through a supplied first-person billboard view', () => {
+    const upperRight = character('g', '0.5 0 0.5 0.5 1');
+    start();
+    mode2d.set(false);
+    upperRight.posZ = 10;
+    upperRight.altitude = 1.5;
+    TestBed.inject(UiSignalService).tableViewRotation.set({ x: 0, y: 0, z: 90 });
+
+    const tableAnchor = service.anchorOf(upperRight, 50);
+    const eyeAnchor = service.anchorOf(upperRight, 50, {
+      mode2d: false,
+      yawDeg: -90,
+      pitchDeg: 90,
+      tiltDeg: 0,
+      contain: false,
+      specifiedHeightPx: 120,
+    });
+
+    // The first-person billboard is upright and follows the camera yaw, while its full-frame
+    // image height and world elevation still determine the position of the selected region.
+    expect(tableAnchor).not.toEqual(eyeAnchor);
+    expect(eyeAnchor.x).toBeCloseTo(350);
+    expect(eyeAnchor.y).toBeCloseTo(280);
+    expect(eyeAnchor.z).toBeCloseTo(175);
+  });
 });

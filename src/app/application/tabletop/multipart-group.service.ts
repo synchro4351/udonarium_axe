@@ -13,6 +13,7 @@ import {
   isLinkedPart,
   linkedPartsOf,
   partAnchorOffset,
+  PartAnchorView,
   partTransformOf,
 } from '@axe/domain/character/part-group';
 import { DataElement } from '@axe/domain/data/data-element';
@@ -77,30 +78,34 @@ export class MultipartGroupService {
 
   /**
    * Where an effect aimed at the piece lands: its middle, or for a part the middle of its region
-   * as the table is being looked at.
+   * in the table view or a supplied billboard view.
    */
-  anchorOf(character: GameCharacter, gridSize: number): { x: number; y: number; z: number } {
+  anchorOf(character: GameCharacter, gridSize: number, view?: PartAnchorView): { x: number; y: number; z: number } {
     const sizePx = gridSize * (character.size > 0 ? character.size : 1);
     const center = { x: character.location.x + sizePx / 2, y: character.location.y + sizePx / 2, z: character.posZ };
     const frame = isLinkedPart(character) ? decodePartRegion(character.partRegion) : null;
     if (!frame) return center;
-    const rotation = this.uiSignal.tableViewRotation();
+    const mode2d = view?.mode2d ?? this.tabletop.mode2d();
+    const rotation = view
+      ? { x: view.pitchDeg ?? 50, y: view.tiltDeg ?? 0, z: view.yawDeg }
+      : this.uiSignal.tableViewRotation();
     const table = this.tabletop.currentTable;
     const config = this.objectStore.get<Config>('Config');
     const contain =
-      this.tabletop.mode2d() && !!table && resolveRoomRules(config?.roomRuleAnswers ?? null, table).pieceImageInCell;
+      view?.contain ?? (mode2d && !!table && resolveRoomRules(config?.roomRuleAnswers ?? null, table).pieceImageInCell);
     const offset = partAnchorOffset(frame, sizePx, {
-      mode2d: this.tabletop.mode2d(),
-      yawDeg: this.uiSignal.tableViewRotationZ(),
+      mode2d,
+      yawDeg: view?.yawDeg ?? this.uiSignal.tableViewRotationZ(),
       pitchDeg: rotation?.x ?? 50,
       tiltDeg: rotation?.y ?? 0,
       contain,
-      specifiedHeightPx: character.specifyKomaImageFlag && !contain ? character.komaImageHeight : undefined,
+      specifiedHeightPx:
+        view?.specifiedHeightPx ?? (character.specifyKomaImageFlag && !contain ? character.komaImageHeight : undefined),
     });
     return {
       x: center.x + offset.dx,
       y: center.y + offset.dy,
-      z: center.z + offset.dz + (this.tabletop.mode2d() ? 0 : character.altitude * gridSize),
+      z: center.z + offset.dz + (mode2d ? 0 : character.altitude * gridSize),
     };
   }
 

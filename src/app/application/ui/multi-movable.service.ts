@@ -10,6 +10,8 @@ export interface MovableLike {
   readonly tabletopObject: TabletopObject | undefined;
   posX: number;
   posY: number;
+  /** Turns the short glide a piece uses for moves made elsewhere on or off. */
+  setAnimatedTransition?(enabled: boolean): void;
 }
 
 interface FollowerSnapshot {
@@ -91,6 +93,8 @@ export class MultiMovableService {
         }
       }
     }
+    // The leader is dragged without its glide; a follower still gliding would trail it by the length of the glide.
+    for (const f of this.followers) f.ref.setAnimatedTransition?.(false);
     return this.followers.length > 0;
   }
 
@@ -158,6 +162,7 @@ export class MultiMovableService {
   }
 
   private clear(): void {
+    for (const f of this.followers) f.ref.setAnimatedTransition?.(true);
     this.leaderId = null;
     this.followers = [];
   }

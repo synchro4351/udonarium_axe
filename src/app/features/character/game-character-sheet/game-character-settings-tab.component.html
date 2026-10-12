@@ -127,6 +127,25 @@
         }}
       </label>
     </div>
+    <label class="flex items-center gap-1.5 text-[0.82em]">
+      <span class="text-ui-muted min-w-[6em] shrink-0 text-[0.85em] whitespace-nowrap">{{
+        'feature.inventory.settingsTab.labelPlacement' | transloco
+      }}</span>
+      <select
+        class="bg-ui-input text-ui-text border-ui-border-input rounded-ui-sm min-w-0 flex-1 cursor-pointer border border-solid px-1.5 py-0.75 text-[0.82em]"
+        name="labelPlacement"
+        data-testid="label-placement"
+        [ngModel]="labelPlacement()"
+        (change)="onSetLabelPlacement($event)"
+        [title]="'feature.inventory.settingsTab.labelPlacementTitle' | transloco"
+      >
+        @for (placement of labelPlacements; track placement) {
+          <option [value]="placement">
+            {{ 'feature.inventory.settingsTab.labelPlacements.' + placement | transloco }}
+          </option>
+        }
+      </select>
+    </label>
     <div class="flex items-center gap-1.5 text-[0.82em]">
       <span class="text-ui-muted min-w-[6em] shrink-0 text-[0.85em] whitespace-nowrap">{{
         'feature.inventory.settingsTab.positionX' | transloco

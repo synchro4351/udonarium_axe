@@ -1219,8 +1219,8 @@ describe('GameCharacterComponent', () => {
     describe('the buffs as the switch for how they show', () => {
       beforeEach(() => TestBed.inject(BuffViewPreferenceService).set('icon'));
 
-      const bearBuff = () => {
-        const character = GameCharacter.create('バフ', 1, '');
+      const bearBuff = (imageIdentifier = '') => {
+        const character = GameCharacter.create('バフ', 1, imageIdentifier);
         character.addExtendData();
         fixture.componentRef.setInput('gameCharacter', character);
         const buffRoot = character.buffDataElement!;
@@ -1277,6 +1277,29 @@ describe('GameCharacterComponent', () => {
           expect(switchButton().getAttribute('title')).toContain('個数');
         } finally {
           character.destroy();
+        }
+      });
+
+      it('keeps the buff display switch and detail rows when an ordinary character moves labels into the picture', () => {
+        const imageIdentifier = TestBed.inject(ImageStorage).add('https://example.invalid/buff-label.png').identifier;
+        const character = bearBuff(imageIdentifier);
+        character.labelPlacement = 'center';
+        TestBed.inject(ObjectChangeService).notifyChanged(character.identifier);
+        fixture.detectChanges();
+
+        try {
+          expect(root().querySelector('[data-testid="buff-plate"]')).toBeNull();
+          expect(root().querySelector('[data-testid="label-block"] [data-testid="buff-view-switch"]')).not.toBeNull();
+          expect(root().querySelector('[data-testid="buff-badge"]')).not.toBeNull();
+
+          switchButton().click();
+          fixture.detectChanges();
+
+          expect(root().querySelector('[data-testid="buff-badge"]')).toBeNull();
+          expect(root().querySelector('[data-testid="label-block"] [game-data-element-buff]')).not.toBeNull();
+        } finally {
+          character.destroy();
+          TestBed.inject(ImageStorage).delete(imageIdentifier);
         }
       });
 
@@ -2779,6 +2802,57 @@ describe('GameCharacterComponent', () => {
       expect(
         root.querySelector<HTMLElement>('[data-testid="multi-angle-piece-motion-source"]')!.style.pointerEvents
       ).toBe('');
+    });
+
+    it("places a part's name, bars and buffs as one block by its chosen placement", () => {
+      const placed = (placement: string) => {
+        const head = part('Head', '0 0 0.5 1 1');
+        head.labelPlacement = placement;
+        const block = show(head).querySelector<HTMLElement>('[data-testid="label-block"]')!;
+        return { block, at: [block.style.left, block.style.top] };
+      };
+      expect(placed('').at).toEqual(['50%', '0%']);
+      const corner = placed('bottomRight');
+      expect(corner.at).toEqual(['100%', '100%']);
+      expect(corner.block.querySelector('[data-testid="part-name"]')!.textContent!.trim()).toBe('Head');
+      expect(placed('nonsense').at).toEqual(['50%', '0%']);
+    });
+
+    it("keeps an ordinary character's floating labels by default and moves them into the picture when placed", () => {
+      const plain = GameCharacter.create('Plain', 1, imageId);
+      made.push(plain);
+      const root = show(plain);
+      expect(root.querySelector('[data-testid="piece-name"]')).not.toBeNull();
+      expect(root.querySelector('[data-testid="label-block"]')).toBeNull();
+
+      const placed = GameCharacter.create('Plain', 1, imageId);
+      made.push(placed);
+      placed.labelPlacement = 'center';
+      show(placed);
+      const block = root.querySelector<HTMLElement>('[data-testid="label-block"]')!;
+      expect(block.getAttribute('data-placement')).toBe('center');
+      expect([block.style.left, block.style.top]).toEqual(['50%', '50%']);
+      expect(block.textContent).toContain('Plain');
+      expect(root.querySelector('[data-testid="piece-name"]')).toBeNull();
+      expect(root.querySelector('[data-testid="buff-plate"]')).toBeNull();
+      // The whole picture is the box; the target marker and the hit flash stay on the piece, not the region.
+      const region = root.querySelector<HTMLElement>('[data-testid="part-region"]')!;
+      expect([region.style.left, region.style.top, region.style.width, region.style.height]).toEqual([
+        '0%',
+        '0%',
+        '100%',
+        '100%',
+      ]);
+      expect(region.getAttribute('data-targeted')).toBeNull();
+    });
+
+    it('still hides the name of a placed ordinary character that asks to', () => {
+      const plain = GameCharacter.create('Plain', 1, imageId);
+      made.push(plain);
+      plain.labelPlacement = 'topLeft';
+      plain.hideName = true;
+      const root = show(plain);
+      expect(root.querySelector('[data-testid="part-name"]')).toBeNull();
     });
 
     it('turns every part of a group in one phase, counted from one clock', () => {
