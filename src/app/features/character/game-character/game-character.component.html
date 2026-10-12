@@ -220,7 +220,9 @@
                 [style.height.px]="imageView.boxHeightPx()"
               >
                 @let buffEl = this.gameCharacter()!.buffDataElement;
-                @if (buffEl && buffNum() > 0 && !hideBuff() && !multiAngleResourceBuffOrbitEnabled() && !partFrame()) {
+                @if (
+                  buffEl && buffNum() > 0 && !hideBuff() && !multiAngleResourceBuffOrbitEnabled() && !labelsInPicture()
+                ) {
                   <div class="[-webkit-transform-style:preserve-3d] transform-3d">
                     <div
                       class="absolute m-auto [-webkit-transform-style:preserve-3d] transform-3d"
@@ -319,7 +321,7 @@
                     </div>
                   </div>
                 }
-                @if (floatingChanges().length > 0 && !partFrame()) {
+                @if (floatingChanges().length > 0 && !labelsInPicture()) {
                   <div
                     class="pointer-events-none absolute [-webkit-transform-style:preserve-3d] transform-3d"
                     [appBillboard]="floatOrbitFacing()"
@@ -341,7 +343,7 @@
                     </div>
                   </div>
                 }
-                @if (pieceGauges().length > 0 && !multiAngleResourceBuffOrbitEnabled() && !partFrame()) {
+                @if (pieceGauges().length > 0 && !multiAngleResourceBuffOrbitEnabled() && !labelsInPicture()) {
                   <div
                     class="absolute [-webkit-transform-style:preserve-3d] transform-3d"
                     [appBillboard]="gaugeOrbitFacing()"
@@ -379,7 +381,7 @@
                     </div>
                   </div>
                 }
-                @if (name() && !hideName() && !multiAngleNameOrbitEnabled() && !partFrame()) {
+                @if (name() && !hideName() && !multiAngleNameOrbitEnabled() && !labelsInPicture()) {
                   <div
                     class="absolute [-webkit-transform-style:preserve-3d] transform-3d"
                     [style.font-size.px]="nameFontSizePx"
@@ -448,7 +450,7 @@
                     >
                   </div>
                 }
-                @if (!isPoster() && 0 < imageFile().url.length && partFrame()) {
+                @if (!isPoster() && 0 < imageFile().url.length && labelsInPicture()) {
                   @if (specifyKomaImageFlag() && !imageView.fitsInCell()) {
                     <div
                       class="relative inset-x-0 bottom-0 m-auto align-bottom [-webkit-transform-style:preserve-3d] transform-3d"
@@ -496,7 +498,7 @@
                   0 < imageFile().url.length &&
                   specifyKomaImageFlag() &&
                   !imageView.fitsInCell() &&
-                  !partFrame()
+                  !labelsInPicture()
                 ) {
                   <img
                     class="image chrome-smooth-image-trick inset-x-0 bottom-0 m-auto h-auto align-bottom [-webkit-transform-style:preserve-3d] transform-3d"
@@ -518,7 +520,7 @@
                   0 < imageFile().url.length &&
                   !specifyKomaImageFlag() &&
                   !imageView.fitsInCell() &&
-                  !partFrame()
+                  !labelsInPicture()
                 ) {
                   <img
                     class="image chrome-smooth-image-trick inset-x-0 bottom-0 m-auto h-auto align-bottom [-webkit-transform-style:preserve-3d] transform-3d"
@@ -533,7 +535,7 @@
                     [src]="imageFile().url | safe: 'resourceUrl'"
                   />
                 }
-                @if (!isPoster() && 0 < imageFile().url.length && imageView.fitsInCell() && !partFrame()) {
+                @if (!isPoster() && 0 < imageFile().url.length && imageView.fitsInCell() && !labelsInPicture()) {
                   <img
                     class="image chrome-smooth-image-trick inset-x-0 bottom-0 m-auto block object-contain align-bottom [-webkit-transform-style:preserve-3d] transform-3d"
                     [appBillboard]="imageView.pieceFacing()"
@@ -945,10 +947,10 @@
     data-testid="part-region"
     [ngStyle]="partRegionCss()"
     [style.font-size.px]="partFontSizePx()"
-    [style.box-shadow]="isTargeted() ? '0 0 0 0.3em #ff3b30, 0 0 0.8em rgba(255,59,48,0.9)' : null"
-    [attr.data-targeted]="isTargeted()"
+    [style.box-shadow]="partFrame() && isTargeted() ? '0 0 0 0.3em #ff3b30, 0 0 0.8em rgba(255,59,48,0.9)' : null"
+    [attr.data-targeted]="partFrame() ? isTargeted() : null"
   >
-    @if (hitFlash(); as flash) {
+    @if (partFrame() && hitFlash(); as flash) {
       <div
         class="animate-hit-flash absolute inset-0"
         [ngStyle]="{
@@ -959,12 +961,17 @@
         }"
       ></div>
     }
-    <div class="absolute top-0 left-1/2 flex -translate-x-1/2 flex-col items-center gap-[0.2em] whitespace-nowrap">
-      @if (!hideName() && partLabel()) {
+    <div
+      class="absolute flex flex-col gap-[0.2em] whitespace-nowrap"
+      data-testid="label-block"
+      [attr.data-placement]="labelPlacement()"
+      [ngStyle]="labelBlockStyle()"
+    >
+      @if (!hideName() && blockLabel()) {
         <span
           data-testid="part-name"
           class="bg-ui-panel text-ui-text max-w-[12em] truncate rounded-full px-[0.5em] leading-snug opacity-90"
-          >{{ partLabel() }}{{ isLock ? ' 🔒' : '' }}</span
+          >{{ blockLabel() }}{{ isLock ? ' 🔒' : '' }}</span
         >
       }
       @for (row of gaugeRows(); track row.gauge.identifier) {
@@ -980,25 +987,56 @@
         </span>
       }
       @if (!hideBuff() && buffBadges().length > 0) {
-        <span class="flex items-center gap-[0.2em]" data-testid="part-buffs">
-          @for (badge of buffBadges().slice(0, 5); track badge.identifier) {
-            <span
-              data-testid="buff-badge"
-              class="inline-flex size-[1.4em] items-center justify-center rounded-full border border-solid border-white/35 text-[0.9em] leading-none"
-              [style.background]="badge.color"
-              [attr.title]="badge.name"
-            >
-              @if (badge.iconUrl) {
-                <img class="size-[0.9em] object-contain" [src]="badge.iconUrl | safe: 'resourceUrl'" alt="" />
-              } @else {
-                {{ badge.icon }}
-              }
-            </span>
+        <button
+          type="button"
+          data-testid="buff-view-switch"
+          class="bg-ui-panel text-ui-text flex w-max max-w-[16em] cursor-pointer flex-col items-start rounded-[0.35em] border border-white/20 px-[0.35em] py-[0.15em] text-left"
+          [attr.title]="
+            ('feature.character.contextMenu.buffView' | transloco) + ': ' + (buffViewLabelKey() | transloco)
+          "
+          (click)="cycleBuffView($event)"
+          (mousedown)="cycleBuffView($event)"
+          (touchstart)="$event.stopPropagation()"
+        >
+          @switch (buffViewMode()) {
+            @case ('detail') {
+              <span class="flex flex-col items-start" data-testid="part-buffs">
+                @for (childElement of buffChildren(); track childElement.identifier) {
+                  <span
+                    game-data-element-buff
+                    [gameDataElement]="childElement"
+                    [isEdit]="false"
+                    [isPieceMode]="true"
+                  ></span>
+                }
+              </span>
+            }
+            @case ('count') {
+              <span>{{ 'feature.character.buff.count' | transloco: { count: buffNum() } }}</span>
+            }
+            @default {
+              <span class="flex items-center gap-[0.2em]" data-testid="part-buffs">
+                @for (badge of buffBadges().slice(0, 5); track badge.identifier) {
+                  <span
+                    data-testid="buff-badge"
+                    class="inline-flex size-[1.4em] items-center justify-center rounded-full border border-solid border-white/35 text-[0.9em] leading-none"
+                    [style.background]="badge.color"
+                    [attr.title]="badge.name"
+                  >
+                    @if (badge.iconUrl) {
+                      <img class="size-[0.9em] object-contain" [src]="badge.iconUrl | safe: 'resourceUrl'" alt="" />
+                    } @else {
+                      {{ badge.icon }}
+                    }
+                  </span>
+                }
+                @if (buffBadges().length > 5) {
+                  <span class="text-white [text-shadow:0_0.1em_0.2em_#000]">+{{ buffBadges().length - 5 }}</span>
+                }
+              </span>
+            }
           }
-          @if (buffBadges().length > 5) {
-            <span class="text-white [text-shadow:0_0.1em_0.2em_#000]">+{{ buffBadges().length - 5 }}</span>
-          }
-        </span>
+        </button>
       }
       @for (change of floatingChanges(); track change.key) {
         <span

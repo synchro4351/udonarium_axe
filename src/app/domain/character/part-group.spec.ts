@@ -118,6 +118,22 @@ describe('part group metadata', () => {
     ]);
   });
 
+  it('keeps the label placement through a copy and a save and load, and reads a file without it as the default', () => {
+    const plain = character();
+    expect(plain.labelPlacement).toBe('');
+    const unset = ObjectSerializer.instance.parseXml(plain.toXml()) as GameCharacter;
+    created.push(unset);
+    expect(unset.labelPlacement).toBe('');
+
+    plain.labelPlacement = 'topRight';
+    const copy = plain.clone();
+    created.push(copy);
+    expect(copy.labelPlacement).toBe('topRight');
+    const loaded = ObjectSerializer.instance.parseXml(plain.toXml()) as GameCharacter;
+    created.push(loaded);
+    expect(loaded.labelPlacement).toBe('topRight');
+  });
+
   it('publishes a position-only change and writes nothing when already aligned', () => {
     const leader = character();
     const follower = character();

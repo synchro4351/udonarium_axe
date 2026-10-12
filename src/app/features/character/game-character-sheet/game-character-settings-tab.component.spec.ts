@@ -44,6 +44,29 @@ describe('GameCharacterSettingsTabComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  describe('label placement', () => {
+    const choose = (value: string) => component.onSetLabelPlacement({ target: { value } } as unknown as Event);
+
+    it('stores a chosen preset, keeps the default as an empty value and ignores unknown values', () => {
+      choose('bottomLeft');
+      expect(character.labelPlacement).toBe('bottomLeft');
+      expect(component.labelPlacement()).toBe('bottomLeft');
+      choose('above');
+      expect(character.labelPlacement).toBe('');
+      choose('center');
+      choose('sideways');
+      expect(character.labelPlacement).toBe('');
+    });
+
+    it('offers a compact select with every preset', () => {
+      fixture.detectChanges();
+      const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>(
+        '[data-testid="label-placement"]'
+      )!;
+      expect(select.options).toHaveLength(10);
+    });
+  });
+
   describe('templates kept on the piece', () => {
     function partTables(): readonly DataElement[] {
       return character.detailDataElement!.getFirstElementByName('パーツ')!.children;

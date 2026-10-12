@@ -58,6 +58,12 @@ import { BuffBadge, toBuffBadges } from '@axe/domain/character/buff-badge';
 import { BUFF_VIEW_LABEL_KEYS, type BuffViewMode, nextBuffViewMode } from '@axe/domain/character/buff-view-mode';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import {
+  DEFAULT_LABEL_PLACEMENT,
+  LabelPlacement,
+  labelPlacementOf,
+  labelPlacementStyle,
+} from '@axe/domain/character/label-placement';
+import {
   decodePartRegion,
   isLinkedPart,
   partBoxRegion,
@@ -618,16 +624,54 @@ export class GameCharacterComponent {
     return box ? partClipPath(box) : null;
   });
 
-  readonly partRegionCss = computed(() => {
-    const box = this.partBox();
-    return box ? partRegionStyle(box) : null;
-  });
-
   readonly partLabel = computed(() => {
     const char = this.gameCharacter();
     if (!char || !this.partFrame()) return '';
     return char.partName || this.name();
   });
+
+  /** Where the name, bars and buffs sit; unknown or unset is the default. */
+  readonly labelPlacement = computed<LabelPlacement>(() => {
+    const char = this.gameCharacter();
+    if (!char) return DEFAULT_LABEL_PLACEMENT;
+    this.objectChange.versionOf(char.identifier)();
+    return labelPlacementOf(char.labelPlacement);
+  });
+
+  /**
+   * Whether the name, bars and buffs are drawn as one block inside the picture's bounds rather than
+   * floating over the piece. A part always does; an ordinary piece does once another placement is
+   * chosen. A poster and the multi-angle display keep their own label layout.
+   */
+  readonly labelsInPicture = computed(
+    () =>
+      !!this.partFrame() ||
+      (this.labelPlacement() !== DEFAULT_LABEL_PLACEMENT && !this.isPoster() && !this.multiAngleNameOrbitEnabled())
+  );
+
+  /** The picture's bounds in its box that the label block is placed in: a part's region, else the whole picture. */
+  readonly labelBox = computed<PartRegion | null>(() => {
+    if (!this.labelsInPicture()) return null;
+    const natural = this.imageView.naturalSize();
+    const frame: PartFrame = this.partFrame() ?? {
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 1,
+      aspect: natural ? natural.width / natural.height : 1,
+    };
+    return partBoxRegion(frame, this.isPoster() || this.imageView.fitsInCell());
+  });
+
+  readonly partRegionCss = computed(() => {
+    const box = this.labelBox();
+    return box ? partRegionStyle(box) : null;
+  });
+
+  readonly labelBlockStyle = computed(() => labelPlacementStyle(this.labelPlacement()));
+
+  /** The name shown in the label block: a part's own name, else the piece's. */
+  readonly blockLabel = computed(() => (this.partFrame() ? this.partLabel() : this.name()));
 
   /** Labels inside a part's picture are drawn at the picture's supersampled scale. */
   readonly partFontSizePx = computed(() => 10 * this.imageView.supersample());

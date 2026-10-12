@@ -6,6 +6,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { getMyPeerId } from '@axe/core/network/peer-context-source';
 import { normalizeFolderPath } from '@axe/domain/character/character-folder';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { DEFAULT_LABEL_PLACEMENT, LABEL_PLACEMENTS, labelPlacementOf } from '@axe/domain/character/label-placement';
 import {
   convertLegacyCheckTableElements,
   countConvertibleCheckTableElements,
@@ -54,6 +55,23 @@ export class GameCharacterSettingsTabComponent {
       locationY: char.location.y,
     };
   });
+
+  readonly labelPlacements = LABEL_PLACEMENTS;
+
+  readonly labelPlacement = computed(() => {
+    const char = this.character();
+    this.objectChange.versionOf(char.identifier)();
+    return labelPlacementOf(char.labelPlacement);
+  });
+
+  /** Chooses where the name, bars and buffs sit; the default is kept as an empty value so untouched pieces stay as they were. */
+  onSetLabelPlacement(event: Event): void {
+    if (!this.rolePermission.canEditTabletop) return;
+    const placement = labelPlacementOf((event.target as HTMLSelectElement).value);
+    const stored = placement === DEFAULT_LABEL_PLACEMENT ? '' : placement;
+    const character = this.character();
+    if (character.labelPlacement !== stored) character.labelPlacement = stored;
+  }
 
   readonly legacyCheckTableCount = computed(() => {
     const char = this.character();
