@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { strFromU8, unzipSync } from 'fflate';
+
 import { expect, Page, test } from '@playwright/test';
+import { strFromU8, unzipSync } from 'fflate';
 
 import { openPanel, waitAppReady } from './helpers';
 
@@ -28,14 +29,50 @@ async function openParts(page: Page) {
   await files.locator('img[alt="parts-test.png"]').click();
   await files.getByTestId('multipart-open').click();
   await expect(page.getByTestId('multipart-select')).toBeVisible();
+  await page
+    .getByTestId('multipart-image')
+    .locator('img')
+    .evaluate((image) => (image as HTMLImageElement).decode());
 }
 
 async function selectPart(page: Page, start: [number, number], end: [number, number]) {
+  const newRange = page.getByTestId('multipart-new-range');
+  if (await newRange.isVisible()) {
+    await newRange.click();
+    await expect(newRange).toBeHidden();
+  }
+  const previousCount = await page.getByTestId('multipart-region').count();
+  await page.getByTestId('multipart-select').scrollIntoViewIfNeeded();
+  await page.getByTestId('multipart-select').evaluate(
+    (element) =>
+      new Promise<void>((resolve, reject) => {
+        let previous = element.getBoundingClientRect();
+        let stableFrames = 0;
+        let frames = 0;
+        const sample = () => {
+          const current = element.getBoundingClientRect();
+          const stable =
+            Math.abs(current.x - previous.x) < 0.25 &&
+            Math.abs(current.y - previous.y) < 0.25 &&
+            Math.abs(current.width - previous.width) < 0.25 &&
+            Math.abs(current.height - previous.height) < 0.25;
+          stableFrames = stable ? stableFrames + 1 : 0;
+          previous = current;
+          frames++;
+          if (stableFrames >= 3) resolve();
+          else if (frames >= 120) reject(new Error('Multipart image did not settle before pointer input'));
+          else requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      })
+  );
   const bounds = (await page.getByTestId('multipart-select').boundingBox())!;
   await page.mouse.move(bounds.x + start[0] * bounds.width, bounds.y + start[1] * bounds.height);
   await page.mouse.down();
   await page.mouse.move(bounds.x + end[0] * bounds.width, bounds.y + end[1] * bounds.height, { steps: 8 });
   await page.mouse.up();
+  await expect(page.getByTestId('multipart-region')).toHaveCount(previousCount + 1);
+  await expect(newRange).toBeVisible();
 }
 
 test('creates two independently named ordinary tokens from selected regions', async ({ page }) => {
@@ -160,4 +197,68 @@ test('splits an existing character and drags its separate hit regions together',
   expect(xml).toContain('partRegion=');
   expect(xml).toContain('検証ドラゴン');
   expect(xml).toContain('HP');
+});
+
+test('keeps overlapping regions and adjusts the selected one with its handles', async ({ page }) => {
+  await openParts(page);
+  const panel = page.locator('multipart-character');
+  await selectPart(page, [0.1, 0.1], [0.5, 0.6]);
+  await selectPart(page, [0.9, 0.9], [0.3, 0.3]);
+  await expect(panel.locator('input')).toHaveCount(2);
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+
+  const selected = page.locator('[data-testid="multipart-region"][data-selected]');
+  const regionOf = async () => ({
+    x: Number(await selected.getAttribute('x')),
+    y: Number(await selected.getAttribute('y')),
+    width: Number(await selected.getAttribute('width')),
+    height: Number(await selected.getAttribute('height')),
+  });
+  const first = page.locator('[data-testid="multipart-region"]').first();
+  // Clicking a saved region selects it without creating another one.
+  const firstBounds = (await first.boundingBox())!;
+  await page.mouse.click(firstBounds.x + firstBounds.width * 0.2, firstBounds.y + firstBounds.height * 0.2);
+  await expect(first).toHaveAttribute('data-selected', '');
+  await expect(panel.locator('input')).toHaveCount(2);
+
+  // Dragging the south-east handle changes only the size.
+  const before = await regionOf();
+  const handle = (await page.getByTestId('multipart-handle-se').boundingBox())!;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 30, handle.y + handle.height / 2 + 20, { steps: 6 });
+  await page.mouse.up();
+  const resized = await regionOf();
+  expect(resized.x).toBe(before.x);
+  expect(resized.y).toBe(before.y);
+  expect(resized.width).toBeGreaterThan(before.width);
+  expect(resized.height).toBeGreaterThan(before.height);
+  await expect(panel.locator('input')).toHaveCount(2);
+
+  // Dragging the body moves it without changing the size.
+  const body = (await first.boundingBox())!;
+  await page.mouse.move(body.x + body.width * 0.2, body.y + body.height * 0.2);
+  await page.mouse.down();
+  await page.mouse.move(body.x + body.width * 0.2 + 25, body.y + body.height * 0.2 + 10, { steps: 6 });
+  await page.mouse.up();
+  const moved = await regionOf();
+  expect(moved.width).toBe(resized.width);
+  expect(moved.height).toBe(resized.height);
+  expect(moved.x).toBeGreaterThan(resized.x);
+  expect(moved.y).toBeGreaterThan(resized.y);
+  expect(moved.x + moved.width).toBeLessThanOrEqual(300);
+  await expect(panel.locator('input')).toHaveCount(2);
+});
+
+test('starts a new range after deselecting a region that covers the image', async ({ page }) => {
+  await openParts(page);
+  const panel = page.locator('multipart-character');
+  await selectPart(page, [0, 0], [1, 1]);
+  await expect(panel.locator('input')).toHaveCount(1);
+  await expect(panel.getByTestId('multipart-new-range')).toBeVisible();
+
+  await panel.getByTestId('multipart-new-range').click();
+  await expect(panel.getByTestId('multipart-new-range')).toHaveCount(0);
+  await selectPart(page, [0.2, 0.2], [0.4, 0.4]);
+  await expect(panel.locator('input')).toHaveCount(2);
 });

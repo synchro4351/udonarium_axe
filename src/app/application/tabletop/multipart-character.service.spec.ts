@@ -112,12 +112,11 @@ describe('MultipartCharacterService', () => {
     expect(xml).toContain('part-1.png');
   });
 
-  it('rejects overlapping parts before cropping or creating anything', async () => {
+  it('creates a token for each of several overlapping parts', async () => {
     const overlapping = [parts[0], { name: 'Body', x: 30, y: 20, width: 40, height: 60 }];
-    await expect(service.create(source.identifier, image, overlapping)).rejects.toThrow('Unavailable');
-    expect(crops).toBe(0);
-    expect(added).toHaveLength(0);
-    expect(created).toHaveLength(0);
+    const result = await service.create(source.identifier, image, overlapping);
+    expect(result).toHaveLength(2);
+    expect(crops).toBe(2);
   });
 
   it('makes no images or characters when a later crop fails', async () => {
@@ -214,11 +213,17 @@ describe('MultipartCharacterService', () => {
     it.each([
       ['a single part', () => service.createLinked(original, wide, [halves[0]], 'Wyrm')],
       ['an empty creature name', () => service.createLinked(original, wide, halves, '  ')],
-      ['overlapping parts', () => service.createLinked(original, wide, [halves[0], { ...halves[1], x: 100 }], 'Wyrm')],
     ])('refuses %s before cropping anything', async (_, attempt) => {
       await expect(attempt()).rejects.toThrow('Unavailable');
       expect(crops).toBe(0);
       expect(original.location.name).toBe('table');
+    });
+
+    it('links parts whose regions overlap, with each region kept as chosen', async () => {
+      parts = await service.createLinked(original, wide, [halves[0], { ...halves[1], x: 100 }], 'Wyrm');
+      expect(parts).toHaveLength(2);
+      expect(decodePartRegion(parts[1].partRegion)?.x).toBeCloseTo(1 / 3);
+      expect(original.location.name).toBe('graveyard');
     });
 
     it('refuses a character off the table, one already a part, or one the reader may not view', async () => {
