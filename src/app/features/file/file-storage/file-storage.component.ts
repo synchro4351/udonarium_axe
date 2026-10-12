@@ -17,7 +17,7 @@ import { MultipartCharacterService } from '@axe/application/tabletop/multipart-c
 import { PanelService } from '@axe/application/ui/panel.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
 import { emitSelectFile } from '@axe/core/event/domain-events';
-import { FileArchiver, ImageDropPlace } from '@axe/core/storage/file-archiver';
+import { FileArchiver, ImageDropPlace, MAX_LOADED_IMAGE_BYTES } from '@axe/core/storage/file-archiver';
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { canBrowseImage, ImageTag, SYSTEM_RESERVED_TAG } from '@axe/domain/media/image-tag';
@@ -318,7 +318,7 @@ export class FileStorageComponent implements DroppedImageHolder {
     const files = Array.from(input.files ?? []);
     input.value = '';
     if (!files.length) return;
-    if (files.length === 1 && isPasteableImage(files[0].type)) {
+    if (files.length === 1 && isPasteableImage(files[0].type) && files[0].size <= MAX_LOADED_IMAGE_BYTES) {
       void this.offer({ kind: 'image', file: files[0] });
       return;
     }

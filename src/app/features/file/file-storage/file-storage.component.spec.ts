@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { FileArchiver } from '@axe/core/storage/file-archiver';
+import { FileArchiver, MAX_LOADED_IMAGE_BYTES } from '@axe/core/storage/file-archiver';
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ImageTag, SYSTEM_RESERVED_TAG } from '@axe/domain/media/image-tag';
@@ -463,6 +463,16 @@ describe('FileStorageComponent', () => {
       expect(component.pendingImage()?.original.file).toBe(map);
       expect(load).not.toHaveBeenCalled();
       expect(input.value).toBe('');
+    });
+
+    it('sends a single over-limit chosen picture to the official image edit queue', () => {
+      const image = new File([new Uint8Array(MAX_LOADED_IMAGE_BYTES + 1)], 'big.bmp', { type: 'image/bmp' });
+
+      chooseFiles(image);
+
+      expect(upload).toHaveBeenCalledWith([image]);
+      expect(component.pendingImage()).toBeNull();
+      expect(load).not.toHaveBeenCalled();
     });
 
     it('sends several chosen files through the official upload queue', () => {
