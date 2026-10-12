@@ -109,13 +109,17 @@ test.describe('共有メモの整形表示', () => {
     await sheet.locator('label').filter({ hasText: '本文' }).locator('textarea').fill('# 見出し\n- 項目');
     await expect(note).toContainText('# 見出し');
 
-    await sheet.getByTestId('text-note-format-formatted').click();
-    await expect(sheet.getByTestId('text-note-format-formatted')).toHaveAttribute('aria-checked', 'true');
+    const formatSwitch = sheet.locator('text-format-switch');
+    const formattedOption = formatSwitch.locator('[data-format="formatted"]');
+    await formattedOption.click();
+    await expect(formattedOption).toHaveAttribute('aria-checked', 'true');
     await expect(note.locator('.note-formatted h1')).toHaveText('見出し');
     await expect(note.locator('.note-formatted li')).toHaveText('項目');
     await expect(note).not.toContainText('# 見出し');
 
-    await sheet.getByTestId('text-note-format-plain').click();
+    const normalOption = formatSwitch.locator('[data-format="normal"]');
+    await normalOption.click();
+    await expect(normalOption).toHaveAttribute('aria-checked', 'true');
     await expect(note.locator('.note-formatted')).toHaveCount(0);
     await expect(note.locator('h1, li')).toHaveCount(0);
     await expect(note).toContainText('# 見出し');
