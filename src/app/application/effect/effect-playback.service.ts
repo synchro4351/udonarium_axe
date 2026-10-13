@@ -7,7 +7,7 @@ import { VolumeType } from '@axe/core/storage/audio-player';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { PERF_EFFECT_FRAME, perfCounters } from '@axe/core/util/perf-counters';
 import { GameCharacter } from '@axe/domain/character/game-character';
-import { isLinkedPart } from '@axe/domain/character/part-group';
+import { hasPartRegion } from '@axe/domain/character/part-group';
 import { EffectCast, normalizeEffectCast } from '@axe/domain/effect/effect-cast';
 import { DefeatReaction, defeatReactionOf } from '@axe/domain/effect/effect-defeat';
 import { EffectPreset } from '@axe/domain/effect/effect-preset';
@@ -130,7 +130,7 @@ export class EffectPlaybackService {
   private localPartAnchors(cast: EffectCast): EffectCast {
     const anchor = (identifier: string) => {
       const character = this.objectStore.get(identifier);
-      if (!(character instanceof GameCharacter) || !isLinkedPart(character)) return null;
+      if (!(character instanceof GameCharacter) || !hasPartRegion(character)) return null;
       const grid = this.injector.get(TabletopService).gridSize();
       return this.injector.get(MultipartGroupService).anchorOf(character, grid);
     };

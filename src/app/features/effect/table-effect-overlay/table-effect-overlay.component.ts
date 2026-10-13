@@ -12,7 +12,7 @@ import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { PERF_EFFECT_RENDERABLES, perfCounters } from '@axe/core/util/perf-counters';
 import { GameCharacter } from '@axe/domain/character/game-character';
-import { isLinkedPart } from '@axe/domain/character/part-group';
+import { hasPartRegion } from '@axe/domain/character/part-group';
 import { EffectParticleLayer, effectParticles } from '@axe/domain/effect/effect-particles';
 import { stagedEffectParticles } from '@axe/domain/effect/effect-stage-timeline';
 import {
@@ -332,7 +332,7 @@ export class TableEffectOverlayComponent {
     if (!(object instanceof TabletopObject) || !object.isVisibleOnTable) return null;
     // A following effect re-resolves its target every frame and so overrides the position stored in
     // the cast; a linked part has to land on its own region on this viewer's screen, not on the whole picture.
-    if (object instanceof GameCharacter && isLinkedPart(object)) {
+    if (object instanceof GameCharacter && hasPartRegion(object)) {
       const eye = this.eye();
       return this.multipartGroup.anchorOf(
         object,

@@ -3,6 +3,7 @@ import { ContextMenuAction, ContextMenuSeparator } from '@axe/application/ui/con
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { copyBeside } from '@axe/application/ui/tabletop-context-menu-actions';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { DiceSymbol } from '@axe/domain/dice/dice-symbol';
 import { isLockedInPlace } from '@axe/domain/tabletop/lockable';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
@@ -16,6 +17,10 @@ export interface MultiSelectionContextDeps {
   /** The pieces the selected dice can be put away into, and how to do it. */
   readonly diceOwners?: { identifier: string; name: string }[];
   readonly storeDice?: (dice: DiceSymbol[], ownerIdentifier: string) => void;
+  /** Links the selected characters under one shared transform. */
+  readonly linkCharacters?: (characters: readonly GameCharacter[]) => boolean;
+  /** Copies a linked group as a unit, returning its new members. */
+  readonly copyCharacterGroup?: (character: GameCharacter) => GameCharacter[];
 }
 
 /**
@@ -28,12 +33,21 @@ export function buildMultiSelectionContextMenu(
   objects: readonly TabletopObject[],
   deps: MultiSelectionContextDeps
 ): ContextMenuAction[] {
-  const { t, selectionSignalService, gridSize, rollDice, diceOwners, storeDice } = deps;
+  const { t, selectionSignalService, gridSize, rollDice, diceOwners, storeDice, linkCharacters, copyCharacterGroup } =
+    deps;
   const count = objects.length;
   const movable = objects.filter((o) => !isLockedInPlace(o));
   const dice = objects.filter((o): o is DiceSymbol => o instanceof DiceSymbol && o.isVisible);
 
   return [
+    ...(linkCharacters && objects.length > 1 && objects.every((o) => o instanceof GameCharacter)
+      ? [
+          {
+            name: t('feature.character.contextMenu.linkSelected'),
+            action: () => linkCharacters(objects as GameCharacter[]),
+          } as ContextMenuAction,
+        ]
+      : []),
     {
       name: t('feature.tabletop.selection.countLabel', { count }),
       action: undefined,
@@ -65,7 +79,23 @@ export function buildMultiSelectionContextMenu(
     {
       name: t('feature.tabletop.selection.copyAll'),
       action: () => {
-        const cloned = movable.map((obj) => copyBeside(obj, gridSize).identifier);
+        const handled = new Set<string>();
+        const cloned: string[] = [];
+        for (const obj of movable) {
+          if (handled.has(obj.identifier)) continue;
+          if (obj instanceof GameCharacter && copyCharacterGroup) {
+            const copies = copyCharacterGroup(obj);
+            const sourceGroup = obj.partGroup;
+            handled.add(obj.identifier);
+            if (sourceGroup) {
+              for (const member of movable)
+                if (member instanceof GameCharacter && member.partGroup === sourceGroup) handled.add(member.identifier);
+            }
+            cloned.push(...copies.map((copy) => copy.identifier));
+            continue;
+          }
+          cloned.push(copyBeside(obj, gridSize).identifier);
+        }
         if (cloned.length > 0) selectionSignalService.replaceSelection(cloned);
       },
     },
@@ -95,6 +125,8 @@ export interface TryBuildMultiSelectionContextMenuOptions {
   readonly rollDice?: (dice: DiceSymbol[]) => void;
   readonly diceOwners?: { identifier: string; name: string }[];
   readonly storeDice?: (dice: DiceSymbol[], ownerIdentifier: string) => void;
+  readonly linkCharacters?: MultiSelectionContextDeps['linkCharacters'];
+  readonly copyCharacterGroup?: MultiSelectionContextDeps['copyCharacterGroup'];
 }
 
 /**
@@ -107,7 +139,18 @@ export interface TryBuildMultiSelectionContextMenuOptions {
 export function tryBuildMultiSelectionContextMenu(
   options: TryBuildMultiSelectionContextMenuOptions
 ): ContextMenuAction[] | null {
-  const { self, selectionSignalService, objectStore, t, gridSize, rollDice, diceOwners, storeDice } = options;
+  const {
+    self,
+    selectionSignalService,
+    objectStore,
+    t,
+    gridSize,
+    rollDice,
+    diceOwners,
+    storeDice,
+    linkCharacters,
+    copyCharacterGroup,
+  } = options;
   if (selectionSignalService.selectionSize() <= 1) return null;
   const selected = selectionSignalService.selectedObjects();
   if (!selected.has(self.identifier)) return null;
@@ -124,5 +167,7 @@ export function tryBuildMultiSelectionContextMenu(
     rollDice,
     diceOwners,
     storeDice,
+    linkCharacters,
+    copyCharacterGroup,
   });
 }

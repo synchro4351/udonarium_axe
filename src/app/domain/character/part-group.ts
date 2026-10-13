@@ -47,9 +47,14 @@ interface PartLike {
   readonly location: { name: string };
 }
 
-/** Whether the piece is one part of a linked group. */
-export function isLinkedPart(character: Pick<PartLike, 'partGroup' | 'partRegion'>): boolean {
-  return character.partGroup.length > 0 && decodePartRegion(character.partRegion) !== null;
+/** Whether the piece belongs to a linked group, independently of its crop metadata. */
+export function isLinkedPart(character: Pick<PartLike, 'partGroup'>): boolean {
+  return character.partGroup.length > 0;
+}
+
+/** Whether the picture is cropped to a saved region, even after it leaves its linked group. */
+export function hasPartRegion(character: Pick<PartLike, 'partRegion'>): boolean {
+  return decodePartRegion(character.partRegion) !== null;
 }
 
 /** The other parts of the same group that are out on the table. */
@@ -74,14 +79,10 @@ export function partDisplayName(groupName: string, partName: string): string {
   return `${group}(${part})`;
 }
 
-/** Takes a piece out of its group, leaving an ordinary character. */
-export function clearPartGroup(
-  character: Pick<GameCharacter, 'partGroup' | 'partGroupName' | 'partName' | 'partRegion'>
-) {
+/** Removes group identity while preserving the picture's crop and part label. */
+export function clearPartGroup(character: Pick<GameCharacter, 'partGroup' | 'partGroupName'>) {
   character.partGroup = '';
   character.partGroupName = '';
-  character.partName = '';
-  character.partRegion = '';
 }
 
 /** What the parts of a group keep in common. */

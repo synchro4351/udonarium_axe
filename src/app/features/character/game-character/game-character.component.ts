@@ -70,6 +70,7 @@ import {
 } from '@axe/domain/character/label-placement';
 import {
   decodePartRegion,
+  hasPartRegion,
   isLinkedPart,
   partBoxRegion,
   partClipPath,
@@ -620,12 +621,49 @@ export class GameCharacterComponent {
     fitInCell: this.fitsImageInCell,
   });
 
-  /** The piece's rectangle in its group's shared picture; null for an ordinary character. */
+  /** The piece's saved rectangle in a shared picture, whether or not it remains linked. */
   readonly partFrame = computed<PartFrame | null>(() => {
     const char = this.gameCharacter();
     if (!char) return null;
     this.objectChange.versionOf(char.identifier)();
-    return isLinkedPart(char) ? decodePartRegion(char.partRegion) : null;
+    return hasPartRegion(char) ? decodePartRegion(char.partRegion) : null;
+  });
+
+  readonly isGroupMember = computed(() => {
+    const char = this.gameCharacter();
+    if (!char) return false;
+    this.objectChange.versionOf(char.identifier)();
+    return char.partGroup.length > 0;
+  });
+
+  /** The group name is shown once, on its first visible member on the table. */
+  readonly isGroupNameRepresentative = computed(() => {
+    const char = this.gameCharacter();
+    if (!char || !this.isGroupMember()) return false;
+    this.objectChange.collectionOf(GameCharacter.aliasName)();
+    this.objectChange.trackMyCursor();
+    const visibleMembers = this.partGroups
+      .membersOf(char.partGroup)
+      .filter((member) => {
+        this.objectChange.versionOf(member.identifier)();
+        return (
+          member.location.name === 'table' &&
+          member.partGroup === char.partGroup &&
+          this.visionService.isTokenVisible(member) &&
+          this.disclosureService.canView(member) &&
+          this.overlay.names() &&
+          (!member.hideName || this.rolePermission.canSeeHidden)
+        );
+      })
+      .sort((a, b) => (a.identifier < b.identifier ? -1 : a.identifier > b.identifier ? 1 : 0));
+    return visibleMembers[0]?.identifier === char.identifier;
+  });
+
+  readonly groupName = computed(() => {
+    const char = this.gameCharacter();
+    if (!char || !this.isGroupMember()) return '';
+    this.objectChange.versionOf(char.identifier)();
+    return char.partGroupName;
   });
 
   /**
@@ -646,8 +684,9 @@ export class GameCharacterComponent {
 
   readonly partLabel = computed(() => {
     const char = this.gameCharacter();
-    if (!char || !this.partFrame()) return '';
-    return char.partName || this.name();
+    if (!char) return '';
+    if (this.isGroupMember()) return char.partName;
+    return this.partFrame() ? this.name() : '';
   });
 
   /** Where the name, bars and buffs sit; unknown or unset is the default. */
@@ -665,6 +704,7 @@ export class GameCharacterComponent {
    */
   readonly labelsInPicture = computed(
     () =>
+      this.isGroupMember() ||
       !!this.partFrame() ||
       (this.labelPlacement() !== DEFAULT_LABEL_PLACEMENT && !this.isPoster() && !this.multiAngleNameOrbitEnabled())
   );
@@ -691,7 +731,7 @@ export class GameCharacterComponent {
   readonly labelBlockStyle = computed(() => labelPlacementStyle(this.labelPlacement()));
 
   /** The name shown in the label block: a part's own name, else the piece's. */
-  readonly blockLabel = computed(() => (this.partFrame() ? this.partLabel() : this.name()));
+  readonly blockLabel = computed(() => (this.isGroupMember() || this.partFrame() ? this.partLabel() : this.name()));
 
   /** Labels inside a part's picture are drawn at the picture's supersampled scale. */
   readonly partFontSizePx = computed(() => 10 * this.imageView.supersample());
@@ -989,14 +1029,15 @@ export class GameCharacterComponent {
   );
 
   readonly multiAngleLabelText = computed(() => {
-    if (this.hideBuff() || this.multiAngleResourceBuffOrbitEnabled()) return this.name();
+    const label = this.blockLabel();
+    if (this.hideBuff() || this.multiAngleResourceBuffOrbitEnabled()) return label;
     const buffNames = this.buffBadges()
       .map((buff) => buff.name.trim())
       .filter((name) => name.length > 0)
       .join('・');
-    if (buffNames.length < 1) return this.name();
+    if (buffNames.length < 1) return label;
     const leadingBuff = Array.from(buffNames).slice(0, 5).join('');
-    return `${this.name()}/${leadingBuff}`;
+    return `${label}/${leadingBuff}`;
   });
 
   readonly multiAngleResourceGaugeLayout = computed(() =>
@@ -1014,7 +1055,7 @@ export class GameCharacterComponent {
     () =>
       this.multiAngleNameOrbitEnabled() &&
       !this.partFrame() &&
-      ((this.name().length > 0 && !this.hideName()) ||
+      ((this.blockLabel().length > 0 && !this.hideName()) ||
         (this.multiAngleResourceBuffOrbitEnabled() &&
           (this.orbitPieceGauges().length > 0 || (!this.hideBuff() && this.buffBadges().length > 0))))
   );
@@ -1529,8 +1570,9 @@ export class GameCharacterComponent {
         onToggleTarget: () => this.toggleTarget(),
         onClearTargets: this.anythingTargeted() ? () => this.clearEveryTarget() : undefined,
         onSplitParts: this.multipart.mayLink(char) ? () => this.objectPanels.openPartSplit(char) : undefined,
+        onCopy: isLinkedPart(char) ? () => void this.partGroups.copyGroup(char) : undefined,
         onUnlinkPart:
-          this.partFrame() && this.rolePermission.canEditTabletop ? () => this.partGroups.unlink(char) : undefined,
+          isLinkedPart(char) && this.rolePermission.canEditTabletop ? () => this.partGroups.unlink(char) : undefined,
         onViewFirstPerson: this.firstPerson.canLookOutOf(char)
           ? () => this.firstPerson.enterSeat(char.identifier)
           : undefined,

@@ -5,6 +5,7 @@ import {
   clearPartGroup,
   decodePartRegion,
   encodePartRegion,
+  hasPartRegion,
   isLinkedPart,
   linkedPartsOf,
   partAnchorOffset,
@@ -60,10 +61,19 @@ describe('part group metadata', () => {
     }
   });
 
-  it('counts only pieces with a key and a readable region as parts', () => {
-    expect(isLinkedPart({ partGroup: '', partRegion: '0 0 1 1 1' })).toBe(false);
-    expect(isLinkedPart({ partGroup: 'g', partRegion: 'broken' })).toBe(false);
-    expect(isLinkedPart({ partGroup: 'g', partRegion: '0 0 1 1 1' })).toBe(true);
+  it('keeps group membership independent of crop metadata', () => {
+    const linked = character();
+    linked.partGroup = 'plain-group';
+    expect(isLinkedPart(linked)).toBe(true);
+    expect(hasPartRegion(linked)).toBe(false);
+    linked.partRegion = 'invalid';
+    expect(isLinkedPart(linked)).toBe(true);
+    expect(hasPartRegion(linked)).toBe(false);
+  });
+
+  it('counts group membership independently of readable crop metadata', () => {
+    expect(isLinkedPart({ partGroup: '' })).toBe(false);
+    expect(isLinkedPart({ partGroup: 'g' })).toBe(true);
   });
 
   it('links only other parts of the same group that stand on the table', () => {
@@ -84,12 +94,19 @@ describe('part group metadata', () => {
     expect(partDisplayName('Dragon', ' ')).toBe('Dragon');
   });
 
-  it('clears every group field', () => {
+  it('clears group identity while preserving a cropped part region and name', () => {
     const head = part('g1');
     head.partGroupName = 'Dragon';
     head.partName = 'Head';
     clearPartGroup(head);
-    expect([head.partGroup, head.partGroupName, head.partName, head.partRegion]).toEqual(['', '', '', '']);
+    expect([head.partGroup, head.partGroupName, head.partName, head.partRegion]).toEqual([
+      '',
+      '',
+      'Head',
+      '0 0 0.5 1 2',
+    ]);
+    expect(isLinkedPart(head)).toBe(false);
+    expect(hasPartRegion(head)).toBe(true);
   });
 
   it('never lets a copy join the group of the part it was copied from', () => {
@@ -99,7 +116,12 @@ describe('part group metadata', () => {
     const copy = head.clone();
     created.push(copy);
     expect(copy.identifier).not.toBe(head.identifier);
-    expect([copy.partGroup, copy.partGroupName, copy.partName, copy.partRegion]).toEqual(['', '', '', '']);
+    expect([copy.partGroup, copy.partGroupName, copy.partName, copy.partRegion]).toEqual([
+      '',
+      '',
+      'Head',
+      '0 0 0.5 1 2',
+    ]);
     expect(head.partGroup).toBe('g1');
   });
 

@@ -1871,6 +1871,8 @@
       },
       "multipart": {
         "title": "Create part tokens",
+        "wholeName": "Whole name",
+        "partName": "Part name",
         "hint": "Drag to outline each part, then give it a name. Each token has independent HP.",
         "select": "Select a part region",
         "part": "Part {{number}}",
@@ -1934,6 +1936,7 @@
         "moveMode": "Getting about",
         "splitParts": "Split into parts",
         "unlinkPart": "Unlink this part",
+        "linkSelected": "Link selected characters",
         "viewFirstPerson": "Look out of this piece",
         "shareFirstPerson": "Put everyone in this piece's view",
         "stopSharingFirstPerson": "Release everyone from the shared view"

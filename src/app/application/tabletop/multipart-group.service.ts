@@ -1,19 +1,23 @@
 import { DestroyRef, inject, Injectable } from '@angular/core';
+import { DisclosureService } from '@axe/application/permission/disclosure.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeEvent, ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { MultiMovableService } from '@axe/application/ui/multi-movable.service';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { generateUuid } from '@axe/core/util/uuid';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import {
   applyPartTransform,
   clearPartGroup,
   decodePartRegion,
+  hasPartRegion,
   isLinkedPart,
   linkedPartsOf,
   partAnchorOffset,
   PartAnchorView,
+  partDisplayName,
   partTransformOf,
 } from '@axe/domain/character/part-group';
 import { DataElement } from '@axe/domain/data/data-element';
@@ -36,6 +40,7 @@ export class MultipartGroupService {
   private readonly objectStore = inject(ObjectStore);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly roles = inject(RolePermissionService);
+  private readonly disclosure = inject(DisclosureService);
   private readonly multiMovable = inject(MultiMovableService);
   private readonly tabletop = inject(TabletopService);
   private readonly uiSignal = inject(UiSignalService);
@@ -71,8 +76,122 @@ export class MultipartGroupService {
 
   /** Takes one part out of its group; the rest stay linked. */
   unlink(character: GameCharacter): boolean {
-    if (!this.roles.canEditTabletop || !isLinkedPart(character)) return false;
+    if (
+      !this.roles.canEditTabletop ||
+      !isLinkedPart(character) ||
+      this.objectStore.get(character.identifier) !== character ||
+      !this.disclosure.canView(character)
+    )
+      return false;
     clearPartGroup(character);
+    return true;
+  }
+
+  /** Links a chosen set of distinct characters while keeping their cropped-picture metadata. */
+  link(characters: readonly GameCharacter[]): boolean {
+    if (!this.roles.canEditTabletop || characters.length < 2 || characters.some((character) => character.isLock))
+      return false;
+    const requested = [...new Set(characters)];
+    const groups = new Set(requested.map((character) => character.partGroup).filter(Boolean));
+    const distinct = [...new Set([...requested, ...[...groups].flatMap((group) => this.membersOf(group))])];
+    if (
+      distinct.length < 2 ||
+      distinct.some(
+        (character) =>
+          this.objectStore.get(character.identifier) !== character ||
+          !this.disclosure.canView(character) ||
+          (requested.includes(character) && character.location.name !== 'table') ||
+          character.isLock
+      )
+    )
+      return false;
+    const transform = partTransformOf(distinct[0]);
+    const group = generateUuid();
+    const groupName =
+      requested.find((character) => character.partGroupName.trim())?.partGroupName.trim() || requested[0].name;
+    for (const character of distinct) {
+      character.partGroup = group;
+      if (!character.partName.trim()) character.partName = character.name;
+      character.partGroupName = groupName;
+      character.name = partDisplayName(groupName, character.partName);
+      if (character.location.name === 'table') applyPartTransform(character, transform);
+    }
+    return true;
+  }
+
+  /** Copies every member of a linked group once, with its own fresh group key. */
+  copyGroup(character: GameCharacter): GameCharacter[] {
+    if (
+      !this.roles.canEditTabletop ||
+      this.objectStore.get(character.identifier) !== character ||
+      !this.disclosure.canView(character)
+    )
+      return [];
+    const members = isLinkedPart(character) ? this.membersOf(character.partGroup) : [character];
+    if (members.length === 0 || members.some((member) => !this.disclosure.canView(member))) return [];
+    const group = isLinkedPart(character) && members.length > 1 ? generateUuid() : '';
+    const sharedBase = character.partGroupName || character.name.replace(/\([^()]*\)$/, '');
+    const baseMatch = sharedBase.match(/^(.*)_([0-9]+)$/);
+    const unsuffixedBase = baseMatch?.[1] ?? sharedBase;
+    const firstNumber = baseMatch ? Number(baseMatch[2]) + 1 : 2;
+    const taken = new Set(
+      this.objectStore.getObjects(GameCharacter).flatMap((candidate) => {
+        const candidateBase = candidate.partGroupName || candidate.name.replace(/\([^()]*\)$/, '');
+        const match = candidateBase.match(/^(.*)_([0-9]+)$/);
+        if (!match || match[1] !== unsuffixedBase) return [];
+        return [Number(match[2])];
+      })
+    );
+    let sharedSuffix = firstNumber;
+    while (taken.has(sharedSuffix)) sharedSuffix++;
+    const copiedGroupName = `${unsuffixedBase}_${sharedSuffix}`;
+    const copies: GameCharacter[] = [];
+    try {
+      for (const member of members) {
+        const copy = member.clone();
+        copies.push(copy);
+        copy.partRegion = member.partRegion;
+        if (group) {
+          copy.partGroup = group;
+          copy.partGroupName = copiedGroupName;
+          copy.partName = member.partName;
+          copy.name = partDisplayName(copiedGroupName, copy.partName);
+        }
+        if (member.location.name === 'table') {
+          copy.location.x += 50;
+          copy.location.y += 50;
+        }
+        member.parent?.appendChild(copy);
+        copy.update();
+      }
+      return copies;
+    } catch (error) {
+      for (const copy of copies) copy.destroy();
+      throw error;
+    }
+  }
+
+  renameGroup(group: string, name: string): boolean {
+    if (!this.roles.canEditTabletop || !group) return false;
+    const members = this.membersOf(group);
+    if (members.length === 0 || members.some((member) => !this.disclosure.canView(member))) return false;
+    for (const member of members) {
+      member.partGroupName = name.trim();
+      member.name = partDisplayName(member.partGroupName, member.partName);
+    }
+    return true;
+  }
+
+  renamePart(character: GameCharacter, name: string): boolean {
+    if (
+      !this.roles.canEditTabletop ||
+      !isLinkedPart(character) ||
+      this.objectStore.get(character.identifier) !== character ||
+      !this.disclosure.canView(character)
+    )
+      return false;
+    character.partName = name.trim();
+    character.name = partDisplayName(character.partGroupName, character.partName);
     return true;
   }
 
@@ -83,7 +202,7 @@ export class MultipartGroupService {
   anchorOf(character: GameCharacter, gridSize: number, view?: PartAnchorView): { x: number; y: number; z: number } {
     const sizePx = gridSize * (character.size > 0 ? character.size : 1);
     const center = { x: character.location.x + sizePx / 2, y: character.location.y + sizePx / 2, z: character.posZ };
-    const frame = isLinkedPart(character) ? decodePartRegion(character.partRegion) : null;
+    const frame = hasPartRegion(character) ? decodePartRegion(character.partRegion) : null;
     if (!frame) return center;
     const mode2d = view?.mode2d ?? this.tabletop.mode2d();
     const rotation = view

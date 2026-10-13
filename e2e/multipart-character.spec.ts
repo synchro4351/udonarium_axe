@@ -127,7 +127,7 @@ test('cancel and remove never create tokens', async ({ page }) => {
   await expect(page.locator('game-character')).toHaveCount(before);
 });
 
-test('splits an existing character and drags its separate hit regions together', async ({ page }) => {
+async function splitDragon(page: Page) {
   await waitAppReady(page);
   const original = page.locator('game-character').filter({ hasText: 'モンスターC' }).first();
   await original.dispatchEvent('contextmenu');
@@ -141,6 +141,10 @@ test('splits an existing character and drags its separate hit regions together',
   await panel.getByRole('textbox', { name: '部位名', exact: true }).nth(1).fill('胴体');
   await panel.getByTestId('multipart-create').click();
   await expect(panel).toHaveCount(0);
+}
+
+test('splits an existing character and drags its separate hit regions together', async ({ page }) => {
+  await splitDragon(page);
   const head = page
     .locator('game-character')
     .filter({ has: page.getByTestId('part-name').filter({ hasText: '頭部' }) });
@@ -197,6 +201,53 @@ test('splits an existing character and drags its separate hit regions together',
   expect(xml).toContain('partRegion=');
   expect(xml).toContain('検証ドラゴン');
   expect(xml).toContain('HP');
+});
+
+test('renames a group and its part, then copies every part independently', async ({ page }) => {
+  await splitDragon(page);
+  const tokens = page.locator('game-character');
+  const head = tokens.filter({ has: page.getByTestId('part-name').filter({ hasText: '頭部' }) });
+  await head.dispatchEvent('contextmenu');
+  await page.locator('context-menu').getByText('詳細を表示', { exact: true }).click();
+  const sheet = page.locator('game-character-sheet');
+  await sheet.getByTestId('multipart-whole-name').fill('古代竜');
+  await sheet.getByTestId('multipart-whole-name').press('Tab');
+  await sheet.getByTestId('multipart-part-name').fill('首');
+  await sheet.getByTestId('multipart-part-name').press('Tab');
+  await expect(tokens.getByTestId('part-name').filter({ hasText: /^首$/ })).toHaveCount(1);
+  await expect(tokens.getByTestId('part-name').filter({ hasText: /^胴体$/ })).toHaveCount(1);
+  await expect(tokens.getByTestId('group-name')).toHaveCount(1);
+  await expect(tokens.getByTestId('group-name')).toHaveText('古代竜');
+  const before = await tokens.count();
+  await sheet.getByRole('button', { name: 'コピーを作る', exact: true }).first().click();
+  await expect(tokens).toHaveCount(before + 2);
+  await expect(tokens.getByTestId('part-name').filter({ hasText: /^首$/ })).toHaveCount(2);
+  await expect(tokens.getByTestId('part-name').filter({ hasText: /^胴体$/ })).toHaveCount(2);
+  await expect(tokens.getByTestId('group-name')).toHaveCount(2);
+});
+
+test('relinks selected parts after unlinking without losing their crop', async ({ page }) => {
+  await splitDragon(page);
+  const tokens = page.locator('game-character');
+  const head = tokens.filter({ has: page.getByTestId('part-name').filter({ hasText: /^頭部$/ }) });
+  const body = tokens.filter({ has: page.getByTestId('part-name').filter({ hasText: /^胴体$/ }) });
+  for (const token of [head, body]) {
+    await token.dispatchEvent('contextmenu');
+    await page.locator('context-menu').getByText('部位の連動を外す', { exact: true }).click();
+    await expect(token.getByTestId('part-region')).toHaveCount(1);
+  }
+  await expect(tokens.getByTestId('group-name')).toHaveCount(0);
+  for (const token of [head, body]) {
+    const bounds = (await token.getByTestId('part-region').boundingBox())!;
+    await page.keyboard.down('Control');
+    await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height * 0.8);
+    await page.keyboard.up('Control');
+  }
+  await head.dispatchEvent('contextmenu');
+  await page.locator('context-menu').getByText('連動させる', { exact: true }).click();
+  await expect(tokens.getByTestId('group-name')).toHaveCount(1);
+  await expect(head.getByTestId('part-region')).toHaveCount(1);
+  await expect(body.getByTestId('part-region')).toHaveCount(1);
 });
 
 test('keeps overlapping regions and adjusts the selected one with its handles', async ({ page }) => {

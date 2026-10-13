@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { Card, CardState } from '@axe/domain/card/card';
 import { GameCharacter } from '@axe/domain/character/game-character';
@@ -39,6 +40,37 @@ describe('GameCharacterSheetComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('shows whole and part name fields only for linked characters and delegates their changes', () => {
+    const character = GameCharacter.create('Wyrm(Head)', 1, '');
+    character.partGroup = 'wyrm';
+    character.partGroupName = 'Wyrm';
+    character.partName = 'Head';
+    character.partRegion = '0 0 1 1 1';
+    const groups = TestBed.inject(MultipartGroupService);
+    const renameGroup = vi.spyOn(groups, 'renameGroup').mockReturnValue(true);
+    const renamePart = vi.spyOn(groups, 'renamePart').mockReturnValue(true);
+
+    try {
+      component.tabletopObject = character;
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelector<HTMLInputElement>('[data-testid="multipart-whole-name"]')?.value).toBe('Wyrm');
+      expect(root.querySelector<HTMLInputElement>('[data-testid="multipart-part-name"]')?.value).toBe('Head');
+
+      component.setMultipartGroupName(character, { target: { value: 'Dragon' } } as unknown as Event);
+      component.setMultipartPartName(character, { target: { value: 'Tail' } } as unknown as Event);
+      expect(renameGroup).toHaveBeenCalledWith('wyrm', 'Dragon');
+      expect(renamePart).toHaveBeenCalledWith(character, 'Tail');
+
+      character.partGroup = '';
+      TestBed.inject(ObjectChangeService).notifyChanged(character.identifier);
+      fixture.detectChanges();
+      expect(root.querySelector('[data-testid="multipart-name-fields"]')).toBeNull();
+    } finally {
+      character.destroy();
+    }
   });
 
   describe('card editing permission', () => {

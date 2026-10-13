@@ -20,6 +20,7 @@ import { PointerDeviceService } from '@axe/application/input/pointer-device.serv
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { MultipartCharacterService } from '@axe/application/tabletop/multipart-character.service';
+import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
 import { BottomSheetService } from '@axe/application/ui/bottom-sheet.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { DataElementDragService } from '@axe/application/ui/data-element-drag.service';
@@ -36,6 +37,7 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { isLinkedPart } from '@axe/domain/character/part-group';
 import {
   DataElement,
   DataElementAttribute,
@@ -119,6 +121,7 @@ export class GameCharacterSheetComponent {
   private readonly rolePermission = inject(RolePermissionService);
   private readonly cardGame = inject(CardGameService);
   private readonly multipart = inject(MultipartCharacterService);
+  private readonly multipartGroups = inject(MultipartGroupService);
   private readonly objectPanels = inject(ObjectPanelService);
 
   /**
@@ -755,6 +758,21 @@ export class GameCharacterSheetComponent {
     return char.name;
   });
 
+  isMultipartCharacter(char: GameCharacter): boolean {
+    this.objectChange.versionOf(char.identifier)();
+    return char.partGroup.length > 0;
+  }
+
+  setMultipartGroupName(char: GameCharacter, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.multipartGroups.renameGroup(char.partGroup, input.value);
+  }
+
+  setMultipartPartName(char: GameCharacter, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.multipartGroups.renamePart(char, input.value);
+  }
+
   /**
    * Opens the character's portraits in a sheet from the bottom, from the portrait at the top of a
    * narrow sheet, where there is no column beside the game data to show them in.
@@ -945,7 +963,9 @@ export class GameCharacterSheetComponent {
    */
   clone() {
     if (!this.rolePermission.canEditTabletop) return;
-    if (this.tabletopObject) cloneTabletopObject(this.tabletopObject);
+    const character = this.character;
+    if (character && isLinkedPart(character)) this.multipartGroups.copyGroup(character);
+    else if (this.tabletopObject) cloneTabletopObject(this.tabletopObject);
   }
 
   /** Whether the character on the table may be split into linked parts from here. */

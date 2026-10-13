@@ -76,6 +76,32 @@
         </button>
       </div>
       <disclosure-control [object]="char" />
+      @if (isMultipartCharacter(char)) {
+        <div class="flex flex-wrap gap-x-3 gap-y-1 px-3 pt-2 text-[0.78em]" data-testid="multipart-name-fields">
+          <label class="flex min-w-48 flex-1 items-center gap-2">
+            <span class="text-ui-muted shrink-0">{{ 'feature.file.multipart.wholeName' | transloco }}</span>
+            <input
+              type="text"
+              class="border-ui-border-panel bg-ui-input text-ui-text rounded-ui-sm focus:border-ui-accent min-w-0 flex-1 border border-solid px-2 py-1 outline-none"
+              [value]="char.partGroupName"
+              [disabled]="isReadOnly()"
+              (change)="setMultipartGroupName(char, $event)"
+              data-testid="multipart-whole-name"
+            />
+          </label>
+          <label class="flex min-w-48 flex-1 items-center gap-2">
+            <span class="text-ui-muted shrink-0">{{ 'feature.file.multipart.partName' | transloco }}</span>
+            <input
+              type="text"
+              class="border-ui-border-panel bg-ui-input text-ui-text rounded-ui-sm focus:border-ui-accent min-w-0 flex-1 border border-solid px-2 py-1 outline-none"
+              [value]="char.partName"
+              [disabled]="isReadOnly()"
+              (change)="setMultipartPartName(char, $event)"
+              data-testid="multipart-part-name"
+            />
+          </label>
+        </div>
+      }
       <div class="border-ui-border-panel bg-ui-surface flex items-end gap-px border-b border-solid px-2 pt-1.5">
         <button
           class="hover:text-ui-text text-ui-muted border-ui-border-panel -mb-px inline-flex cursor-pointer items-center gap-1 rounded-t-xs border border-solid bg-[color-mix(in_srgb,var(--ui-elevated)_58%,var(--ui-surface))] px-3.5 py-1.5 text-[0.8em] font-semibold whitespace-nowrap transition-[background,border-color,color,box-shadow] hover:bg-[color-mix(in_srgb,var(--ui-elevated)_82%,var(--ui-surface))] [&_.material-icons]:text-[14px]!"

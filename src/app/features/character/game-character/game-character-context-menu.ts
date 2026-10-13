@@ -48,6 +48,8 @@ export interface GameCharacterContextMenuCallbacks {
   onSplitParts?: () => void;
   /** Takes a linked part out of its group. Left out for anything but a part. */
   onUnlinkPart?: () => void;
+  /** Copies every member of the piece's linked group. */
+  onCopy?: () => void;
   /** Opens a first-person view from the piece. Left out where it may not be viewed from. */
   onViewFirstPerson?: () => void;
   /** Shares the first-person view with the room. Left out for anyone but the GM. */
@@ -421,7 +423,9 @@ export function buildGameCharacterContextMenuModel(
   const objectActions: ContextMenuAction[] = [
     ...overlapEntries,
     buildLockToggleAction(char.isLock, (next) => (char.isLock = next), t),
-    buildCopyAction(char, gridSize, t),
+    ...(callbacks.onCopy
+      ? [{ name: t('feature.tabletop.contextMenu.copy'), action: () => callbacks.onCopy?.() } as ContextMenuAction]
+      : [buildCopyAction(char, gridSize, t)]),
     ...(callbacks.onSplitParts
       ? [
           {

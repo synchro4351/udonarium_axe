@@ -5,6 +5,7 @@ import {
 } from '@axe/application/ui/multi-selection-context-menu';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { DiceSymbol, DiceType } from '@axe/domain/dice/dice-symbol';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
 
@@ -94,6 +95,22 @@ describe('buildMultiSelectionContextMenu', () => {
     moveAll.action?.();
     expect((a as unknown as { lastSetLocation?: string }).lastSetLocation).toBe('graveyard');
     expect((b as unknown as { lastSetLocation?: string }).lastSetLocation).toBeUndefined();
+  });
+
+  it('links selected characters through the supplied group service', () => {
+    const selection = new SelectionSignalService();
+    const pieces = [GameCharacter.create('A', 1, ''), GameCharacter.create('B', 1, '')];
+    const linked = vi.fn(() => true);
+    const menu = buildMultiSelectionContextMenu(pieces, {
+      t,
+      selectionSignalService: selection,
+      gridSize: 50,
+      linkCharacters: linked,
+    });
+    menu[0].action?.();
+    expect(menu[0].name).toBe('feature.character.contextMenu.linkSelected');
+    expect(linked).toHaveBeenCalledWith(pieces);
+    pieces.forEach((piece) => piece.destroy());
   });
 });
 
@@ -194,6 +211,31 @@ describe('the dice among a selection', () => {
 });
 
 describe('tryBuildMultiSelectionContextMenu', () => {
+  it('copies a selected group only once and selects the new members', () => {
+    const selection = new SelectionSignalService();
+    const first = GameCharacter.create('Dragon(Head)', 2, '');
+    const second = GameCharacter.create('Dragon(Body)', 2, '');
+    first.partGroup = second.partGroup = 'dragon';
+    const copyGroup = vi.fn(() => [{ identifier: 'new-head' }, { identifier: 'new-body' }] as GameCharacter[]);
+    try {
+      const menu = buildMultiSelectionContextMenu([first, second], {
+        t,
+        selectionSignalService: selection,
+        gridSize: 50,
+        copyCharacterGroup: copyGroup,
+      });
+      const copy = menu.find(
+        (entry) => (entry as ContextMenuAction).name === 'feature.tabletop.selection.copyAll'
+      ) as ContextMenuAction;
+      copy.action?.();
+      expect(copyGroup).toHaveBeenCalledTimes(1);
+      expect(selection.selectedObjects()).toEqual(new Set(['new-head', 'new-body']));
+    } finally {
+      first.destroy();
+      second.destroy();
+    }
+  });
+
   it('offers nothing for a selection of one', () => {
     const selection = new SelectionSignalService();
     selection.addSelection('a');
