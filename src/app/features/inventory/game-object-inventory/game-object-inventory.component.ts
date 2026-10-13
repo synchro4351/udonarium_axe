@@ -28,6 +28,7 @@ import { tableItemNames } from '@axe/application/inventory/summary-items';
 import { DisclosureService } from '@axe/application/permission/disclosure.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
 import { TurnOrderService } from '@axe/application/turn/turn-order.service';
@@ -154,6 +155,7 @@ export class GameObjectInventoryComponent {
   private readonly turnOrderService = inject(TurnOrderService);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly rolePermission = inject(RolePermissionService);
+  private readonly multipartGroups = inject(MultipartGroupService);
   private readonly vision = inject(VisionService);
   private readonly ailmentService = inject(StatusAilmentService);
   private readonly viewPreference = inject(InventoryViewPreferenceService);
@@ -1400,7 +1402,8 @@ export class GameObjectInventoryComponent {
 
   private cloneGameObject(gameObject: TabletopObject) {
     if (!this.rolePermission.canEditTabletop) return;
-    gameObject.clone();
+    if (gameObject instanceof GameCharacter && gameObject.partGroup) this.multipartGroups.copyGroup(gameObject);
+    else gameObject.clone();
   }
 
   private showDetail(gameObject: GameCharacter) {

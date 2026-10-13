@@ -2774,6 +2774,28 @@ describe('GameCharacterComponent', () => {
       expect(root.querySelector('[data-testid="piece-name"]')).toBeNull();
     });
 
+    it('shows the whole name on only one visible group member', () => {
+      const head = part('Head', '0 0 0.5 1 1');
+      const tail = part('Tail', '0.5 0 0.5 1 1');
+      ObjectStore.instance.add(head, false);
+      ObjectStore.instance.add(tail, false);
+
+      try {
+        const headRoot = show(head);
+        const headHasWholeName = headRoot.querySelector('[data-testid="group-name"]') !== null;
+        const headPartName = headRoot.querySelector('[data-testid="part-name"]')?.textContent?.trim();
+        const tailRoot = show(tail);
+        const tailHasWholeName = tailRoot.querySelector('[data-testid="group-name"]') !== null;
+        const tailPartName = tailRoot.querySelector('[data-testid="part-name"]')?.textContent?.trim();
+        expect([headHasWholeName, tailHasWholeName].filter(Boolean)).toHaveLength(1);
+        expect(headPartName).toBe('Head');
+        expect(tailPartName).toBe('Tail');
+      } finally {
+        ObjectStore.instance.remove(head);
+        ObjectStore.instance.remove(tail);
+      }
+    });
+
     it('marks an aimed part on its region instead of over the shared stack', () => {
       const head = part('Head', '0 0 0.5 1 1');
       head.targeted = true;

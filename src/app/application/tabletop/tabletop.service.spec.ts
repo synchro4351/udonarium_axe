@@ -64,7 +64,12 @@ describe('TabletopService', () => {
       });
 
       const loaded = ObjectStore.instance.getObjects(GameCharacter).find((character) => character !== head)!;
-      expect([loaded.partGroup, loaded.partGroupName, loaded.partName, loaded.partRegion]).toEqual(['', '', '', '']);
+      expect([loaded.partGroup, loaded.partGroupName, loaded.partName, loaded.partRegion]).toEqual([
+        '',
+        '',
+        'Tail',
+        '0.5 0 0.5 1 1',
+      ]);
       expect(head.partGroup).toBe('wyrm');
     });
   });

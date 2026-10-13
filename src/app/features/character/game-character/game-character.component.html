@@ -17,6 +17,17 @@
     (pointercancel)="onPiecePointerCancel($event)"
     #root
   >
+    @if (isGroupNameRepresentative() && !hideName() && groupName()) {
+      <div
+        data-testid="group-name"
+        class="bg-ui-panel text-ui-text pointer-events-none absolute top-0 left-1/2 z-10 max-w-[24em] -translate-x-1/2 truncate rounded-full px-[0.6em] py-[0.1em] text-center font-semibold opacity-95 [-webkit-transform-style:preserve-3d] transform-3d"
+        [style.font-size.px]="nameFontSizePx"
+        [appBillboard]="nameStackFacing()"
+        [attr.title]="groupName()"
+      >
+        {{ groupName() }}
+      </div>
+    }
     @if (hitFlash() === 'damage' && !partFrame()) {
       <div
         data-testid="hit-flash"
@@ -392,7 +403,12 @@
                     </div>
                   </div>
                 }
-                @if (name() && !hideName() && !multiAngleNameOrbitEnabled() && !labelsInPicture()) {
+                @if (
+                  blockLabel() &&
+                  !hideName() &&
+                  !multiAngleNameOrbitEnabled() &&
+                  (!labelsInPicture() || (isGroupMember() && !partFrame()))
+                ) {
                   <div
                     class="absolute [-webkit-transform-style:preserve-3d] transform-3d"
                     [style.font-size.px]="nameFontSizePx"
@@ -409,7 +425,7 @@
                         }"
                       >
                         <div class="max-w-[24em] truncate">
-                          {{ name() }}
+                          {{ blockLabel() }}
                           @if (isLock) {
                             <i class="material-icons inline align-middle text-[1em]!">lock</i>
                           }
@@ -422,7 +438,7 @@
                         [appBillboard]="nameStackFacing()"
                       >
                         <div class="max-w-[24em] truncate">
-                          {{ name() }}
+                          {{ blockLabel() }}
                           @if (isLock) {
                             <i class="material-icons inline align-middle text-[1em]!">lock</i>
                           }
@@ -931,8 +947,8 @@
   </div>
 }
 
-<!-- A linked part: the group's full frame clipped to this part's region, which is also all the
-     pointer can hit. Its name, bars, buffs and changes sit inside the region, not over the stack. -->
+<!-- A cropped part: the shared picture is clipped to its saved region, which is also all the
+     pointer can hit. Its part label, bars, buffs and changes sit inside the region. -->
 <ng-template #partPicture let-fit="fit">
   <img
     class="image chrome-smooth-image-trick pointer-events-auto block"
@@ -972,7 +988,7 @@
       @if (!hideName() && blockLabel()) {
         <span
           data-testid="part-name"
-          class="bg-ui-panel text-ui-text max-w-[12em] truncate rounded-full px-[0.5em] leading-snug opacity-90"
+          class="bg-ui-panel text-ui-text max-w-[12em] truncate rounded-full px-[0.5em] text-[0.78em] leading-snug opacity-85"
           >{{ blockLabel() }}{{ isLock ? ' 🔒' : '' }}</span
         >
       }

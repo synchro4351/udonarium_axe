@@ -589,15 +589,14 @@ export class GameCharacter extends OwnedTabletopObject {
    * Copies the piece and names the copy with the next free number, so copying `Goblin` when
    * `Goblin_2` exists makes `Goblin_3`.
    *
-   * The numbers already taken are counted across every character outside the graveyard. A copy of
-   * a linked part is an ordinary character: it never joins the group it was copied from.
+   * The numbers already taken are counted across every character outside the graveyard. A low
+   * level clone retains its crop and part label but clears group identity. Explicit group copies
+   * assign a fresh group key.
    */
   override clone(): this {
     const cloneObject = super.clone();
     cloneObject.partGroup = '';
     cloneObject.partGroupName = '';
-    cloneObject.partName = '';
-    cloneObject.partRegion = '';
 
     let objectname: string;
     const reg = new RegExp('^(.*)_([0-9]+)$');

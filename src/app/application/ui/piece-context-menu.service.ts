@@ -3,6 +3,7 @@ import { CharacterDiceService } from '@axe/application/dice/character-dice.servi
 import { DiceRollService } from '@axe/application/dice/dice-roll.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerCoordinate } from '@axe/application/input/pointer-device.service';
+import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { tryBuildMultiSelectionContextMenu } from '@axe/application/ui/multi-selection-context-menu';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
@@ -24,6 +25,7 @@ export class PieceContextMenuService {
   private readonly objectStore = inject(ObjectStore);
   private readonly diceRollService = inject(DiceRollService);
   private readonly characterDice = inject(CharacterDiceService);
+  private readonly multipartGroups = inject(MultipartGroupService);
   private readonly t = inject(TRANSLATE_FN);
 
   /** True when the bulk menu was opened. The caller stops there. */
@@ -40,6 +42,8 @@ export class PieceContextMenuService {
         .filter((character) => character.isVisibleOnTable)
         .map((character) => ({ identifier: character.identifier, name: character.name })),
       storeDice: (dice, ownerIdentifier) => this.storeDice(dice, ownerIdentifier),
+      linkCharacters: (characters) => this.multipartGroups.link(characters),
+      copyCharacterGroup: (character) => this.multipartGroups.copyGroup(character),
     });
     if (!multi) return false;
 

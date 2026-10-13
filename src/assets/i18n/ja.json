@@ -1871,6 +1871,8 @@
       },
       "multipart": {
         "title": "部位コマを作る",
+        "wholeName": "全体名",
+        "partName": "部位名",
         "hint": "画像をドラッグで囲み、部位ごとの名前を付けてください。HPはそれぞれ独立します。",
         "select": "部位の範囲を囲む",
         "part": "部位{{number}}",
@@ -1934,6 +1936,7 @@
         "moveMode": "移動の仕方",
         "splitParts": "部位に分ける",
         "unlinkPart": "部位の連動を外す",
+        "linkSelected": "連動させる",
         "viewFirstPerson": "このコマの視点で見る",
         "shareFirstPerson": "全員をこのコマの視点にする",
         "stopSharingFirstPerson": "全員の共有視点を解除する"

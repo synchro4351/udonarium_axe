@@ -1870,6 +1870,8 @@
         "separator": ", "
       },
       "multipart": {
+        "wholeName": "전체 이름",
+        "partName": "부위 이름",
         "title": "부위 말 만들기",
         "hint": "이미지를 드래그하여 부위를 선택하고 이름을 붙이세요. HP는 각각 독립적입니다.",
         "select": "부위 영역 선택",
@@ -1934,6 +1936,7 @@
         "moveMode": "이동 방법",
         "splitParts": "부위로 나누기",
         "unlinkPart": "부위 연동 해제",
+        "linkSelected": "연동하기",
         "viewFirstPerson": "이 캐릭터의 시점으로 보기",
         "shareFirstPerson": "모두를 이 캐릭터의 시점으로",
         "stopSharingFirstPerson": "모두의 공유 시점 해제"
