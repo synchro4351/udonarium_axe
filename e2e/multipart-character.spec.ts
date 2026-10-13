@@ -229,8 +229,8 @@ test('renames a group and its part, then copies every part independently', async
 test('relinks selected parts after unlinking without losing their crop', async ({ page }) => {
   await splitDragon(page);
   const tokens = page.locator('game-character');
-  const head = tokens.filter({ has: page.getByTestId('part-name').filter({ hasText: /^頭部$/ }) });
-  const body = tokens.filter({ has: page.getByTestId('part-name').filter({ hasText: /^胴体$/ }) });
+  const head = tokens.filter({ has: page.getByTestId('part-name').filter({ hasText: '頭部' }) });
+  const body = tokens.filter({ has: page.getByTestId('part-name').filter({ hasText: '胴体' }) });
   for (const token of [head, body]) {
     await token.dispatchEvent('contextmenu');
     await page.locator('context-menu').getByText('部位の連動を外す', { exact: true }).click();
