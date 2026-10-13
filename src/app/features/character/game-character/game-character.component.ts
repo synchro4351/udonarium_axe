@@ -685,6 +685,7 @@ export class GameCharacterComponent {
   readonly partLabel = computed(() => {
     const char = this.gameCharacter();
     if (!char) return '';
+    this.objectChange.versionOf(char.identifier)();
     if (this.isGroupMember()) return char.partName;
     return this.partFrame() ? this.name() : '';
   });

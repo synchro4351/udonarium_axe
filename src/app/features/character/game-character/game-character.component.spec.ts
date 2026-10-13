@@ -2796,6 +2796,18 @@ describe('GameCharacterComponent', () => {
       }
     });
 
+    it('refreshes a renamed part while its membership and crop stay unchanged', () => {
+      const head = part('Head', '0 0 0.5 1 1');
+      const root = show(head);
+      expect(root.querySelector('[data-testid="part-name"]')!.textContent!.trim()).toBe('Head');
+      head.partName = 'Neck';
+      TestBed.inject(ObjectChangeService).notifyChanged(head.identifier);
+      fixture.detectChanges();
+      expect(root.querySelector('[data-testid="part-name"]')!.textContent!.trim()).toBe('Neck');
+      expect(head.partGroup).toBe('wyrm');
+      expect(head.partRegion).toBe('0 0 0.5 1 1');
+    });
+
     it('marks an aimed part on its region instead of over the shared stack', () => {
       const head = part('Head', '0 0 0.5 1 1');
       head.targeted = true;
