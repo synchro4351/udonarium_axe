@@ -14,6 +14,15 @@ r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は�
 
 ## 連動する多部位キャラクター（開発版）
 
+### 再連動・全体コピー・名前の編集（2026-10-13）
+
+基点は`3d05f16c`。既存の多部位・表示位置と、公式v1.65.2のキャラクター・複数選択・同期処理に依存します。公式だけを基点にした独立パッチではありません。
+
+- [d6c845ac](https://github.com/synchro4351/udonarium_axe/commit/d6c845ac)：複数選択から連動し、卓上・詳細画面・インベントリのコピーを全部位のコピーへ揃えます。同じグループを複数選んでも一組だけ複製し、新しいグループキーを付けます。全体名・部位名を後から編集でき、全体名は一つだけ大きく表示します。
+- [eb43d4da](https://github.com/synchro4351/udonarium_axe/commit/eb43d4da)：部位名を変更した直後にも、卓上の文字へ反映されるよう更新の追跡を修正します。グループと範囲を変えずに名前だけを変える回帰試験を追加しました。
+- 連動の識別と画像の範囲を分け、解除後も切り抜きと部位名を保持します。HP・バフは各キャラクターで独立し、単体読込は元のグループへ加わりません。[仕様](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-group-controls/docs/TYOITASHI_MULTIPART_GROUP_CONTROLS.md)。
+- [cc3d7e79](https://github.com/synchro4351/udonarium_axe/commit/cc3d7e79)：絵文字・特殊記法の入口を小さくし、部位分けの長い説明を削除します。表示の調整を別の枝`codex/compact-stamp-tools`へ分けています。
+
 - [5df7c7bf](https://github.com/synchro4351/udonarium_axe/commit/5df7c7bf)：既存キャラクターを部位に分け、同じ画像枠に透明な余白を保ち、部位ごとのクリック・リソース・バフ・エフェクトと連動移動を扱います。基点6ba5a88e。通常のキャラクターへ同期属性4つを追加し、部屋ZIPで保存します。コピーと単体読込では連動を外します。
 - [02c4f9f2](https://github.com/synchro4351/udonarium_axe/commit/02c4f9f2)：[仕様・確認結果・制限](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-linked-characters/docs/TYOITASHI_LINKED_MULTIPART.md)。既存の部位範囲選択・キャラクター複製・同期・複数コマ移動・エフェクト再生に依存します。同時操作の専用排他制御、チャットの親→部位選択、相対位置での連動は今回の範囲外です。
 
