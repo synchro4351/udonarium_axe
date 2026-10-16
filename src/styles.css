@@ -337,39 +337,69 @@ input[type='range'].portrait-slider::-moz-range-thumb {
   border-radius: 2px;
 }
 
-/* chat-messageのルビ表示。chat-messageはinnerHTMLで<ruby>要素を生成するので、
-   AngularのEmulated view encapsulationの範囲外になるため、グローバルに定義している。 */
-/* ルビ装飾。`decorateChatStyleText`が<ruby class="chat-ruby">を吐く。
-   チャットと共有メモ（TextNoteの非編集モード）で共用するため、`.msg-text`のスコープを外している。 */
+/* Ruby, as chat, shared notes, cards and the novel mode write it: <ruby class="chat-ruby">.
+   A chat message builds its elements through innerHTML, outside Angular's view encapsulation, so
+   the rules live here. Laying ruby out is left to the browser, which spreads the shorter of base and
+   ruby 1:2:1 where their lengths differ (ruby-align: space-around). What a reader chooses is
+   switched by the data-ruby-* attributes ChatPreferencesService sets on each window's <html>. */
 ruby.chat-ruby {
-  display: inline-flex;
-  flex-direction: column-reverse;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 1px;
-  margin: 0 1px;
-  vertical-align: text-bottom;
-  line-height: 1;
-  white-space: nowrap;
+  ruby-align: space-around;
+  ruby-position: over;
 }
 
 ruby.chat-ruby rb {
-  display: block;
   font-weight: inherit;
-  line-height: 1.25;
 }
 
 ruby.chat-ruby rt {
-  display: block;
-  box-sizing: border-box;
-  min-width: 100%;
-  padding: 0 1px;
   color: inherit;
-  font-size: 0.78em;
+  font-size: 0.65em;
   font-weight: 700;
   line-height: 1.15;
-  text-align: center;
-  white-space: nowrap;
+}
+
+:root[data-ruby-spacing='tight'] ruby.chat-ruby {
+  ruby-align: center;
+}
+
+:root[data-ruby-align='start'] ruby.chat-ruby {
+  ruby-align: start;
+}
+
+:root[data-ruby-size='half'] ruby.chat-ruby rt {
+  font-size: 0.5em;
+}
+
+:root[data-ruby-size='large'] ruby.chat-ruby rt {
+  font-size: 0.8em;
+}
+
+:root[data-ruby-show='brackets'] ruby.chat-ruby,
+:root[data-ruby-show='brackets'] ruby.chat-ruby rb {
+  display: inline;
+}
+
+:root[data-ruby-show='brackets'] ruby.chat-ruby rt {
+  display: inline;
+  font-size: 0.85em;
+  font-weight: inherit;
+}
+
+:root[data-ruby-show='brackets'] ruby.chat-ruby rt::before {
+  content: '（';
+}
+
+:root[data-ruby-show='brackets'] ruby.chat-ruby rt::after {
+  content: '）';
+}
+
+:root[data-ruby-show='brackets'] ruby.chat-ruby rt:empty::before,
+:root[data-ruby-show='brackets'] ruby.chat-ruby rt:empty::after {
+  content: none;
+}
+
+:root[data-ruby-show='hidden'] ruby.chat-ruby rt {
+  display: none;
 }
 
 /* `> `で始まる引用行は、隣り合う複数行をまとめて、アクセントの縦線が付いたblockquote風に装飾する。
@@ -3895,6 +3925,163 @@ body.mobile-layout ui-panel input,
 body.mobile-layout ui-panel textarea {
   -webkit-user-select: text;
   user-select: text;
+}
+
+/*
+ * The net of light under water. Each net moves by one repeat of its tile and starts over, so it
+ * never jumps; two nets of different sizes move different ways, and where they cross the light
+ * shifts the way it does under real water. Only the transform moves, which the compositor does alone.
+ */
+.water-net {
+  background-repeat: repeat;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+.water-net-a {
+  animation-name: water-net-forward;
+  animation-duration: 26s;
+}
+
+.water-net-b {
+  animation-name: water-net-across;
+  animation-duration: 39s;
+}
+
+.water-net-glint {
+  animation-name: water-net-across;
+  animation-duration: 57s;
+  animation-direction: reverse;
+}
+
+/*
+ * What flowing water carries along: turned to run the way the water flows (set inline), then slid
+ * along that way by one repeat of its picture, over and over.
+ */
+.water-flow {
+  transform: rotate(var(--flow-angle, 0deg));
+  animation: water-flow var(--flow-seconds, 0s) linear infinite;
+  will-change: transform;
+}
+
+@keyframes water-flow {
+  from {
+    transform: rotate(var(--flow-angle, 0deg)) translateX(calc(var(--water-tile, 0px) * -0.5));
+  }
+  to {
+    transform: rotate(var(--flow-angle, 0deg)) translateX(calc(var(--water-tile, 0px) * 0.5));
+  }
+}
+
+:root.motion-reduced .water-flow {
+  animation: none;
+}
+
+/* The clouds of silt in murky water and the scum on dirty water drift far slower than the light. */
+.water-silt {
+  animation-name: water-net-forward;
+  animation-duration: 150s;
+  animation-direction: reverse;
+}
+
+.water-scum {
+  animation-name: water-net-across;
+  animation-duration: 120s;
+}
+
+@keyframes water-net-forward {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(var(--water-tile, 0px), var(--water-tile, 0px), 0);
+  }
+}
+
+@keyframes water-net-across {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(calc(var(--water-tile, 0px) * -1), var(--water-tile, 0px), 0);
+  }
+}
+
+:root.motion-reduced .water-net {
+  animation: none;
+}
+
+/*
+ * The waves breaking where land rises out of the water. A strip lies on the surface along the
+ * shore with the sea below it; each wave comes in from the sea, brightest at its front, and
+ * spends itself on the shore at the top. The foam left along the shore stays put.
+ */
+.water-foam {
+  background: linear-gradient(to bottom, rgb(255 255 255 / 0.5) 0%, rgb(255 255 255 / 0.12) 14%, transparent 30%);
+}
+
+.water-wave {
+  opacity: 0;
+  background: linear-gradient(to bottom, rgb(255 255 255 / 0.8) 0%, rgb(255 255 255 / 0.25) 35%, transparent 100%);
+  animation: water-wave 3.6s ease-in infinite;
+}
+
+.water-wave-late {
+  animation-delay: -1.8s;
+}
+
+@keyframes water-wave {
+  0% {
+    transform: translateY(190%);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.9;
+  }
+  85% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+}
+
+:root.motion-reduced .water-wave {
+  animation: none;
+}
+
+/* The ring a piece standing in water makes on the surface: two rings, half a beat apart. */
+.water-ripple {
+  opacity: 0;
+  animation: water-ripple 2.6s ease-out infinite;
+}
+
+.water-ripple-late {
+  animation-delay: -1.3s;
+}
+
+@keyframes water-ripple {
+  from {
+    transform: scale(0.55);
+    opacity: 0.85;
+  }
+  to {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+:root.motion-reduced .water-ripple {
+  animation: none;
+  opacity: 0.55;
+  transform: scale(0.9);
+}
+
+:root.motion-reduced .water-ripple-late {
+  display: none;
 }
 
 /* 戦場の霧が空中を漂う。層ごとにdurationと負のdelayをずらして位相を散らす。 */

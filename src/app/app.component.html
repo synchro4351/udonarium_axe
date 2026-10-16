@@ -22,6 +22,7 @@
       <first-person-view />
     </div>
   }
+  <app-beat-light />
   @if (mobile.isActive()) {
     @if (!visualNovel.active()) {
       @defer (on immediate) {
@@ -194,5 +195,7 @@
 }
 <app-invite-join />
 <app-switch-notice />
+<move-plan-band />
+<interrupt-prompt />
 <ui-snackbar />
 <div #modalLayer></div>

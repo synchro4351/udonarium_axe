@@ -69,6 +69,15 @@ describe('decorate-chat-text', () => {
       );
     });
 
+    it('writes a reading split by bars one part over each letter, each letter escaped on its own', () => {
+      expect(escapeHtmlWithRuby('|漢字《かん|じ》')).toBe(
+        '<ruby class="chat-ruby"><rb>漢</rb><rt>かん</rt><rb>字</rb><rt>じ</rt></ruby>'
+      );
+      expect(escapeHtmlWithRuby('|&字《アンド|じ》')).toBe(
+        '<ruby class="chat-ruby"><rb>&amp;</rb><rt>アンド</rt><rb>字</rb><rt>じ</rt></ruby>'
+      );
+    });
+
     it('turns "\\s" into a space inside and outside the ruby', () => {
       expect(escapeHtmlWithRuby('一\\s|二\\s三<に\\sさん>')).toBe(
         '一 <ruby class="chat-ruby"><rb>二 三</rb><rt>に さん</rt></ruby>'
@@ -99,6 +108,14 @@ describe('decorate-chat-text', () => {
       expect(splitRubyNotation('|天気<てんき>は 《晴れ》')).toEqual([
         { text: '天気', reading: 'てんき' },
         { text: 'は 《晴れ》', reading: '' },
+      ]);
+    });
+
+    it('cuts a reading split over its letters into a run for each letter', () => {
+      expect(splitRubyNotation('|漢字《かん|じ》だ')).toEqual([
+        { text: '漢', reading: 'かん' },
+        { text: '字', reading: 'じ' },
+        { text: 'だ', reading: '' },
       ]);
     });
 

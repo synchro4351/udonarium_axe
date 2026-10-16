@@ -1,5 +1,6 @@
 import type { ImageFile } from '@axe/core/storage/image-file';
 import type { ChatMessage } from '@axe/domain/chat/chat-message';
+import { rubyRunsOf } from '@axe/domain/chat/chat-ruby-notation';
 import { replaceRubyNotation } from '@axe/domain/chat/ruby-notation';
 import { vnBodyOf } from '@axe/domain/visual-novel/vn-emote';
 
@@ -103,7 +104,12 @@ export class ChatLogExporter {
     const escape = ChatLogExporter.escapeAttribute;
     return replaceRubyNotation(
       value,
-      (base, reading) => `<ruby>${escape(base)}<rt>${escape(reading)}</rt></ruby>`,
+      (base, reading) => {
+        const runs = rubyRunsOf(base, reading)
+          .map((run) => `<rb>${escape(run.base)}</rb><rt>${escape(run.reading)}</rt>`)
+          .join('');
+        return `<ruby class="chat-ruby">${runs}</ruby>`;
+      },
       escape
     ).replace(/\s/g, ' ');
   }

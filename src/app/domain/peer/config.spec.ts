@@ -3,6 +3,7 @@ import { VolumeType } from '@axe/core/storage/audio-player';
 import { ObjectContext } from '@axe/core/sync/game-object';
 import { waitZeroTimeout } from '@axe/core/util/zero-timeout';
 import { OPEN_STAMP_RULES, withStampsAllowed, withStampUseOn } from '@axe/domain/chat/stamp-rules';
+import { DEFAULT_DJ_SETTINGS } from '@axe/domain/media/dj-settings';
 import { Jukebox } from '@axe/domain/media/jukebox';
 import { DEFAULT_ROOM_VOLUMES } from '@axe/domain/media/room-volumes';
 import { Config } from '@axe/domain/peer/config';
@@ -19,6 +20,105 @@ describe('Config', () => {
     // thrown after the test has finished.
     await waitZeroTimeout();
     (Config as unknown as { _instance: Config | undefined })._instance = undefined;
+  });
+
+  describe('engagement-zone rules', () => {
+    it('answers nothing for a room saved before it could, so the defaults are played', () => {
+      expect(Config.instance.zoneRuleAnswers).toEqual({
+        enabled: null,
+        sizes: null,
+        countField: null,
+        samePointM: null,
+        outnumber: null,
+        leaveKind: null,
+        blockRadiusM: null,
+        clearName: null,
+      });
+      expect(Config.instance.moveKinds).toBeNull();
+    });
+
+    it('reads back what it writes, and empty again for null', () => {
+      const config = Config.instance;
+      config.zoneEnabled = true;
+      config.zoneSizes = '4:2:3';
+      config.zoneCountField = '体数';
+      config.zoneSamePointM = 0;
+      config.zoneOutnumber = 3;
+      config.zoneLeaveKind = '全力';
+      config.moveKinds = '全力:3:,通常:1:';
+
+      expect(config.zoneRuleAnswers).toEqual({
+        enabled: true,
+        sizes: '4:2:3',
+        countField: '体数',
+        samePointM: 0,
+        outnumber: 3,
+        leaveKind: '全力',
+        blockRadiusM: null,
+        clearName: null,
+      });
+      expect(config.moveKinds).toBe('全力:3:,通常:1:');
+
+      config.zoneEnabled = null;
+      config.zoneSizes = null;
+      config.zoneCountField = null;
+      config.zoneSamePointM = null;
+      config.zoneOutnumber = null;
+      config.zoneLeaveKind = null;
+      config.moveKinds = null;
+      expect(config.moveKinds).toBeNull();
+      expect(config.zoneRuleAnswers).toEqual({
+        enabled: null,
+        sizes: null,
+        countField: null,
+        samePointM: null,
+        outnumber: null,
+        leaveKind: null,
+        blockRadiusM: null,
+        clearName: null,
+      });
+    });
+  });
+
+  describe('drawing a move as straight legs', () => {
+    it('is off for a room saved before it could be asked, and reads back what it writes', () => {
+      const config = Config.instance;
+      expect(config.pathMove).toBe(false);
+
+      config.pathMove = true;
+      expect(config.pathMove).toBe(true);
+      config.pathMove = false;
+      expect(config.pathMove).toBe(false);
+    });
+  });
+
+  describe('stepping into a move', () => {
+    it('is off for a room saved before it could be asked, with no kind named, and reads back what it writes', () => {
+      const config = Config.instance;
+      expect(config.interruptEnabled).toBe(false);
+      expect(config.interruptKind).toBeNull();
+
+      config.interruptEnabled = true;
+      config.interruptKind = '全力';
+      expect(config.interruptEnabled).toBe(true);
+      expect(config.interruptKind).toBe('全力');
+
+      config.interruptKind = null;
+      expect(config.interruptKind).toBeNull();
+    });
+  });
+
+  describe('setting the sides out', () => {
+    it('has no tables for a room saved before it could, and reads back what it writes', () => {
+      const config = Config.instance;
+      expect(config.placementDistances).toBeNull();
+      expect(config.distanceModifiers).toBeNull();
+
+      config.placementDistances = '近い:10';
+      config.distanceModifiers = '10:修正なし';
+      expect(config.placementDistances).toBe('近い:10');
+      expect(config.distanceModifiers).toBe('10:修正なし');
+    });
   });
 
   describe('instance (singleton)', () => {
@@ -129,6 +229,80 @@ describe('Config', () => {
 
       expect(setNewVolume).toHaveBeenCalled();
       expect(Config.instance.roomVolumes.bgm).toBe(0.2);
+    });
+  });
+
+  describe('the room’s mix', () => {
+    function attributesOf(context: ObjectContext): Record<string, unknown> {
+      return context.syncData['attributes'] as Record<string, unknown>;
+    }
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('levels sounds, ducks the music and crossfades for two seconds until the game master says otherwise', () => {
+      expect(Config.instance.djSettings).toEqual(DEFAULT_DJ_SETTINGS);
+      expect(DEFAULT_DJ_SETTINGS).toEqual({
+        autoLevel: true,
+        ducking: true,
+        crossfadeS: 2,
+        pauseFadeS: 0.4,
+        quantize: false,
+        beatLight: false,
+      });
+    });
+
+    it('keeps what is set', () => {
+      Config.instance.djSettings = { ...DEFAULT_DJ_SETTINGS, ducking: false, crossfadeS: 8 };
+
+      expect(Config.instance.djSettings).toEqual({ ...DEFAULT_DJ_SETTINGS, ducking: false, crossfadeS: 8 });
+    });
+
+    it('mixes as a new room does for an older version that sends none', () => {
+      Config.instance.djSettings = { ...DEFAULT_DJ_SETTINGS, autoLevel: false };
+      const older = Config.instance.toContext();
+      delete attributesOf(older)['_djSettings'];
+      older.majorVersion += 1;
+
+      Config.instance.apply(older);
+
+      expect(Config.instance.djSettings).toEqual(DEFAULT_DJ_SETTINGS);
+    });
+
+    it('keeps the mix when an older version that passed it along sends the config back', () => {
+      Config.instance.djSettings = { ...DEFAULT_DJ_SETTINGS, quantize: true };
+      const passedAlong = Config.instance.toContext();
+      attributesOf(passedAlong)['_hideSystemAvatar'] = '1';
+      passedAlong.majorVersion += 1;
+
+      Config.instance.apply(passedAlong);
+
+      expect(Config.instance.djSettings.quantize).toBe(true);
+    });
+
+    it('keeps the pads, every one empty for an older version that sends none', () => {
+      Config.instance.djPads = ['airhorn', '', '', '', '', '', '', 'applause'];
+      expect(Config.instance.djPads[7]).toBe('applause');
+
+      const older = Config.instance.toContext();
+      delete attributesOf(older)['_djPads'];
+      older.majorVersion += 1;
+      Config.instance.apply(older);
+
+      expect(Config.instance.djPads.every((pad) => pad === '')).toBe(true);
+    });
+
+    it('remixes on the jukebox straight away when another peer changes the mix', () => {
+      const jukebox = new Jukebox('Jukebox');
+      jukebox.initialize();
+      const refreshMix = vi.spyOn(jukebox, 'refreshMix').mockImplementation(() => {});
+      const changed = Config.instance.toContext();
+      attributesOf(changed)['_djSettings'] = '{"ducking":false}';
+      changed.majorVersion += 1;
+
+      Config.instance.apply(changed);
+
+      expect(refreshMix).toHaveBeenCalledOnce();
+      expect(Config.instance.djSettings.ducking).toBe(false);
     });
   });
 

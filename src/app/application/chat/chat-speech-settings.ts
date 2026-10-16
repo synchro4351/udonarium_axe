@@ -1,3 +1,4 @@
+import { readingOf } from '@axe/domain/chat/chat-ruby-notation';
 import { replaceRubyNotation } from '@axe/domain/chat/ruby-notation';
 
 export interface SpeechSettings {
@@ -41,7 +42,7 @@ export function readSpeechSettings(value: unknown): SpeechSettings {
 
 /** Read ruby pronunciations and omit markup and URLs without interpreting HTML. */
 export function speechText(text: string): string {
-  return replaceRubyNotation(text, (_base, reading) => reading)
+  return replaceRubyNotation(text, (_base, reading) => readingOf(reading))
     .replace(/https?:\/\/[^\s<>]+/gi, ' ')
     .replace(/<[^>]*>/g, ' ')
     .replace(/\p{Cc}/gu, ' ')

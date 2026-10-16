@@ -2,6 +2,7 @@
    is HTML-escaped before quotation styling is applied. Live chat and non-editing notes use
    the same rendering path. */
 
+import { rubyRunsOf } from '@axe/domain/chat/chat-ruby-notation';
 import { replaceRubyNotation, rubyNotationRuns } from '@axe/domain/chat/ruby-notation';
 
 const HTML_ESCAPE_MAP: Readonly<Record<string, string>> = {
@@ -32,6 +33,8 @@ function escapeRun(text: string): string {
 /**
  * Escapes text as {@link escapeHtml} does, turns the ruby notation (`|word<reading>` or
  * `|word《reading》`, with a half- or full-width bar) into `<ruby>` markup, and `\s` into a space.
+ * A reading split by bars over the letters of its word, `|漢字《かん|じ》`, is written one part
+ * over each letter.
  *
  * Takes the text as it was typed: the notation is read before anything is escaped, and the words
  * and the reading are escaped on their own, so markup typed into either stays text.
@@ -39,7 +42,12 @@ function escapeRun(text: string): string {
 export function escapeHtmlWithRuby(text: string): string {
   return replaceRubyNotation(
     text,
-    (base, reading) => `<ruby class="chat-ruby"><rb>${escapeRun(base)}</rb><rt>${escapeRun(reading)}</rt></ruby>`,
+    (base, reading) => {
+      const runs = rubyRunsOf(base, reading)
+        .map((run) => `<rb>${escapeRun(run.base)}</rb><rt>${escapeRun(run.reading)}</rt>`)
+        .join('');
+      return `<ruby class="chat-ruby">${runs}</ruby>`;
+    },
     escapeRun
   );
 }
@@ -52,16 +60,19 @@ export interface RubyPart {
 }
 
 /**
- * Cuts a line at the ruby notation, the same way {@link escapeHtmlWithRuby} reads it.
+ * Cuts a line at the ruby notation, the same way {@link escapeHtmlWithRuby} reads it, a reading
+ * split over the letters of its word into one run for each letter.
  *
  * The runs stay text rather than becoming html, for a place that shows a line a little at a time
  * and so cannot hand over a finished piece of markup.
  */
 export function splitRubyNotation(text: string): RubyPart[] {
-  return rubyNotationRuns(text).map((run) => ({
-    text: run.text.replace(ESCAPED_SPACE, ' '),
-    reading: run.reading.replace(ESCAPED_SPACE, ' '),
-  }));
+  return rubyNotationRuns(text).flatMap((run) =>
+    (run.reading === '' ? [{ base: run.text, reading: '' }] : rubyRunsOf(run.text, run.reading)).map((part) => ({
+      text: part.base.replace(ESCAPED_SPACE, ' '),
+      reading: part.reading.replace(ESCAPED_SPACE, ' '),
+    }))
+  );
 }
 
 /** Whether the text holds any ruby notation, read the same way {@link escapeHtmlWithRuby} reads it. */
