@@ -9,7 +9,7 @@
 ## バージョンとソース
 
 - **固定版：tyoitashi r6／Axe v1.65.2**：[ソース `0fb166d0`](https://github.com/synchro4351/udonarium_axe/tree/0fb166d045f15863fa966ad0278692ba419abd9a)
-- **開発版：Axe v1.65.2対応**：[`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`0fb166d0`](https://github.com/synchro4351/udonarium_axe/tree/0fb166d0)。公式の画像編集・一人称表示を含む更新を取り込みました。新規利用者のホットバーには異なる用途の見本を3つ置きます。
+- **開発版：Axe v1.67.0対応**：[`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`01ffa130`](https://github.com/synchro4351/udonarium_axe/tree/01ffa130)。公式の騎乗・交戦エリア・水域・DJデッキ・ルビ表示設定などを取り込みました。次の固定版tyoitashi r7にする予定です。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
@@ -18,7 +18,10 @@
 
 [試用サイト](https://udonarium-trial.synwork.work/)で固定版`tyoitashi r6`を試せます。実験的な機能を含むため、動作が不安定な場合があります。大切な卓データは手元へ保存してください。デモのソースは上記の固定コミット`0fb166d0`です。
 
-## 開発版で追加した変更（Axe v1.65.2）
+## 開発版で追加した変更（Axe v1.67.0）
+
+- 公式v1.67.0へ追従しました。半角のルビ `|漢字<かんじ>` も、公式の文字ごとのルビ `|漢字《かん|じ》` とチャットのルビ表示設定に対応します。公式の騎乗・水域と多部位コマの名前・リソース表示は両立します。[変更一覧](TYOITASHI_CHANGES.md#公式v167への追従)。
+
 
 - 複数コマを選んで「連動させる」と、位置やサイズを一緒に操作できます。多部位のコピーは全部位を別の組として作り、全体名と部位名は詳細画面から変更できます。[操作の改善](https://github.com/synchro4351/udonarium_axe/tree/codex/multipart-group-controls) · [使い方と保存](https://github.com/synchro4351/udonarium_axe/blob/codex/multipart-group-controls/docs/TYOITASHI_MULTIPART_GROUP_CONTROLS.md)。
 
