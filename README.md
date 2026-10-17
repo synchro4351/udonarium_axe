@@ -8,15 +8,15 @@
 
 ## バージョンとソース
 
-- **固定版：tyoitashi r6／Axe v1.65.2**：[ソース `0fb166d0`](https://github.com/synchro4351/udonarium_axe/tree/0fb166d045f15863fa966ad0278692ba419abd9a)
-- **開発版：Axe v1.67.0対応**：[`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`01ffa130`](https://github.com/synchro4351/udonarium_axe/tree/01ffa130)。公式の騎乗・交戦エリア・水域・DJデッキ・ルビ表示設定などを取り込みました。次の固定版tyoitashi r7にする予定です。
+- **固定版：tyoitashi r7／Axe v1.67.0**：[ソース `01ffa130`](https://github.com/synchro4351/udonarium_axe/tree/01ffa13046f32c140abfbdf6052db27da7546aa5)
+- **開発版：Axe v1.67.0対応**：[`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)、現在のソース [`01ffa130`](https://github.com/synchro4351/udonarium_axe/tree/01ffa130)。公式の騎乗・交戦エリア・水域・DJデッキ・ルビ表示設定などを取り込みました。
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
 
 ## 非公式デモ
 
-[試用サイト](https://udonarium-trial.synwork.work/)で固定版`tyoitashi r6`を試せます。実験的な機能を含むため、動作が不安定な場合があります。大切な卓データは手元へ保存してください。デモのソースは上記の固定コミット`0fb166d0`です。
+[試用サイト](https://udonarium-trial.synwork.work/)で固定版`tyoitashi r7`を試せます。実験的な機能を含むため、動作が不安定な場合があります。大切な卓データは手元へ保存してください。デモのソースは上記の固定コミット`01ffa130`です。
 
 ## 開発版で追加した変更（Axe v1.67.0）
 
