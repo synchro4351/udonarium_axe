@@ -133,7 +133,8 @@ export class ImageFile {
    *
    * A file named like a save-data image, a 64-character hash and an extension, keeps that hash as
    * its identifier and its bytes untouched, so the pieces in a loaded room still find it. Anything
-   * else is converted to WebP when that comes out smaller, and keyed by the hash of the result.
+   * else is converted to WebP when that comes out smaller, scaled down past `uploadMaxSide`, and
+   * keyed by the hash of the result.
    */
   static async createAsync(file: File): Promise<ImageFile>;
   static async createAsync(blob: Blob): Promise<ImageFile>;
@@ -148,6 +149,12 @@ export class ImageFile {
 
   private static readonly SAVE_DATA_FILENAME_RE = /^([0-9a-f]{64})\./;
 
+  /**
+   * The longest side an added picture is scaled down to, or 0 to keep its size. It is set from
+   * this browser's upload preference; pictures named by a save-data hash are never resized.
+   */
+  static uploadMaxSide = 0;
+
   private static async _createAsync(blob: Blob, name?: string): Promise<ImageFile> {
     const preservedId = name ? (ImageFile.SAVE_DATA_FILENAME_RE.exec(name)?.[1] ?? null) : null;
 
@@ -156,7 +163,7 @@ export class ImageFile {
       imageFile.context.identifier = preservedId;
       imageFile.context.blob = blob;
     } else {
-      const converted = await convertBlobToWebP(blob);
+      const converted = await convertBlobToWebP(blob, undefined, ImageFile.uploadMaxSide);
       const arrayBuffer = await FileReaderUtil.readAsArrayBufferAsync(converted);
       imageFile.context.identifier = await FileReaderUtil.calcSHA256Async(arrayBuffer);
       imageFile.context.blob = new Blob([arrayBuffer], { type: converted.type });

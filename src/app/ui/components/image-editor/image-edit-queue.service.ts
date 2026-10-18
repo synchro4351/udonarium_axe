@@ -90,11 +90,11 @@ export class ImageEditQueue {
 
   /**
    * Stores a picture left as it came. One over the size limit is written out again as a WebP
-   * first, as the editor would, in case that brings it under.
+   * first, as the editor would, and scaled down as any added picture is, in case that brings it under.
    */
   private async takeAsItCame(file: File): Promise<ImageLoadResult> {
     if (file.size <= MAX_LOADED_IMAGE_BYTES) return this.fileArchiver.loadImages([file]);
-    const converted = await convertBlobToWebP(file);
+    const converted = await convertBlobToWebP(file, undefined, ImageFile.uploadMaxSide);
     if (converted === file || converted.size > MAX_LOADED_IMAGE_BYTES) return { images: [], oversized: [file.name] };
     return this.fileArchiver.loadImages([
       new File([converted], editedName(file.name, converted.type), { type: converted.type }),

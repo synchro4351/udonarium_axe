@@ -5825,6 +5825,8 @@
       "overLimit": "This picture is {{size}}MB, over the 2MB limit. Adding it converts it to a lighter format; if it still does not fit, crop it or lower the output size",
       "editFirst": "Edit before adding",
       "editFirstHint": "When ticked, each picture chosen opens in the editor before it is added. A picture over 2MB opens in the editor either way",
+      "shrinkLarge": "Shrink large pictures",
+      "shrinkLargeHint": "Pictures longer than 2560px are scaled down and stored as WebP as they are added. Everyone at the table receives the same smaller file, which helps players on slow connections. Pictures already in the room and those in save data are left as they are",
       "saveFailed": "The picture could not be stored. Please try again"
     },
     "fileSelecter": {

@@ -129,8 +129,11 @@ const SKIP_WEBP_CONVERT = new Set(['image/gif', 'image/apng', 'image/webp', 'ima
  *
  * GIF, APNG, animated PNG, WebP and SVG are left alone so animation and vectors survive, as is
  * anything that is not an image or does not decode in time.
+ *
+ * Given a maximum side, a picture longer than that on either side is also scaled down to fit,
+ * with the same rule that the result is kept only when it comes out smaller.
  */
-export async function convertBlobToWebP(blob: Blob, loadTimeoutMs?: number): Promise<Blob> {
+export async function convertBlobToWebP(blob: Blob, loadTimeoutMs?: number, maxSide = 0): Promise<Blob> {
   if (!blob || blob.size === 0) return blob;
 
   const type = blob.type;
@@ -152,13 +155,16 @@ export async function convertBlobToWebP(blob: Blob, loadTimeoutMs?: number): Pro
     const w = img.naturalWidth || img.width;
     const h = img.naturalHeight || img.height;
     if (w <= 0 || h <= 0) return blob;
+    const scale = maxSide > 0 ? Math.min(1, maxSide / Math.max(w, h)) : 1;
+    const targetW = Math.max(1, Math.round(w * scale));
+    const targetH = Math.max(1, Math.round(h * scale));
 
     const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
+    canvas.width = targetW;
+    canvas.height = targetH;
     const ctx = canvas.getContext('2d');
     if (!ctx) return blob;
-    ctx.drawImage(img, 0, 0, w, h);
+    ctx.drawImage(img, 0, 0, targetW, targetH);
 
     const webp = await canvasToBlobPreferWebP(canvas, 0.9);
     if (!webp) return blob;

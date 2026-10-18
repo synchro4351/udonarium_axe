@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { PersonalVolumeService } from '@axe/application/media/personal-volume.service';
+import { ImageUploadPreferenceService } from '@axe/application/file/image-upload-preference.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { KeyboardInsetService } from '@axe/application/ui/keyboard-inset.service';
 import { AppConfigService } from '@axe/composition/app-config.service';
@@ -63,6 +64,7 @@ export class AppInitializationService {
   private readonly ngSelectConfig = inject(NgSelectConfig);
   private readonly keyboardInset = inject(KeyboardInsetService);
   private readonly personalVolumes = inject(PersonalVolumeService);
+  private readonly imageUploadPreference = inject(ImageUploadPreferenceService);
 
   /**
    * Starts the app once at launch, before any room is used.
@@ -74,6 +76,7 @@ export class AppInitializationService {
   initialize(): void {
     initializeNetworkMessaging();
     this.fileArchiver.initialize();
+    this.imageUploadPreference.initialize();
     this.fileArchiver.mayLoadDrops = () => this.rolePermission.canEditTabletop;
     ImageSharingSystem.instance.initialize();
     AudioSharingSystem.instance.initialize();

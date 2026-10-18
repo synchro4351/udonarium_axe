@@ -33,6 +33,19 @@
         />
         {{ 'ui.imageEditor.editFirst' | transloco }}
       </label>
+      <label
+        class="text-ui-muted inline-flex cursor-pointer items-center gap-1 text-[12px] whitespace-nowrap select-none"
+        data-testid="file-selecter-shrink-large"
+        [title]="'ui.imageEditor.shrinkLargeHint' | transloco"
+      >
+        <input
+          type="checkbox"
+          class="[accent-color:var(--ui-accent)]"
+          [checked]="uploadPreference.shrinkLarge()"
+          (change)="uploadPreference.setShrinkLarge($any($event.target).checked)"
+        />
+        {{ 'ui.imageEditor.shrinkLarge' | transloco }}
+      </label>
     }
   </div>
   <div class="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] content-start gap-2 px-0 pt-3 pb-0">
