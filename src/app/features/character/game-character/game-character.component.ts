@@ -435,7 +435,7 @@ export class GameCharacterComponent {
       target: this.gameCharacter,
       collideLayers: ['terrain'],
       transformCssOffset: translateZCss(Z_OFFSET_TALL_OBJECT_PX),
-      snapStyle: (char) => (char.size % 1 !== 0 ? GridSnapStyle.VERTEX : undefined),
+      snapStyle: () => this.snapStyle(),
     });
 
     this.destroyRef.onDestroy(() => {
@@ -461,6 +461,17 @@ export class GameCharacterComponent {
   readonly gameCharacter = input<GameCharacter | null>(null);
   readonly rootElementRef = viewChild<ElementRef<HTMLElement>>('root');
   private readonly movableRef = viewChild(MovableDirective);
+
+  /**
+   * How the piece snaps to a square grid: on the grid's crossings while its size is fractional, else
+   * as the table says. Read anew whenever the character changes, so a resize moves it off the crossings.
+   */
+  private readonly snapStyle = computed(() => {
+    const char = this.gameCharacter();
+    if (!char) return undefined;
+    this.objectChange.versionOf(char.identifier)();
+    return char.size % 1 !== 0 ? GridSnapStyle.VERTEX : undefined;
+  });
 
   readonly isHiddenByVision = computed(() => {
     const char = this.gameCharacter();
