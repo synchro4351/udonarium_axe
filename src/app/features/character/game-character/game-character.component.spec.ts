@@ -34,7 +34,7 @@ import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
-import { GameTable, GridType } from '@axe/domain/tabletop/game-table';
+import { GameTable, GridSnapStyle, GridType } from '@axe/domain/tabletop/game-table';
 import { TableAmbience } from '@axe/domain/tabletop/table-ambience';
 import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
 import { Terrain } from '@axe/domain/tabletop/terrain';
@@ -842,6 +842,24 @@ describe('GameCharacterComponent', () => {
         table.gridType = GridType.SQUARE;
       }
     });
+  });
+
+  it('stops snapping to the grid crossings once a fractional size is made whole', async () => {
+    const character = GameCharacter.create('half-size', 0.5, '');
+    fixture.componentRef.setInput('gameCharacter', character);
+    fixture.detectChanges();
+    try {
+      expect(component.movableOption().snapStyle).toBe(GridSnapStyle.VERTEX);
+
+      character.size = 1;
+      character.update();
+      await Promise.resolve();
+      fixture.detectChanges();
+
+      expect(component.movableOption().snapStyle).toBeUndefined();
+    } finally {
+      character.destroy();
+    }
   });
 
   it('registers its effect in the constructor, so nothing is set up outside an injection context', () => {
