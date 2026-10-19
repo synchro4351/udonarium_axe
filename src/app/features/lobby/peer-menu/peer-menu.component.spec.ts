@@ -33,6 +33,53 @@ describe('PeerMenuComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  describe('copying the invite link', () => {
+    interface InviteCopy {
+      inviteLink: () => string;
+      isInviteCopied: () => boolean;
+      copyInviteLink(field: HTMLInputElement): Promise<void>;
+    }
+    const link = 'https://example.test/#join?r=room&n=name';
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
+
+    it('copies the selected field instead when the browser refuses the clipboard', async () => {
+      vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } });
+      // happy-dom has no execCommand, so give the document one to spy on.
+      const execCommand = vi.fn().mockReturnValue(true);
+      Object.defineProperty(document, 'execCommand', { value: execCommand, configurable: true });
+      const copy = component as unknown as InviteCopy;
+      copy.inviteLink = () => link;
+      const field = document.createElement('input');
+      field.value = link;
+      const select = vi.spyOn(field, 'select');
+
+      await copy.copyInviteLink(field);
+
+      expect(select).toHaveBeenCalled();
+      expect(execCommand).toHaveBeenCalledWith('copy');
+      expect(copy.isInviteCopied()).toBe(true);
+    });
+
+    it('leaves the field alone when the clipboard takes the link', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal('navigator', { clipboard: { writeText } });
+      const copy = component as unknown as InviteCopy;
+      copy.inviteLink = () => link;
+      const field = document.createElement('input');
+      const select = vi.spyOn(field, 'select');
+
+      await copy.copyInviteLink(field);
+
+      expect(writeText).toHaveBeenCalledWith(link);
+      expect(select).not.toHaveBeenCalled();
+      expect(copy.isInviteCopied()).toBe(true);
+    });
+  });
+
   it('asks for no change detector', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((component as any).changeDetector).toBeUndefined();

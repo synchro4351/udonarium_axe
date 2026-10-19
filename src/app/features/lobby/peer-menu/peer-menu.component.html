@@ -159,12 +159,13 @@
         </div>
         <div class="flex items-center gap-1.5">
           <input
+            #inviteField
             class="min-w-0 flex-1 text-[0.7rem]"
             readonly
             [value]="inviteLink()"
             (focus)="selectInviteLink($event)"
           />
-          <button class="shrink-0 text-xs" (click)="copyInviteLink()">
+          <button class="shrink-0 text-xs" (click)="copyInviteLink(inviteField)">
             {{
               (isInviteCopied() ? 'feature.lobby.peerMenu.inviteCopied' : 'feature.lobby.peerMenu.inviteCopy')
                 | transloco
