@@ -327,16 +327,21 @@ export class PeerMenuComponent {
     }
   }
 
-  protected async copyInviteLink(): Promise<void> {
+  protected async copyInviteLink(field: HTMLInputElement): Promise<void> {
     const link = this.inviteLink();
     if (link.length < 1) return;
 
     try {
       await navigator.clipboard.writeText(link);
       this.isInviteCopied.show(true);
+      return;
     } catch (reason) {
       Logger.warn('[PeerMenu] 招待リンクをクリップボードにコピーできませんでした', reason);
     }
+    // Some browsers refuse the clipboard API (a page not served securely, a denied permission),
+    // so copy the link out of its selected field the old way instead.
+    field.select();
+    if (document.execCommand('copy')) this.isInviteCopied.show(true);
   }
 
   protected selectInviteLink(event: Event): void {
