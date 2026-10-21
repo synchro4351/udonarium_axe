@@ -21,7 +21,7 @@ describe('setupMovableRotableForPiece', () => {
     const movableOption = signal<MovableOption>({});
     const rotableOption = signal<RotableOption>({});
     TestBed.runInInjectionContext(() =>
-      setupMovableRotableForPiece(
+      setupMovableRotableForPiece<GameCharacter>(
         { movableOption, rotableOption },
         {
           target: signal(character),
@@ -46,7 +46,7 @@ describe('setupMovableRotableForPiece', () => {
     const movableOption = signal<MovableOption>({});
     const rotableOption = signal<RotableOption>({});
     TestBed.runInInjectionContext(() =>
-      setupMovableRotableForPiece(
+      setupMovableRotableForPiece<GameCharacter>(
         { movableOption, rotableOption },
         { target: signal(character), snapStyle: GridSnapStyle.BOTH }
       )
