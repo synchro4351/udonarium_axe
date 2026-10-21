@@ -245,7 +245,7 @@ describe('EffectPresetEditorComponent', () => {
     fixture.detectChanges();
 
     const button = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find((element) =>
-      (element.textContent ?? '').includes('書き出す')
+      (element.textContent ?? '').includes('保存')
     )!;
     button.click();
 
