@@ -571,7 +571,7 @@ describe('ChatInputComponent', () => {
         '[data-testid="chat-input-stamp"]'
       )!;
       button.click();
-      expect(toggle).toHaveBeenCalledWith(button, 'line', expect.any(Function));
+      expect(toggle).toHaveBeenCalledWith(button, 'line', expect.any(Function), expect.any(Object));
       toggle.mock.calls[0][2]('seal:ok');
 
       expect(emitted).toEqual([
@@ -787,40 +787,30 @@ describe('ChatInputComponent', () => {
       expect(component.stampSuggestions()).toEqual([]);
     });
 
-    describe('writing tools', () => {
-      async function openTools(): Promise<void> {
-        find<HTMLButtonElement>('[data-testid="chat-writing-tools"]')!.click();
-        await settle();
+    describe('ways of writing on the stamp list', () => {
+      type SyntaxChoice = { syntax: { id: string; name: string }[]; pick: (id: string) => void };
+
+      function openStampsTakingSyntax(): SyntaxChoice {
+        const toggle = vi.spyOn(TestBed.inject(StampPickerService), 'toggle').mockImplementation(() => undefined);
+        find<HTMLButtonElement>('[data-testid="chat-input-stamp"]')!.click();
+        expect(toggle).toHaveBeenCalledOnce();
+        return toggle.mock.calls[0][3] as SyntaxChoice;
       }
 
-      it('offers the emoji and syntax tabs without a second stamp picker', async () => {
-        await openTools();
-        expect(findAll('[data-testid="chat-stamp-tab"]').map((tab) => tab.textContent!.trim())).toEqual([
-          '絵文字',
-          '特殊記法',
-        ]);
-        expect(findAll('[data-testid="chat-emoji-choice"]').length).toBeGreaterThan(20);
-        expect(findAll('[data-testid="chat-stamp-choice"]')).toHaveLength(0);
+      it('offers the chat’s ways of writing as a tab of the stamps, with no button of their own', async () => {
+        expect(find('[data-testid="chat-writing-tools"]')).toBeNull();
+
+        const choice = openStampsTakingSyntax();
+
+        expect(choice.syntax.map((each) => each.id)).toContain('ruby');
+        expect(choice.syntax.find((each) => each.id === 'ruby')?.name).toBeTruthy();
       });
 
-      it('puts an emoji into the line where the caret stood, and sends nothing', async () => {
-        await type('ab', 1);
-        await openTools();
-        find<HTMLButtonElement>('[data-testid="chat-emoji-choice"][aria-label="🎲"]')!.click();
-        await settle();
-
-        expect(component.text).toBe('a🎲b');
-        expect(lines).toEqual([]);
-        expect(component.isStampPickerOpen()).toBe(false);
-      });
-
-      it('inserts syntax around the selected words without sending', async () => {
+      it('inserts the way of writing picked around the selected words without sending', async () => {
         await type('今日は晴天です', 5);
         textBox().setSelectionRange(3, 5);
-        await openTools();
-        findAll('[data-testid="chat-stamp-tab"]')[1].click();
-        await settle();
-        find<HTMLButtonElement>('[data-testid="chat-syntax-choice"][data-syntax="ruby"]')!.click();
+
+        openStampsTakingSyntax().pick('ruby');
         await settle();
 
         expect(component.text).toBe('今日は|晴天<かんじ>です');

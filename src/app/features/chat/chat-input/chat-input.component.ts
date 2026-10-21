@@ -44,7 +44,12 @@ import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { ChatOutgoing, composeChatOutgoing, composeStampOutgoing, OutgoingStamp } from '@axe/domain/chat/chat-outgoing';
 import { paletteLineText, suggestPaletteLines } from '@axe/domain/chat/chat-palette-suggestion';
 import { previewTextOf } from '@axe/domain/chat/chat-stamp-text';
-import { applyChatSyntax, ChatSyntaxSnippet } from '@axe/domain/chat/chat-syntax-snippet';
+import {
+  applyChatSyntax,
+  chatSyntaxExample,
+  ChatSyntaxSnippet,
+  chatSyntaxSnippets,
+} from '@axe/domain/chat/chat-syntax-snippet';
 import { imageStampId } from '@axe/domain/chat/stamp-catalog';
 import { DataElement } from '@axe/domain/data/data-element';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
@@ -68,7 +73,6 @@ import { ChatComposeService } from '@axe/features/chat/chat-compose.service';
 import { ChatInputDiceBotHelper } from '@axe/features/chat/chat-input/chat-input-dicebot';
 import { allowsChat } from '@axe/features/chat/chat-input/chat-input-helpers';
 import { ChatInputHistory } from '@axe/features/chat/chat-input/chat-input-history';
-import { ChatStampPickerComponent } from '@axe/features/chat/chat-stamp-picker/chat-stamp-picker.component';
 import { StampPickerService } from '@axe/features/chat/stamp/stamp-picker.service';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
 import { PortraitChoice, PortraitPickerComponent } from '@axe/ui/components/portrait-picker/portrait-picker.component';
@@ -93,7 +97,6 @@ export type ChatInputSuggestion =
   templateUrl: './chat-input.component.html',
   host: {
     class: 'block min-w-0 [container-type:inline-size]',
-    '(document:pointerdown)': 'onDocumentPointerDown($event)',
   },
   imports: [
     NgClass,
@@ -102,7 +105,6 @@ export type ChatInputSuggestion =
     NgOptionComponent,
     NgSelectWindowDirective,
     NgStyle,
-    ChatStampPickerComponent,
     PortraitPickerComponent,
     PortraitSliderComponent,
     SafePipe,
@@ -318,7 +320,6 @@ export class ChatInputComponent {
    */
   readonly offersStamps = input(false);
   private readonly injector = inject(Injector);
-  private readonly writingToolsButtonRef = viewChild<ElementRef<HTMLButtonElement>>('writingToolsButton');
 
   /**
    * Whether the lines of the speaking character's chat palette that hold what is being written are
@@ -326,9 +327,6 @@ export class ChatInputComponent {
    */
   readonly suggestsPalette = input(false);
 
-  private readonly stampPickerRef = viewChild(ChatStampPickerComponent);
-
-  readonly isStampPickerOpen = signal(false);
   /** Where the caret stood in the text box when it last moved. */
   private readonly caret = signal(0);
   /** The draft Escape put the suggestions away for, or the one a palette line just filled in. */
@@ -426,34 +424,6 @@ export class ChatInputComponent {
     return image?.thumbnail.url || image?.url || '';
   }
 
-  /** Opens the stamp picker, or closes it and hands focus back to the text box. */
-  toggleStampPicker(): void {
-    if (this.isStampPickerOpen()) {
-      this.isStampPickerOpen.set(false);
-      this.focusTextArea();
-      return;
-    }
-    this.isStampPickerOpen.set(true);
-  }
-
-  /** Closes the stamp picker without picking anything, handing focus back to the stamp button. */
-  closeStampPicker(): void {
-    this.isStampPickerOpen.set(false);
-    afterNextRender({ write: () => this.writingToolsButtonRef()?.nativeElement.focus() }, { injector: this.injector });
-  }
-
-  /**
-   * Closes the stamp picker when a press lands anywhere but on it or on its own button, which
-   * toggles it by itself. Focus is left where the press put it.
-   */
-  onDocumentPointerDown(event: Event): void {
-    if (!this.isStampPickerOpen()) return;
-    const target = event.target;
-    if (this.stampPickerRef()?.contains(target)) return;
-    if (target instanceof Node && this.writingToolsButtonRef()?.nativeElement.contains(target)) return;
-    this.isStampPickerOpen.set(false);
-  }
-
   /**
    * Puts one of the chat's ways of writing into the line, around any words picked out, and picks
    * out the placeholder to write over next. Nothing is sent.
@@ -465,23 +435,7 @@ export class ChatInputComponent {
     const end = textArea?.selectionEnd ?? start;
     const edit = applyChatSyntax(text, start, end, snippet);
     this.text = edit.text;
-    this.isStampPickerOpen.set(false);
     this.focusTextArea(edit.selectionEnd, edit.selectionStart);
-    this.kickCalcFitHeight();
-  }
-
-  /**
-   * Puts an emoji into the line where the caret is, over any words picked out, and leaves the caret
-   * after it. Nothing is sent.
-   */
-  insertEmoji(emoji: string): void {
-    const textArea = this.textAreaElementRef()?.nativeElement;
-    const text = this.text;
-    const start = Math.min(textArea?.selectionStart ?? text.length, text.length);
-    const end = Math.min(Math.max(textArea?.selectionEnd ?? start, start), text.length);
-    this.text = text.slice(0, start) + emoji + text.slice(end);
-    this.isStampPickerOpen.set(false);
-    this.focusTextArea(start + emoji.length);
     this.kickCalcFitHeight();
   }
 
@@ -516,14 +470,12 @@ export class ChatInputComponent {
   }
 
   /**
-   * Escape puts the suggestions away until the draft changes, or closes the picker. With neither
-   * open it is left to whatever else listens for it.
+   * Escape puts the suggestions away until the draft changes. With none open it is left to
+   * whatever else listens for it; the stamp picker closes itself on Escape.
    */
   onEscape(event: Event): void {
     if (this.suggestions().length > 0) {
       this.dismissedDraft.set(this._text());
-    } else if (this.isStampPickerOpen()) {
-      this.isStampPickerOpen.set(false);
     } else {
       return;
     }
@@ -976,7 +928,26 @@ export class ChatInputComponent {
   /** Opens the stamps under the button beside the send button, to send the one picked. */
   protected openStamps(anchor: EventTarget | null): void {
     if (!(anchor instanceof Element)) return;
-    this.stampPicker.toggle(anchor, 'line', (stampId) => this.sendStamp(stampId));
+    const snippets = chatSyntaxSnippets({
+      rubyBase: this.t('feature.chat.syntax.placeholder.rubyBase'),
+      rubyReading: this.t('feature.chat.syntax.placeholder.rubyReading'),
+      resource: this.t('feature.chat.syntax.placeholder.resource'),
+      buffName: this.t('feature.chat.syntax.placeholder.buffName'),
+      effectName: this.t('feature.chat.syntax.placeholder.effectName'),
+    });
+    // The chat's ways of writing ride on a tab of the stamps, put into the line rather than sent.
+    this.stampPicker.toggle(anchor, 'line', (stampId) => this.sendStamp(stampId), {
+      syntax: snippets.map((snippet) => ({
+        id: snippet.id,
+        name: this.t(`feature.chat.syntax.items.${snippet.id}.name`),
+        hint: this.t(`feature.chat.syntax.items.${snippet.id}.hint`),
+        example: chatSyntaxExample(snippet),
+      })),
+      pick: (id) => {
+        const snippet = snippets.find((each) => each.id === id);
+        if (snippet) this.insertSyntax(snippet);
+      },
+    });
   }
 
   /**

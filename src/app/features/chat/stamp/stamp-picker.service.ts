@@ -10,12 +10,18 @@ import { StampUse } from '@axe/domain/chat/stamp-rules';
 import { builtinStampPack } from '@axe/domain/media/builtin-stamps';
 import { StampPackPanelComponent } from '@axe/features/chat/stamp-pack-panel/stamp-pack-panel.component';
 import { placePopover } from '@axe/ui/anchored-popover';
-import { StampPickerComponent } from '@axe/ui/components/stamp-picker/stamp-picker.component';
+import { StampPickerComponent, StampPickerSyntax } from '@axe/ui/components/stamp-picker/stamp-picker.component';
 
 const PICKER_WIDTH = 360;
 const PICKER_MIN_HEIGHT = 200;
 const PACK_PANEL_WIDTH = 520;
 const PACK_PANEL_HEIGHT = 480;
+
+/** The chat's ways of writing to offer on a tab of their own, and what to do with the one picked. */
+export interface StampPickerSyntaxChoice {
+  readonly syntax: readonly StampPickerSyntax[];
+  readonly pick: (id: string) => void;
+}
 
 interface OpenPicker {
   readonly ref: ComponentRef<StampPickerComponent>;
@@ -44,16 +50,26 @@ export class StampPickerService {
    * Opens the stamps the room lets be used `use`'s way under `anchor`, handing the one picked to
    * `pick`, or closes them where the same button opened them last.
    */
-  toggle(anchor: Element, use: StampUse, pick: (stampId: string) => void): void {
+  toggle(
+    anchor: Element,
+    use: StampUse,
+    pick: (stampId: string) => void,
+    syntax: StampPickerSyntaxChoice | null = null
+  ): void {
     if (this.opened?.anchor === anchor) {
       this.close();
       return;
     }
-    this.open(anchor, use, pick);
+    this.open(anchor, use, pick, syntax);
   }
 
   /** Opens the stamps the room lets be used `use`'s way under `anchor`, closing any already open. */
-  open(anchor: Element, use: StampUse, pick: (stampId: string) => void): void {
+  open(
+    anchor: Element,
+    use: StampUse,
+    pick: (stampId: string) => void,
+    syntax: StampPickerSyntaxChoice | null = null
+  ): void {
     this.close();
     const parent =
       OverlayLayers.layerFor(anchor.ownerDocument) ??
@@ -83,6 +99,13 @@ export class StampPickerService {
       this.close();
       pick(stampId);
     });
+    if (syntax) {
+      ref.setInput('syntax', syntax.syntax);
+      ref.instance.syntaxPicked.subscribe((id) => {
+        this.close();
+        syntax.pick(id);
+      });
+    }
     ref.instance.manage.subscribe(() => {
       this.close();
       this.openPackPanel();

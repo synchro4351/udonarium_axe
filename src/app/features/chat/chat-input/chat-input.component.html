@@ -209,14 +209,7 @@
 
     @if (canSpeak()) {
       <form name="chat-input" class="relative m-0 flex min-w-0 items-center gap-2">
-        @if (isStampPickerOpen()) {
-          <chat-stamp-picker
-            class="absolute inset-x-0 bottom-full z-20 mb-1"
-            (emojiPicked)="insertEmoji($event)"
-            (syntaxPicked)="insertSyntax($event)"
-            (closed)="closeStampPicker()"
-          />
-        } @else if (suggestions().length > 0) {
+        @if (suggestions().length > 0) {
           <div
             role="listbox"
             data-testid="chat-stamp-suggestions"
@@ -319,21 +312,6 @@
             <i aria-hidden="true" class="material-icons">emoji_emotions</i>
           </button>
         }
-        <button
-          #writingToolsButton
-          type="button"
-          class="border-ui-border-panel text-ui-muted hover:border-ui-accent hover:text-ui-accent m-0 flex size-7 shrink-0 cursor-pointer items-center justify-center self-center rounded-full border border-solid bg-transparent p-0 transition-colors hover:shadow-none [&_i]:text-[16px]! [&_i]:leading-none"
-          data-testid="chat-writing-tools"
-          [class.text-ui-accent]="isStampPickerOpen()"
-          [class.border-ui-accent]="isStampPickerOpen()"
-          [attr.aria-expanded]="isStampPickerOpen()"
-          aria-haspopup="dialog"
-          [attr.aria-label]="'feature.chat.syntax.tab' | transloco"
-          [title]="'feature.chat.syntax.tab' | transloco"
-          (click)="toggleStampPicker()"
-        >
-          <i aria-hidden="true" class="material-icons">edit_note</i>
-        </button>
         <button
           type="submit"
           class="border-ui-accent bg-ui-accent hover:border-ui-accent hover:bg-ui-accent m-0 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-solid p-0 text-[12px] font-semibold text-white transition-[background,border-color,filter] hover:text-white hover:shadow-none hover:brightness-110 [&_i]:text-[18px] [&_i]:leading-none"
