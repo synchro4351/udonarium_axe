@@ -7,6 +7,7 @@ import { GameCharacter } from '@axe/domain/character/game-character';
 import { DiceSymbol } from '@axe/domain/dice/dice-symbol';
 import { isLockedInPlace } from '@axe/domain/tabletop/lockable';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
+import { isWithheldHere } from '@axe/domain/tabletop/withheld';
 
 export interface MultiSelectionContextDeps {
   readonly t: TranslateFn;
@@ -82,7 +83,7 @@ export function buildMultiSelectionContextMenu(
         const handled = new Set<string>();
         const cloned: string[] = [];
         for (const obj of movable) {
-          if (handled.has(obj.identifier)) continue;
+          if (handled.has(obj.identifier) || isWithheldHere(obj)) continue;
           if (obj instanceof GameCharacter && copyCharacterGroup) {
             const copies = copyCharacterGroup(obj);
             const sourceGroup = obj.partGroup;

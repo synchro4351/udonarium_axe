@@ -8,6 +8,7 @@ import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
+import { Network } from '@axe/core/network/network';
 import { IPeerContext } from '@axe/core/network/peer-context';
 import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
 import { ObjectStore } from '@axe/core/sync/object-store';
@@ -44,6 +45,10 @@ describe('HandRailComponent', () => {
     PeerCursor.createMyCursor();
     PeerCursor.myCursor.userId = 'me';
     PeerCursor.myCursor.role = PeerRole.Player;
+    // Every cursor counts as connected unless a test takes its link away.
+    vi.spyOn(Network, 'peerIds', 'get').mockImplementation(() =>
+      ObjectStore.instance.getObjects<PeerCursor>(PeerCursor).map((cursor) => cursor.peerId)
+    );
   });
 
   afterEach(() => {
@@ -150,7 +155,7 @@ describe('HandRailComponent', () => {
   });
 
   it('opens everyone’s hands from a labelled button beside the rail rather than in the corner', async () => {
-    const open = vi.spyOn(TestBed.inject(PanelService), 'open').mockReturnValue(undefined as never);
+    const open = vi.spyOn(TestBed.inject(PanelService), 'openLazy').mockReturnValue(undefined as never);
     TestBed.inject(HandRailService).open();
     fixture.detectChanges();
     await fixture.whenStable();
@@ -273,6 +278,7 @@ describe('HandRailComponent', () => {
     other.userId = 'other';
     other.name = 'あいて';
     other.role = PeerRole.Player;
+    other.peerId = 'peer-other';
     other.initialize();
     const card = makeCard(handLocationOf('me'));
     const menu = TestBed.inject(ContextMenuService);
@@ -303,7 +309,7 @@ describe('HandRailComponent', () => {
       setPeerContextProvider({
         peerContext: { userId: 'me', peerId: 'me/peer' } as IPeerContext,
         peerContexts: [],
-        peerIds: [],
+        peerIds: ['peer-other'],
         peerId: 'me/peer',
       });
     });
@@ -338,6 +344,7 @@ describe('HandRailComponent', () => {
       other.userId = 'other';
       other.name = 'あいて';
       other.role = PeerRole.Player;
+      other.peerId = 'peer-other';
       other.initialize();
       PeerCursor.myCursor.role = PeerRole.GameMaster;
       const card = makeCard(handLocationOf('me'));
@@ -365,6 +372,7 @@ describe('HandRailComponent', () => {
     other.userId = 'other';
     other.name = 'あいて';
     other.role = PeerRole.Player;
+    other.peerId = 'peer-other';
     other.initialize();
     const card = makeCard(handLocationOf('me'));
     const open = vi.spyOn(TestBed.inject(ContextMenuService), 'open').mockImplementation(() => undefined);
@@ -490,6 +498,7 @@ describe('HandRailComponent', () => {
       other.userId = 'other';
       other.name = 'あいて';
       other.role = PeerRole.Player;
+      other.peerId = 'peer-other';
       other.initialize();
       vi.spyOn(TestBed.inject(ChatMessageService), 'sendSystemMessage').mockImplementation(() => null!);
     });
@@ -686,10 +695,31 @@ describe('HandRailComponent', () => {
       for (const cursor of ObjectStore.instance.getObjects<PeerCursor>(PeerCursor)) {
         if (cursor !== PeerCursor.myCursor && cursor.userId !== 'me') ObjectStore.instance.delete(cursor, false);
       }
+      vi.spyOn(Network, 'peerIds', 'get').mockImplementation(() =>
+        ObjectStore.instance
+          .getObjects<PeerCursor>(PeerCursor)
+          .filter((cursor) => cursor !== PeerCursor.myCursor)
+          .map((cursor) => cursor.peerId)
+      );
     });
 
     afterEach(() => {
       for (const object of made.splice(0)) object.destroy();
+      vi.restoreAllMocks();
+    });
+
+    it('follows a participant whose link drops and comes back, with nothing else changing', () => {
+      otherPlayer('other', 'あいて');
+      const targets = () => (component as unknown as { giveRecipients: () => { userId: string }[] }).giveRecipients();
+      const linked = vi.spyOn(Network, 'peerIds', 'get').mockReturnValue([]);
+      const networkVersion = TestBed.inject(ObjectChangeService).networkVersion;
+      networkVersion.update((version) => version + 1);
+      expect(targets()).toEqual([]);
+
+      linked.mockReturnValue(['peer-other']);
+      networkVersion.update((version) => version + 1);
+
+      expect(targets().map((seat) => seat.userId)).toEqual(['other']);
     });
 
     it('offers the other participants and gives the card to the one picked', async () => {

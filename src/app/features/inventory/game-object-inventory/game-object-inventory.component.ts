@@ -68,6 +68,7 @@ import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { OwnedTabletopObject } from '@axe/domain/tabletop/owned-tabletop-object';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
+import { isWithheldHere } from '@axe/domain/tabletop/withheld';
 import { NpcDragService } from '@axe/features/gm-tools/npc-bar/npc-drag.service';
 import {
   buildInventoryFolderAssignMenu,
@@ -1413,7 +1414,7 @@ export class GameObjectInventoryComponent {
   }
 
   private cloneGameObject(gameObject: TabletopObject) {
-    if (!this.rolePermission.canEditTabletop) return;
+    if (!this.rolePermission.canEditTabletop || isWithheldHere(gameObject)) return;
     if (gameObject instanceof GameCharacter && gameObject.partGroup) this.multipartGroups.copyGroup(gameObject);
     else gameObject.clone();
   }

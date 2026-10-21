@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { CardGameService } from '@axe/application/card/card-game.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
+import { Network } from '@axe/core/network/network';
 import { IPeerContext } from '@axe/core/network/peer-context';
 import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
 import { ObjectStore } from '@axe/core/sync/object-store';
@@ -24,10 +25,13 @@ describe('CardGameService', () => {
     return card;
   }
 
+  let linked: string[];
+
   function peer(userId: string, name: string, role: PeerRole = PeerRole.Player): PeerCursor {
     const cursor = new PeerCursor();
     cursor.userId = userId;
     cursor.peerId = `peer-${userId}`;
+    linked.push(cursor.peerId);
     cursor.name = name;
     cursor.role = role;
     cursor.initialize();
@@ -48,6 +52,8 @@ describe('CardGameService', () => {
     PeerCursor.myCursor.name = 'わたし';
     PeerCursor.myCursor.role = PeerRole.Player;
     TestBed.configureTestingModule({ providers: [...TEST_PROVIDERS] });
+    linked = [];
+    vi.spyOn(Network, 'peerIds', 'get').mockImplementation(() => [...linked]);
     service = TestBed.inject(CardGameService);
     sendSystemMessage = vi
       .spyOn(TestBed.inject(ChatMessageService), 'sendSystemMessage')
@@ -90,6 +96,23 @@ describe('CardGameService', () => {
 
       const orders = service.handCardsOf('me').map((card) => card.handOrder);
       expect(new Set(orders).size).toBe(orders.length);
+    });
+
+    it('deals once to a seat that loaded the page again, and nothing to one gone', () => {
+      const before = peer('again', 'さいど');
+      const after = peer('again', 'さいど');
+      const gone = peer('gone', 'たいしつ');
+      linked.splice(linked.indexOf(gone.peerId), 1);
+      expect(before.peerId).toBe(after.peerId);
+      const stack = CardStack.create('山札');
+      created.push(stack);
+      for (const code of ['s01', 's02', 's03', 's04']) stack.putOnBottom(trumpCard(code));
+
+      const result = service.dealAll(stack);
+
+      expect(result.participants).toBe(2);
+      expect(service.handCardsOf('again')).toHaveLength(2);
+      expect(service.handCardsOf('gone')).toHaveLength(0);
     });
 
     it('deals nothing to an onlooker', () => {
@@ -356,6 +379,21 @@ describe('CardGameService', () => {
     });
     afterEach(() => resetPeerContextProvider());
 
+    it('counts as orphaned on a room server a hand held for one there only as a guest, who holds no cards', () => {
+      vi.spyOn(Network, 'transport', 'get').mockReturnValue('server');
+      peer('claimed', 'なりすまし', PeerRole.Guest);
+      secretCard('ひみつ', 'claimed', 1);
+
+      expect(service.orphanHands().map((hand) => hand.userId)).toEqual(['claimed']);
+    });
+
+    it("keeps a guest's hand as present over SkyWay, where a guest is still a seat", () => {
+      peer('watcher', 'けんがく', PeerRole.Guest);
+      secretCard('ひみつ', 'watcher', 1);
+
+      expect(service.orphanHands()).toEqual([]);
+    });
+
     it('lists only hands whose holder has no cursor, in hand order, for several absent users', () => {
       peer('other', 'あいて');
       peer('dropping', 'きれかけ');
@@ -506,6 +544,16 @@ describe('CardGameService', () => {
       expect(reloaded.location.name).toBe(handLocationOf('other'));
       expect(reloaded.handOrder).toBe(card.handOrder);
       expect(reloaded.state).toBe(CardState.BACK);
+    });
+    it('moves nothing for a guest, who holds no cards', () => {
+      PeerCursor.myCursor.role = PeerRole.Guest;
+      const card = trumpCard('s07');
+      card.toHand('other');
+
+      expect(service.drawFromHand(card, 'あいて')).toBe(false);
+
+      expect(card.location.name).toBe(handLocationOf('other'));
+      expect(sendSystemMessage).not.toHaveBeenCalled();
     });
   });
 

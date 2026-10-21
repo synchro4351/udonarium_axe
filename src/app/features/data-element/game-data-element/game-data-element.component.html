@@ -191,7 +191,13 @@
             </div>
           }
           @case ('longText') {
-            @if (isTextFormatted() && !isEdit()) {
+            @if (isReadOnly()) {
+              <div
+                class="textarea-url w-full min-w-12.5 text-[0.8em] wrap-break-word whitespace-pre-wrap"
+                data-testid="long-text-read-only"
+                [innerHTML]="escapeHtml(value) | linkify"
+              ></div>
+            } @else if (isTextFormatted() && !isEdit()) {
               <div
                 class="note-formatted text-ui-text w-full min-w-12.5 text-[0.9em] leading-normal wrap-anywhere [word-break:break-word]"
                 data-testid="long-text-formatted"

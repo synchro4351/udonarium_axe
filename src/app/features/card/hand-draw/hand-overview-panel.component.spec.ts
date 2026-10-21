@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { Network } from '@axe/core/network/network';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { handLocationOf } from '@axe/domain/card/hand-location';
@@ -15,6 +16,8 @@ describe('HandOverviewPanelComponent', () => {
   let fixture: ComponentFixture<HandOverviewPanelComponent>;
   let component: HandOverviewPanelComponent;
   const created: { destroy(): void }[] = [];
+  /** The peers connected right now; a participant counts only while linked, as in the room. */
+  let linked: string[];
 
   function card(code: string, userId: string): Card {
     const object = Card.create('カード', `./assets/images/trump/${code}.webp`, './assets/images/trump/z01.webp');
@@ -27,6 +30,7 @@ describe('HandOverviewPanelComponent', () => {
     const cursor = new PeerCursor();
     cursor.userId = userId;
     cursor.peerId = `peer-${userId}`;
+    linked.push(cursor.peerId);
     cursor.name = name;
     cursor.role = role;
     cursor.initialize();
@@ -41,6 +45,8 @@ describe('HandOverviewPanelComponent', () => {
   }
 
   beforeEach(() => {
+    linked = [];
+    vi.spyOn(Network, 'peerIds', 'get').mockImplementation(() => [...linked]);
     PeerCursor.createMyCursor();
     PeerCursor.myCursor.userId = 'me';
     PeerCursor.myCursor.name = 'わたし';
@@ -55,6 +61,7 @@ describe('HandOverviewPanelComponent', () => {
     TestBed.inject(HandDragService).end();
     Config.instance.allowsHandGive = true;
     Config.instance.handVisibilityMode = 'choice';
+    vi.restoreAllMocks();
     for (const object of created.splice(0)) object.destroy();
     for (const cursor of ObjectStore.instance.getObjects<PeerCursor>(PeerCursor)) {
       if (cursor !== PeerCursor.myCursor) ObjectStore.instance.delete(cursor, false);
