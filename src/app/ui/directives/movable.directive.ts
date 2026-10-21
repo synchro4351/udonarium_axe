@@ -269,6 +269,9 @@ export class MovableDirective implements MovableInteractionContext {
       setAnimatedTransition(enabled: boolean) {
         self.setAnimatedTransition(enabled);
       },
+      commitPosition() {
+        self.commitPosition();
+      },
     };
     this.multiMovableService.register(this._multiAdapter);
   }

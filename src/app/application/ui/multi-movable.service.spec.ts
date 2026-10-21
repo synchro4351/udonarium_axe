@@ -25,6 +25,25 @@ describe('MultiMovableService', () => {
     selection = TestBed.inject(SelectionSignalService);
   });
 
+  it('writes where each follower stands to its object at once when the leader asks, and only for that leader', () => {
+    const leader = makeMovable({ id: 'a', x: 100, y: 100 });
+    const follower = { ...makeMovable({ id: 'b', x: 200, y: 300 }), commitPosition: vi.fn() };
+    service.register(leader);
+    service.register(follower);
+    selection.replaceSelection(['a', 'b']);
+    service.beginDrag(leader);
+
+    service.commitFollowers('b');
+    expect(follower.commitPosition).not.toHaveBeenCalled();
+
+    service.commitFollowers('a');
+    expect(follower.commitPosition).toHaveBeenCalledOnce();
+
+    service.endDrag(leader);
+    service.commitFollowers('a');
+    expect(follower.commitPosition).toHaveBeenCalledOnce();
+  });
+
   it('refuses to begin a drag when the leader is outside the selection', () => {
     const leader = makeMovable({ id: 'leader' });
     service.register(leader);
