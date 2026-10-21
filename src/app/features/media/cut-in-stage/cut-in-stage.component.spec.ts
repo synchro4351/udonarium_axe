@@ -428,6 +428,43 @@ describe('CutInStageComponent', () => {
     });
   });
 
+  describe('a text layer that tells the time', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('shows the time of day and counts down to the close, a second at a time', () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      vi.setSystemTime(new Date(2026, 9, 21, 21, 5, 0));
+      const scene = makeScene();
+      addLayer(scene, { kind: 'text', text: '休憩中 {time} あと{remaining}' });
+
+      fixture.componentRef.setInput('endsAtMs', Date.now() + 10 * 60 * 1000);
+      show(scene, false, 0);
+      const words = () => (fixture.nativeElement.querySelector('.whitespace-pre-wrap') as HTMLElement).textContent;
+      expect(words()).toBe('休憩中 21:05 あと10:00');
+
+      // Ticks land just past each whole second.
+      vi.advanceTimersByTime(1010);
+      fixture.detectChanges();
+      expect(words()).toBe('休憩中 21:05 あと9:59');
+
+      vi.advanceTimersByTime(60 * 1000);
+      fixture.detectChanges();
+      expect(words()).toBe('休憩中 21:06 あと8:59');
+    });
+
+    it('shows no time left for a cut-in that runs until it is stopped', () => {
+      const scene = makeScene();
+      addLayer(scene, { kind: 'text', text: 'あと{remaining}' });
+
+      show(scene, false, 0);
+      expect((fixture.nativeElement.querySelector('.whitespace-pre-wrap') as HTMLElement).textContent).toBe(
+        'あと--:--'
+      );
+    });
+  });
+
   it('refuses to let the browser drag a layer picture away', () => {
     const scene = makeScene();
     addLayer(scene, { imageIdentifier: 'nothing' });

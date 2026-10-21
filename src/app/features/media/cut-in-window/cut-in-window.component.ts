@@ -190,6 +190,8 @@ export class CutInWindowComponent {
   panelLayout: { left: number; top: number; width: number; height: number } | null = null;
   playbackStartedAtMs: number | null = null;
   playbackOffsetMs = 0;
+  /** When the window closes on its own on this watcher's clock, or null where it stays until stopped. */
+  playbackEndsAtMs: number | null = null;
   protected readonly playbackStarted = signal(false);
 
   cutIn: CutIn | null = null;
@@ -281,10 +283,12 @@ export class CutInWindowComponent {
       this.sceneSound = this.cutInSound.play(scene, sceneSoundOffsetMs ?? this.playbackOffsetMs, scene.sceneLoop);
     }
 
+    const playbackMs = cutInPlaybackMs(this.cutIn, this.cutIn.scene);
+    this.playbackEndsAtMs = playbackMs > 0 ? Date.now() - this.playbackOffsetMs + playbackMs : null;
+
     this.playbackStarted.set(true);
     if (this.readyVideoTarget && this.isVideoCued) this.startVideo(this.readyVideoTarget);
 
-    const playbackMs = cutInPlaybackMs(this.cutIn, this.cutIn.scene);
     if (playbackMs > 0) {
       this.cutInTimeOut = setTimeout(
         () => {

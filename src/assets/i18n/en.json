@@ -952,6 +952,9 @@
         "portraitSlotHint": "Played from chat, this shows the speaking character's portrait; otherwise this layer's own picture, or a silhouette.",
         "insertSpeakerName": "Insert name",
         "speakerNameHint": "{character} becomes the name of whoever played it",
+        "insertClock": "Insert time",
+        "insertRemaining": "Insert time left",
+        "clockHint": "{time} becomes the time of day, {remaining} the time left before it closes (--:-- while it runs until stopped)",
         "fontOption": {
           "default": "Default",
           "gothic": "Sans serif (device font)",

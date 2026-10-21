@@ -4,6 +4,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   ElementRef,
   inject,
   input,
@@ -16,6 +17,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { MotionService } from '@axe/application/ui/motion.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { clipCss } from '@axe/domain/media/cut-in-clip';
+import { usesClock, withClock } from '@axe/domain/media/cut-in-clock-text';
 import { fillCss } from '@axe/domain/media/cut-in-fill';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import {
@@ -94,6 +96,11 @@ export class CutInStageComponent {
   readonly zoom = input(1);
   /** Who the cut-in is played for: whose portrait and name its layers show where they ask. */
   readonly speaker = input<CutInSpeaker | null>(null);
+  /** When the cut-in closes on this watcher's clock, or null where it stays until it is stopped. */
+  readonly endsAtMs = input<number | null>(null);
+
+  /** The watcher's clock, moved on each second while a shown text layer tells the time. */
+  private readonly now = signal(Date.now());
 
   private readonly layerElements = viewChildren<ElementRef<HTMLElement>>('layerElement');
   private readonly wipeElements = viewChildren<ElementRef<HTMLElement>>('wipeElement');
@@ -151,8 +158,29 @@ export class CutInStageComponent {
     return `translate(${fit.offsetX}px, ${fit.offsetY}px) scale(${fit.scale})`;
   });
 
+  /** Whether a shown text layer writes the time of day or the time left. */
+  private readonly tellsTime = computed(() =>
+    this.layers().some((layer) => {
+      this.objectChange.versionOf(layer.identifier)();
+      return layer.kind === 'text' && usesClock(layer.text);
+    })
+  );
+
   constructor() {
     this.watchHostSize();
+
+    effect((onCleanup) => {
+      if (!this.tellsTime()) return;
+      this.now.set(Date.now());
+      let timer: ReturnType<typeof setTimeout>;
+      // Each tick lands just past a whole second, so the seconds shown turn over together.
+      const tick = () => {
+        this.now.set(Date.now());
+        timer = setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
+      };
+      timer = setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
+      onCleanup(() => clearTimeout(timer));
+    });
 
     // Building is kept apart from running, so moving the scrubber only moves the clock
     // rather than tearing every animation down and putting it up again sixty times a second.
@@ -241,9 +269,13 @@ export class CutInStageComponent {
 
   protected readonly fitTransform = portraitFitTransform;
 
-  /** A text layer's words, with the speaker's name put in where it asks for it. */
+  /**
+   * A text layer's words, with the time and the speaker's name put in where it asks for them. The
+   * time goes in first, so a speaker named like a token is shown as named.
+   */
   protected textOf(layer: CutInLayer): string {
-    return withSpeakerName(layer.text, this.speaker()?.name, this.t('feature.media.cutIn.unknownSpeaker'));
+    const timed = usesClock(layer.text) ? withClock(layer.text, this.now(), this.endsAtMs()) : layer.text;
+    return withSpeakerName(timed, this.speaker()?.name, this.t('feature.media.cutIn.unknownSpeaker'));
   }
 
   /**

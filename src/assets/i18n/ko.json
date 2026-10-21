@@ -952,6 +952,9 @@
         "portraitSlotHint": "채팅에서 재생하면 발언한 캐릭터의 스탠딩을 표시합니다. 없으면 이 레이어의 이미지를, 그것도 없으면 실루엣을 표시합니다.",
         "insertSpeakerName": "이름 넣기",
         "speakerNameHint": "{character}가 재생한 사람의 이름이 됩니다",
+        "insertClock": "시각 넣기",
+        "insertRemaining": "남은 시간 넣기",
+        "clockHint": "{time}이 현재 시각, {remaining}이 닫힐 때까지 남은 시간이 됩니다(멈출 때까지 계속되면 --:--)",
         "fontOption": {
           "default": "기본값",
           "gothic": "고딕 (기기 글꼴)",

@@ -952,6 +952,9 @@
         "portraitSlotHint": "チャットから再生したときは発言したキャラの立ち絵を出します。いないときはこの層の画像を、それもなければ影絵を出します。",
         "insertSpeakerName": "名前を入れる",
         "speakerNameHint": "{character} が再生した人の名前になります",
+        "insertClock": "時刻を入れる",
+        "insertRemaining": "残り時間を入れる",
+        "clockHint": "{time} が今の時刻、{remaining} が閉じるまでの残り時間になります（止めるまで続くときは --:--）",
         "fontOption": {
           "default": "既定",
           "gothic": "ゴシック（端末依存）",

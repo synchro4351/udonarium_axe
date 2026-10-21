@@ -16,6 +16,7 @@ import {
   isCutInExit,
 } from '@axe/domain/media/cut-in-animation-presets';
 import { CUT_IN_CLIPS, type CutInClip, isCutInClip } from '@axe/domain/media/cut-in-clip';
+import { CLOCK_TOKEN, REMAINING_TOKEN } from '@axe/domain/media/cut-in-clock-text';
 import { CUT_IN_EFFECTS, type CutInEffect, isCutInEffect } from '@axe/domain/media/cut-in-effect';
 import {
   CUT_IN_FILL_SHAPES,
@@ -336,6 +337,14 @@ export class CutInLayerPropertiesComponent {
   /** Adds the mark that says the speaker's name to the end of a text layer's words. */
   insertSpeakerName(): void {
     this.write((layer) => (layer.text = `${layer.text}${SPEAKER_NAME_TOKEN}`));
+  }
+
+  insertClock(): void {
+    this.write((layer) => (layer.text = `${layer.text}${CLOCK_TOKEN}`));
+  }
+
+  insertRemaining(): void {
+    this.write((layer) => (layer.text = `${layer.text}${REMAINING_TOKEN}`));
   }
 
   /** A text layer's font size in pixels, never set below 1. */
