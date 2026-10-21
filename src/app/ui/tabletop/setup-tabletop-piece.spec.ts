@@ -24,7 +24,7 @@ describe('setupMovableRotableForPiece', () => {
       setupMovableRotableForPiece(
         { movableOption, rotableOption },
         {
-          target: () => character,
+          target: signal(character),
           snapStyle: (piece) => (piece.size % 1 !== 0 ? GridSnapStyle.VERTEX : undefined),
         }
       )
@@ -48,7 +48,7 @@ describe('setupMovableRotableForPiece', () => {
     TestBed.runInInjectionContext(() =>
       setupMovableRotableForPiece(
         { movableOption, rotableOption },
-        { target: () => character, snapStyle: GridSnapStyle.BOTH }
+        { target: signal(character), snapStyle: GridSnapStyle.BOTH }
       )
     );
     TestBed.tick();
