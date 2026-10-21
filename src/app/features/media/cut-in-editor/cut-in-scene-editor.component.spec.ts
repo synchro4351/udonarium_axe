@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { CutInSoundService } from '@axe/application/media/cut-in-sound.service';
+import { ShortcutScopeService } from '@axe/application/ui/shortcut-scope.service';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { encodeCutInTracks } from '@axe/domain/media/cut-in-keyframe';
@@ -172,6 +173,13 @@ describe('CutInSceneEditorComponent', () => {
     // A real release carries no button, which is also what an abandoned drag looks like.
     editor().onPointerUp(pointer('pointerup', to[0], to[1], 0));
   }
+
+  it('puts its keys first on the cheat sheet while it is open', () => {
+    const scopes = TestBed.inject(ShortcutScopeService);
+    expect(scopes.scopes()).toContain('cutInEditor');
+    fixture.destroy();
+    expect(scopes.scopes()).not.toContain('cutInEditor');
+  });
 
   it('starts with no scene at all', () => {
     expect(component.scene()).toBeNull();

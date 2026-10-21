@@ -63,7 +63,7 @@ import { getPeerContext } from '@axe/core/network/peer-context-source';
 import { VolumeType } from '@axe/core/storage/audio-player';
 import { imageFileEqual } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
-import { ObjectStore } from '@axe/core/sync/object-store';
+import { isInStore, ObjectStore } from '@axe/core/sync/object-store';
 import { BUFF_BADGES_PER_ROW, BuffBadge, toBuffBadges } from '@axe/domain/character/buff-badge';
 import { BUFF_VIEW_LABEL_KEYS, type BuffViewMode, nextBuffViewMode } from '@axe/domain/character/buff-view-mode';
 import { GameCharacter } from '@axe/domain/character/game-character';
@@ -114,6 +114,7 @@ import {
 } from '@axe/domain/tabletop/hex-flower-geometry';
 import { isFlatTopGrid, isHexGrid } from '@axe/domain/tabletop/hex-geometry';
 import { landingLeanAt } from '@axe/domain/tabletop/move/landing-height';
+import { pieceCornerOnSquare } from '@axe/domain/tabletop/move/piece-on-grid';
 import {
   DEFAULT_MULTI_ANGLE_PIECE_REVOLUTION_SECONDS,
   multiAngleNameMotionMode,
@@ -152,7 +153,6 @@ import { GameCharacterBuffViewComponent } from '@axe/features/character/game-cha
 import { GameDataElementBuffComponent } from '@axe/features/character/game-data-element-buff/game-data-element-buff.component';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { buildConcealMenu } from '@axe/features/tabletop/board-switch/concealment-context-menu';
-import { LightSettingsComponent } from '@axe/features/tabletop/light-settings/light-settings.component';
 import { StampComponent } from '@axe/ui/components/stamp/stamp.component';
 import { BillboardDirective } from '@axe/ui/directives/billboard.directive';
 import { MovableOption } from '@axe/ui/directives/movable.directive';
@@ -436,6 +436,7 @@ export class GameCharacterComponent {
       collideLayers: ['terrain'],
       transformCssOffset: translateZCss(Z_OFFSET_TALL_OBJECT_PX),
       snapStyle: (char) => (char.size % 1 !== 0 ? GridSnapStyle.VERTEX : undefined),
+      snapToSquare: (char, at) => pieceCornerOnSquare(this.tabletopService.currentTable, char, at),
     });
 
     this.destroyRef.onDestroy(() => {
@@ -2333,7 +2334,7 @@ export class GameCharacterComponent {
         import('@axe/features/character/battle-placement-panel/battle-placement-panel.component').then(
           (m) => m.BattlePlacementPanelComponent
         ),
-      option,
+      { ...option, stillWanted: () => isInStore(gameObject) },
       (component) => component.leaderIdentifier.set(gameObject.identifier)
     );
   }
@@ -2353,7 +2354,7 @@ export class GameCharacterComponent {
         import('@axe/features/character/line-of-fire-panel/line-of-fire-panel.component').then(
           (m) => m.LineOfFirePanelComponent
         ),
-      option,
+      { ...option, stillWanted: () => isInStore(gameObject) },
       (component) => component.shooterIdentifier.set(gameObject.identifier)
     );
   }
@@ -2364,9 +2365,15 @@ export class GameCharacterComponent {
       title: this.translateFn('feature.character.contextMenu.lightSettings'),
       ...sheetPanelBox(coordinate, 360, 460),
     };
-    const component = this.panelService.open<LightSettingsComponent>(LightSettingsComponent, option);
-    component.target = gameObject;
-    component.showVision = true;
+    this.panelService.openLazy(
+      () =>
+        import('@axe/features/tabletop/light-settings/light-settings.component').then((m) => m.LightSettingsComponent),
+      { ...option, stillWanted: () => isInStore(gameObject) },
+      (component) => {
+        component.target = gameObject;
+        component.showVision = true;
+      }
+    );
   }
 
   protected readonly buffChildren = computed<DataElement[]>(() => {

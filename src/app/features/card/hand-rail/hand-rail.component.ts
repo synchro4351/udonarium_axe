@@ -31,7 +31,6 @@ import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
-import { HandOverviewPanelComponent } from '@axe/features/card/hand-draw/hand-overview-panel.component';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
 import {
   buildHandCardContextMenu,
@@ -191,8 +190,9 @@ export class HandRailComponent {
     return this.cardGame.allowsHandGive();
   });
 
-  /** The other seats that may receive a card, kept current as cursors join, leave or change role. */
+  /** The other seats that may receive a card, kept current as cursors join, leave, change role or lose their link. */
   protected readonly giveRecipients = computed(() => {
+    this.objectChange.networkVersion();
     this.objectChange.collectionOf(PeerCursor.aliasName)();
     this.objectChange.trackMyCursor();
     for (const cursor of this.objectStore.getObjects<PeerCursor>(PeerCursor)) {
@@ -341,11 +341,15 @@ export class HandRailComponent {
     const rail = this.railRef()?.nativeElement.getBoundingClientRect();
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     const anchor = rail ?? { left: 0, top: viewport.height, right: viewport.width, bottom: viewport.height };
-    this.panelService.open(HandOverviewPanelComponent, {
-      title: this.t('feature.card.hand.viewPublicHands'),
-      ...HAND_OVERVIEW_SIZE,
-      ...spotBeside(anchor, HAND_OVERVIEW_SIZE, viewport),
-    });
+    this.panelService.openLazy(
+      () =>
+        import('@axe/features/card/hand-draw/hand-overview-panel.component').then((m) => m.HandOverviewPanelComponent),
+      {
+        title: this.t('feature.card.hand.viewPublicHands'),
+        ...HAND_OVERVIEW_SIZE,
+        ...spotBeside(anchor, HAND_OVERVIEW_SIZE, viewport),
+      }
+    );
   }
 
   protected discardPairs(): void {

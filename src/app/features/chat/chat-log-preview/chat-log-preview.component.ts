@@ -5,7 +5,7 @@ import { SaveDataService } from '@axe/application/file/save-data.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { PanelService } from '@axe/application/ui/panel.service';
-import { ChatLogImages } from '@axe/domain/chat/chat-log-export';
+import { ChatLogImages, exportChatLog } from '@axe/domain/chat/chat-log-export';
 import { ChatLogExporter, ChatLogTab } from '@axe/domain/chat/chat-log-exporter';
 import { ChatLogScope } from '@axe/domain/chat/chat-log-rich';
 import {
@@ -70,6 +70,7 @@ export class ChatLogPreviewComponent {
     const prepared = this.prepared();
     if (!prepared || this.format() !== 'html') return '';
     return this.saveDataService.renderChatLog(
+      exportChatLog,
       this.effectiveStyle(),
       this.effectiveScope(),
       prepared.tabs,
@@ -80,7 +81,7 @@ export class ChatLogPreviewComponent {
   readonly text = computed(() => {
     const prepared = this.prepared();
     if (!prepared || this.format() !== 'text') return '';
-    return this.saveDataService.renderChatLog('text', this.effectiveScope(), prepared.tabs, {
+    return this.saveDataService.renderChatLog(exportChatLog, 'text', this.effectiveScope(), prepared.tabs, {
       resolver: () => '',
       registryScript: '',
     });

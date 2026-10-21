@@ -8,6 +8,7 @@ import { HotbarPreferenceService } from '@axe/application/ui/hotbar-preference.s
 import { PanelService } from '@axe/application/ui/panel.service';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { WidgetVisibilityService } from '@axe/application/ui/widget-visibility.service';
+import { FileArchiver } from '@axe/core/storage/file-archiver';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { Hotbar } from '@axe/domain/hotbar/hotbar';
 import { emptyHotbarSlotDraft } from '@axe/domain/hotbar/hotbar-draft';
@@ -15,6 +16,7 @@ import { HotbarSet } from '@axe/domain/hotbar/hotbar-set';
 import { HOTBAR_SLOTS_PER_PAGE } from '@axe/domain/hotbar/hotbar-size';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
+import { ReloadCheck } from '@axe/domain/peer/reload-check';
 import { HotbarService } from '@axe/features/hotbar/hotbar.service';
 import { HotbarBarComponent } from '@axe/features/hotbar/hotbar-bar/hotbar-bar.component';
 import { HotbarRunnerService } from '@axe/features/hotbar/hotbar-runner.service';
@@ -95,6 +97,23 @@ describe('HotbarBarComponent', () => {
     localStorage.removeItem('ui-widgets');
     localStorage.removeItem('ui-hotbar');
     localStorage.removeItem(HOTBAR_STARTER_KEY);
+  });
+
+  it('loads a chosen file as a fresh load, whatever was answered to the one before', async () => {
+    const reloadCheck = new ReloadCheck('ReloadCheck');
+    reloadCheck.initialize();
+    const start = vi.spyOn(reloadCheck, 'reloadCheckStart');
+    const load = vi.spyOn(TestBed.inject(FileArchiver), 'load').mockResolvedValue();
+    const input = document.createElement('input');
+    Object.defineProperty(input, 'files', { value: [new File(['<hotbar-set/>'], 'hotbar.xml')] });
+
+    await (fixture.componentInstance as unknown as { loadFile(event: Event): Promise<void> }).loadFile({
+      target: input,
+    } as unknown as Event);
+
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(start.mock.invocationCallOrder[0]).toBeLessThan(load.mock.invocationCallOrder[0]);
+    reloadCheck.destroy();
   });
 
   it('stays out of the way until it is asked for', () => {
@@ -445,14 +464,14 @@ describe('HotbarBarComponent', () => {
     expect(slots()[9].className).toContain('animate-hit-flash');
   });
 
-  it('opens the editor when an empty slot is pressed', () => {
+  it('opens the editor when an empty slot is pressed', async () => {
     ownedCharacter('術者');
     fixture.detectChanges();
     const open = vi.spyOn(TestBed.inject(PanelService), 'open').mockReturnValue({ setFrom: vi.fn() } as never);
 
     slots()[4].click();
 
-    expect(open).toHaveBeenCalled();
+    await vi.waitFor(() => expect(open).toHaveBeenCalled());
   });
 
   it('trades two slots when one is dragged onto the other', () => {
@@ -482,7 +501,7 @@ describe('HotbarBarComponent', () => {
     expect(ownHotbar().slotAt(preference.page(), 0)?.argument).toBe('dice-roll');
   });
 
-  it('opens the editor on an empty slot even after a drag was let go of outside the bar', () => {
+  it('opens the editor on an empty slot even after a drag was let go of outside the bar', async () => {
     const character = ownedCharacter('術者');
     fillSlot(character, 0, 'dice-roll');
     fixture.detectChanges();
@@ -495,7 +514,7 @@ describe('HotbarBarComponent', () => {
     slots()[4].dispatchEvent(new PointerEvent('pointerdown', { button: 0, clientX: 0, clientY: 0 }));
     slots()[4].click();
 
-    expect(open).toHaveBeenCalled();
+    await vi.waitFor(() => expect(open).toHaveBeenCalled());
   });
 
   it('lets a slot go when the browser takes the gesture away', () => {
@@ -515,7 +534,20 @@ describe('HotbarBarComponent', () => {
     expect(run).toHaveBeenCalled();
   });
 
-  it('opens the editor beside the slot it was opened for', () => {
+  it('opens the editor on the slot pressed and the page showing, with what the slot holds', async () => {
+    ownedCharacter('術者');
+    preference.gotoPage(1);
+    fixture.detectChanges();
+    const editor = { setFrom: vi.fn() };
+    vi.spyOn(TestBed.inject(PanelService), 'open').mockReturnValue(editor as never);
+
+    slots()[4].click();
+
+    await vi.waitFor(() => expect(editor.setFrom).toHaveBeenCalled());
+    expect(editor.setFrom).toHaveBeenCalledWith({ page: 1, slotIndex: 4 }, emptyHotbarSlotDraft());
+  });
+
+  it('opens the editor beside the slot it was opened for', async () => {
     ownedCharacter('術者');
     fixture.detectChanges();
     const slot = slots()[4];
@@ -529,6 +561,7 @@ describe('HotbarBarComponent', () => {
 
     slot.click();
 
+    await vi.waitFor(() => expect(open).toHaveBeenCalled());
     expect(open.mock.calls[0][1]).toMatchObject({ left: 432, top: 172 });
   });
 
@@ -709,18 +742,20 @@ describe('HotbarBarComponent', () => {
     expect(Number(bar()!.style.zIndex)).toBeGreaterThan(1899999);
   });
 
-  it('opens the editor on the shelf just above wherever the bar is sitting', () => {
+  it('opens the editor on the shelf just above wherever the bar is sitting', async () => {
     ownedCharacter('術者');
     fixture.detectChanges();
     const open = vi.spyOn(TestBed.inject(PanelService), 'open').mockReturnValue({ setFrom: vi.fn() } as never);
 
     slots()[4].click();
+    await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(1));
     expect((open.mock.calls[0][1] as { layer: number }).layer).toBe(Z_HOTBAR + 1);
 
     preference.setPinned(true);
     fixture.detectChanges();
     slots()[5].click();
 
+    await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(2));
     expect((open.mock.calls[1][1] as { layer: number }).layer).toBeGreaterThan(1899999);
   });
 

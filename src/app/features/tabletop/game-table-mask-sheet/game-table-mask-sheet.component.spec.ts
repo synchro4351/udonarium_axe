@@ -6,6 +6,7 @@ import { ImageStorage } from '@axe/core/storage/image-storage';
 import { GameTableMask } from '@axe/domain/tabletop/game-table-mask';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { GameTableMaskSheetComponent } from '@axe/features/tabletop/game-table-mask-sheet/game-table-mask-sheet.component';
+import { expectClosesForAGuest } from '@axe/testing/closes-for-a-guest';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
 interface DeletedChannel {
@@ -124,6 +125,10 @@ describe('GameTableMaskSheetComponent', () => {
     } finally {
       mask.destroy();
     }
+  });
+
+  it('closes once its seat is made a guest, who may no longer write what it writes', () => {
+    expectClosesForAGuest(() => TestBed.createComponent(GameTableMaskSheetComponent));
   });
 
   describe('the basic settings', () => {

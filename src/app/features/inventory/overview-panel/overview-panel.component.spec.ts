@@ -24,8 +24,11 @@ import { WhiteBoard } from '@axe/domain/tabletop/white-board';
 import { OverviewPanelComponent } from '@axe/features/inventory/overview-panel/overview-panel.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 import { DraggableDirective } from '@axe/ui/directives/draggable.directive';
+import { loadLinkify } from '@axe/ui/text-decoration/linkify-loader';
 
 describe('OverviewPanelComponent', () => {
+  beforeAll(() => loadLinkify());
+
   let component: OverviewPanelComponent;
   let fixture: ComponentFixture<OverviewPanelComponent>;
 

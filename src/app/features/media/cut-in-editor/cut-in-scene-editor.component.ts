@@ -18,6 +18,7 @@ import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { type CutInSoundHandle, CutInSoundService } from '@axe/application/media/cut-in-sound.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ModalService } from '@axe/application/ui/modal.service';
+import { ShortcutScopeService } from '@axe/application/ui/shortcut-scope.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { EditHistory } from '@axe/core/util/edit-history';
 import { GameCharacter } from '@axe/domain/character/game-character';
@@ -407,6 +408,7 @@ export class CutInSceneEditorComponent {
   });
 
   constructor() {
+    inject(ShortcutScopeService).hold('cutInEditor', this.destroyRef);
     // The stack is started from the scene as it stands, before anything is changed, so the
     // very first change has something to be taken back to.
     effect(() => {
