@@ -3850,7 +3850,9 @@
         "sendToTickerHint": "이 발언을 화면 외곽에도 흘려보냅니다",
         "tools": "입력 설정",
         "myDice": "마이 주사위",
-        "stamp": "스탬프 보내기 (입력 중인 글이 있으면 함께)"
+        "stamp": "스탬프 보내기 (입력 중인 글이 있으면 함께)",
+        "speakerWhole": "전체",
+        "speakerPartHint": "부위를 골라 발언합니다. 「전체」는 나누기 전의 이름과 이미지로 발언합니다"
       },
       "tab": {
         "unnamedCharacter": "이름 없는 캐릭터",

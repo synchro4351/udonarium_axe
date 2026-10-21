@@ -26,7 +26,7 @@ import { portraitNameOf } from '@axe/domain/character/character-portrait';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage, ChatMessageContext, ChatMessageTargetContext } from '@axe/domain/chat/chat-message';
 import { copiedMessageContext } from '@axe/domain/chat/chat-message-copy';
-import { ChatOutgoing, OutgoingStamp } from '@axe/domain/chat/chat-outgoing';
+import { ChatOutgoing, ChatSpeakAs, OutgoingStamp } from '@axe/domain/chat/chat-outgoing';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { canRoleSpeakTab, canRoleViewTab } from '@axe/domain/chat/chat-tab-permission';
@@ -269,7 +269,8 @@ export class ChatMessageService {
       value.sendTo,
       value.portraitIndex,
       value.messColor,
-      { light: value.messBubbleLight ?? '', dark: value.messBubbleDark ?? '' }
+      { light: value.messBubbleLight ?? '', dark: value.messBubbleDark ?? '' },
+      value.speakAs
     );
     return true;
   }
@@ -292,7 +293,8 @@ export class ChatMessageService {
     sendTo?: string,
     portraitIndex?: number,
     color?: string,
-    bubbles?: { light: string; dark: string }
+    bubbles?: { light: string; dark: string },
+    speakAs?: ChatSpeakAs
   ): ChatMessage | null {
     const stamp = stampOf(stampId);
     if (!stamp || !this.stampRules.allows('line', stampId)) return null;
@@ -302,8 +304,8 @@ export class ChatMessageService {
     const chatMessage: ChatMessageContext = {
       from: Network.peerContext.userId,
       to: sendTo != null ? this.whisperTo(sendTo) : undefined,
-      name: this.makeMessageName(sendFrom, sendTo),
-      imageIdentifier: this.findImageIdentifier(sendFrom, imgIndex),
+      name: this.makeMessageName(sendFrom, sendTo, speakAs?.name),
+      imageIdentifier: speakAs?.imageIdentifier || this.findImageIdentifier(sendFrom, imgIndex),
       timestamp: this.calcTimeStamp(chatTab),
       text: words,
       imagePos: this.keptOffTable ? undefined : this.findImagePos(sendFrom),
@@ -349,7 +351,8 @@ export class ChatMessageService {
     quoteOf?: string,
     bubbles?: { light: string; dark: string },
     vnEmote?: string,
-    stamp?: OutgoingStamp
+    stamp?: OutgoingStamp,
+    speakAs?: ChatSpeakAs
   ): ChatMessage {
     const resolvedMessage = this.resolveAttachmentImageReferences(text, sendFrom, attachmentImageIdentifiers ?? []);
     text = resolvedMessage.text;
@@ -363,8 +366,8 @@ export class ChatMessageService {
     const chatMessage: ChatMessageContext = {
       from: Network.peerContext.userId,
       to: sendTo != null ? this.whisperTo(sendTo) : undefined,
-      name: this.makeMessageName(sendFrom, sendTo),
-      imageIdentifier: this.findImageIdentifier(sendFrom, imgIndex),
+      name: this.makeMessageName(sendFrom, sendTo, speakAs?.name),
+      imageIdentifier: speakAs?.imageIdentifier || this.findImageIdentifier(sendFrom, imgIndex),
       timestamp: this.calcTimeStamp(chatTab),
       tag: chatMessageTag,
       text,
@@ -564,8 +567,8 @@ export class ChatMessageService {
     return PeerCursor.standingFor(identifier)?.name ?? identifier;
   }
 
-  private makeMessageName(sendFrom: string, sendTo?: string): string {
-    const sendFromName = this.findObjectName(sendFrom);
+  private makeMessageName(sendFrom: string, sendTo?: string, speakingAs?: string): string {
+    const sendFromName = speakingAs || this.findObjectName(sendFrom);
     if (sendTo == null || sendTo.length < 1) return sendFromName;
     const sendToName = this.findObjectName(sendTo);
     return sendFromName + ' > ' + sendToName;

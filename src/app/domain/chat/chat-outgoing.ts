@@ -6,6 +6,17 @@ export interface OutgoingStamp {
   readonly words: string;
 }
 
+/**
+ * Who a line is said as where that is not the piece it is sent from: a group of linked parts
+ * speaking as a whole, under the group's name and the picture it was cut from. The line still
+ * goes from the part, which answers for its dice, resources and macros.
+ */
+export interface ChatSpeakAs {
+  name: string;
+  /** The picture shown beside the line; empty to keep the part's own. */
+  imageIdentifier: string;
+}
+
 export interface ChatOutgoing {
   text: string;
   /** The dice system the line is read under; none for a stamp, which is not read for dice. */
@@ -25,6 +36,8 @@ export interface ChatOutgoing {
    * absent for a line of words.
    */
   stamp?: OutgoingStamp;
+  /** Who the line is said as, where not the piece it is sent from. */
+  speakAs?: ChatSpeakAs;
 }
 
 /**
@@ -57,6 +70,7 @@ export interface ChatOutgoingDraft {
   quoteOf: string;
   toTicker: boolean;
   stamp?: OutgoingStamp;
+  speakAs?: ChatSpeakAs;
 }
 
 /**
@@ -80,6 +94,7 @@ export function composeChatOutgoing(draft: ChatOutgoingDraft): ChatOutgoing {
     quoteOf: draft.quoteOf,
     toTicker: draft.toTicker,
     ...(draft.stamp ? { stamp: draft.stamp } : {}),
+    ...(draft.speakAs ? { speakAs: draft.speakAs } : {}),
   };
 }
 

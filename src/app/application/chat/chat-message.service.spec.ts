@@ -785,6 +785,52 @@ describe('ChatMessageService', () => {
       expect(message.imageIdentifier).toBe('img-1');
     });
 
+    it('says a line as a whole creature of linked parts, under its name and picture, whispered or not', () => {
+      const none = undefined;
+      const whole = { name: 'モンスターC', imageIdentifier: 'img-2' };
+      const said = (sendTo?: string) =>
+        service.sendMessage(
+          chatTab,
+          'ガオー',
+          null,
+          character.identifier,
+          sendTo,
+          none,
+          none,
+          none,
+          none,
+          none,
+          none,
+          none,
+          none,
+          none,
+          whole
+        );
+
+      const line = said();
+      expect(line.name).toBe('モンスターC');
+      expect(line.imageIdentifier).toBe('img-2');
+      expect(line.sendFrom).toBe(character.identifier);
+      expect(said(PeerCursor.myCursor.identifier).name).toBe(`モンスターC > ${PeerCursor.myCursor.name}`);
+
+      const stamp = service.sendStamp(
+        chatTab,
+        'feel:smile',
+        '［にこにこ］',
+        character.identifier,
+        none,
+        none,
+        none,
+        none,
+        {
+          name: 'モンスターC',
+          imageIdentifier: '',
+        }
+      );
+      expect(stamp?.name).toBe('モンスターC');
+      expect(stamp?.imageIdentifier).toBe('img-0');
+    });
+
     it('switches to the portrait the name picks out and takes the command off the line', () => {
       const message = speak('こんにちは @笑顔');
 

@@ -61,6 +61,8 @@ export class GameCharacter extends OwnedTabletopObject {
   @SyncVar() partName: string = '';
   /** The part's rectangle in the shared picture, as `part-group` writes it. */
   @SyncVar() partRegion: string = '';
+  /** The picture the group's parts were cut from, which the group speaks with as a whole. */
+  @SyncVar() partGroupImage: string = '';
   private static readonly MAX_DETAIL_GROUP_DEPTH = 2;
 
   constructor(identifier: string = generateUuid()) {
