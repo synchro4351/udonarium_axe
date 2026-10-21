@@ -21,7 +21,7 @@ import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { ChatComposeService } from '@axe/features/chat/chat-compose.service';
 import { ChatInputComponent } from '@axe/features/chat/chat-input/chat-input.component';
-import { StampPickerService } from '@axe/features/chat/stamp/stamp-picker.service';
+import { StampPickerService, type StampPickerSyntaxChoice } from '@axe/features/chat/stamp/stamp-picker.service';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
@@ -788,13 +788,11 @@ describe('ChatInputComponent', () => {
     });
 
     describe('ways of writing on the stamp list', () => {
-      type SyntaxChoice = { syntax: { id: string; name: string }[]; pick: (id: string) => void };
-
-      function openStampsTakingSyntax(): SyntaxChoice {
+      function openStampsTakingSyntax(): StampPickerSyntaxChoice {
         const toggle = vi.spyOn(TestBed.inject(StampPickerService), 'toggle').mockImplementation(() => undefined);
         find<HTMLButtonElement>('[data-testid="chat-input-stamp"]')!.click();
         expect(toggle).toHaveBeenCalledOnce();
-        return toggle.mock.calls[0][3] as SyntaxChoice;
+        return toggle.mock.calls[0][3]!;
       }
 
       it('offers the chat’s ways of writing as a tab of the stamps, with no button of their own', async () => {
