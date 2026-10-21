@@ -77,6 +77,11 @@ export interface MovableOption {
   readonly snapOrigin?: { x: number; y: number };
   readonly snapStyle?: GridSnapStyle;
   /**
+   * The snap style asked for each time the piece snaps, ahead of `snapStyle`, for a piece whose
+   * style follows something that can change while it is on the table, as a character's size.
+   */
+  readonly snapStyleOf?: () => GridSnapStyle | undefined;
+  /**
    * Where the piece goes when it is snapped from a place, ahead of the table's own snap; nothing
    * leaves it to that. A piece moved over squares of several cells is put on a square this way.
    */
@@ -125,6 +130,7 @@ export class MovableDirective implements MovableInteractionContext {
   private transformCssOffset: string = '';
   private snapOrigin: { x: number; y: number } | undefined;
   private snapStyle: GridSnapStyle | undefined;
+  private snapStyleOf: MovableOption['snapStyleOf'];
   private snapToSquare: MovableOption['snapToSquare'];
 
   readonly option = input.required<MovableOption>({ alias: 'movable.option' });
@@ -213,6 +219,7 @@ export class MovableDirective implements MovableInteractionContext {
       if (opt.transformCssOffset != null) this.transformCssOffset = opt.transformCssOffset;
       this.snapOrigin = opt.snapOrigin;
       this.snapStyle = opt.snapStyle;
+      this.snapStyleOf = opt.snapStyleOf;
       this.snapToSquare = opt.snapToSquare;
       this.refreshOverlapRegistration();
       this.refreshObjectChangeListener();
@@ -947,7 +954,8 @@ export class MovableDirective implements MovableInteractionContext {
     const table = this.tableSelecter.viewTable;
     const effectiveGridSize = table?.gridSize ?? gridSize;
     const gridType = table?.gridType ?? GridType.SQUARE;
-    const snapStyle = this.snapStyle ?? table?.gridSnapStyle ?? GridSnapStyle.CENTER;
+    const ownStyle = this.snapStyleOf ? this.snapStyleOf() : this.snapStyle;
+    const snapStyle = ownStyle ?? table?.gridSnapStyle ?? GridSnapStyle.CENTER;
 
     if (isHexGrid(gridType)) {
       const originX = this.snapOrigin?.x ?? this.width / 2;
