@@ -96,6 +96,18 @@
           [placeholder]="'feature.media.cutInEditor.textPlaceholder' | transloco"
           [disabled]="!isEditable()"
         ></textarea>
+        <div class="flex items-center gap-1.5">
+          <button
+            type="button"
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm cursor-pointer border border-solid bg-transparent px-1.5 py-0.5 text-[11px] transition-[background,color] disabled:cursor-default disabled:opacity-50"
+            data-testid="cut-in-insert-speaker-name"
+            [disabled]="!isEditable()"
+            (click)="insertSpeakerName()"
+          >
+            {{ 'feature.media.cutInEditor.insertSpeakerName' | transloco }}
+          </button>
+          <span class="text-ui-dim text-[10px]">{{ 'feature.media.cutInEditor.speakerNameHint' | transloco }}</span>
+        </div>
 
         <div class="grid grid-cols-[3.6rem_minmax(0,1fr)] items-center gap-x-1.5 gap-y-1">
           <label class="text-ui-muted text-[11px]">{{ 'feature.media.cutInEditor.fontSize' | transloco }}</label>

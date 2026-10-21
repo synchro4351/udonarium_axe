@@ -27,6 +27,8 @@ async function makeSpeakerCutIn(page: Page): Promise<Locator> {
   await text.press('End');
   await text.pressSequentially('、参戦！');
   await expect(text).toHaveValue('{character}、参戦！');
+  // The per-letter look sits in the folded 文字ごと section.
+  await list.getByTestId('cut-in-letter-details').locator('summary').click();
   await list.getByTestId('cut-in-letter-motion').selectOption({ label: 'タイプ' });
   // Looping keeps the cut-in up until it is stopped, however slowly the checks run.
   await list.locator('cut-in-scene-editor input[name="cut-in-scene-loop"]').check();
