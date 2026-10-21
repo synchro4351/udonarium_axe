@@ -4,12 +4,12 @@ import { openPanel, waitAppReady } from './helpers';
 
 /** How opaque each letter of the text layer reading `text` is on the stage right now. */
 async function opacities(page: Page, text: string): Promise<number[]> {
-  const letters = page
-    .locator('cut-in-scene-editor')
-    .getByTestId('cut-in-letters')
-    .filter({ hasText: text })
-    .locator('[data-letter]');
-  return letters.evaluateAll((elements) => elements.map((element) => Number(getComputedStyle(element).opacity)));
+  return page.locator('cut-in-scene-editor').evaluate((root, wanted) => {
+    const lines = new Set([...root.querySelectorAll('[data-letter-rank]')].map((letter) => letter.parentElement!));
+    const layer = [...lines].find((line) => line.textContent === wanted);
+    if (!layer) return [];
+    return [...layer.querySelectorAll('[data-letter-rank]')].map((letter) => Number(getComputedStyle(letter).opacity));
+  }, text);
 }
 
 /** Holds the scene at a moment, as typing into the time field does. */
@@ -51,7 +51,7 @@ test('per-letter controls set the order, timing and exit the browser plays, and 
   await expect(editor.getByTestId('cut-in-letter-preset-fade')).toBeHidden();
   await details.locator('summary').click();
   await editor.getByTestId('cut-in-letter-preset-fade').click();
-  await expect(editor.getByTestId('cut-in-layer-letter-motion')).toHaveValue('fade');
+  await expect(editor.getByTestId('cut-in-letter-motion')).toHaveValue('fade');
 
   // A fade comes in where it rests, so it has no way in; without an exit, no exit length either.
   await expect(editor.getByTestId('cut-in-letterDirection')).toBeDisabled();

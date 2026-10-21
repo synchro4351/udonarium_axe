@@ -71,6 +71,34 @@ describe('CutInStageComponent', () => {
     return animate;
   }
 
+  it('keeps the letter order set on a layer whose letters come in by a preset motion', () => {
+    const animate = stubAnimate();
+    const scene = makeScene(1000);
+    addLayer(scene, {
+      kind: 'text',
+      text: 'AB',
+      letterMotion: 'fade',
+      letterOrder: 'reverse',
+      letterIntervalMs: 200,
+      letterDurationMs: 200,
+    } as Partial<CutInLayer>);
+
+    show(scene);
+
+    const framesOf = (letter: string) => {
+      const at = animate.mock.contexts.findIndex(
+        (element) =>
+          (element as HTMLElement).dataset?.['letterRank'] !== undefined &&
+          (element as HTMLElement).textContent === letter
+      );
+      return animate.mock.calls[at][0] as { offset: number; opacity: number }[];
+    };
+    const firstShown = (frames: { offset: number; opacity: number }[]) =>
+      Math.min(...frames.filter((frame) => frame.opacity > 0).map((frame) => frame.offset));
+    // From the end: B comes in first, A after it.
+    expect(firstShown(framesOf('B'))).toBeLessThan(firstShown(framesOf('A')));
+  });
+
   it('draws nothing without a scene', () => {
     show(null);
 
