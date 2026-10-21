@@ -16,7 +16,9 @@ import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { CoordinateService } from '@axe/application/input/coordinate.service';
 import { PointerCoordinate } from '@axe/application/input/pointer-device.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { BatchService } from '@axe/application/ui/batch.service';
+import { BillboardFacing, NOT_TURNED } from '@axe/application/ui/billboard-frame.service';
 import { callCursorMove, callHeartBeat } from '@axe/core/event/domain-events';
 import { Network } from '@axe/core/network/network';
 import { getPeerContexts, getPeerIds } from '@axe/core/network/peer-context-source';
@@ -25,6 +27,7 @@ import { ResettableTimeout } from '@axe/core/util/resettable-timeout';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole, roleBadgeClass, roleShortLabelKey } from '@axe/domain/peer/peer-role';
+import { BillboardDirective } from '@axe/ui/directives/billboard.directive';
 import { toTransformCss } from '@axe/ui/directives/movable-helpers';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 
@@ -33,7 +36,7 @@ import { SafePipe } from '@axe/ui/pipes/safe.pipe';
   selector: 'peer-cursor, [peer-cursor]',
   templateUrl: './peer-cursor.component.html',
   host: { class: 'block' },
-  imports: [NgClass, SafePipe],
+  imports: [BillboardDirective, NgClass, SafePipe],
 })
 export class PeerCursorComponent {
   private static readonly _sentLogoutIdentifiers = new Set<string>();
@@ -44,6 +47,7 @@ export class PeerCursorComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly objectStore = inject(ObjectStore);
+  private readonly tabletop = inject(TabletopService);
   private readonly t = inject(TRANSLATE_FN);
 
   readonly cursorElementRef = viewChild<ElementRef>('cursor');
@@ -67,6 +71,20 @@ export class PeerCursorComponent {
     this.objectChange.versionOf(this.cursor().identifier)();
     return roleBadgeClass(this.cursor().role);
   });
+
+  /**
+   * The faces the marker is drawn with. Along the table it stands up, with a back for a reader on
+   * the far side; seen from straight above a standing marker would be edge on, so it lies flat.
+   */
+  readonly faces = computed(() => (this.tabletop.mode2d() ? ['is-flat'] : ['is-front', 'is-back']));
+
+  /**
+   * How the marker is turned against the view. Lying flat, it is turned back by the view's own
+   * turn, so its point keeps pointing down the screen however the table is turned.
+   */
+  readonly facing = computed<BillboardFacing>(() =>
+    this.tabletop.mode2d() ? (rotation) => `rotateZ(${-(rotation?.z ?? 0)}deg)` : NOT_TURNED
+  );
 
   readonly name = computed(() => {
     this.objectChange.versionOf(this.cursor().identifier)();
