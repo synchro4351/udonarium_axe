@@ -947,7 +947,8 @@
           "slide": "Slide in",
           "wave": "Wave",
           "shake": "Shake",
-          "custom": "Custom"
+          "custom": "Custom",
+          "decode": "Decode"
         },
         "portraitSlot": "Show the player's portrait",
         "portraitSlotHint": "Played from chat, this shows the speaking character's portrait; otherwise this layer's own picture, or a silhouette.",

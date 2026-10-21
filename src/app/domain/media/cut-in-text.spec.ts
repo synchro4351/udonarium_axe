@@ -1,5 +1,6 @@
 import {
   CUT_IN_CHARACTER_FALLBACK,
+  decodedLetter,
   drawsLetters,
   LETTER_STAGGER_MS,
   letterControlTakesEffect,
@@ -328,6 +329,26 @@ describe('cut-in text', () => {
       expect(letterControlTakesEffect('letterEase', { letterMotion: 'pop' })).toBe(false);
       expect(letterControlTakesEffect('letterEase', { letterMotion: 'pop', letterExit: 'reverse' })).toBe(true);
       expect(letterControlTakesEffect('letterDurationMs', { letterMotion: 'custom' })).toBe(true);
+    });
+  });
+  describe('letters that decode', () => {
+    const settings = { letterIntervalMs: 100, letterDurationMs: 300 };
+
+    it('shows stray letters from the layer coming on until the letter’s turn has run, then the letter', () => {
+      const at = (ms: number, index = 0, letter = 'A') => decodedLetter(letter, index, ms, 1000, settings, 3);
+      expect(at(1000)).not.toBe('A');
+      expect(at(1000)).toMatch(/^[A-Z0-9#$%&@*+=?]$/);
+      expect(at(1299)).not.toBe('A');
+      expect(at(1300)).toBe('A');
+      // The next letter settles a gap later.
+      expect(at(1300, 1, 'B')).not.toBe('B');
+      expect(at(1400, 1, 'B')).toBe('B');
+    });
+
+    it('runs Japanese through kana, keeps a space, and shows the same stray letter to every screen', () => {
+      expect(decodedLetter('あ', 0, 0, 0, settings)).toMatch(/^[ア-ン]$/);
+      expect(decodedLetter(' ', 0, 0, 0, settings)).toBe(' ');
+      expect(decodedLetter('A', 0, 120, 0, settings)).toBe(decodedLetter('A', 0, 140, 0, settings));
     });
   });
 });

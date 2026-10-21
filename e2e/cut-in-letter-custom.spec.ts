@@ -43,3 +43,30 @@ test('brings each letter of a cut-in in from a pose of the layer’s own, blurre
   expect(first.transform).toMatch(/translate\((\d+(\.\d+)?)px/);
   expect(first.transform).toContain('rotate(');
 });
+
+test('runs each letter of a cut-in through stray letters before it settles, as a decoder does', async ({ page }) => {
+  await waitAppReady(page);
+  await openPanel(page, 'カットイン');
+  const list = page.locator('app-cut-in-list');
+  await expect(list).toBeVisible({ timeout: 10000 });
+  await list.locator('button[title="新しいカットインを作る"]').click();
+  await list.getByRole('tab', { name: 'シーン' }).click();
+  await list.locator('cut-in-scene-editor button', { hasText: '文字を足す' }).click();
+  await list.locator('cut-in-layer-properties textarea[name="cut-in-layer-text"]').fill('HELLO');
+  await list.getByTestId('cut-in-letter-details').locator('summary').click();
+  await list.getByTestId('cut-in-letter-motion').selectOption({ label: 'デコーダー' });
+  await list.getByTestId('cut-in-letterIntervalMs').fill('80');
+  await list.getByTestId('cut-in-letterDurationMs').fill('400');
+  await list.locator('cut-in-scene-editor input[name="cut-in-scene-loop"]').check();
+  await list.getByRole('tab', { name: '基本設定' }).click();
+  await list.locator('cut-in-editor button[title="自分だけ再生"]').click();
+
+  const stage = page.locator('app-cut-in-window app-cut-in-stage');
+  await expect(stage).toBeVisible({ timeout: 5000 });
+  // Scrambled at first, the stray letters changing as it runs.
+  const early = await stage.innerText();
+  expect(early.trim()).not.toBe('HELLO');
+  await expect.poll(async () => (await stage.innerText()).trim(), { timeout: 2000 }).not.toBe(early.trim());
+  // Every letter has settled once the last one's turn has run.
+  await expect.poll(async () => (await stage.innerText()).trim(), { timeout: 8000 }).toBe('HELLO');
+});

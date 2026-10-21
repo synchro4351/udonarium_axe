@@ -47,8 +47,10 @@ export function resolveCharacterName(text: string, name: string | null | undefin
  * - `slide`: they fade in one after another, gliding the last stretch into place
  * - `custom`: each comes from a pose of the layer's own choosing, along the curve it chooses, as a
  *   layer's own keyframes take it
+ * - `decode`: they run through stray letters where they stand and settle on the real one, one
+ *   after another, as a decoder does
  */
-export const CUT_IN_LETTER_MOTIONS = ['none', 'pop', 'wave', 'shake', 'fade', 'slide', 'custom'] as const;
+export const CUT_IN_LETTER_MOTIONS = ['none', 'pop', 'wave', 'shake', 'fade', 'slide', 'custom', 'decode'] as const;
 export type CutInLetterMotion = (typeof CUT_IN_LETTER_MOTIONS)[number];
 
 export function isCutInLetterMotion(value: unknown): value is CutInLetterMotion {
@@ -209,7 +211,7 @@ export function letterControlTakesEffect(
   key: keyof CutInLetterControls,
   layer: { letterMotion: string } & CutInLetterSettings
 ): boolean {
-  const enters = ENTERING_MOTIONS.includes(layer.letterMotion);
+  const enters = ENTERING_MOTIONS.includes(layer.letterMotion) || layer.letterMotion === 'decode';
   const leaves = letterSettingsOf(layer).letterExit !== 'none';
   switch (key) {
     case 'letterFromX':
@@ -420,6 +422,37 @@ export function letterPoseAt(
     }
   }
   return pose;
+}
+
+/** The stray letters a decoding Latin letter runs through. */
+const DECODE_LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&@*+=?';
+/** The stray letters a decoding letter of any other script runs through. */
+const DECODE_KANA = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+/** How often a decoding letter changes to another stray one. */
+export const DECODE_STEP_MS = 50;
+
+/**
+ * What a letter shows at a moment of the scene while its layer decodes: a stray letter, changing
+ * every `DECODE_STEP_MS`, from when the layer comes on until the letter's turn has run its length,
+ * then the letter itself. A space stays a space. The stray letters depend on the letter and the
+ * moment alone, so every screen shows the same.
+ */
+export function decodedLetter(
+  letter: string,
+  index: number,
+  ms: number,
+  startMs: number,
+  settings: CutInLetterSettings = {},
+  letterCount: number = index + 1
+): string {
+  if (letter.trim().length < 1) return letter;
+  const controls = letterSettingsOf(settings);
+  const rank = letterRank(index, letterCount, controls.letterOrder);
+  const settlesAt = startMs + rank * controls.letterIntervalMs + controls.letterDurationMs;
+  if (ms >= settlesAt) return letter;
+  const pool = /^[\x21-\x7e]$/.test(letter) ? DECODE_LATIN : DECODE_KANA;
+  const step = Math.floor(Math.max(0, ms - startMs) / DECODE_STEP_MS);
+  return pool[Math.floor(noise(index, step, 7) * pool.length)];
 }
 
 /** One frame of a letter's motion, from 0 to 1 along the scene. */

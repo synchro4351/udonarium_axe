@@ -42,7 +42,9 @@
                     <span>
                       @for (line of lines; track $index; let last = $last) {
                         @for (letter of line; track letter.rank) {
-                          <span class="inline-block" [attr.data-letter-rank]="letter.rank">{{ letter.text }}</span>
+                          <span class="inline-block" [attr.data-letter-rank]="letter.rank">{{
+                            shownLetter(layer, letter)
+                          }}</span>
                         }
                         @if (!last) {
                           <br />

@@ -42,6 +42,8 @@ import {
 } from '@axe/domain/media/cut-in-scene-timeline';
 import { type CutInSpeaker, PORTRAIT_SILHOUETTE_URL, withSpeakerName } from '@axe/domain/media/cut-in-speaker';
 import {
+  DECODE_STEP_MS,
+  decodedLetter,
   drawsLetters,
   isCutInLetterMotion,
   letterFrames as customLetterFrames,
@@ -166,8 +168,41 @@ export class CutInStageComponent {
     })
   );
 
+  /** Whether a shown text layer decodes, which is what the scene clock below is kept for. */
+  private readonly decodes = computed(() =>
+    this.layers().some((layer) => {
+      this.objectChange.versionOf(layer.identifier)();
+      return layer.kind === 'text' && layer.letterMotion === 'decode';
+    })
+  );
+
+  /**
+   * Where the scene's clock stands, for letters that change what they show rather than how they
+   * stand: run on a timer while playing, from where the shared clock stood, and the scrubber's
+   * place while still.
+   */
+  private readonly sceneClockMs = signal(0);
+
   constructor() {
     this.watchHostSize();
+
+    effect((onCleanup) => {
+      if (!this.decodes()) return;
+      if (!this.playing()) {
+        this.sceneClockMs.set(this.playheadMs());
+        return;
+      }
+      const startedAt = Date.now() - this.startOffsetMs();
+      const durationMs = untracked(this.durationMs);
+      const loops = untracked(this.loops);
+      const tick = () => {
+        const ms = Date.now() - startedAt;
+        this.sceneClockMs.set(loops && durationMs > 0 ? ms % durationMs : ms);
+      };
+      tick();
+      const timer = setInterval(tick, DECODE_STEP_MS);
+      onCleanup(() => clearInterval(timer));
+    });
 
     effect((onCleanup) => {
       if (!this.tellsTime()) return;
@@ -276,6 +311,13 @@ export class CutInStageComponent {
   protected textOf(layer: CutInLayer): string {
     const timed = usesClock(layer.text) ? withClock(layer.text, this.now(), this.endsAtMs()) : layer.text;
     return withSpeakerName(timed, this.speaker()?.name, this.t('feature.media.cutIn.unknownSpeaker'));
+  }
+
+  /** What one letter of a layer shows now: the letter, or a stray one while the layer decodes it. */
+  protected shownLetter(layer: CutInLayer, letter: PlacedLetter): string {
+    if (layer.letterMotion !== 'decode') return letter.text;
+    const count = this.letterLines.get(layer.identifier)?.lines.flat().length ?? letter.rank + 1;
+    return decodedLetter(letter.text, letter.rank, this.sceneClockMs(), layer.startMs, layer, count);
   }
 
   /**
