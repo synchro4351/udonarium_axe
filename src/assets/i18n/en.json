@@ -946,7 +946,8 @@
           "pop": "Pop",
           "slide": "Slide in",
           "wave": "Wave",
-          "shake": "Shake"
+          "shake": "Shake",
+          "custom": "Custom"
         },
         "portraitSlot": "Show the player's portrait",
         "portraitSlotHint": "Played from chat, this shows the speaking character's portrait; otherwise this layer's own picture, or a silhouette.",
@@ -990,6 +991,7 @@
         "letterExit_fade": "Fade",
         "letterExit_shrink": "Shrink",
         "letterExit_rise": "Float up",
+        "letterExit_reverse": "Back the way in",
         "letterIntervalMs": "Delay per letter (ms)",
         "letterDurationMs": "Letter motion (ms)",
         "letterExitDurationMs": "Exit length (ms)",
@@ -1001,7 +1003,14 @@
         "letterDirection_up": "Up",
         "letterDirection_down": "Down",
         "letterDirection_left": "Left",
-        "letterDirection_right": "Right"
+        "letterDirection_right": "Right",
+        "letterFromX": "Start offset across (letters)",
+        "letterFromY": "Start offset down (letters)",
+        "letterFromScale": "Start scale (×)",
+        "letterFromRotate": "Start rotation (deg)",
+        "letterFromOpacity": "Start opacity",
+        "letterFromBlur": "Start blur (px)",
+        "letterEase": "Letter easing"
       },
       "djDeck": {
         "open": "Open the DJ deck",

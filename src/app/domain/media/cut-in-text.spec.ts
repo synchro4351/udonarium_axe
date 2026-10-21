@@ -109,6 +109,14 @@ describe('cut-in text', () => {
         letterExit: 'none',
         letterExitDurationMs: 260,
         letterDirection: 'up',
+        // A custom letter comes from a letter below, unseen, along the keyframes' own default curve.
+        letterFromX: 0,
+        letterFromY: 1,
+        letterFromScale: 1,
+        letterFromRotate: 0,
+        letterFromOpacity: 0,
+        letterFromBlur: 0,
+        letterEase: 'outCubic',
       };
 
       expect(letterSettingsOf()).toEqual(defaults);
@@ -261,6 +269,65 @@ describe('cut-in text', () => {
       expect(frames(10)).toBeLessThanOrEqual(360);
       expect(frames(1000) * 1000).toBeLessThanOrEqual(40_000);
       expect(frames(1000)).toBeGreaterThanOrEqual(22);
+    });
+  });
+  describe('a letter coming from a pose of the layer’s own', () => {
+    const custom = {
+      letterFromX: -2,
+      letterFromY: 0.5,
+      letterFromScale: 3,
+      letterFromRotate: 90,
+      letterFromOpacity: 0,
+      letterFromBlur: 8,
+      letterEase: 'linear',
+      letterIntervalMs: 100,
+      letterDurationMs: 400,
+    };
+
+    it('starts from the chosen pose, measured in letters, and comes to rest along the chosen curve', () => {
+      const at = (ms: number, index = 0) => letterPoseAt('custom', index, 0, 40, ms, 1000, custom, 3);
+      expect(at(1000)).toEqual({ dx: -80, dy: 20, rotate: 90, scale: 3, opacity: 0, blur: 8 });
+      expect(at(1200)).toEqual({ dx: -40, dy: 10, rotate: 45, scale: 2, opacity: 0.5, blur: 4 });
+      expect(at(1400)).toEqual({ dx: 0, dy: 0, rotate: 0, scale: 1, opacity: 1 });
+      // The next letter starts its way in a gap later.
+      expect(at(1200, 1).dx).toBe(-60);
+    });
+
+    it('takes the letters back out the way they came, the last one gone as the layer goes', () => {
+      const leaving = { ...custom, letterExit: 'reverse', letterExitDurationMs: 200 };
+      const at = (ms: number) => letterPoseAt('custom', 0, 0, 40, ms, 0, leaving, 1, 2000);
+      expect(at(1700)).toMatchObject({ dx: 0, opacity: 1 });
+      expect(at(1900)).toMatchObject({ dx: -40, scale: 2, opacity: 0.5, blur: 4 });
+      expect(at(2000)).toMatchObject({ dx: -80, scale: 3, opacity: 0 });
+      // A motion that brings letters in leaves backwards too.
+      const fading = letterPoseAt(
+        'fade',
+        0,
+        0,
+        40,
+        1900,
+        0,
+        { letterExit: 'reverse', letterExitDurationMs: 200 },
+        1,
+        2000
+      );
+      expect(fading.opacity).toBeCloseTo(0.5);
+    });
+
+    it('writes a blur into every frame of a blurred letter, and none into one never blurred', () => {
+      const blurred = letterFrames('custom', 0, 0, 40, 0, 1000, custom, 1);
+      expect(blurred.every((frame) => frame.filter?.startsWith('blur('))).toBe(true);
+      expect(blurred[0].filter).toBe('blur(8px)');
+      expect(blurred.at(-1)?.filter).toBe('blur(0px)');
+      const sharp = letterFrames('custom', 0, 0, 40, 0, 1000, { ...custom, letterFromBlur: 0 }, 1);
+      expect(sharp.some((frame) => 'filter' in frame)).toBe(false);
+    });
+
+    it('opens its own settings only to a custom motion or a way back out', () => {
+      expect(letterControlTakesEffect('letterFromBlur', { letterMotion: 'custom' })).toBe(true);
+      expect(letterControlTakesEffect('letterEase', { letterMotion: 'pop' })).toBe(false);
+      expect(letterControlTakesEffect('letterEase', { letterMotion: 'pop', letterExit: 'reverse' })).toBe(true);
+      expect(letterControlTakesEffect('letterDurationMs', { letterMotion: 'custom' })).toBe(true);
     });
   });
 });

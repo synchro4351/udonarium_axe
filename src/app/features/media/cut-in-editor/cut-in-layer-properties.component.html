@@ -841,6 +841,34 @@
               [disabled]="!isEditable() || !letterControlEnabled(time.key)"
             />
           }
+          @for (from of letterFroms; track from.key) {
+            <label class="text-ui-muted text-[11px]">{{ 'feature.media.cutInEditor.' + from.key | transloco }}</label>
+            <input
+              class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm box-border w-full border border-solid px-1.5 py-1 text-right text-[12px] outline-none disabled:opacity-50"
+              [name]="'cut-in-layer-' + from.key"
+              [attr.data-testid]="'cut-in-' + from.key"
+              type="number"
+              [min]="from.min"
+              [max]="from.max"
+              [step]="from.step"
+              [ngModel]="letterControls[from.key]"
+              (ngModelChange)="setLetterControl(from.key, $event)"
+              [disabled]="!isEditable() || !letterControlEnabled(from.key)"
+            />
+          }
+          <label class="text-ui-muted text-[11px]">{{ 'feature.media.cutInEditor.letterEase' | transloco }}</label>
+          <select
+            class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm box-border w-full border border-solid p-1 text-[12px] outline-none disabled:opacity-50"
+            name="cut-in-layer-letterEase"
+            data-testid="cut-in-letterEase"
+            [ngModel]="letterControls.letterEase"
+            (ngModelChange)="setLetterControl('letterEase', $event)"
+            [disabled]="!isEditable() || !letterControlEnabled('letterEase')"
+          >
+            @for (easing of easings; track easing) {
+              <option [value]="easing">{{ 'feature.media.cutInEditor.easing' + easing | transloco }}</option>
+            }
+          </select>
         </div>
       </details>
     }

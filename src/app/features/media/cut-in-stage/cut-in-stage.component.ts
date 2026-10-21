@@ -374,7 +374,11 @@ export class CutInStageComponent {
       customSettings.letterTiltMode !== 'alternate' ||
       customSettings.letterExit !== 'none' ||
       customSettings.letterDirection !== 'up';
-    if (customMotion && drawsLetters(layer) && (customMotion === 'none' || hasCustomControls)) {
+    if (
+      customMotion &&
+      drawsLetters(layer) &&
+      (customMotion === 'none' || customMotion === 'custom' || hasCustomControls)
+    ) {
       const window = layerWindow(layer, durationMs);
       const timing = motion ? letterTimingOf(motion, layer.letterStaggerMs, layer.letterDurationMs) : null;
       // The layer's settings are read off its synced properties, which sit on its prototype and so

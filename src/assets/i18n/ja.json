@@ -946,7 +946,8 @@
           "pop": "弾む",
           "slide": "すべり込む",
           "wave": "波打つ",
-          "shake": "震える"
+          "shake": "震える",
+          "custom": "カスタム"
         },
         "portraitSlot": "再生した人の立ち絵を出す",
         "portraitSlotHint": "チャットから再生したときは発言したキャラの立ち絵を出します。いないときはこの層の画像を、それもなければ影絵を出します。",
@@ -990,6 +991,7 @@
         "letterExit_fade": "消える",
         "letterExit_shrink": "縮む",
         "letterExit_rise": "上へ浮かぶ",
+        "letterExit_reverse": "来た道を戻る",
         "letterIntervalMs": "1字ごとの遅れ（ms）",
         "letterDurationMs": "1字の動き（ms）",
         "letterExitDurationMs": "退場の長さ（ms）",
@@ -1001,7 +1003,14 @@
         "letterDirection_up": "上へ",
         "letterDirection_down": "下へ",
         "letterDirection_left": "左へ",
-        "letterDirection_right": "右へ"
+        "letterDirection_right": "右へ",
+        "letterFromX": "開始位置・横（文字数）",
+        "letterFromY": "開始位置・縦（文字数）",
+        "letterFromScale": "開始の大きさ（倍）",
+        "letterFromRotate": "開始の回転（度）",
+        "letterFromOpacity": "開始の不透明度",
+        "letterFromBlur": "開始のぼかし（px）",
+        "letterEase": "1字の補間"
       },
       "djDeck": {
         "open": "DJデッキを開く",
