@@ -16,6 +16,14 @@ import { Network } from '@axe/core/index';
 import { BUFF_VIEW_MODES } from '@axe/domain/character/buff-view-mode';
 import { heldDiceOf } from '@axe/domain/character/character-dice';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import {
+  IMAGE_AURA_COLORS,
+  IMAGE_EFFECT_TOGGLES,
+  ImageAura,
+  readImageEffects,
+  toggleImageEffect,
+  withImageAura,
+} from '@axe/domain/character/image-effect';
 import { DataElement, DataElementFieldType } from '@axe/domain/data/data-element';
 import { sheetElementsOf } from '@axe/domain/data/data-element-templates';
 import { decodeRangeShapeField, RangeShapeFieldValue } from '@axe/domain/data/range-shape-field';
@@ -359,6 +367,37 @@ export function buildGameCharacterContextMenuModel(
         ]
       : []),
   ];
+  const effects = readImageEffects(char.imageEffects);
+  const setEffects = (next: string) => {
+    char.imageEffects = next;
+    SoundEffect.play(PresetSound.sweep);
+  };
+  const imageEffectActions: ContextMenuAction[] = [
+    ...IMAGE_EFFECT_TOGGLES.map((toggle) => ({
+      name: (effects.toggles.has(toggle) ? '✔ ' : '') + t(`feature.character.contextMenu.imageEffect.${toggle}`),
+      action: () => setEffects(toggleImageEffect(char.imageEffects, toggle)),
+    })),
+    {
+      name: t('feature.character.contextMenu.imageEffect.aura'),
+      action: undefined,
+      subActions: [null, ...(Object.keys(IMAGE_AURA_COLORS) as ImageAura[])].map((aura) => ({
+        name:
+          (effects.aura === aura ? '✔ ' : '') + t(`feature.character.contextMenu.imageEffect.aura_${aura ?? 'none'}`),
+        action: () => setEffects(withImageAura(char.imageEffects, aura)),
+      })),
+    },
+    ContextMenuSeparator,
+    {
+      name: t('feature.character.contextMenu.imageEffect.reset'),
+      action: () => setEffects(''),
+      enabled: char.imageEffects.length > 0,
+    },
+  ];
+  lookToggles.push({
+    name: t('feature.character.contextMenu.imageEffect.title'),
+    action: undefined,
+    subActions: imageEffectActions,
+  });
   const handlingToggles: ContextMenuAction[] = [
     char.hideInventory
       ? {

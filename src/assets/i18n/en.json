@@ -2301,7 +2301,28 @@
         "conditionGroup": "State of the piece",
         "splitParts": "Split into parts",
         "unlinkPart": "Unlink this part",
-        "linkSelected": "Link selected characters"
+        "linkSelected": "Link selected characters",
+        "imageEffect": {
+          "title": "Image effects",
+          "flip": "Flip",
+          "ghost": "Ghostly (blur)",
+          "silhouette": "Silhouette",
+          "sepia": "Sepia",
+          "dark": "Darken",
+          "flash": "Flash red",
+          "shake": "Shake",
+          "aura": "Aura",
+          "aura_none": "None",
+          "aura_black": "Black",
+          "aura_blue": "Blue",
+          "aura_green": "Green",
+          "aura_cyan": "Cyan",
+          "aura_red": "Red",
+          "aura_magenta": "Magenta",
+          "aura_yellow": "Yellow",
+          "aura_white": "White",
+          "reset": "Remove all effects"
+        }
       },
       "panel": {
         "sheet": "Character sheet",

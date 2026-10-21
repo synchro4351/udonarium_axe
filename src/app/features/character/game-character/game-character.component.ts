@@ -69,6 +69,12 @@ import { BUFF_BADGES_PER_ROW, BuffBadge, toBuffBadges } from '@axe/domain/charac
 import { BUFF_VIEW_LABEL_KEYS, type BuffViewMode, nextBuffViewMode } from '@axe/domain/character/buff-view-mode';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import {
+  ImageEffectStyle,
+  imageEffectStyle,
+  PLAIN_IMAGE_STYLE,
+  readImageEffects,
+} from '@axe/domain/character/image-effect';
+import {
   DEFAULT_LABEL_PLACEMENT,
   LabelPlacement,
   labelPlacementOf,
@@ -771,6 +777,13 @@ export class GameCharacterComponent {
     this.objectChange.versionOf(char.identifier)();
     return char.komaImageHeight;
   });
+  /** How the effects laid over the picture are drawn on it. */
+  readonly imageEffect = computed<ImageEffectStyle>(() => {
+    const char = this.gameCharacter();
+    if (!char) return PLAIN_IMAGE_STYLE;
+    this.objectChange.versionOf(char.identifier)();
+    return imageEffectStyle(readImageEffects(char.imageEffects));
+  });
   readonly specifyKomaImageFlag = computed(() => {
     const char = this.gameCharacter();
     if (!char) return false;
@@ -893,6 +906,7 @@ export class GameCharacterComponent {
     billboardFacing: this.pieceImageFacing,
     squarePoster: true,
     fitInCell: this.fitsImageInCell,
+    mirrored: computed(() => this.imageEffect().scale !== null),
   });
 
   /** The piece's saved rectangle in a shared picture, whether or not it remains linked. */

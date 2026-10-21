@@ -94,6 +94,27 @@ describe('pieceImageView', () => {
     billboard.set(false);
     expect(image.pieceFacing()(atRest)).toBe(supersampleTransform({ factor: 1, anchor: 'bottom', inner: '' }));
   });
+
+  it('mirrors the picture last, inside the turn to the camera, whether or not it billboards', () => {
+    const mirrored = signal(true);
+    const image = pieceImageView({
+      imageUrl: url,
+      isPoster: poster,
+      sizePx,
+      specifiedHeightPx: specified,
+      billboardEnabled: billboard,
+      billboardFacing,
+      mirrored,
+    });
+    const turned = supersampleTransform({ factor: 1, anchor: 'bottom', inner: 'rotateX(50deg)' });
+    expect(image.pieceFacing()(atRest)).toBe(`${turned} scaleX(-1)`);
+    expect(image.komaFacing()(atRest)).toMatch(/rotateX\(50deg\).* scaleX\(-1\)$/);
+
+    billboard.set(false);
+    expect(image.pieceFacing()(atRest)).toMatch(/ scaleX\(-1\)$/);
+    mirrored.set(false);
+    expect(image.pieceFacing()(atRest)).not.toContain('scaleX');
+  });
 });
 
 describe('a picture held to the ground its piece stands on', () => {

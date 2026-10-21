@@ -2301,7 +2301,28 @@
         "conditionGroup": "コマの状態",
         "splitParts": "部位に分ける",
         "unlinkPart": "部位の連動を外す",
-        "linkSelected": "連動させる"
+        "linkSelected": "連動させる",
+        "imageEffect": {
+          "title": "画像効果",
+          "flip": "左右反転",
+          "ghost": "半透明（ぼかし）",
+          "silhouette": "黒塗り",
+          "sepia": "セピア",
+          "dark": "暗く",
+          "flash": "赤く点滅",
+          "shake": "揺らす",
+          "aura": "オーラ",
+          "aura_none": "なし",
+          "aura_black": "黒",
+          "aura_blue": "青",
+          "aura_green": "緑",
+          "aura_cyan": "水色",
+          "aura_red": "赤",
+          "aura_magenta": "紫",
+          "aura_yellow": "黄",
+          "aura_white": "白",
+          "reset": "効果をすべて外す"
+        }
       },
       "panel": {
         "sheet": "キャラクターシート",
