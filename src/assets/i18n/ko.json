@@ -3552,6 +3552,7 @@
         "inviteIncludePassword": "암호를 포함",
         "inviteCopy": "복사",
         "inviteCopied": "복사했습니다",
+        "inviteCopyFailed": "복사하지 못했습니다. 선택된 링크를 Ctrl+C(Mac은 ⌘+C)로 복사해 주세요",
         "inviteOverlay": "방송용(투명 화면)",
         "inviteOverlayHint": "OBS의 브라우저 소스에 붙일 URL로 만듭니다. 판도 패널도 내보내지 않고 발언과 차례만 투명한 배경 위에 표시합니다",
         "connectionMode": "접속",

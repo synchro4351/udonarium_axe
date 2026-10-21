@@ -42,6 +42,71 @@ describe('PeerMenuComponent', () => {
     (PeerCursor as unknown as Record<string, unknown>)['peerIdMap'] = new Map();
   });
 
+  describe('copying the invitation link', () => {
+    type CopyControls = {
+      inviteLink: () => string;
+      copyInviteLink(field?: HTMLInputElement): Promise<void>;
+      isInviteCopied: () => boolean;
+      isInviteCopyFailed: () => boolean;
+    };
+    let view: CopyControls;
+    let field: HTMLInputElement;
+    let execCommand: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      view = component as unknown as CopyControls;
+      view.inviteLink = () => 'https://example.com/?id=room';
+      field = document.createElement('input');
+      field.value = 'https://example.com/?id=room';
+      document.body.appendChild(field);
+      execCommand = vi.fn(() => true);
+      Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand });
+    });
+
+    afterEach(() => {
+      field.remove();
+      Reflect.deleteProperty(document, 'execCommand');
+      vi.restoreAllMocks();
+    });
+
+    function clipboard(writeText: (text: string) => Promise<void>): void {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    }
+
+    it('copies through the clipboard where the browser allows it', async () => {
+      const writeText = vi.fn(() => Promise.resolve());
+      clipboard(writeText);
+
+      await view.copyInviteLink(field);
+
+      expect(writeText).toHaveBeenCalledWith('https://example.com/?id=room');
+      expect(execCommand).not.toHaveBeenCalled();
+      expect(view.isInviteCopied()).toBe(true);
+    });
+
+    it('falls back to copying the selected field when the clipboard refuses, as Chrome does unfocused', async () => {
+      clipboard(() => Promise.reject(new DOMException('Document is not focused.', 'NotAllowedError')));
+
+      await view.copyInviteLink(field);
+
+      expect(execCommand).toHaveBeenCalledWith('copy');
+      expect(view.isInviteCopied()).toBe(true);
+      expect(view.isInviteCopyFailed()).toBe(false);
+    });
+
+    it('leaves the link selected and asks for Ctrl+C when neither way works', async () => {
+      clipboard(() => Promise.reject(new Error('denied')));
+      execCommand.mockReturnValue(false);
+
+      await view.copyInviteLink(field);
+
+      expect(view.isInviteCopied()).toBe(false);
+      expect(view.isInviteCopyFailed()).toBe(true);
+      expect(field.selectionStart).toBe(0);
+      expect(field.selectionEnd).toBe(field.value.length);
+    });
+  });
+
   it('should create', () => {
     expect(component).toBeTruthy();
   });
