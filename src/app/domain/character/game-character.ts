@@ -74,6 +74,8 @@ export class GameCharacter extends OwnedTabletopObject {
   @SyncVar() rotate: number = 0;
   @SyncVar() roll: number = 0;
   @SyncVar() isDropShadow: boolean = false;
+  /** Effects laid over the picture, as `image-effect.ts` writes them; empty for none. */
+  @SyncVar() imageEffects: string = '';
 
   @SyncVar() hideInventory: boolean = false;
   /** Kept out of the order of turns. The piece is still listed, and still carries its buffs. */

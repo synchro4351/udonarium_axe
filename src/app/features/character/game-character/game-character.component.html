@@ -163,7 +163,8 @@
                   multiAnglePiecePedestalRotation() +
                   ' scaleY(0.5) translateY(-150%) translateY(' +
                   size() * gridSize +
-                  'px)',
+                  'px)' +
+                  (imageEffect().scale ? ' scaleX(-1)' : ''),
               }"
               [src]="imageFile().url | safe: 'resourceUrl'"
             />
@@ -180,7 +181,8 @@
                   multiAnglePiecePedestalRotation() +
                   ' scaleY(0.5) translateY(-150%) translateY(' +
                   size() * gridSize +
-                  'px)',
+                  'px)' +
+                  (imageEffect().scale ? ' scaleX(-1)' : ''),
               }"
               [src]="imageFile().url | safe: 'resourceUrl'"
             />
@@ -198,7 +200,8 @@
                   multiAnglePiecePedestalRotation() +
                   ' scaleY(0.5) translateY(-150%) translateY(' +
                   size() * gridSize +
-                  'px)',
+                  'px)' +
+                  (imageEffect().scale ? ' scaleX(-1)' : ''),
               }"
               [src]="imageFile().url | safe: 'resourceUrl'"
             />
@@ -594,6 +597,10 @@
                       right: 'auto',
                     }"
                     [style.mask-image]="inWater()?.mask ?? null"
+                    [style.filter]="imageEffect().filter"
+                    [style.--image-effect-filter]="imageEffect().filter"
+                    [style.opacity]="imageEffect().opacity"
+                    [style.animation]="imageEffect().animation"
                     (load)="imageView.onImageLoad($event)"
                     [src]="imageFile().url | safe: 'resourceUrl'"
                   />
@@ -634,6 +641,10 @@
                       marginRight: imageView.supersampleInset(),
                     }"
                     [style.mask-image]="inWater()?.mask ?? null"
+                    [style.filter]="imageEffect().filter"
+                    [style.--image-effect-filter]="imageEffect().filter"
+                    [style.opacity]="imageEffect().opacity"
+                    [style.animation]="imageEffect().animation"
                     (load)="imageView.onImageLoad($event)"
                     [src]="imageFile().url | safe: 'resourceUrl'"
                   />
@@ -669,6 +680,10 @@
                       marginRight: imageView.supersampleInset(),
                     }"
                     [style.mask-image]="inWater()?.mask ?? null"
+                    [style.filter]="imageEffect().filter"
+                    [style.--image-effect-filter]="imageEffect().filter"
+                    [style.opacity]="imageEffect().opacity"
+                    [style.animation]="imageEffect().animation"
                     (load)="imageView.onImageLoad($event)"
                     [src]="imageFile().url | safe: 'resourceUrl'"
                   />
@@ -1067,6 +1082,11 @@
     [ngClass]="fit"
     data-testid="part-picture"
     [style.clip-path]="partClip()"
+    [style.filter]="imageEffect().filter"
+    [style.--image-effect-filter]="imageEffect().filter"
+    [style.scale]="imageEffect().scale"
+    [style.opacity]="imageEffect().opacity"
+    [style.animation]="imageEffect().animation"
     (load)="imageView.onImageLoad($event)"
     [src]="imageFile().url | safe: 'resourceUrl'"
     alt=""

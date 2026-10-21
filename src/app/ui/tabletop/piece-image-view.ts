@@ -12,6 +12,11 @@ export interface PieceImageViewInputs {
   squarePoster?: boolean;
   /** Whether the picture is held to the ground the piece stands on, rather than towering over it. */
   fitInCell?: Signal<boolean>;
+  /**
+   * Whether the picture is turned the other way round. It is done last, inside the turn to the
+   * camera, so the picture is mirrored where it stands rather than across the table's own turn.
+   */
+  mirrored?: Signal<boolean>;
 }
 
 export interface PieceImageView {
@@ -71,6 +76,7 @@ export function pieceImageView(inputs: PieceImageViewInputs): PieceImageView {
 
   /** What the picture is turned by, which is nothing at all where the piece does not billboard. */
   const inner = (): BillboardFacing => (inputs.billboardEnabled() ? inputs.billboardFacing() : NOT_TURNED);
+  const mirror = (): string => (inputs.mirrored?.() ? ' scaleX(-1)' : '');
 
   return {
     naturalSize: natural.asReadonly(),
@@ -83,12 +89,15 @@ export function pieceImageView(inputs: PieceImageViewInputs): PieceImageView {
       const factor = supersample();
       const outer = `translateX(-50%) translateX(${inputs.sizePx() / 2}px)`;
       const facing = inner();
-      return (rotation) => supersampleTransform({ factor, anchor: 'bottom', outer, inner: facing(rotation) });
+      const mirrored = mirror();
+      return (rotation) =>
+        supersampleTransform({ factor, anchor: 'bottom', outer, inner: facing(rotation) }) + mirrored;
     }),
     pieceFacing: computed<BillboardFacing>(() => {
       const factor = supersample();
       const facing = inner();
-      return (rotation) => supersampleTransform({ factor, anchor: 'bottom', inner: facing(rotation) });
+      const mirrored = mirror();
+      return (rotation) => supersampleTransform({ factor, anchor: 'bottom', inner: facing(rotation) }) + mirrored;
     }),
     posterTransform: computed(() => supersampleTransform({ factor: supersample(), anchor: 'center' })),
     onImageLoad(event: Event): void {

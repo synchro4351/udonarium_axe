@@ -2301,7 +2301,28 @@
         "conditionGroup": "말의 상태",
         "splitParts": "부위로 나누기",
         "unlinkPart": "부위 연동 해제",
-        "linkSelected": "연동하기"
+        "linkSelected": "연동하기",
+        "imageEffect": {
+          "title": "이미지 효과",
+          "flip": "좌우 반전",
+          "ghost": "반투명(흐림)",
+          "silhouette": "검게 칠하기",
+          "sepia": "세피아",
+          "dark": "어둡게",
+          "flash": "빨갛게 깜빡임",
+          "shake": "흔들기",
+          "aura": "오라",
+          "aura_none": "없음",
+          "aura_black": "검정",
+          "aura_blue": "파랑",
+          "aura_green": "초록",
+          "aura_cyan": "하늘색",
+          "aura_red": "빨강",
+          "aura_magenta": "자주",
+          "aura_yellow": "노랑",
+          "aura_white": "하양",
+          "reset": "효과 모두 해제"
+        }
       },
       "panel": {
         "sheet": "캐릭터 시트",

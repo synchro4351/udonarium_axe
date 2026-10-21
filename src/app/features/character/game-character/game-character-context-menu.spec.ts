@@ -26,6 +26,7 @@ interface MutableChar {
   altitude: number;
   isAltitudeIndicate: boolean;
   isDropShadow: boolean;
+  imageEffects: string;
   hideInventory: boolean;
   noTurn: boolean;
   nonTalkFlag: boolean;
@@ -47,6 +48,7 @@ function makeChar(overrides: Partial<MutableChar> = {}): MutableChar {
     altitude: 0,
     isAltitudeIndicate: false,
     isDropShadow: false,
+    imageEffects: '',
     hideInventory: false,
     noTurn: false,
     nonTalkFlag: false,
@@ -451,6 +453,41 @@ describe('buildGameCharacterContextMenu()', () => {
       t
     );
     expect(names(groupOf(hidden, '表示と扱い')).slice(0, 2)).toEqual(['☑ 名前を隠す', '☑ バフを隠す']);
+  });
+
+  it('lays effects over the picture from the display group, ticked by what is on', () => {
+    const char = makeChar({ imageEffects: 'flip' });
+    const menu = buildGameCharacterContextMenu(char as unknown as GameCharacter, 50, makeService(), callbacks(), t);
+    const effects = groupOf(groupOf(menu, '表示と扱い'), '画像効果');
+    expect(names(effects)).toEqual([
+      '✔ 左右反転',
+      '半透明（ぼかし）',
+      '黒塗り',
+      'セピア',
+      '暗く',
+      '赤く点滅',
+      '揺らす',
+      'オーラ',
+      '',
+      '効果をすべて外す',
+    ]);
+
+    effects.find((entry) => entry.name === '揺らす')!.action!();
+    expect(char.imageEffects).toBe('flip shake');
+    groupOf(effects, 'オーラ').find((entry) => entry.name === '赤')!.action!();
+    expect(char.imageEffects).toBe('flip shake aura:red');
+    effects.find((entry) => entry.name === '効果をすべて外す')!.action!();
+    expect(char.imageEffects).toBe('');
+
+    const plain = buildGameCharacterContextMenu(
+      makeChar() as unknown as GameCharacter,
+      50,
+      makeService(),
+      callbacks(),
+      t
+    );
+    const reset = groupOf(groupOf(plain, '表示と扱い'), '画像効果').find((entry) => entry.name === '効果をすべて外す');
+    expect(reset?.enabled).toBe(false);
   });
 
   it('offers the game master alone a toggle for whether it is a non-player character', () => {
