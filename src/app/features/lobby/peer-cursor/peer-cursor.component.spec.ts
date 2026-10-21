@@ -1,7 +1,10 @@
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { BatchService } from '@axe/application/ui/batch.service';
+import { BillboardFrameService } from '@axe/application/ui/billboard-frame.service';
 import { Network } from '@axe/core/network/network';
 import { localDispatch } from '@axe/core/network/network-messaging';
 import { ObjectStore } from '@axe/core/sync/object-store';
@@ -65,6 +68,40 @@ describe('PeerCursorComponent', () => {
     expect(shown()).toContain('あとの名前');
     expect(shown()).not.toContain('まえの名前');
     other.destroy();
+  });
+
+  describe('the marker of another seat', () => {
+    function showOther(): HTMLElement {
+      beMyself('me');
+      const other = new PeerCursor();
+      other.userId = 'other';
+      other.initialize();
+      fixture.componentRef.setInput('cursor', other);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    const facesOf = (host: HTMLElement) =>
+      [...host.querySelectorAll('[data-face]')].map((face) => face.getAttribute('data-face'));
+
+    it('stands up with a back while the table is seen along it, and is never turned', () => {
+      const host = showOther();
+
+      expect(facesOf(host)).toEqual(['is-front', 'is-back']);
+      TestBed.inject(BillboardFrameService).apply({ x: 50, y: 0, z: 30 });
+      expect((host.querySelector('[data-testid="peer-cursor-facing"]') as HTMLElement).style.transform).toBe('');
+    });
+
+    it('lies flat seen from straight above, turned back by the turn of the view', () => {
+      Object.defineProperty(TestBed.inject(TabletopService), 'mode2d', { value: signal(true) });
+      const host = showOther();
+
+      expect(facesOf(host)).toEqual(['is-flat']);
+      TestBed.inject(BillboardFrameService).apply({ x: 0, y: 0, z: 30 });
+      expect((host.querySelector('[data-testid="peer-cursor-facing"]') as HTMLElement).style.transform).toBe(
+        'rotateZ(-30deg)'
+      );
+    });
   });
 
   it('tears down without throwing when no timer was set', () => {
