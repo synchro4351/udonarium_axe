@@ -946,7 +946,9 @@
           "pop": "통통",
           "slide": "미끄러져 들어옴",
           "wave": "물결",
-          "shake": "떨림"
+          "shake": "떨림",
+          "custom": "사용자 지정",
+          "decode": "디코더"
         },
         "portraitSlot": "재생한 사람의 스탠딩 표시",
         "portraitSlotHint": "채팅에서 재생하면 발언한 캐릭터의 스탠딩을 표시합니다. 없으면 이 레이어의 이미지를, 그것도 없으면 실루엣을 표시합니다.",
@@ -990,6 +992,7 @@
         "letterExit_fade": "사라지기",
         "letterExit_shrink": "축소",
         "letterExit_rise": "위로 떠오르기",
+        "letterExit_reverse": "들어온 길로 돌아감",
         "letterIntervalMs": "글자별 지연 (ms)",
         "letterDurationMs": "글자 동작 시간 (ms)",
         "letterExitDurationMs": "퇴장 길이 (ms)",
@@ -1001,7 +1004,14 @@
         "letterDirection_up": "위로",
         "letterDirection_down": "아래로",
         "letterDirection_left": "왼쪽으로",
-        "letterDirection_right": "오른쪽으로"
+        "letterDirection_right": "오른쪽으로",
+        "letterFromX": "시작 위치·가로(글자 수)",
+        "letterFromY": "시작 위치·세로(글자 수)",
+        "letterFromScale": "시작 크기(배)",
+        "letterFromRotate": "시작 회전(도)",
+        "letterFromOpacity": "시작 불투명도",
+        "letterFromBlur": "시작 흐림(px)",
+        "letterEase": "글자 보간"
       },
       "djDeck": {
         "open": "DJ 덱 열기",

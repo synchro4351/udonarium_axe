@@ -21,7 +21,7 @@ const STEP_MS = 50;
 /** A moment this close to the fullest counts as full, so an overshoot that settles later does not win. */
 const NEARLY_FULL = 0.98;
 /** The letter motions that bring each letter in from nothing, rather than moving it all along. */
-const LETTERS_COME_IN: readonly CutInLetterMotion[] = ['pop', 'fade', 'slide'];
+const LETTERS_COME_IN: readonly CutInLetterMotion[] = ['pop', 'fade', 'slide', 'custom'];
 
 /**
  * The first moment a scene shows close to the most of itself.

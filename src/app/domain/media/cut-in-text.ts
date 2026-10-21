@@ -1,4 +1,5 @@
 import { graphemesOf } from '@axe/domain/chat/emoji-only-text';
+import { type CutInEasingName, easingAt, readCutInEasing } from '@axe/domain/media/cubic-bezier';
 
 /**
  * What a text layer says once it is played, and how its letters move.
@@ -44,8 +45,12 @@ export function resolveCharacterName(text: string, name: string | null | undefin
  * - `shake`: they tremble, each on its own
  * - `fade`: they fade in one after another where they rest
  * - `slide`: they fade in one after another, gliding the last stretch into place
+ * - `custom`: each comes from a pose of the layer's own choosing, along the curve it chooses, as a
+ *   layer's own keyframes take it
+ * - `decode`: they run through stray letters where they stand and settle on the real one, one
+ *   after another, as a decoder does
  */
-export const CUT_IN_LETTER_MOTIONS = ['none', 'pop', 'wave', 'shake', 'fade', 'slide'] as const;
+export const CUT_IN_LETTER_MOTIONS = ['none', 'pop', 'wave', 'shake', 'fade', 'slide', 'custom', 'decode'] as const;
 export type CutInLetterMotion = (typeof CUT_IN_LETTER_MOTIONS)[number];
 
 export function isCutInLetterMotion(value: unknown): value is CutInLetterMotion {
@@ -81,8 +86,11 @@ const MIN_FRAMES = 30;
 export const CUT_IN_LETTER_ORDERS = ['forward', 'reverse', 'center'] as const;
 /** How a tilt leans the letters: every other one the other way, or all the same way. */
 export const CUT_IN_LETTER_TILTS = ['alternate', 'uniform'] as const;
-/** How the letters leave, one after another in the same order, before the layer goes. */
-export const CUT_IN_LETTER_EXITS = ['none', 'fade', 'shrink', 'rise'] as const;
+/**
+ * How the letters leave, one after another in the same order, before the layer goes. `reverse` takes
+ * each back out the way it came in.
+ */
+export const CUT_IN_LETTER_EXITS = ['none', 'fade', 'shrink', 'rise', 'reverse'] as const;
 /** Which way a letter travels as it comes in. Only the motions that bring letters in use it. */
 export const CUT_IN_LETTER_DIRECTIONS = ['up', 'down', 'left', 'right'] as const;
 export type CutInLetterOrder = (typeof CUT_IN_LETTER_ORDERS)[number];
@@ -95,6 +103,19 @@ export const LETTER_TIMING_LIMITS = {
   letterIntervalMs: { min: 0, max: 1000 },
   letterDurationMs: { min: 50, max: 3000 },
   letterExitDurationMs: { min: 50, max: 3000 },
+} as const;
+
+/**
+ * The bounds of the pose a `custom` letter comes from: how far off, in letters, how large, how far
+ * turned, how much shown and how blurred.
+ */
+export const LETTER_FROM_LIMITS = {
+  letterFromX: { min: -10, max: 10 },
+  letterFromY: { min: -10, max: 10 },
+  letterFromScale: { min: 0, max: 10 },
+  letterFromRotate: { min: -1080, max: 1080 },
+  letterFromOpacity: { min: 0, max: 1 },
+  letterFromBlur: { min: 0, max: 40 },
 } as const;
 
 /**
@@ -111,6 +132,13 @@ export interface CutInLetterSettings {
   letterExit?: string;
   letterExitDurationMs?: number;
   letterDirection?: string;
+  letterFromX?: number;
+  letterFromY?: number;
+  letterFromScale?: number;
+  letterFromRotate?: number;
+  letterFromOpacity?: number;
+  letterFromBlur?: number;
+  letterEase?: string;
 }
 
 /** The detailed letter controls, read safely. */
@@ -122,6 +150,16 @@ export interface CutInLetterControls {
   letterExit: CutInLetterExit;
   letterExitDurationMs: number;
   letterDirection: CutInLetterDirection;
+  /** Where a `custom` letter comes from, in letters off its place, across and down. */
+  letterFromX: number;
+  letterFromY: number;
+  letterFromScale: number;
+  letterFromRotate: number;
+  letterFromOpacity: number;
+  /** How blurred a `custom` letter starts, in pixels. */
+  letterFromBlur: number;
+  /** The curve a `custom` letter comes in along. */
+  letterEase: CutInEasingName;
 }
 
 /**
@@ -138,11 +176,29 @@ export function letterSettingsOf(settings: CutInLetterSettings = {}): CutInLette
     letterExit: oneOf(CUT_IN_LETTER_EXITS, settings.letterExit, 'none'),
     letterExitDurationMs: bounded(settings.letterExitDurationMs, POP_MS, limits.letterExitDurationMs),
     letterDirection: oneOf(CUT_IN_LETTER_DIRECTIONS, settings.letterDirection, 'up'),
+    letterFromX: bounded(settings.letterFromX, 0, LETTER_FROM_LIMITS.letterFromX),
+    letterFromY: bounded(settings.letterFromY, 1, LETTER_FROM_LIMITS.letterFromY),
+    letterFromScale: bounded(settings.letterFromScale, 1, LETTER_FROM_LIMITS.letterFromScale),
+    letterFromRotate: bounded(settings.letterFromRotate, 0, LETTER_FROM_LIMITS.letterFromRotate),
+    letterFromOpacity: bounded(settings.letterFromOpacity, 0, LETTER_FROM_LIMITS.letterFromOpacity),
+    letterFromBlur: bounded(settings.letterFromBlur, 0, LETTER_FROM_LIMITS.letterFromBlur),
+    letterEase: readCutInEasing(settings.letterEase),
   };
 }
 
+/** The settings only a `custom` letter motion, or a `reverse` exit, reads. */
+export const CUSTOM_LETTER_CONTROLS = [
+  'letterFromX',
+  'letterFromY',
+  'letterFromScale',
+  'letterFromRotate',
+  'letterFromOpacity',
+  'letterFromBlur',
+  'letterEase',
+] as const;
+
 /** The motions that bring each letter in, one after another. */
-const ENTERING_MOTIONS: readonly string[] = ['pop', 'fade', 'slide'];
+const ENTERING_MOTIONS: readonly string[] = ['pop', 'fade', 'slide', 'custom'];
 
 /**
  * Whether a detailed control changes anything for the layer's motion and exit as they stand.
@@ -155,9 +211,17 @@ export function letterControlTakesEffect(
   key: keyof CutInLetterControls,
   layer: { letterMotion: string } & CutInLetterSettings
 ): boolean {
-  const enters = ENTERING_MOTIONS.includes(layer.letterMotion);
+  const enters = ENTERING_MOTIONS.includes(layer.letterMotion) || layer.letterMotion === 'decode';
   const leaves = letterSettingsOf(layer).letterExit !== 'none';
   switch (key) {
+    case 'letterFromX':
+    case 'letterFromY':
+    case 'letterFromScale':
+    case 'letterFromRotate':
+    case 'letterFromOpacity':
+    case 'letterFromBlur':
+    case 'letterEase':
+      return layer.letterMotion === 'custom' || letterSettingsOf(layer).letterExit === 'reverse';
     case 'letterDirection':
       return layer.letterMotion === 'pop' || layer.letterMotion === 'slide';
     case 'letterDurationMs':
@@ -267,6 +331,39 @@ export interface LetterPose {
   rotate: number;
   scale: number;
   opacity: number;
+  /** How blurred, in pixels; only a `custom` letter is ever blurred. */
+  blur?: number;
+}
+
+/**
+ * Lays onto `pose` where a letter is that has come `done` of the way in, from 0 to 1. Run backwards
+ * it takes the letter out the way it came.
+ */
+function enteringPose(
+  motion: CutInLetterMotion,
+  done: number,
+  sizePx: number,
+  controls: CutInLetterControls,
+  pose: LetterPose
+): void {
+  if (motion === 'custom') {
+    const along = easingAt(controls.letterEase, done);
+    const off = 1 - along;
+    pose.dx += controls.letterFromX * sizePx * off;
+    pose.dy += controls.letterFromY * sizePx * off;
+    pose.rotate += controls.letterFromRotate * off;
+    pose.scale *= controls.letterFromScale + (1 - controls.letterFromScale) * along;
+    pose.opacity *= Math.min(1, Math.max(0, controls.letterFromOpacity + (1 - controls.letterFromOpacity) * along));
+    const blur = controls.letterFromBlur * off;
+    if (blur > 0) pose.blur = (pose.blur ?? 0) + blur;
+    return;
+  }
+  pose.scale *= motion === 'pop' ? (done === 0 ? 0 : backOut(done)) : 1;
+  pose.opacity *= motion === 'pop' ? Math.min(1, done * 3) : done;
+  const distance = motion === 'fade' ? 0 : (1 - done) * sizePx * 0.3;
+  if (controls.letterDirection === 'left') pose.dx += distance;
+  else if (controls.letterDirection === 'right') pose.dx -= distance;
+  else pose.dy += controls.letterDirection === 'down' ? -distance : distance;
 }
 
 /**
@@ -300,14 +397,9 @@ export function letterPoseAt(
   };
   const since = ms - startMs;
 
-  if (motion === 'pop' || motion === 'fade' || motion === 'slide') {
+  if (ENTERING_MOTIONS.includes(motion)) {
     const done = Math.min(1, Math.max(0, (since - rank * controls.letterIntervalMs) / controls.letterDurationMs));
-    pose.scale = motion === 'pop' ? (done === 0 ? 0 : backOut(done)) : 1;
-    pose.opacity = motion === 'pop' ? Math.min(1, done * 3) : done;
-    const distance = motion === 'fade' ? 0 : (1 - done) * sizePx * 0.3;
-    if (controls.letterDirection === 'left') pose.dx = distance;
-    else if (controls.letterDirection === 'right') pose.dx = -distance;
-    else pose.dy = controls.letterDirection === 'down' ? -distance : distance;
+    enteringPose(motion, done, sizePx, controls, pose);
   } else if (motion === 'wave') {
     pose.dy = -Math.sin((Math.max(0, since) / WAVE_PERIOD_MS) * Math.PI * 2 - rank * WAVE_SHIFT) * sizePx * 0.12;
   } else if (motion === 'shake') {
@@ -320,11 +412,47 @@ export function letterPoseAt(
     const exit = exitWindow(rank, letterCount, controls, startMs, endMs);
     const progress =
       exit.durationMs > 0 ? Math.min(1, Math.max(0, (ms - exit.fromMs) / exit.durationMs)) : Number(ms >= endMs);
-    pose.opacity *= 1 - progress;
-    if (controls.letterExit === 'shrink') pose.scale *= 1 - progress;
-    if (controls.letterExit === 'rise') pose.dy -= progress * sizePx * 0.5;
+    if (controls.letterExit === 'reverse') {
+      // Back out the way it came; a motion that brings nothing in leaves as `custom` would.
+      enteringPose(ENTERING_MOTIONS.includes(motion) ? motion : 'custom', 1 - progress, sizePx, controls, pose);
+    } else {
+      pose.opacity *= 1 - progress;
+      if (controls.letterExit === 'shrink') pose.scale *= 1 - progress;
+      if (controls.letterExit === 'rise') pose.dy -= progress * sizePx * 0.5;
+    }
   }
   return pose;
+}
+
+/** The stray letters a decoding Latin letter runs through. */
+const DECODE_LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&@*+=?';
+/** The stray letters a decoding letter of any other script runs through. */
+const DECODE_KANA = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+/** How often a decoding letter changes to another stray one. */
+export const DECODE_STEP_MS = 50;
+
+/**
+ * What a letter shows at a moment of the scene while its layer decodes: a stray letter, changing
+ * every `DECODE_STEP_MS`, from when the layer comes on until the letter's turn has run its length,
+ * then the letter itself. A space stays a space. The stray letters depend on the letter and the
+ * moment alone, so every screen shows the same.
+ */
+export function decodedLetter(
+  letter: string,
+  index: number,
+  ms: number,
+  startMs: number,
+  settings: CutInLetterSettings = {},
+  letterCount: number = index + 1
+): string {
+  if (letter.trim().length < 1) return letter;
+  const controls = letterSettingsOf(settings);
+  const rank = letterRank(index, letterCount, controls.letterOrder);
+  const settlesAt = startMs + rank * controls.letterIntervalMs + controls.letterDurationMs;
+  if (ms >= settlesAt) return letter;
+  const pool = /^[\x21-\x7e]$/.test(letter) ? DECODE_LATIN : DECODE_KANA;
+  const step = Math.floor(Math.max(0, ms - startMs) / DECODE_STEP_MS);
+  return pool[Math.floor(noise(index, step, 7) * pool.length)];
 }
 
 /** One frame of a letter's motion, from 0 to 1 along the scene. */
@@ -332,7 +460,14 @@ export type CutInLetterFrame = {
   offset: number;
   transform: string;
   opacity: number;
+  /** The blur, for a letter blurred at some point of its motion; absent for one never blurred. */
+  filter?: string;
 };
+
+/** The pose's blur as a CSS filter. */
+export function letterFilter(pose: LetterPose): string {
+  return `blur(${Math.round((pose.blur ?? 0) * 100) / 100}px)`;
+}
 
 /** A pose as the CSS transform that puts a letter there. */
 export function letterTransform(pose: LetterPose): string {
@@ -382,13 +517,15 @@ export function letterFrames(
   for (const moment of [startMs, ...exact, endMs]) {
     if (moment >= 0 && moment <= durationMs) moments.add(moment);
   }
-  const frames: CutInLetterFrame[] = [];
-  for (const moment of [...moments].sort((a, b) => a - b)) {
-    const offset = moment / durationMs;
-    const now = pose(moment);
-    frames.push({ offset, transform: letterTransform(now), opacity: now.opacity });
-  }
-  return frames;
+  const poses = [...moments].sort((a, b) => a - b).map((moment) => ({ moment, pose: pose(moment) }));
+  // A blur is written into every frame or none, so the browser has a filter to run between them.
+  const blurs = poses.some((each) => (each.pose.blur ?? 0) > 0);
+  return poses.map(({ moment, pose: now }) => ({
+    offset: moment / durationMs,
+    transform: letterTransform(now),
+    opacity: now.opacity,
+    ...(blurs ? { filter: letterFilter(now) } : {}),
+  }));
 }
 
 function tiltOf(tiltDeg: number): number {

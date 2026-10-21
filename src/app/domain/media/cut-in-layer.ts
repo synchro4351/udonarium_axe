@@ -115,6 +115,14 @@ export class CutInLayer extends ObjectNode {
   @SyncVar() letterExit: string = 'none';
   @SyncVar() letterExitDurationMs: number = 260;
   @SyncVar() letterDirection: string = 'up';
+  /** The pose a `custom` letter comes from, read through `letterSettingsOf` as the others are. */
+  @SyncVar() letterFromX: number = 0;
+  @SyncVar() letterFromY: number = 1;
+  @SyncVar() letterFromScale: number = 1;
+  @SyncVar() letterFromRotate: number = 0;
+  @SyncVar() letterFromOpacity: number = 0;
+  @SyncVar() letterFromBlur: number = 0;
+  @SyncVar() letterEase: string = 'outCubic';
 
   // kind: fill
   @SyncVar() fillShape: CutInFillShape = 'linear';

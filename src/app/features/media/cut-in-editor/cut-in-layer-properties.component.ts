@@ -39,6 +39,7 @@ import {
 } from '@axe/domain/media/cut-in-letter-motion';
 import { SPEAKER_NAME_TOKEN } from '@axe/domain/media/cut-in-speaker';
 import {
+  CUSTOM_LETTER_CONTROLS,
   CUT_IN_LETTER_DIRECTIONS,
   CUT_IN_LETTER_EXITS,
   CUT_IN_LETTER_MOTIONS,
@@ -47,6 +48,7 @@ import {
   type CutInLetterControls,
   type CutInLetterSettings,
   isCutInLetterMotion,
+  LETTER_FROM_LIMITS,
   LETTER_TIMING_LIMITS,
   letterControlTakesEffect,
   letterSettingsOf,
@@ -113,6 +115,17 @@ export class CutInLayerPropertiesComponent {
     key,
     ...LETTER_TIMING_LIMITS[key],
   }));
+  /** Where a `custom` letter comes from, each with its range and how finely it is set. */
+  readonly letterFroms = (
+    [
+      ['letterFromX', 0.1],
+      ['letterFromY', 0.1],
+      ['letterFromScale', 0.1],
+      ['letterFromRotate', 5],
+      ['letterFromOpacity', 0.1],
+      ['letterFromBlur', 1],
+    ] as const
+  ).map(([key, step]) => ({ key, step, ...LETTER_FROM_LIMITS[key] }));
   readonly maxLetterTiltDeg = MAX_LETTER_TILT_DEG;
   readonly fontOptions = CUT_IN_FONT_OPTIONS;
   readonly easings = CUT_IN_EASING_NAMES;
@@ -524,7 +537,7 @@ export class CutInLayerPropertiesComponent {
   }
 
   /** Whether a detailed letter control can be changed and still have an effect. */
-  letterControlEnabled(key: keyof CutInLetterControls): boolean {
+  letterControlEnabled(key: keyof CutInLetterControls | (typeof CUSTOM_LETTER_CONTROLS)[number]): boolean {
     const layer = this.layer();
     if (!layer || !this.isEditable()) return false;
     this.objectChange.versionOf(layer.identifier)();
