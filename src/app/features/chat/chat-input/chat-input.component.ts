@@ -41,7 +41,13 @@ import { portraitNameOf } from '@axe/domain/character/character-portrait';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatBubbleColors, chatBubbleOf, chatColorOf, DEFAULT_CHAT_COLOR } from '@axe/domain/chat/chat-color';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
-import { ChatOutgoing, composeChatOutgoing, composeStampOutgoing, OutgoingStamp } from '@axe/domain/chat/chat-outgoing';
+import {
+  ChatOutgoing,
+  ChatSpeakAs,
+  composeChatOutgoing,
+  composeStampOutgoing,
+  OutgoingStamp,
+} from '@axe/domain/chat/chat-outgoing';
 import { paletteLineText, suggestPaletteLines } from '@axe/domain/chat/chat-palette-suggestion';
 import { previewTextOf } from '@axe/domain/chat/chat-stamp-text';
 import {
@@ -73,6 +79,13 @@ import { ChatComposeService } from '@axe/features/chat/chat-compose.service';
 import { ChatInputDiceBotHelper } from '@axe/features/chat/chat-input/chat-input-dicebot';
 import { allowsChat } from '@axe/features/chat/chat-input/chat-input-helpers';
 import { ChatInputHistory } from '@axe/features/chat/chat-input/chat-input-history';
+import {
+  partsOfGroup,
+  SpeakerChoice,
+  speakerChoices,
+  WHOLE_GROUP_PREFIX,
+  wholeGroupOf,
+} from '@axe/features/chat/chat-input/chat-speakers';
 import { StampPickerService } from '@axe/features/chat/stamp/stamp-picker.service';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
 import { PortraitChoice, PortraitPickerComponent } from '@axe/ui/components/portrait-picker/portrait-picker.component';
@@ -245,6 +258,70 @@ export class ChatInputComponent {
   set sendFrom(sendFrom: string) {
     this._sendFrom.set(sendFrom);
     this.sendFromChange.emit(sendFrom);
+  }
+
+  /** The group of linked parts spoken for as a whole, through its first part; null for one piece. */
+  private readonly wholeGroup = signal<string | null>(null);
+  /** The linked parts spoken as so far, which stay in the speaker list beside their group. */
+  private readonly spokenAsParts = signal<ReadonlySet<string>>(new Set());
+
+  /** The group spoken for as a whole, while the piece spoken from still belongs to it. */
+  readonly speakingWhole = computed<string | null>(() => {
+    const group = this.wholeGroup();
+    if (!group) return null;
+    this.objectChange.versionOf(this._sendFrom())();
+    const piece = this.objectStore.get(this._sendFrom());
+    return piece instanceof GameCharacter && piece.partGroup === group ? group : null;
+  });
+
+  /** The speaker list, with each creature of linked parts on one line until its parts are used. */
+  readonly speakerChoices = computed<SpeakerChoice[]>(() =>
+    speakerChoices(this.gameCharacters(), this.spokenAsParts(), this.speakingWhole() ? '' : this._sendFrom())
+  );
+
+  /** What the speaker list shows as chosen: the whole group, or the piece spoken as. */
+  get speakerValue(): string {
+    const group = this.speakingWhole();
+    return group ? WHOLE_GROUP_PREFIX + group : this.sendFrom;
+  }
+  set speakerValue(value: string) {
+    const group = wholeGroupOf(value);
+    if (group) {
+      const first = partsOfGroup(this.gameCharacters(), group)[0];
+      if (!first) return;
+      this.wholeGroup.set(group);
+      this.sendFrom = first.identifier;
+      return;
+    }
+    this.wholeGroup.set(null);
+    this.sendFrom = value;
+    const piece = this.objectStore.get(value);
+    if (piece instanceof GameCharacter && piece.partGroup) {
+      this.spokenAsParts.update((spoken) => new Set([...spoken, value]));
+    }
+  }
+
+  /** The parts of the creature being spoken for, to pick one from; empty for an ordinary piece. */
+  readonly speakerParts = computed<GameCharacter[]>(() => {
+    this.objectChange.versionOf(this._sendFrom())();
+    const piece = this.objectStore.get(this._sendFrom());
+    if (!(piece instanceof GameCharacter) || !piece.partGroup) return [];
+    return partsOfGroup(this.gameCharacters(), piece.partGroup);
+  });
+
+  /** Speaks as one part of the creature being spoken for, or as the whole of it for an empty pick. */
+  protected pickSpeakerPart(identifier: string): void {
+    const piece = this.objectStore.get(this.sendFrom);
+    if (!(piece instanceof GameCharacter) || !piece.partGroup) return;
+    this.speakerValue = identifier ? identifier : WHOLE_GROUP_PREFIX + piece.partGroup;
+  }
+
+  /** Who the line is said as when the whole group speaks: its name and the picture it was cut from. */
+  private speakAsNow(): ChatSpeakAs | undefined {
+    if (!this.speakingWhole()) return undefined;
+    const piece = this.objectStore.get(this.sendFrom);
+    if (!(piece instanceof GameCharacter)) return undefined;
+    return { name: piece.partGroupName.trim() || piece.name, imageIdentifier: piece.partGroupImage };
   }
 
   readonly sendToInput = input('', { alias: 'sendTo' });
@@ -731,6 +808,11 @@ export class ChatInputComponent {
    * `ImageFile.Empty` when there is none.
    */
   get imageFile(): ImageFile {
+    const whole = this.speakAsNow();
+    if (whole?.imageIdentifier) {
+      const image = this.imageStorage.get(whole.imageIdentifier);
+      if (image) return image;
+    }
     if (this.selectedPortrait) {
       const image = this.imageStorage.get(this.selectedPortrait.value as string);
       return image ? image : ImageFile.Empty;
@@ -912,6 +994,7 @@ export class ChatInputComponent {
       quoteOf: this.quoteTarget()?.identifier ?? '',
       toTicker: this.showsTickerSwitch() && this.sendsToTicker(),
       ...(stamp ? { stamp } : {}),
+      speakAs: this.speakAsNow(),
     };
     DiceBot.gameSystemForLineAsync(this.gameType, draft.text).then((gameSystem) => {
       this.chat.emit(composeChatOutgoing({ ...draft, gameSystem }));
@@ -977,6 +1060,7 @@ export class ChatInputComponent {
           portraitIndex: this.portraitIndex,
           color: this.selectChatColor,
           bubbles: this.chatBubbles(this.colorSelectNo()),
+          speakAs: this.speakAsNow(),
         },
         stampId,
         words

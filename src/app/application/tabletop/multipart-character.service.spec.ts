@@ -191,6 +191,8 @@ describe('MultipartCharacterService', () => {
       expect([head.partGroupName, head.partName, tail.partName]).toEqual(['Wyrm', 'Head', 'Tail']);
       expect(decodePartRegion(head.partRegion)).toEqual({ x: 0, y: 0, width: 0.5, height: 1, aspect: 1.5 });
       expect(decodePartRegion(tail.partRegion)?.x).toBe(0.5);
+      // The whole creature speaks with the picture the parts were cut from.
+      expect([head.partGroupImage, tail.partGroupImage]).toEqual([source.identifier, source.identifier]);
       for (const part of parts) {
         expect(part.identifier).not.toBe(original.identifier);
         expect(String(hp(part).currentValue)).toBe('150');

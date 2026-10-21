@@ -149,7 +149,8 @@ describe('ChatWindowComponent', () => {
         '',
         0,
         '#000000',
-        { light: '', dark: '' }
+        { light: '', dark: '' },
+        undefined
       );
       expect(tab.chatMessages.map((message) => message.sentStamp)).toEqual(['sfx:creepy']);
     } finally {

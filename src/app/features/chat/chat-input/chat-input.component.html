@@ -28,16 +28,36 @@
       <ng-select
         name="send-from"
         class="ud-select chat-select chat-select--from"
-        [(ngModel)]="sendFrom"
+        [(ngModel)]="speakerValue"
         [clearable]="false"
       >
         @if (!onlyCharacters()) {
           <ng-option [value]="myPeer.identifier">{{ myPeer.name }}{{ 'feature.chat.input.you' | transloco }}</ng-option>
         }
-        @for (gameCharacter of gameCharacters(); track gameCharacter.identifier) {
-          <ng-option [value]="gameCharacter.identifier">{{ gameCharacter.name }}</ng-option>
+        @for (speaker of speakerChoices(); track speaker.value) {
+          <ng-option [value]="speaker.value">{{ speaker.label }}</ng-option>
         }
       </ng-select>
+      @if (speakerParts(); as parts) {
+        @if (parts.length > 0) {
+          <select
+            class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm max-w-28 border border-solid px-1 py-0.5 text-[12px]"
+            name="send-from-part"
+            data-testid="chat-input-speaker-part"
+            [title]="'feature.chat.input.speakerPartHint' | transloco"
+            (change)="pickSpeakerPart($any($event.target).value)"
+          >
+            <option value="" [selected]="speakingWhole() !== null">
+              {{ 'feature.chat.input.speakerWhole' | transloco }}
+            </option>
+            @for (part of parts; track part.identifier) {
+              <option [value]="part.identifier" [selected]="speakingWhole() === null && part.identifier === sendFrom">
+                {{ part.partName || part.name }}
+              </option>
+            }
+          </select>
+        }
+      }
       <span class="text-ui-muted flex-none text-[11px] leading-none @max-[320px]:hidden">▶</span>
       <ng-select name="send-to" class="ud-select chat-select chat-select--to" [(ngModel)]="sendTo" [clearable]="false">
         <ng-option [value]="''">{{ 'feature.chat.input.everyone' | transloco }}</ng-option>

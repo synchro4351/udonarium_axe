@@ -732,7 +732,8 @@ export class ChatWindowComponent {
         value.quoteOf,
         { light: value.messBubbleLight ?? '', dark: value.messBubbleDark ?? '' },
         undefined,
-        value.stamp
+        value.stamp,
+        value.speakAs
       );
       if (value.toTicker) this.chatTickerSelection.showMessage(sent.identifier);
     }

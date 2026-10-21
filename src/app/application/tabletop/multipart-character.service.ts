@@ -157,6 +157,7 @@ export class MultipartCharacterService {
         part.partGroupName = group;
         part.partName = selections[i].name;
         part.partRegion = encodePartRegion(selections[i], image.naturalWidth, image.naturalHeight);
+        part.partGroupImage = identifier;
         const slot = part.imageSourceElement;
         if (!slot) throw new Error('Unavailable');
         slot.value = stored[i];

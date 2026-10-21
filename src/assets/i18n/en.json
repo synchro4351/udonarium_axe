@@ -3826,7 +3826,9 @@
         "sendToTickerHint": "Also run this line around the edge of the screen",
         "tools": "Input settings",
         "myDice": "My Dice",
-        "stamp": "Send a stamp (with what you have typed, if anything)"
+        "stamp": "Send a stamp (with what you have typed, if anything)",
+        "speakerWhole": "Whole",
+        "speakerPartHint": "Speak as one part. \"Whole\" speaks under the name and picture from before it was split"
       },
       "tab": {
         "unnamedCharacter": "Unnamed character",
