@@ -5,24 +5,17 @@ import { openFabMenu, waitAppReady } from './helpers';
 test('stamp panel and chat behave in a real browser', async ({ page }) => {
   await waitAppReady(page);
 
-  await page.getByTestId('chat-stamp-button').click();
+  // The writing tools open the emoji and syntax picker; a press anywhere else puts it away.
+  // Sending stamps themselves is covered by chat-stamps.spec on the official stamp picker.
+  const tools = page.getByTestId('chat-writing-tools');
   const picker = page.locator('chat-stamp-picker');
-  await expect(picker).toBeVisible();
-  await picker.getByRole('tab', { name: /プリセット/ }).click();
-  await expect(picker.getByTestId('chat-stamp-choice')).toHaveCount(10);
-  await picker.getByTestId('chat-stamp-choice').first().click();
-  const sentStamp = page.locator('chat-message [data-testid="chat-message-stamp"]').last();
-  await expect(sentStamp).toBeVisible();
-  expect((await sentStamp.boundingBox())?.height).toBeLessThanOrEqual(80);
-
-  // A press anywhere else puts the picker away.
-  await page.getByTestId('chat-stamp-button').click();
+  await tools.click();
   await expect(picker).toBeVisible();
   await page.locator('textarea.chat-input').click();
   await expect(picker).toBeHidden();
 
   // The syntax tab writes into the box and sends nothing.
-  await page.getByTestId('chat-stamp-button').click();
+  await tools.click();
   await picker.getByRole('tab', { name: /特殊記法/ }).click();
   await picker.locator('[data-syntax="ruby"]').click();
   const textarea = page.locator('textarea.chat-input');
@@ -34,7 +27,7 @@ test('stamp panel and chat behave in a real browser', async ({ page }) => {
   await textarea.press('ArrowDown');
   await textarea.press('Enter');
   await expect(textarea).toHaveValue('');
-  await expect(page.locator('chat-message [data-testid="chat-message-stamp"]')).toHaveCount(2);
+  await expect(page.locator('chat-message [data-testid="chat-message-stamp"]')).toHaveCount(1);
 
   await textarea.fill('👍🎉');
   await textarea.press('Enter');
@@ -42,7 +35,7 @@ test('stamp panel and chat behave in a real browser', async ({ page }) => {
 
   await openFabMenu(page);
   await page.getByTestId('fab-entry-media').click();
-  await page.getByTestId('fab-entry-stamp').click();
+  await page.getByTestId('fab-entry-stampPacks').click();
   const panel = page.getByTestId('stamp-pack-list');
   await expect(panel.getByTestId('stamp-builtin-item')).toHaveCount(10);
   await panel.getByTestId('stamp-pack-create').click();

@@ -12,6 +12,8 @@ export interface MovableLike {
   posY: number;
   /** Turns the short glide a piece uses for moves made elsewhere on or off. */
   setAnimatedTransition?(enabled: boolean): void;
+  /** Writes where the piece stands to its object now, rather than when its update timer runs. */
+  commitPosition?(): void;
 }
 
 interface FollowerSnapshot {
@@ -159,6 +161,15 @@ export class MultiMovableService {
       if (obj) result.push(obj);
     }
     return result;
+  }
+
+  /**
+   * Writes where each follower in the current group drag stands to its object now, so what follows
+   * a put-down (riders carried, pieces bound to it) reads the place it was moved to.
+   */
+  commitFollowers(leaderIdentifier: string): void {
+    if (!leaderIdentifier || this.leaderId !== leaderIdentifier) return;
+    for (const f of this.followers) f.ref.commitPosition?.();
   }
 
   private clear(): void {

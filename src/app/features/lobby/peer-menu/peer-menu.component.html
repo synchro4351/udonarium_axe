@@ -172,18 +172,25 @@
         </div>
         <div class="flex items-center gap-1.5">
           <input
+            #inviteField
             class="min-w-0 flex-1 text-[0.7rem]"
             readonly
+            data-testid="invite-link-field"
             [value]="inviteLink()"
             (focus)="selectInviteLink($event)"
           />
-          <button class="shrink-0 text-xs" (click)="copyInviteLink()">
+          <button class="shrink-0 text-xs" data-testid="invite-link-copy" (click)="copyInviteLink(inviteField)">
             {{
               (isInviteCopied() ? 'feature.lobby.peerMenu.inviteCopied' : 'feature.lobby.peerMenu.inviteCopy')
                 | transloco
             }}
           </button>
         </div>
+        @if (isInviteCopyFailed()) {
+          <p class="m-0 text-[0.7rem] text-(--ui-danger)" data-testid="invite-link-copy-failed" role="alert">
+            {{ 'feature.lobby.peerMenu.inviteCopyFailed' | transloco }}
+          </p>
+        }
         @if (isServerTransport()) {
           @if (!amGameMaster()) {
             <p class="m-0 text-[0.7rem] text-(--ui-text-dim)">

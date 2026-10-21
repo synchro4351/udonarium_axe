@@ -16,7 +16,7 @@ test('both ruby forms render safely and the picker inserts ASCII notation', asyn
   await expect(literal).toContainText('1 < 2 > 0');
   await expect(literal.locator('ruby rt')).toHaveText('img src=x onerror=alert(1)');
   await expect(literal.locator('ruby img, script')).toHaveCount(0);
-  await page.getByTestId('chat-stamp-button').click();
+  await page.getByTestId('chat-writing-tools').click();
   const picker = page.locator('chat-stamp-picker');
   await picker.getByRole('tab', { name: /特殊記法/ }).click();
   await picker.locator('[data-syntax="ruby"]').click();

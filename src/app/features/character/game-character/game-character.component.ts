@@ -45,6 +45,7 @@ import { BuffViewPreferenceService } from '@axe/application/ui/buff-view-prefere
 import { ContextMenuAction } from '@axe/application/ui/context-menu.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { MobileLayoutService } from '@axe/application/ui/mobile-layout.service';
+import { MultiMovableService } from '@axe/application/ui/multi-movable.service';
 import { buildOverlapContextMenu } from '@axe/application/ui/overlap-context-menu';
 import { PanelOption, PanelService } from '@axe/application/ui/panel.service';
 import { PieceContextMenuService } from '@axe/application/ui/piece-context-menu.service';
@@ -343,6 +344,7 @@ export class GameCharacterComponent {
   private readonly rolePermission = inject(RolePermissionService);
   private readonly engagementZones = inject(EngagementZoneService);
   private readonly ride = inject(RideService);
+  private readonly multiMovable = inject(MultiMovableService);
   private readonly snackbar = inject(SnackbarService);
   private readonly disclosureService = inject(DisclosureService);
   private readonly visionService = inject(VisionService);
@@ -2227,8 +2229,16 @@ export class GameCharacterComponent {
   private settlePutDown() {
     const character = this.gameCharacter();
     if (!character) return;
+    // Pieces moved along with this one, its linked parts or the rest of a selection, were put down
+    // too: a mount among them carries its rider, as it does when dragged itself.
+    const movedWith = this.multiMovable
+      .followerTabletopObjectsFor(character.identifier)
+      .filter((object): object is GameCharacter => object instanceof GameCharacter);
+    this.multiMovable.commitFollowers(character.identifier);
     this.engagementZones.carryBound(character);
+    for (const other of movedWith) this.engagementZones.carryBound(other);
     this.ride.afterPutDown(character);
+    for (const other of movedWith) this.ride.afterPutDown(other);
     this.triggerFire.putDown(character);
     this.engagementZones.offerFight(character);
     this.ride.offerRide(character);

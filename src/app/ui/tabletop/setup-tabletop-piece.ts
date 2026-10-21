@@ -21,13 +21,17 @@ function applyMovableOption<T extends TabletopObject>(
   piece: T,
   opts: MovableSetup<T>
 ): void {
-  const snapStyle = typeof opts.snapStyle === 'function' ? opts.snapStyle(piece) : opts.snapStyle;
+  const styleOf = opts.snapStyle;
+  const snapStyle = typeof styleOf === 'function' ? styleOf(piece) : styleOf;
   const snapOrigin = opts.snapOrigin?.(piece);
   signal.set({
     tabletopObject: piece,
     transformCssOffset: opts.transformCssOffset,
     colideLayers: opts.collideLayers ? [...opts.collideLayers] : undefined,
     snapStyle,
+    // A style read from the piece is read again at each snap, since what it is read from (as a
+    // character's size) can change without the piece itself being replaced.
+    snapStyleOf: typeof styleOf === 'function' ? () => styleOf(piece) : undefined,
     snapOrigin,
     snapToSquare: opts.snapToSquare ? (at) => opts.snapToSquare!(piece, at) : undefined,
     layerName: opts.layerName,

@@ -2,6 +2,16 @@ import { expect, Page, test } from '@playwright/test';
 
 import { openTableContextMenu, revealMenuEntry, waitAppReady } from './helpers';
 
+/** Card editing is for the game master unless the room lets players edit cards (a tyoitashi room rule). */
+async function becomeGm(page: Page) {
+  await page
+    .locator('ui-panel')
+    .filter({ hasText: '接続情報' })
+    .getByRole('button', { name: /^\s*GM\s*$/ })
+    .click();
+  await expect(page.locator('app-gm-toolbar button').first()).toBeVisible({ timeout: 10000 });
+}
+
 async function createCardStack(page: Page) {
   const menu = await openTableContextMenu(page);
   await (await revealMenuEntry(page, menu, 'トランプの山札を作成')).click();
@@ -40,6 +50,7 @@ test.describe('card handling for trading card games', () => {
   });
 
   test('adds an item on the sheet of a card', async ({ page }) => {
+    await becomeGm(page);
     await createCardStack(page);
     await drawOne(page);
 

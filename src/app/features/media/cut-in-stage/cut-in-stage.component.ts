@@ -345,8 +345,10 @@ export class CutInStageComponent {
     if (customMotion && drawsLetters(layer) && (customMotion === 'none' || hasCustomControls)) {
       const window = layerWindow(layer, durationMs);
       const timing = motion ? letterTimingOf(motion, layer.letterStaggerMs, layer.letterDurationMs) : null;
+      // The layer's settings are read off its synced properties, which sit on its prototype and so
+      // would not survive a spread of the layer itself; the letter order and exit went missing so.
       const settings = timing
-        ? { ...layer, letterIntervalMs: timing.staggerMs, letterDurationMs: timing.durationMs }
+        ? { ...customSettings, letterIntervalMs: timing.staggerMs, letterDurationMs: timing.durationMs }
         : layer;
       const handles = letters.map((letter) => {
         const index = Number(letter.dataset['letterRank']);

@@ -55,7 +55,7 @@
               <span class="tip"> | </span>
               <span class="tip msg-timestamp">{{ chatMessage.timestamp | date: 'y/M/d H:mm' }}</span>
             </span>
-            @if (!isEditing()) {
+            @if (!isEditing() && !readOnly()) {
               <chat-speech-controls [message]="chatMessage" />
             }
             @if (bookmarks().shared; as mark) {

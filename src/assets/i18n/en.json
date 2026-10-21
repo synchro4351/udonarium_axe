@@ -3552,6 +3552,7 @@
         "inviteIncludePassword": "Include password",
         "inviteCopy": "Copy",
         "inviteCopied": "Copied",
+        "inviteCopyFailed": "Could not copy. Copy the selected link with Ctrl+C (⌘+C on a Mac)",
         "inviteOverlay": "For streaming (transparent)",
         "inviteOverlayHint": "Makes a URL for an OBS browser source: no table, no panels — just speech and turns on a transparent background",
         "connectionMode": "Connection",

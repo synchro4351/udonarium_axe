@@ -190,6 +190,8 @@ export class PeerMenuComponent {
   protected readonly includePasswordInInvite = signal(true);
   protected readonly inviteOverlay = signal(false);
   protected readonly isInviteCopied = transientSignal(false, 2000);
+  /** Shown for a while after neither way of copying worked, asking for Ctrl+C on the selected link. */
+  protected readonly isInviteCopyFailed = transientSignal(false, 6000);
 
   protected readonly inviteLink = computed(() => {
     this.objectChange.networkVersion();
@@ -327,16 +329,22 @@ export class PeerMenuComponent {
     }
   }
 
-  protected async copyInviteLink(): Promise<void> {
+  /**
+   * Copies the invitation link. Where the browser refuses the clipboard, as Chrome does while the
+   * page is not focused, the link field is selected and copied the older way instead; where that
+   * fails too, the link is left selected and the reader is asked to copy it by hand.
+   */
+  protected async copyInviteLink(field?: HTMLInputElement): Promise<void> {
     const link = this.inviteLink();
     if (link.length < 1) return;
 
-    try {
-      await navigator.clipboard.writeText(link);
+    if ((await writeClipboard(link)) || copySelected(field)) {
+      this.isInviteCopyFailed.show(false);
       this.isInviteCopied.show(true);
-    } catch (reason) {
-      Logger.warn('[PeerMenu] 招待リンクをクリップボードにコピーできませんでした', reason);
+      return;
     }
+    field?.select();
+    this.isInviteCopyFailed.show(true);
   }
 
   protected selectInviteLink(event: Event): void {
@@ -527,5 +535,29 @@ export class PeerMenuComponent {
   /** Moves on the clock shown in the menu, which the menu does every second while it is open. */
   dispInfo() {
     this.myTime.set(Date.now());
+  }
+}
+
+/** Writes text to the clipboard, answering whether the browser took it. */
+async function writeClipboard(text: string): Promise<boolean> {
+  try {
+    if (!navigator.clipboard?.writeText) return false;
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (reason) {
+    Logger.warn('[PeerMenu] 招待リンクをクリップボードにコピーできませんでした', reason);
+    return false;
+  }
+}
+
+/** Selects the field's text and copies it with the document's copy command, answering whether it ran. */
+function copySelected(field: HTMLInputElement | undefined): boolean {
+  if (!field) return false;
+  try {
+    field.focus();
+    field.select();
+    return document.execCommand('copy');
+  } catch {
+    return false;
   }
 }
