@@ -2,6 +2,16 @@ import { expect, Page, test } from '@playwright/test';
 
 import { openTableContextMenu, revealMenuEntry, waitAppReady } from './helpers';
 
+/** Card editing is for the game master unless the room lets players edit cards (a tyoitashi room rule). */
+async function becomeGm(page: Page) {
+  await page
+    .locator('ui-panel')
+    .filter({ hasText: '接続情報' })
+    .getByRole('button', { name: /^\s*GM\s*$/ })
+    .click();
+  await expect(page.locator('app-gm-toolbar button').first()).toBeVisible({ timeout: 10000 });
+}
+
 async function explodeCardStack(page: Page) {
   // Makes a deck and breaks it up from its menu, so that single card elements appear.
   const tableMenu = await openTableContextMenu(page);
@@ -23,6 +33,7 @@ async function openCardMenu(page: Page) {
 test.describe('handling a single card (card)', () => {
   test.beforeEach(async ({ page }) => {
     await waitAppReady(page);
+    await becomeGm(page);
     await explodeCardStack(page);
   });
 
