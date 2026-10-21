@@ -40,6 +40,12 @@ import { Network } from '@axe/core/network/network';
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import {
+  ImageEffectStyle,
+  imageEffectStyle,
+  PLAIN_IMAGE_STYLE,
+  readImageEffects,
+} from '@axe/domain/character/image-effect';
 import { ChatBookmarkKind } from '@axe/domain/chat/chat-bookmark';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
@@ -614,6 +620,13 @@ export class ChatMessageComponent {
     this.objectChange.versionOf(chatMessage.identifier)();
     this.objectChange.fileVersion();
     return chatMessage.image ?? ImageFile.Empty;
+  });
+  /** How the effects the speaker's picture carried when the line was said are drawn on its icon. */
+  readonly iconEffect = computed<ImageEffectStyle>(() => {
+    const chatMessage = this.chatMessageInput();
+    if (!chatMessage) return PLAIN_IMAGE_STYLE;
+    this.objectChange.versionOf(chatMessage.identifier)();
+    return imageEffectStyle(readImageEffects(chatMessage.imageEffects ?? ''));
   });
   readonly attachmentImageFiles = computed(() => {
     const chatMessage = this.chatMessageInput();

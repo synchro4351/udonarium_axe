@@ -831,6 +831,14 @@ describe('ChatMessageService', () => {
       expect(stamp?.imageIdentifier).toBe('img-0');
     });
 
+    it('carries the effects laid over the speaker’s picture onto the line, so its icon keeps them', () => {
+      character.imageEffects = 'silhouette flip';
+      expect(speak('……').imageEffects).toBe('silhouette flip');
+      character.imageEffects = '';
+      expect(speak('やあ').imageEffects).toBe('');
+      expect(service.sendMessage(chatTab, 'PLです', null, PeerCursor.myCursor.identifier).imageEffects).toBe('');
+    });
+
     it('switches to the portrait the name picks out and takes the command off the line', () => {
       const message = speak('こんにちは @笑顔');
 

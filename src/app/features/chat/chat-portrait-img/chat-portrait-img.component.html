@@ -17,9 +17,13 @@
                       slot.pos +
                       ' ) ) translateY(' +
                       portraitYPos() +
-                      'px)',
+                      'px)' +
+                      (slot.effect.scale ? ' scaleX(-1)' : ''),
                     'z-index': slot.zIndex,
-                    opacity: slot.opacity,
+                    opacity: slot.opacity * (slot.effect.opacity ?? 1),
+                    filter: slot.effect.filter,
+                    '--image-effect-filter': slot.effect.filter,
+                    animation: slot.effect.animation,
                     height: slot.height + 'px',
                   }"
                   (mousedown)="portraitClick(slot.pos)"

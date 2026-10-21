@@ -17,6 +17,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { PanelService } from '@axe/application/ui/panel.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { ImageEffectStyle, imageEffectStyle, readImageEffects } from '@axe/domain/character/image-effect';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { VisualNovelModeService } from '@axe/features/visual-novel/visual-novel-mode.service';
@@ -33,6 +34,8 @@ export interface PortraitSlot {
   readonly zIndex: number;
   readonly opacity: number;
   readonly height: number;
+  /** The effects laid over the portrait, drawn as on the speaker's piece. */
+  readonly effect: ImageEffectStyle;
 }
 
 @Component({
@@ -129,7 +132,8 @@ export class ChatPortraitImageComponent {
         height = chatTabList?.portraitHeight ?? 0;
       }
 
-      slots.push({ pos, imageFileUrl, zIndex, opacity, height });
+      const effect = imageEffectStyle(readImageEffects(chatTab?.imageEffectsAt?.[pos] ?? ''));
+      slots.push({ pos, imageFileUrl, zIndex, opacity, height, effect });
     }
     return slots;
   });

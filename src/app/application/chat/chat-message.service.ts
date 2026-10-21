@@ -306,6 +306,7 @@ export class ChatMessageService {
       to: sendTo != null ? this.whisperTo(sendTo) : undefined,
       name: this.makeMessageName(sendFrom, sendTo, speakAs?.name),
       imageIdentifier: speakAs?.imageIdentifier || this.findImageIdentifier(sendFrom, imgIndex),
+      imageEffects: this.findImageEffects(sendFrom),
       timestamp: this.calcTimeStamp(chatTab),
       text: words,
       imagePos: this.keptOffTable ? undefined : this.findImagePos(sendFrom),
@@ -368,6 +369,7 @@ export class ChatMessageService {
       to: sendTo != null ? this.whisperTo(sendTo) : undefined,
       name: this.makeMessageName(sendFrom, sendTo, speakAs?.name),
       imageIdentifier: speakAs?.imageIdentifier || this.findImageIdentifier(sendFrom, imgIndex),
+      imageEffects: this.findImageEffects(sendFrom),
       timestamp: this.calcTimeStamp(chatTab),
       tag: chatMessageTag,
       text,
@@ -629,6 +631,12 @@ export class ChatMessageService {
       return object.imageIdentifier;
     }
     return '';
+  }
+
+  /** The effects laid over a speaking piece's picture, which its line's icon carries; none for a peer. */
+  private findImageEffects(sendFrom: string): string {
+    const object = this.objectStore.get(sendFrom);
+    return object instanceof GameCharacter ? object.imageEffects : '';
   }
 
   private findImagePos(identifier: string): number {

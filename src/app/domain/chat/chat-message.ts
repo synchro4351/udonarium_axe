@@ -63,6 +63,7 @@ export interface ChatMessageContext {
   stamp?: string;
   diceLook?: string;
   diceImageIdentifier?: string;
+  imageEffects?: string;
 }
 
 @SyncObject('chat')
@@ -74,6 +75,11 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
   @SyncVar() tag: string;
   @SyncVar() dicebot: string;
   @SyncVar() imageIdentifier: string;
+  /**
+   * The effects laid over the speaker's picture when the line was said, as `image-effect.ts` writes
+   * them, so the icon keeps a silhouette or a flip; empty for none.
+   */
+  @SyncVar() imageEffects: string = '';
   @SyncVar() attachmentImageIdentifiers: string = '';
   @SyncVar() imagePos: number;
   @SyncVar() vnPortraitPos: number = VN_PORTRAIT_POS_UNSET;

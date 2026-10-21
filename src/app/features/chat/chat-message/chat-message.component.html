@@ -24,7 +24,14 @@
               (contextmenu)="onSystemAvatarContextMenu($event, avatar.kind)"
             />
           } @else if (!isSystemMessage && imageFile().url) {
-            <img [src]="imageFile().url | safe: 'resourceUrl'" />
+            <img
+              [src]="imageFile().url | safe: 'resourceUrl'"
+              [style.filter]="iconEffect().filter"
+              [style.--image-effect-filter]="iconEffect().filter"
+              [style.scale]="iconEffect().scale"
+              [style.opacity]="iconEffect().opacity"
+              [style.animation]="iconEffect().animation"
+            />
           }
         </div>
         <div

@@ -38,6 +38,8 @@ export class ChatTab extends ObjectNode implements InnerXml {
     (_, i) => `#${i}`
   );
   @SyncVar() imageIdentifierZpos: number[] = Array.from({ length: PORTRAIT_SLOT_COUNT }, (_, i) => i);
+  /** The effects laid over each standing portrait, as the line that put it there carried them. */
+  @SyncVar() imageEffectsAt: string[] = Array.from({ length: PORTRAIT_SLOT_COUNT }, () => '');
 
   /**
    * When novel mode was last asked to clear the portraits standing on this tab.
@@ -92,10 +94,18 @@ export class ChatTab extends ObjectNode implements InnerXml {
     this.imageIdentifier = [...DEFAULT_IMAGE_IDENTIFIERS];
     this.imageCharacterName = Array.from({ length: PORTRAIT_SLOT_COUNT }, (_, i) => `#${i}`);
     this.imageIdentifierZpos = Array.from({ length: PORTRAIT_SLOT_COUNT }, (_, i) => i);
+    this.imageEffectsAt = Array.from({ length: PORTRAIT_SLOT_COUNT }, () => '');
     this.imageIdentifierDummy = 'test';
   }
 
   imageDispFlag: boolean[] = Array(PORTRAIT_SLOT_COUNT).fill(true) as boolean[];
+
+  /** Writes one portrait's effects, keeping the list as long as the slots for a tab saved without it. */
+  private setImageEffectsAt(pos: number, effects: string): void {
+    const kept = Array.from({ length: PORTRAIT_SLOT_COUNT }, (_, i) => this.imageEffectsAt?.[i] ?? '');
+    kept[pos] = effects;
+    this.imageEffectsAt = kept;
+  }
 
   /** The lines in this tab, in the order they were placed. */
   get chatMessages(): readonly ChatMessage[] {
@@ -283,12 +293,14 @@ export class ChatTab extends ObjectNode implements InnerXml {
         if (oldpos >= 0) {
           this.imageIdentifier[oldpos] = '';
           this.imageCharacterName[oldpos] = '';
+          this.setImageEffectsAt(oldpos, '');
           this.imageDispFlag[oldpos] = false;
         }
 
         if (message.imageIdentifier !== '') {
           this.imageIdentifier[this.pos_num] = message.imageIdentifier ?? '';
           this.imageCharacterName[this.pos_num] = message.name ?? '';
+          this.setImageEffectsAt(this.pos_num, message.imageEffects ?? '');
           this.replacePortraitZIndex(this.pos_num);
           this.imageDispFlag[this.pos_num] = true;
 

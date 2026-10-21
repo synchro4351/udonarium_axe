@@ -50,3 +50,27 @@ test('lays effects over a piece picture from its menu, without moving the pictur
   await chooseEffect(page, piece, ['効果をすべて外す']);
   await expect.poll(() => picture.evaluate((img) => img.style.transform)).not.toContain('scaleX(-1)');
 });
+
+test('keeps a silhouette on the icon of what the piece says, so the chat gives nothing away', async ({ page }) => {
+  await waitAppReady(page);
+  const piece = page.locator('game-character').filter({ hasText: 'キャラクターB' }).first();
+  await expect(piece).toBeAttached();
+  await settle(piece);
+  await chooseEffect(page, piece, ['黒塗り']);
+
+  const from = page.locator('chat-window .chat-select--from');
+  const search = from.locator('input[role="combobox"]');
+  await search.fill('キャラクターB');
+  await expect(
+    page.locator('.ng-dropdown-panel').getByRole('option', { name: 'キャラクターB', exact: true })
+  ).toBeVisible();
+  await search.press('Enter');
+  const textarea = page.locator('textarea.chat-input');
+  await textarea.fill('……誰だと思う？');
+  await textarea.press('Enter');
+
+  const line = page.locator('chat-window chat-message').filter({ hasText: '……誰だと思う？' }).last();
+  await expect(line).toBeVisible();
+  const icon = line.locator('img').first();
+  await expect.poll(() => icon.evaluate((img) => getComputedStyle(img).filter)).toContain('brightness(0)');
+});

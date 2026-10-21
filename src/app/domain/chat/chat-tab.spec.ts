@@ -47,6 +47,24 @@ describe('ChatTab', () => {
     });
   });
 
+  describe('the effects laid over a standing portrait', () => {
+    it('keeps them with the slot the line put its portrait in, and clears them from the slot it left', () => {
+      const tab = new ChatTab();
+      tab.initialize();
+      tab.addMessage({ name: '影', imageIdentifier: 'img-a', imagePos: 2, imageEffects: 'silhouette', text: '……' });
+      expect(tab.imageEffectsAt[2]).toBe('silhouette');
+
+      tab.addMessage({ name: '影', imageIdentifier: 'img-a', imagePos: 5, imageEffects: '', text: '正体は' });
+      expect(tab.imageEffectsAt[2]).toBe('');
+      expect(tab.imageEffectsAt[5]).toBe('');
+      expect(tab.imageEffectsAt).toHaveLength(12);
+
+      tab.portraitReset();
+      expect(tab.imageEffectsAt.every((effects) => effects === '')).toBe(true);
+      tab.destroy();
+    });
+  });
+
   describe('countDisplayableMessages()', () => {
     it('counts nothing in an empty tab', () => {
       const tab = new ChatTab();
