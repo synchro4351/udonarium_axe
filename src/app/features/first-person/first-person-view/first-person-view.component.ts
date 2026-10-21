@@ -36,6 +36,7 @@ import { GameCharacter } from '@axe/domain/character/game-character';
 import { gaugeNumbersOf, selectPieceGauges } from '@axe/domain/character/piece-gauge';
 import { DataElement } from '@axe/domain/data/data-element';
 import { collectDataElements } from '@axe/domain/data/data-element-tree';
+import { Config } from '@axe/domain/peer/config';
 import {
   clipBillboardToEye,
   clipPolygonToEye,
@@ -774,12 +775,18 @@ export class FirstPersonViewComponent {
     };
   }
 
+  /** The resources the room shows as a bar on every piece, by name. */
+  private readonly roomGauges = computed<ReadonlySet<string>>(() => {
+    this.objectChange.versionOf('Config')();
+    return new Set((this.objectStore.get<Config>('Config') ?? null)?.pieceGaugeNames ?? []);
+  });
+
   private gaugesOf(piece: GameCharacter): GaugeView[] {
     const detail = piece.detailDataElement;
     if (!detail) return [];
     this.trackTree(detail);
     const readable = this.disclosure.canView(piece);
-    return selectPieceGauges(detail)
+    return selectPieceGauges(detail, this.roomGauges())
       .slice(0, MAX_MULTI_ANGLE_RESOURCE_GAUGES)
       .map((gauge) => ({
         id: gauge.identifier,

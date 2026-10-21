@@ -53,9 +53,28 @@ export function gaugeColor(ratio: number, inverted = false): string {
   return FULL_COLOR;
 }
 
-/** Whether the resource is set to show as a bar on its piece. */
-export function isGaugeShownOnPiece(element: DataElement): boolean {
-  return element.getAttribute(DataElementAttribute.PIECE_GAUGE) === 'true';
+const NO_ROOM_GAUGES: ReadonlySet<string> = new Set();
+
+/**
+ * Whether the resource shows as a bar on its piece. The resource's own setting comes first, either
+ * way; one with none follows the room, which names the resources every piece shows.
+ */
+export function isGaugeShownOnPiece(element: DataElement, roomGauges: ReadonlySet<string> = NO_ROOM_GAUGES): boolean {
+  const own = element.getAttribute(DataElementAttribute.PIECE_GAUGE);
+  if (own === 'true') return true;
+  if (own === 'false') return false;
+  return roomGauges.has(element.name.trim());
+}
+
+/**
+ * The resource's own setting for its bar after it is turned the other way: nothing where that is
+ * what the room says anyway, so a resource keeps following the room until it is made to differ.
+ */
+export function toggledGaugeSetting(element: DataElement, roomGauges: ReadonlySet<string>): 'true' | 'false' | null {
+  const shownNow = isGaugeShownOnPiece(element, roomGauges);
+  const roomShows = roomGauges.has(element.name.trim());
+  if (shownNow) return roomShows ? 'false' : null;
+  return roomShows ? null : 'true';
 }
 
 /** A resource that grows worse as it rises, such as madness or contamination. */
@@ -64,7 +83,10 @@ export function isGaugeInverted(element: DataElement): boolean {
 }
 
 /** Picks up the resources set to show on the piece, from the top down. */
-export function selectPieceGauges(root: DataElement | null): PieceGauge[] {
+export function selectPieceGauges(
+  root: DataElement | null,
+  roomGauges: ReadonlySet<string> = NO_ROOM_GAUGES
+): PieceGauge[] {
   if (!root) return [];
 
   const gauges: PieceGauge[] = [];
@@ -75,7 +97,7 @@ export function selectPieceGauges(root: DataElement | null): PieceGauge[] {
         walk(data);
         continue;
       }
-      if (!data.isNumberResource || !isGaugeShownOnPiece(data)) continue;
+      if (!data.isNumberResource || !isGaugeShownOnPiece(data, roomGauges)) continue;
 
       const current = Number(data.currentValue);
       const max = Number(data.value);

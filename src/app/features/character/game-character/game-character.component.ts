@@ -539,7 +539,10 @@ export class GameCharacterComponent {
     const readable = this.disclosureService.canView(piece);
     const gauges =
       detail && this.followedTree(detail) !== null
-        ? selectPieceGauges(detail).map((gauge) => ({ gauge, numbers: gaugeNumbersOf(gauge, readable) }))
+        ? selectPieceGauges(detail, this.roomGauges()).map((gauge) => ({
+            gauge,
+            numbers: gaugeNumbersOf(gauge, readable),
+          }))
         : [];
     const buffs = this.overlay.buffs() && !piece.hideBuff ? (piece.buffDataElement ?? null) : null;
     const badges = buffs && this.followedTree(buffs) !== null ? toBuffBadges(buffs) : [];
@@ -770,6 +773,11 @@ export class GameCharacterComponent {
     if (!char) return 0;
     this.objectChange.versionOf(char.identifier)();
     return char.komaImageHeight;
+  });
+  /** The resources the room shows as a bar on every piece, by name. */
+  private readonly roomGauges = computed<ReadonlySet<string>>(() => {
+    this.objectChange.versionOf('Config')();
+    return new Set((this.objectStore.get<Config>('Config') ?? null)?.pieceGaugeNames ?? []);
   });
   readonly specifyKomaImageFlag = computed(() => {
     const char = this.gameCharacter();
@@ -1149,7 +1157,7 @@ export class GameCharacterComponent {
       if (!this.overlay.resourceBars()) return [];
       const detail = this.gameCharacter()?.detailDataElement ?? null;
       if (this.followedTree(detail) === null || !detail) return [];
-      return selectPieceGauges(detail);
+      return selectPieceGauges(detail, this.roomGauges());
     },
     { equal: sameEntries }
   );

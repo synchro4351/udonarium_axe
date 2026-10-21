@@ -1,6 +1,6 @@
 import { expect, Locator, Page, test } from '@playwright/test';
 
-import { createCharacter, revealMenuEntry, waitAppReady } from './helpers';
+import { createCharacter, openPanel, revealMenuEntry, waitAppReady } from './helpers';
 
 function newCharacterPiece(page: Page) {
   return page.locator('game-character').filter({ hasText: '新しいキャラクター' }).first();
@@ -108,6 +108,37 @@ test.describe('what shows above a piece', () => {
 
     await gaugeToggle.uncheck();
     await expect(gauges).toHaveCount(1, { timeout: 5000 });
+  });
+
+  test('lets the room show a resource on every piece, and one piece still take its bar off', async ({ page }) => {
+    await page
+      .locator('ui-panel')
+      .filter({ hasText: '接続情報' })
+      .getByRole('button', { name: /^\s*GM\s*$/ })
+      .click();
+    const gauges = newCharacterPiece(page).locator('[data-testid="piece-gauge"]');
+    await expect(gauges).toHaveCount(2);
+
+    const sheet = await openSheet(page);
+    await sheet.locator('button[title="編集"]').first().dispatchEvent('click');
+    const row = resourceRows(sheet, page).first();
+    await row.locator('button[title="詳細設定"]').first().dispatchEvent('click');
+    const gaugeToggle = row.locator('input[name="data-piece-gauge"]');
+    await gaugeToggle.uncheck();
+    await expect(gauges).toHaveCount(1, { timeout: 5000 });
+
+    // The room names HP for every piece: the bar the piece had taken off follows the room again.
+    await openPanel(page, '部屋設定');
+    const section = page.getByTestId('room-settings-piece-gauges');
+    await section.locator('label:has(input[data-gauge="HP"])').dispatchEvent('click');
+    await expect(section.locator('input[data-gauge="HP"]')).toBeChecked();
+    await expect(gauges).toHaveCount(2, { timeout: 5000 });
+    await expect(gaugeToggle).toBeChecked();
+
+    // Taken off on the piece now, it stays off whatever the room says.
+    await gaugeToggle.dispatchEvent('click');
+    await expect(gauges).toHaveCount(1, { timeout: 5000 });
+    await expect(section.locator('input[data-gauge="HP"]')).toBeChecked();
   });
 
   test('fits the buttons of a resource row on one line', async ({ page }) => {

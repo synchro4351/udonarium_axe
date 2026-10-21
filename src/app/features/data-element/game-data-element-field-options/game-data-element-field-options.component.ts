@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { FormsModule } from '@angular/forms';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { ObjectStore } from '@axe/core/sync/object-store';
+import { isGaugeShownOnPiece, toggledGaugeSetting } from '@axe/domain/character/piece-gauge';
 import {
   playsEffectOnChange,
   playsSoundOnChange,
@@ -11,6 +13,7 @@ import {
 } from '@axe/domain/character/resource-feedback';
 import { showsResourceSlider } from '@axe/domain/character/resource-slider';
 import { DataElement, DataElementAttribute } from '@axe/domain/data/data-element';
+import { Config } from '@axe/domain/peer/config';
 import {
   isTableCellField,
   tableCellLineage,
@@ -44,6 +47,7 @@ const SHEET_CLASSES =
 })
 export class GameDataElementFieldOptionsComponent {
   private readonly objectChange = inject(ObjectChangeService);
+  private readonly objectStore = inject(ObjectStore);
   private readonly t = inject(TRANSLATE_FN);
 
   readonly element = input.required<DataElement>();
@@ -205,14 +209,30 @@ export class GameDataElementFieldOptionsComponent {
     return this.element().isNumberResource;
   }
 
-  /** Whether the resource is shown as a bar on the piece on the table. */
+  /** The resources the room shows as a bar on every piece, by name. */
+  private readonly roomGauges = computed<ReadonlySet<string>>(() => {
+    this.objectChange.versionOf('Config')();
+    return new Set((this.objectStore.get<Config>('Config') ?? null)?.pieceGaugeNames ?? []);
+  });
+
+  /** Whether the resource is shown as a bar on the piece on the table, by its own say or the room's. */
   isPieceGauge(): boolean {
-    return this.hasFlag(DataElementAttribute.PIECE_GAUGE);
+    const element = this.element();
+    this.objectChange.versionOf(element.identifier)();
+    return isGaugeShownOnPiece(element, this.roomGauges());
   }
 
-  /** Shows the resource as a bar on the piece, or takes the bar away. */
+  /**
+   * Shows the resource as a bar on the piece, or takes the bar away. Where that comes back to what
+   * the room says, the resource's own setting is cleared, so it follows the room again.
+   */
   togglePieceGauge(): void {
-    if (this.canShowPieceGauge()) this.toggleFlag(DataElementAttribute.PIECE_GAUGE);
+    if (!this.canShowPieceGauge()) return;
+    const element = this.element();
+    const next = toggledGaugeSetting(element, this.roomGauges());
+    if (next === null) element.removeAttribute(DataElementAttribute.PIECE_GAUGE);
+    else element.setAttribute(DataElementAttribute.PIECE_GAUGE, next);
+    this.objectChange.notifyChanged(element.identifier);
   }
 
   /** Whether the resource grows worse as it rises, so the bar on the piece reads the other way round. */
