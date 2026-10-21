@@ -39,6 +39,12 @@ import {
 } from '@axe/domain/tabletop/turn-order-mode';
 import { ZoneRuleAnswers } from '@axe/domain/tabletop/zone/zone-rules';
 
+/** The names trimmed, without blanks, each once, in the order first given. */
+function uniqueNames(names: readonly string[]): string[] {
+  const trimmed = names.map((name) => name.trim()).filter((name) => name.length > 0);
+  return [...new Set(trimmed)];
+}
+
 @SyncObject('config')
 export class Config extends ObjectNode implements InnerXml {
   @SyncVar('_defaultDiceBot') private _defaultDiceBot: string = 'DiceBot';
@@ -51,6 +57,8 @@ export class Config extends ObjectNode implements InnerXml {
   @SyncVar('_hideSystemAvatar') private _hideSystemAvatar: string = '';
   @SyncVar('_showSpeakerAvatar') private _showSpeakerAvatar: string = '';
   @SyncVar('_controllerResources') private _controllerResources: string = '';
+  /** The resources every piece shows as a bar over it, one name a line; empty for none. */
+  @SyncVar('_pieceGaugeNames') private _pieceGaugeNames: string = '';
   // Blank allows, so a room saved before these existed keeps letting hands trade cards.
   @SyncVar('_handDrawForbidden') private _handDrawForbidden: string = '';
   @SyncVar('_handGiveForbidden') private _handGiveForbidden: string = '';
@@ -153,6 +161,17 @@ export class Config extends ObjectNode implements InnerXml {
    *
    * @see ControllerResourcePick
    */
+  /**
+   * The resources every piece in the room shows as a bar over it, unless the resource itself says
+   * otherwise. Matched by name; none by default, which leaves it to each resource.
+   */
+  get pieceGaugeNames(): string[] {
+    return uniqueNames(this._pieceGaugeNames.split('\n'));
+  }
+  set pieceGaugeNames(names: readonly string[]) {
+    this._pieceGaugeNames = uniqueNames(names).join('\n');
+  }
+
   get controllerResources(): ControllerResourcePick {
     return readControllerResourcePick(this._controllerResources);
   }

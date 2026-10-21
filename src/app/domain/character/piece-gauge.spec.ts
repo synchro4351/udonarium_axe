@@ -4,7 +4,9 @@ import {
   gaugeRatio,
   HIDDEN_GAUGE_NUMBERS,
   isGaugeInverted,
+  isGaugeShownOnPiece,
   selectPieceGauges,
+  toggledGaugeSetting,
 } from '@axe/domain/character/piece-gauge';
 import { DataElement, DataElementAttribute, DataElementType } from '@axe/domain/data/data-element';
 
@@ -95,6 +97,37 @@ describe('selectPieceGauges()', () => {
 
   it('returns nothing when it is unset', () => {
     expect(selectPieceGauges(null)).toEqual([]);
+  });
+
+  describe('with the room naming resources for every piece', () => {
+    const room: ReadonlySet<string> = new Set(['HP', 'MP']);
+
+    it('shows the named resources with no setting of their own, and a resource set either way as set', () => {
+      const root = DataElement.create('detail', '', {});
+      created.push(root);
+      root.appendChild(resource('HP', 10, 20, false));
+      const mp = resource('MP', 5, 10, false);
+      mp.setAttribute(DataElementAttribute.PIECE_GAUGE, 'false');
+      root.appendChild(mp);
+      root.appendChild(resource('SAN', 50, 99, true));
+      root.appendChild(resource('所持金', 100, 999, false));
+
+      expect(selectPieceGauges(root, room).map((gauge) => gauge.name)).toEqual(['HP', 'SAN']);
+      expect(selectPieceGauges(root).map((gauge) => gauge.name)).toEqual(['SAN']);
+    });
+
+    it('turns a resource the other way, clearing its own setting where that is what the room says', () => {
+      const hp = resource(' HP ', 10, 20, false);
+      expect(isGaugeShownOnPiece(hp, room)).toBe(true);
+      expect(toggledGaugeSetting(hp, room)).toBe('false');
+      hp.setAttribute(DataElementAttribute.PIECE_GAUGE, 'false');
+      expect(toggledGaugeSetting(hp, room)).toBeNull();
+
+      const san = resource('SAN', 50, 99, false);
+      expect(toggledGaugeSetting(san, room)).toBe('true');
+      san.setAttribute(DataElementAttribute.PIECE_GAUGE, 'true');
+      expect(toggledGaugeSetting(san, room)).toBeNull();
+    });
   });
 });
 

@@ -561,6 +561,18 @@ describe('Config', () => {
     });
   });
 
+  describe('the resources every piece shows a bar for', () => {
+    it('names none until the room picks some, and keeps each name once, trimmed, in order', () => {
+      expect(Config.instance.pieceGaugeNames).toEqual([]);
+
+      Config.instance.pieceGaugeNames = [' HP', 'MP ', '', 'HP', '気力 ゲージ'];
+      expect(Config.instance.pieceGaugeNames).toEqual(['HP', 'MP', '気力 ゲージ']);
+
+      Config.instance.pieceGaugeNames = [];
+      expect(Config.instance.pieceGaugeNames).toEqual([]);
+    });
+  });
+
   describe('the items the remote controllers show', () => {
     it('shows every item until the room picks some out', () => {
       expect(Config.instance.controllerResources).toBeNull();

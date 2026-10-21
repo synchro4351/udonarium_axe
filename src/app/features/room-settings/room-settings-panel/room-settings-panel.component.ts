@@ -704,6 +704,25 @@ export class RoomSettingsPanelComponent {
     return resourceCatalogOf(characters, { listFirst: DataSummarySetting.instance.dataTags });
   });
 
+  /** The resources that can be shown as a bar over a piece: those with a maximum. */
+  readonly pieceGaugeChoices = computed(() => this.controllerResourceChoices().filter((choice) => choice.isResource));
+
+  /** The resources the room shows as a bar over every piece. */
+  readonly pieceGaugeNames = computed<string[]>(() => {
+    this.objectChange.versionOf('Config')();
+    return this.config.pieceGaugeNames;
+  });
+
+  /**
+   * Shows or stops showing one resource as a bar over every piece in the room; a resource set on its
+   * own sheet keeps its own setting. Only a user allowed to change the shared settings can.
+   */
+  setPieceGaugeShown(name: string, shown: boolean): void {
+    if (this.isSharedReadOnly()) return;
+    const names = this.pieceGaugeNames().filter((each) => each !== name);
+    this.config.pieceGaugeNames = shown ? [...names, name] : names;
+  }
+
   /** The items the room lets its remotes show, or null while it shows every one. */
   readonly controllerResourcePick = computed<ControllerResourcePick>(() => {
     this.objectChange.versionOf('Config')();
