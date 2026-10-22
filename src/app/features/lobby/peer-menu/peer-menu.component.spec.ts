@@ -472,6 +472,19 @@ describe('PeerMenuComponent', () => {
       expect(root.querySelector('[data-testid="peer-menu-server-role"]')).not.toBeNull();
     });
 
+    it('offers the room server’s login in the panel, so a seat let in by a link finds it too', () => {
+      vi.spyOn(Network.instance, 'transport', 'get').mockReturnValue('skyway');
+      fixture = TestBed.createComponent(PeerMenuComponent);
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelector('[data-testid="peer-menu-login"]')).toBeNull();
+
+      TestBed.inject(ObjectChangeService).loadConfig$.emit({ config: { transport: 'server' } });
+      fixture.detectChanges();
+
+      expect(root.querySelector('[data-testid="peer-menu-login"] server-account')).not.toBeNull();
+    });
+
     it('keeps an invitation to its own room, and asks again in another', async () => {
       const room = (roomKey: string) => {
         vi.spyOn(Network.instance, 'roomKey', 'get').mockReturnValue(roomKey);

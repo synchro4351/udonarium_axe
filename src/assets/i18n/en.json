@@ -3752,6 +3752,7 @@
         "deleteFailed": "The account could not be deleted. Please try again later.",
         "deleteFailedLoggedOut": "Could not delete the account. Log in again, then delete it once more.",
         "guestHint": "Without logging in you join as a guest. Log in to create rooms and move things on the table.",
+        "forgotHint": "Forgot your Discord password? Scan the QR code on the login page with the Discord app on your phone to sign in without it, or reset it from \"Forgot your password?\"",
         "unavailable": "This server offers no login, so it has no rooms.",
         "errors": {
           "denied": "The login was cancelled.",

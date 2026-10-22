@@ -62,6 +62,9 @@
           }
         }
       </div>
+      @if (isServerTransport()) {
+        <div class="mt-2" data-testid="peer-menu-login"><server-account /></div>
+      }
       <div class="text-(--ui-text-dim)">{{ myTime() | date: 'yy/MM/dd HH:mm:ss' }}</div>
     </div>
   </div>
