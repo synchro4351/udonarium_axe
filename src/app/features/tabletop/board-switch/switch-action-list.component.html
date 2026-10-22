@@ -13,7 +13,7 @@
             data-testid="switch-action-kind"
             (change)="setKind(index, $any($event.target).value)"
           >
-            @for (kind of kinds; track kind) {
+            @for (kind of kinds(); track kind) {
               <option [value]="kind" [selected]="kind === action.kind">
                 {{ 'feature.boardSwitch.kind.' + kind | transloco }}
               </option>
@@ -286,7 +286,7 @@
   }
 
   <div class="flex flex-wrap gap-1">
-    @for (kind of kinds; track kind) {
+    @for (kind of kinds(); track kind) {
       <button
         type="button"
         class="border-ui-border-panel bg-ui-elevated text-ui-text hover:border-ui-accent hover:text-ui-accent rounded-ui-sm flex cursor-pointer items-center gap-1 border border-solid px-2 py-0.5 text-[12px] disabled:cursor-default disabled:opacity-45"

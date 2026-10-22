@@ -459,7 +459,9 @@
         "appearanceSize": "Size",
         "appearanceKeep": "Leave",
         "appearanceHint": "A box left empty is left alone. The picture and the portrait are numbered from one, in the order the character carries them. The size is in cells. The portrait reaches this screen alone.",
-        "menuCommand": "Entry"
+        "menuCommand": "Entry",
+        "groupActions": "Actions of its own",
+        "groupActionsHint": "Line up switch actions (say, secret, sound, effect, cut-in, show or hide and more) without a slot for each. They run in order after the chosen slots."
       },
       "kind": {
         "chat": "Chat / dice",

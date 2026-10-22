@@ -64,7 +64,8 @@ export interface SwitchHost {
 }
 
 interface PressContext {
-  target: BoardSwitch;
+  /** The switch pressed, or null for actions run from elsewhere, as a hotbar group runs them. */
+  target: BoardSwitch | null;
   definition: SwitchDefinition;
   /** Whether the master is trying it out, which leaves the thing it sits on standing. */
   trial: boolean;
@@ -211,6 +212,32 @@ export class SwitchPressService {
     const host = target.parent;
     if (host instanceof Terrain) host.destroy();
     else target.retired = true;
+  }
+
+  /**
+   * Does a switch's actions with no switch behind them, as the reader, speaking as the piece they
+   * are working: what a hotbar group writes into itself. There is nothing to stand on, so taking
+   * away the thing pressed does nothing, and what is made at a switch's place is made at the
+   * reader's piece or not at all.
+   */
+  async runActions(definition: SwitchDefinition, character: GameCharacter | null): Promise<void> {
+    const context: PressContext = {
+      target: null,
+      definition,
+      trial: false,
+      removesSelf: false,
+      host: { name: '', rect: null },
+      tab: this.macro.currentTab(definition.tab),
+      character,
+    };
+    for (const [order, action] of definition.actions.entries()) {
+      if (order > 0 && action.delayMs > 0) await wait(action.delayMs);
+      try {
+        await this.run(action, context);
+      } catch {
+        // One thing going wrong is no reason to leave the rest undone.
+      }
+    }
   }
 
   private async run(action: SwitchAction, context: PressContext): Promise<void> {

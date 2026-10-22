@@ -59,7 +59,9 @@ export class SwitchActionListComponent {
   readonly actions = input.required<readonly SwitchAction[]>();
   readonly actionsChange = output<SwitchAction[]>();
 
-  protected readonly kinds = SWITCH_ACTION_KINDS;
+  /** Kinds not offered here, as taking away what a switch stands on means nothing on a hotbar. */
+  readonly hiddenKinds = input<readonly SwitchActionKind[]>([]);
+  protected readonly kinds = computed(() => SWITCH_ACTION_KINDS.filter((kind) => !this.hiddenKinds().includes(kind)));
   protected readonly readers = SWITCH_SECRET_READERS;
   protected readonly full = computed(() => this.actions().length >= MAX_SWITCH_ACTIONS);
 

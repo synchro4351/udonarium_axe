@@ -52,7 +52,11 @@ export type HotbarPayload =
   | { kind: 'turn'; action: TurnAction }
   /** A piece changing what it looks like. A part left at its "leave it" value is not touched. */
   | { kind: 'appearance'; image: number; portrait: number; size: number }
-  | { kind: 'group'; steps: HotbarStep[] }
+  /**
+   * Slots run one after another, then actions of a switch's kinds written into the group itself, as
+   * the switch definition writes them, so a run needs no slot of its own for every line or sound.
+   */
+  | { kind: 'group'; steps: HotbarStep[]; actions?: string }
   | { kind: 'plain' };
 
 /**
@@ -180,7 +184,11 @@ export function parseHotbarPayload(kind: HotbarSlotKind, raw: unknown): HotbarPa
     case 'group':
       // A group written before each step had a wait of its own kept one wait for the lot;
       // it is read as that wait before every step but the first, which is what it meant.
-      return { kind: 'group', steps: readSteps(held.steps, readIndex(held.delayMs, 0)) };
+      return {
+        kind: 'group',
+        steps: readSteps(held.steps, readIndex(held.delayMs, 0)),
+        ...(typeof held.actions === 'string' && held.actions.length > 0 ? { actions: held.actions } : {}),
+      };
     default:
       return fallback;
   }
