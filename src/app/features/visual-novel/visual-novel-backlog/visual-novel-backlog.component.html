@@ -63,7 +63,14 @@
       >
         <span class="rounded-ui-sm bg-ui-elevated size-9 shrink-0 overflow-hidden">
           @if (entry.imageUrl.length > 0) {
-            <img class="size-full object-cover object-top" [src]="entry.imageUrl | safe: 'resourceUrl'" alt="" />
+            <img
+              class="size-full object-cover object-top"
+              [src]="entry.imageUrl | safe: 'resourceUrl'"
+              [style.filter]="entry.imageEffect.filter"
+              [style.scale]="entry.imageEffect.scale"
+              [style.opacity]="entry.imageEffect.opacity"
+              alt=""
+            />
           }
         </span>
         <span class="flex min-w-0 grow flex-col">

@@ -1,6 +1,6 @@
 import { expect, Locator, Page, test } from '@playwright/test';
 
-import { waitAppReady } from './helpers';
+import { openPanel, selectVnSpeaker, vnMessageInput, waitAppReady } from './helpers';
 import { settle } from './see-through-helpers';
 
 /** Opens the piece's menu and walks into 表示と扱い › 画像効果, then presses `entry`. */
@@ -73,4 +73,25 @@ test('keeps a silhouette on the icon of what the piece says, so the chat gives n
   await expect(line).toBeVisible();
   const icon = line.locator('img').first();
   await expect.poll(() => icon.evaluate((img) => getComputedStyle(img).filter)).toContain('brightness(0)');
+});
+
+test('keeps a silhouette on the portrait novel mode stands up for the piece', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ui-lang', 'ja'));
+  await waitAppReady(page);
+  const piece = page.locator('game-character').filter({ hasText: 'モンスターA' }).first();
+  await expect(piece).toBeAttached();
+  await settle(piece);
+  await chooseEffect(page, piece, ['黒塗り']);
+
+  await openPanel(page, 'ノベルモード');
+  await expect(page.locator('visual-novel-overlay')).toBeVisible();
+  await selectVnSpeaker(page, 'モンスターA');
+  const input = vnMessageInput(page);
+  await input.fill('……');
+  await input.press('Enter');
+  const portrait = page.locator('visual-novel-overlay img[alt="モンスターA"]');
+  await expect(portrait).toBeVisible({ timeout: 15000 });
+  const effect = portrait.locator('xpath=..');
+  await expect(effect).toHaveAttribute('data-testid', 'vn-portrait-effect');
+  await expect.poll(() => effect.evaluate((element) => getComputedStyle(element).filter)).toContain('brightness(0)');
 });

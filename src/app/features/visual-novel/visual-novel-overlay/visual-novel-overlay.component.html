@@ -198,18 +198,27 @@
       [style.left.%]="chara.left"
     >
       <div [class]="portraitAnimationClass()">
-        <img
-          class="w-auto max-w-none drop-shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
-          [class]="
-            classes(
-              isCompact() ? 'h-[46dvh]' : 'h-[56dvh]',
-              chara.isActive ? speakClass() : '',
-              chara.isFlipped ? '-scale-x-100' : ''
-            )
-          "
-          [src]="chara.url | safe: 'resourceUrl'"
-          [alt]="chara.name"
-        />
+        @let effect = effectOf(chara);
+        <div
+          data-testid="vn-portrait-effect"
+          [style.filter]="effect.filter"
+          [style.--image-effect-filter]="effect.filter"
+          [style.opacity]="effect.opacity"
+          [style.animation]="effect.animation"
+        >
+          <img
+            class="w-auto max-w-none drop-shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
+            [class]="
+              classes(
+                isCompact() ? 'h-[46dvh]' : 'h-[56dvh]',
+                chara.isActive ? speakClass() : '',
+                flippedOf(chara) ? '-scale-x-100' : ''
+              )
+            "
+            [src]="chara.url | safe: 'resourceUrl'"
+            [alt]="chara.name"
+          />
+        </div>
       </div>
     </div>
   }

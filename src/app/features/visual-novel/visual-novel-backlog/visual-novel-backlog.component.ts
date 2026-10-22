@@ -18,6 +18,7 @@ import { ImageService } from '@axe/application/storage/image.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
+import { ImageEffectStyle, imageEffectStyle, readImageEffects } from '@axe/domain/character/image-effect';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
 import {
   encodeVnEmote,
@@ -59,6 +60,8 @@ export interface VnBacklogEntry {
   parts: readonly RubyPart[];
   suffix: string;
   imageUrl: string;
+  /** How the effects the line carried are drawn on its icon. */
+  imageEffect: ImageEffectStyle;
 }
 
 @Component({
@@ -135,6 +138,7 @@ export class VisualNovelBacklogComponent {
         parts: splitRubyNotation(text),
         suffix,
         imageUrl: hasPortrait ? this.imageService.getEmptyOr(message.imageIdentifier).url : '',
+        imageEffect: imageEffectStyle(readImageEffects(message.imageEffects ?? '')),
       };
     });
   });

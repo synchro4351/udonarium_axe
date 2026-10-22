@@ -26,6 +26,7 @@ import { AudioStorage } from '@axe/core/storage/audio-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { portraitNameOf } from '@axe/domain/character/character-portrait';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { ImageEffectStyle, imageEffectStyle, readImageEffects } from '@axe/domain/character/image-effect';
 import { chatColorOf } from '@axe/domain/chat/chat-color';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { canRoleSpeakTab } from '@axe/domain/chat/chat-tab-permission';
@@ -413,6 +414,7 @@ export class VisualNovelOverlayComponent {
         isGameCharacter: this.isGameCharacterSender(message.sendFrom ?? ''),
         isDiceCommand: this.playback.isDiceCommandAt(i),
         emote: vnEmoteOf(message.vnEmote, readableMessageText(message, this.t)),
+        imageEffects: message.imageEffects ?? '',
       });
     }
     return buildVnStage(
@@ -535,6 +537,16 @@ export class VisualNovelOverlayComponent {
       }
     }
     return matched ? { name: matched[1], imageUrl: '' } : null;
+  }
+
+  /** How the effects a standing character's line carried are drawn on its portrait. */
+  protected effectOf(chara: VnStageCharacter): ImageEffectStyle {
+    return imageEffectStyle(readImageEffects(chara.imageEffects));
+  }
+
+  /** Whether a standing portrait is drawn the other way round: turned by the line, or by an effect, not both. */
+  protected flippedOf(chara: VnStageCharacter): boolean {
+    return chara.isFlipped !== (this.effectOf(chara).scale !== null);
   }
 
   readonly narrationKind = computed(() => {

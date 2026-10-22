@@ -289,6 +289,12 @@ describe('buildVnStage()', () => {
     expect(stage[0].isFlipped).toBe(true);
   });
 
+  it('carries the effects the line laid over the speaker’s picture, and none for a line without', () => {
+    const stage = buildVnStage([source({ imageEffects: 'silhouette flip' })], resolveUrl);
+    expect(stage[0].imageEffects).toBe('silhouette flip');
+    expect(buildVnStage([source()], resolveUrl)[0].imageEffects).toBe('');
+  });
+
   it('pulls a place outside the stage back to the first', () => {
     expect(buildVnStage([source({ imagePos: 99 })], resolveUrl)[0].slot).toBe(0);
     expect(buildVnStage([source({ imagePos: null })], resolveUrl)[0].slot).toBe(0);

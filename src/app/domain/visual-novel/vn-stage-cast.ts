@@ -23,6 +23,8 @@ export interface VnStageSource {
   isGameCharacter: boolean;
   isDiceCommand: boolean;
   emote: VnEmote;
+  /** The effects laid over the speaker's picture when the line was said; empty or absent for none. */
+  imageEffects?: string;
 }
 
 export interface VnStageCharacter {
@@ -36,6 +38,8 @@ export interface VnStageCharacter {
   isFlipped: boolean;
   /** Standing for the last time: the line being read is the one they leave on. */
   isLeaving: boolean;
+  /** The effects laid over the picture, as the line it stands for carried them. */
+  imageEffects: string;
 }
 
 /** The same span the chat portraits use, so slot 0 and slot 11 land on the same edges. */
@@ -153,7 +157,10 @@ export function buildVnStage(
   if (!current) return [];
   if (current.emote.kind === 'location' || current.emote.kind === 'scene') return [];
 
-  const found = new Map<string, { name: string; url: string; slot: number; isFlipped: boolean; isLeaving: boolean }>();
+  const found = new Map<
+    string,
+    { name: string; url: string; slot: number; isFlipped: boolean; isLeaving: boolean; imageEffects: string }
+  >();
   const retired = new Set<string>();
   for (let i = window.length - 1; i >= 0 && found.size < VN_STAGE_MAX; i--) {
     const source = window[i];
@@ -178,6 +185,7 @@ export function buildVnStage(
         slot: slotOf(resolveSlot(source)),
         isFlipped: source.emote.flipped,
         isLeaving: true,
+        imageEffects: source.imageEffects ?? '',
       });
       continue;
     }
@@ -189,6 +197,7 @@ export function buildVnStage(
       slot: slotOf(resolveSlot(source)),
       isFlipped: source.emote.flipped,
       isLeaving: false,
+      imageEffects: source.imageEffects ?? '',
     });
   }
   if (found.size < 1) return [];
@@ -214,5 +223,6 @@ export function buildVnStage(
     isActive: id === activeIdentity,
     isFlipped: info.isFlipped,
     isLeaving: info.isLeaving,
+    imageEffects: info.imageEffects,
   }));
 }
