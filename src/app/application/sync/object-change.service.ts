@@ -21,6 +21,7 @@ import {
   fileResourceUpdated$ as domainFileResourceUpdated$,
   finishVote$,
   imageDropped$,
+  jsonLoaded$,
   loadConfig$,
   messageAdded$,
   selectFile$,
@@ -307,6 +308,7 @@ export class ObjectChangeService {
   readonly alarmPop$ = alarmPop$;
   readonly fileLoaded$ = fileLoaded$;
   readonly xmlLoaded$ = xmlLoaded$;
+  readonly jsonLoaded$ = jsonLoaded$;
   readonly imageDropped$ = imageDropped$;
   readonly ccfoliaRoomDropped$ = ccfoliaRoomDropped$;
   readonly loadConfig$ = loadConfig$;

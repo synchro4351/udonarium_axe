@@ -97,6 +97,7 @@ import {
   MenuGroupView,
   MenuNodeView,
 } from '@axe/features/menu/menu-command.service';
+import { MenuFileDropHandlerService } from '@axe/features/menu/menu-file-drop-handler.service';
 import { MobileShellComponent } from '@axe/features/mobile/mobile-shell/mobile-shell.component';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
 import { PlToolbarComponent } from '@axe/features/pl-tools/pl-toolbar/pl-toolbar.component';
@@ -498,6 +499,7 @@ export class AppComponent {
     inject(TurnSoundEventHandlerService);
     inject(EffectChatEventHandlerService);
     inject(VoteEventHandlerService);
+    inject(MenuFileDropHandlerService);
     inject(CardEventHandlerService);
     inject(VisualNovelEventHandlerService);
     inject(CutInEventHandlerService);

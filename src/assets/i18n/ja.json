@@ -5489,7 +5489,8 @@
       },
       "writeOut": "書き出す",
       "readIn": "読み込む",
-      "readFailed": "この端末の並びとして読めないファイルです"
+      "readFailed": "この端末の並びとして読めないファイルです",
+      "dropped": "メニューの配置を読み込みました（{{name}}）"
     },
     "boardSwitch": {
       "panelTitle": "スイッチ - {{name}}",

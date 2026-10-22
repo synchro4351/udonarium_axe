@@ -70,6 +70,12 @@ export interface AlarmPopEvent {
   time: number;
 }
 
+/** A JSON file read from a drop or load, by name and text, for whatever knows that kind to take. */
+export interface JsonLoadedEvent {
+  name: string;
+  text: string;
+}
+
 export interface XmlLoadedEvent {
   xmlElement: Element;
   dropPoint?: { x: number; y: number };
@@ -168,6 +174,7 @@ export const alarmTimeUp$ = new EventChannel<AlarmTimeUpEvent>();
 export const alarmPop$ = new EventChannel<AlarmPopEvent>();
 export const fileLoaded$ = new EventChannel<void>();
 export const xmlLoaded$ = new EventChannel<XmlLoadedEvent>();
+export const jsonLoaded$ = new EventChannel<JsonLoadedEvent>();
 export const imageDropped$ = new EventChannel<ImageDroppedEvent>();
 export const ccfoliaRoomDropped$ = new EventChannel<CcfoliaRoomDroppedEvent>();
 export const filesTooLarge$ = new EventChannel<FilesTooLargeEvent>();
@@ -243,6 +250,10 @@ export function emitAlarmPop(event: AlarmPopEvent) {
 /** Announces that a dropped or opened file has been processed; emitted once per file. */
 export function emitFileLoaded() {
   fileLoaded$.emit();
+}
+/** Announces that a JSON file was read from a drop or load, such as an arrangement of the menus. */
+export function emitJsonLoaded(event: JsonLoadedEvent) {
+  jsonLoaded$.emit(event);
 }
 /** Announces that an XML file was read from a drop or load, so what it describes can be restored. */
 export function emitXmlLoaded(event: XmlLoadedEvent) {

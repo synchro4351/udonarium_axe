@@ -5771,7 +5771,8 @@
       },
       "writeOut": "내보내기",
       "readIn": "불러오기",
-      "readFailed": "메뉴 배열로 읽을 수 없는 파일입니다"
+      "readFailed": "메뉴 배열로 읽을 수 없는 파일입니다",
+      "dropped": "메뉴 배치를 불러왔습니다({{name}})"
     },
     "boardSwitch": {
       "panelTitle": "스위치 - {{name}}",
