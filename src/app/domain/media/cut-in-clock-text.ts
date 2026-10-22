@@ -8,10 +8,60 @@ export const REMAINING_TOKEN = '{remaining}';
 export const ELAPSED_TOKEN = '{elapsed}';
 
 /**
- * A clock token, with an optional width after a colon: `{elapsed:3}` shows at least three digits,
- * `{remaining:2}` at least two in front of the colon. Doubled braces write the token as it is.
+ * A clock token, with an optional format after a colon: a width, as `{elapsed:3}`, or a pattern of
+ * hours, minutes and seconds, as `{remaining:mm:ss}`, `{elapsed:sss}` or `{elapsed:ss.00}` (see
+ * `formatDuration`). Doubled braces write the token as it is.
  */
-const TOKEN_PATTERN = /\{\{(time|remaining|elapsed)(?::(\d))?\}\}|\{(time|remaining|elapsed)(?::(\d))?\}/g;
+const TOKEN_PATTERN =
+  /\{\{(time|remaining|elapsed)(?::([hms:.0-9]{1,16}))?\}\}|\{(time|remaining|elapsed)(?::([hms:.0-9]{1,16}))?\}/g;
+
+/** A format of hours, minutes and seconds: letters for each unit, `:` between, `.0`s for decimals. */
+const DURATION_FORMAT = /^(h+|m+|s+)(?::(m+|s+))?(?::(s+))?(?:\.(0+))?$/;
+
+/**
+ * A length of time written to a format: each letter run is a unit at least as many digits wide,
+ * the first unit shows the whole of the time in it (`sss` for 125 seconds is `125`), the units
+ * after it wrap, and `.0`s give the seconds that many decimals. Rounded up where `up`, as a
+ * countdown is, and down otherwise. Null for a format that is not one.
+ */
+export function formatDuration(ms: number, format: string, up = false): string | null {
+  const match = DURATION_FORMAT.exec(format);
+  if (!match) return null;
+  const units = [match[1], match[2], match[3]].filter((unit): unit is string => !!unit);
+  const order = 'hms';
+  for (let at = 1; at < units.length; at++) {
+    if (order.indexOf(units[at][0]) <= order.indexOf(units[at - 1][0])) return null;
+  }
+  const decimals = match[4]?.length ?? 0;
+  if (decimals > 0 && units.at(-1)![0] !== 's') return null;
+  const step = units.at(-1)![0] === 'h' ? 3_600_000 : units.at(-1)![0] === 'm' ? 60_000 : 1000 / 10 ** decimals;
+  const steps = Math.max(0, ms) / step;
+  const total = (up ? Math.ceil(steps - 1e-9) : Math.floor(steps + 1e-9)) * step;
+  const sizes: Record<string, number> = { h: 3_600_000, m: 60_000, s: 1000 };
+  let rest = total;
+  return units
+    .map((unit, at) => {
+      const size = sizes[unit[0]];
+      const whole = at === units.length - 1 ? rest / size : Math.floor(rest / size);
+      rest -= Math.floor(whole) * size;
+      const last = at === units.length - 1;
+      const text = last && decimals > 0 ? whole.toFixed(decimals) : String(Math.floor(whole));
+      const [integer, fraction] = text.split('.');
+      return integer.padStart(unit.length, '0') + (fraction ? `.${fraction}` : '');
+    })
+    .join(':');
+}
+
+/** How often a text's clock tokens need the clock moved on, in ms: each second, or faster for decimals. */
+export function clockTickMs(text: string): number {
+  let tick = 1000;
+  TOKEN_PATTERN.lastIndex = 0;
+  for (const match of text.matchAll(TOKEN_PATTERN)) {
+    const decimals = /\.(0+)$/.exec(match[4] ?? '')?.[1].length ?? 0;
+    if (decimals > 0) tick = Math.min(tick, decimals === 1 ? 100 : 50);
+  }
+  return tick;
+}
 
 /** Whether a text layer's words change as the clock runs. */
 export function usesClock(text: string): boolean {
@@ -24,8 +74,15 @@ function twoDigits(value: number): string {
 }
 
 /** The time of day as hours and minutes, as `21:05`. */
-export function formatClock(nowMs: number): string {
+export function formatClock(nowMs: number, format?: string): string {
   const now = new Date(nowMs);
+  if (format && DURATION_FORMAT.test(format) && format.startsWith('h')) {
+    const sinceMidnight = ((now.getHours() * 60 + now.getMinutes()) * 60 + now.getSeconds()) * 1000;
+    return (
+      formatDuration(sinceMidnight + now.getMilliseconds(), format) ??
+      `${twoDigits(now.getHours())}:${twoDigits(now.getMinutes())}`
+    );
+  }
   return `${twoDigits(now.getHours())}:${twoDigits(now.getMinutes())}`;
 }
 
@@ -68,13 +125,17 @@ export interface CutInClock {
  */
 export function withClock(text: string, clock: CutInClock): string {
   if (!usesClock(text)) return text;
-  return text.replace(TOKEN_PATTERN, (found, escaped, escapedWidth, name, width) => {
+  return text.replace(TOKEN_PATTERN, (found, escaped, escapedFormat, name, format: string | undefined) => {
     if (escaped) return found.slice(1, -1);
-    const digits = Number(width ?? 1);
-    if (name === 'time') return formatClock(clock.nowMs);
+    const width = format && /^\d$/.test(format) ? Number(format) : 1;
+    const pattern = format && !/^\d$/.test(format) ? format : null;
+    if (name === 'time') return formatClock(clock.nowMs, pattern ?? undefined);
     if (name === 'remaining') {
-      return clock.endsAtMs === null ? NO_END_REMAINING : formatRemaining(clock.endsAtMs - clock.nowMs, digits);
+      if (clock.endsAtMs === null) return NO_END_REMAINING;
+      const left = clock.endsAtMs - clock.nowMs;
+      return (pattern && formatDuration(left, pattern, true)) || formatRemaining(left, width);
     }
-    return formatElapsed(clock.startedAtMs === null ? 0 : clock.nowMs - clock.startedAtMs, digits);
+    const since = clock.startedAtMs === null ? 0 : clock.nowMs - clock.startedAtMs;
+    return (pattern && formatDuration(since, pattern)) || formatElapsed(since, width);
   });
 }

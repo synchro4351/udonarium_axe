@@ -957,7 +957,7 @@
         "insertClock": "Insert time",
         "insertRemaining": "Insert time left",
         "insertElapsed": "Insert seconds elapsed",
-        "clockHint": "{time} becomes the time of day, {remaining} the time left before it closes (--:-- while it runs until stopped), {elapsed} the seconds since it began. Add \":digits\", as {elapsed:3}, to pad with zeros ({remaining:2} shows 09:59)",
+        "clockHint": "{time} becomes the time of day, {remaining} the time left before it closes (--:-- while it runs until stopped), {elapsed} the seconds since it began. Add a format after \":\": {elapsed:3} pads to 3 digits (007), {remaining:mm:ss} shows 01:05, {elapsed:sss} the total seconds in 3 digits, {elapsed:ss.00} two decimals, {time:hh:mm:ss} with seconds",
         "fontOption": {
           "default": "Default",
           "gothic": "Sans serif (device font)",

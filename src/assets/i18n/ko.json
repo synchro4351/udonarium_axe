@@ -957,7 +957,7 @@
         "insertClock": "시각 넣기",
         "insertRemaining": "남은 시간 넣기",
         "insertElapsed": "경과 초 넣기",
-        "clockHint": "{time}이 현재 시각, {remaining}이 닫힐 때까지 남은 시간(멈출 때까지 계속되면 --:--), {elapsed}가 시작한 뒤의 초가 됩니다. {elapsed:3}처럼 「:자릿수」를 붙이면 모자란 자리를 0으로 채웁니다({remaining:2}는 09:59)",
+        "clockHint": "{time}이 현재 시각, {remaining}이 닫힐 때까지 남은 시간(멈출 때까지 계속되면 --:--), {elapsed}가 시작한 뒤의 초가 됩니다. 「:」 뒤에 서식을 붙일 수 있습니다: {elapsed:3}은 3자리(007), {remaining:mm:ss}는 01:05, {elapsed:sss}는 총 초를 3자리, {elapsed:ss.00}은 소수 2자리, {time:hh:mm:ss}는 초까지",
         "fontOption": {
           "default": "기본값",
           "gothic": "고딕 (기기 글꼴)",

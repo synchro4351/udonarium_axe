@@ -17,7 +17,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { MotionService } from '@axe/application/ui/motion.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { clipCss } from '@axe/domain/media/cut-in-clip';
-import { usesClock, withClock } from '@axe/domain/media/cut-in-clock-text';
+import { clockTickMs, usesClock, withClock } from '@axe/domain/media/cut-in-clock-text';
 import { fillCss } from '@axe/domain/media/cut-in-fill';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import {
@@ -162,12 +162,17 @@ export class CutInStageComponent {
     return `translate(${fit.offsetX}px, ${fit.offsetY}px) scale(${fit.scale})`;
   });
 
-  /** Whether a shown text layer writes the time of day or the time left. */
+  /**
+   * How often the clock moves on for the shown text layers that tell the time, in ms; 0 where none
+   * does. Each second, or faster for a time written with decimals.
+   */
   private readonly tellsTime = computed(() =>
-    this.layers().some((layer) => {
+    this.layers().reduce((tick, layer) => {
       this.objectChange.versionOf(layer.identifier)();
-      return layer.kind === 'text' && usesClock(layer.text);
-    })
+      if (layer.kind !== 'text' || !usesClock(layer.text)) return tick;
+      const own = clockTickMs(layer.text);
+      return tick === 0 ? own : Math.min(tick, own);
+    }, 0)
   );
 
   /** Whether a shown text layer decodes, which is what the scene clock below is kept for. */
@@ -207,15 +212,16 @@ export class CutInStageComponent {
     });
 
     effect((onCleanup) => {
-      if (!this.tellsTime()) return;
+      const every = this.tellsTime();
+      if (every === 0) return;
       this.now.set(Date.now());
       let timer: ReturnType<typeof setTimeout>;
-      // Each tick lands just past a whole second, so the seconds shown turn over together.
+      // Each tick lands just past a whole step, so the digits shown turn over together.
       const tick = () => {
         this.now.set(Date.now());
-        timer = setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
+        timer = setTimeout(tick, every - (Date.now() % every) + 5);
       };
-      timer = setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
+      timer = setTimeout(tick, every - (Date.now() % every) + 5);
       onCleanup(() => clearTimeout(timer));
     });
 
