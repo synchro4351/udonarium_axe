@@ -956,7 +956,8 @@
         "speakerNameHint": "{character}가 재생한 사람의 이름이 됩니다",
         "insertClock": "시각 넣기",
         "insertRemaining": "남은 시간 넣기",
-        "clockHint": "{time}이 현재 시각, {remaining}이 닫힐 때까지 남은 시간이 됩니다(멈출 때까지 계속되면 --:--)",
+        "insertElapsed": "경과 초 넣기",
+        "clockHint": "{time}이 현재 시각, {remaining}이 닫힐 때까지 남은 시간(멈출 때까지 계속되면 --:--), {elapsed}가 시작한 뒤의 초가 됩니다. {elapsed:3}처럼 「:자릿수」를 붙이면 모자란 자리를 0으로 채웁니다({remaining:2}는 09:59)",
         "fontOption": {
           "default": "기본값",
           "gothic": "고딕 (기기 글꼴)",

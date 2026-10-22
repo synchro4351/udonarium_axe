@@ -192,6 +192,8 @@ export class CutInWindowComponent {
   playbackOffsetMs = 0;
   /** When the window closes on its own on this watcher's clock, or null where it stays until stopped. */
   playbackEndsAtMs: number | null = null;
+  /** When the cut-in came on on this watcher's clock, which `{elapsed}` counts from. */
+  playbackClockStartMs: number | null = null;
   protected readonly playbackStarted = signal(false);
 
   cutIn: CutIn | null = null;
@@ -284,7 +286,8 @@ export class CutInWindowComponent {
     }
 
     const playbackMs = cutInPlaybackMs(this.cutIn, this.cutIn.scene);
-    this.playbackEndsAtMs = playbackMs > 0 ? Date.now() - this.playbackOffsetMs + playbackMs : null;
+    this.playbackClockStartMs = Date.now() - this.playbackOffsetMs;
+    this.playbackEndsAtMs = playbackMs > 0 ? this.playbackClockStartMs + playbackMs : null;
 
     this.playbackStarted.set(true);
     if (this.readyVideoTarget && this.isVideoCued) this.startVideo(this.readyVideoTarget);

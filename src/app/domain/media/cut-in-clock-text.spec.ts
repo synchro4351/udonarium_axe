@@ -1,4 +1,4 @@
-import { formatClock, formatRemaining, usesClock, withClock } from '@axe/domain/media/cut-in-clock-text';
+import { formatClock, formatElapsed, formatRemaining, usesClock, withClock } from '@axe/domain/media/cut-in-clock-text';
 
 describe('a cut-in text that tells the time', () => {
   const evening = new Date(2026, 9, 21, 21, 5, 30).getTime();
@@ -26,9 +26,30 @@ describe('a cut-in text that tells the time', () => {
 
   it('puts the time in for {time} and {remaining}, and keeps the doubled tokens as written', () => {
     const endsAt = evening + 5 * 60 * 1000;
-    expect(withClock('休憩 {time} / あと{remaining}', evening, endsAt)).toBe('休憩 21:05 / あと5:00');
-    expect(withClock('あと{remaining}', evening, null)).toBe('あと--:--');
-    expect(withClock('{{time}} と {{remaining}} と書く', evening, endsAt)).toBe('{time} と {remaining} と書く');
-    expect(withClock('ふつうの文', evening, endsAt)).toBe('ふつうの文');
+    const clock = { nowMs: evening, endsAtMs: endsAt, startedAtMs: null };
+    expect(withClock('休憩 {time} / あと{remaining}', clock)).toBe('休憩 21:05 / あと5:00');
+    expect(withClock('あと{remaining}', { ...clock, endsAtMs: null })).toBe('あと--:--');
+    expect(withClock('{{time}} と {{remaining}} と {{elapsed:3}} と書く', clock)).toBe(
+      '{time} と {remaining} と {elapsed:3} と書く'
+    );
+    expect(withClock('ふつうの文', clock)).toBe('ふつうの文');
+  });
+
+  it('counts the whole seconds since the cut-in came on, from 0 while it is not played', () => {
+    const clock = { nowMs: evening, endsAtMs: null, startedAtMs: evening - 7_900 };
+    expect(usesClock('{elapsed}秒')).toBe(true);
+    expect(usesClock('{elapsed:3}')).toBe(true);
+    expect(withClock('{elapsed}秒経過', clock)).toBe('7秒経過');
+    expect(withClock('{elapsed}', { ...clock, startedAtMs: null })).toBe('0');
+    expect(formatElapsed(-500)).toBe('0');
+  });
+
+  it('pads a token to the digits written after its colon', () => {
+    const clock = { nowMs: evening, endsAtMs: evening + 9 * 60 * 1000 + 59_000, startedAtMs: evening - 7_000 };
+    expect(withClock('[{elapsed:3}]', clock)).toBe('[007]');
+    expect(withClock('{remaining:2}', clock)).toBe('09:59');
+    expect(formatRemaining(3_725_000, 2)).toBe('01:02:05');
+    expect(withClock('{elapsed:3}', { ...clock, startedAtMs: evening - 12_345_000 })).toBe('12345');
+    expect(withClock('{time:4}', clock)).toBe('21:05');
   });
 });

@@ -956,7 +956,8 @@
         "speakerNameHint": "{character} becomes the name of whoever played it",
         "insertClock": "Insert time",
         "insertRemaining": "Insert time left",
-        "clockHint": "{time} becomes the time of day, {remaining} the time left before it closes (--:-- while it runs until stopped)",
+        "insertElapsed": "Insert seconds elapsed",
+        "clockHint": "{time} becomes the time of day, {remaining} the time left before it closes (--:-- while it runs until stopped), {elapsed} the seconds since it began. Add \":digits\", as {elapsed:3}, to pad with zeros ({remaining:2} shows 09:59)",
         "fontOption": {
           "default": "Default",
           "gothic": "Sans serif (device font)",

@@ -956,7 +956,8 @@
         "speakerNameHint": "{character} が再生した人の名前になります",
         "insertClock": "時刻を入れる",
         "insertRemaining": "残り時間を入れる",
-        "clockHint": "{time} が今の時刻、{remaining} が閉じるまでの残り時間になります（止めるまで続くときは --:--）",
+        "insertElapsed": "経過秒数を入れる",
+        "clockHint": "{time} が今の時刻、{remaining} が閉じるまでの残り時間（止めるまで続くときは --:--）、{elapsed} が始まってからの秒数になります。{elapsed:3} のように「:桁数」を付けると、足りない桁を0で埋めます（{remaining:2} は 09:59）",
         "fontOption": {
           "default": "既定",
           "gothic": "ゴシック（端末依存）",
