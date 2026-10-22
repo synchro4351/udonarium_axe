@@ -16,7 +16,7 @@ import {
   isCutInExit,
 } from '@axe/domain/media/cut-in-animation-presets';
 import { CUT_IN_CLIPS, type CutInClip, isCutInClip } from '@axe/domain/media/cut-in-clip';
-import { CLOCK_TOKEN, REMAINING_TOKEN } from '@axe/domain/media/cut-in-clock-text';
+import { CLOCK_TOKEN, ELAPSED_TOKEN, REMAINING_TOKEN } from '@axe/domain/media/cut-in-clock-text';
 import { CUT_IN_EFFECTS, type CutInEffect, isCutInEffect } from '@axe/domain/media/cut-in-effect';
 import {
   CUT_IN_FILL_SHAPES,
@@ -354,6 +354,10 @@ export class CutInLayerPropertiesComponent {
 
   insertClock(): void {
     this.write((layer) => (layer.text = `${layer.text}${CLOCK_TOKEN}`));
+  }
+
+  insertElapsed(): void {
+    this.write((layer) => (layer.text = `${layer.text}${ELAPSED_TOKEN}`));
   }
 
   insertRemaining(): void {

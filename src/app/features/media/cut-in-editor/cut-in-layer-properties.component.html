@@ -127,6 +127,15 @@
           >
             {{ 'feature.media.cutInEditor.insertRemaining' | transloco }}
           </button>
+          <button
+            type="button"
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text rounded-ui-sm cursor-pointer border border-solid bg-transparent px-1.5 py-0.5 text-[11px] transition-[background,color] disabled:cursor-default disabled:opacity-50"
+            data-testid="cut-in-insert-elapsed"
+            [disabled]="!isEditable()"
+            (click)="insertElapsed()"
+          >
+            {{ 'feature.media.cutInEditor.insertElapsed' | transloco }}
+          </button>
           <span class="text-ui-dim text-[10px]">{{ 'feature.media.cutInEditor.clockHint' | transloco }}</span>
         </div>
 

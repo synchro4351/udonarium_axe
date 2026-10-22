@@ -100,6 +100,8 @@ export class CutInStageComponent {
   readonly speaker = input<CutInSpeaker | null>(null);
   /** When the cut-in closes on this watcher's clock, or null where it stays until it is stopped. */
   readonly endsAtMs = input<number | null>(null);
+  /** When the cut-in came on on this watcher's clock, or null where it is not being played. */
+  readonly startedAtMs = input<number | null>(null);
 
   /** The watcher's clock, moved on each second while a shown text layer tells the time. */
   private readonly now = signal(Date.now());
@@ -309,7 +311,9 @@ export class CutInStageComponent {
    * time goes in first, so a speaker named like a token is shown as named.
    */
   protected textOf(layer: CutInLayer): string {
-    const timed = usesClock(layer.text) ? withClock(layer.text, this.now(), this.endsAtMs()) : layer.text;
+    const timed = usesClock(layer.text)
+      ? withClock(layer.text, { nowMs: this.now(), endsAtMs: this.endsAtMs(), startedAtMs: this.startedAtMs() })
+      : layer.text;
     return withSpeakerName(timed, this.speaker()?.name, this.t('feature.media.cutIn.unknownSpeaker'));
   }
 
