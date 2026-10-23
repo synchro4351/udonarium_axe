@@ -44,6 +44,7 @@ import { IdleSeatService } from '@axe/features/lobby/idle-seat.service';
 import { dropInvitationFromAddress } from '@axe/features/lobby/leave-room';
 import { LobbyComponent } from '@axe/features/lobby/lobby/lobby.component';
 import { ReConnectComponent } from '@axe/features/lobby/re-connect/re-connect.component';
+import { ServerAccountComponent } from '@axe/features/lobby/server-account/server-account.component';
 import { RoomArchiveEventHandlerService } from '@axe/features/room-archive/room-archive-event-handler.service';
 import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
@@ -65,7 +66,7 @@ export type ConnectionMode = (typeof CONNECTION_MODES)[number];
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'peer-menu',
   templateUrl: './peer-menu.component.html',
-  imports: [FormsModule, DatePipe, SafePipe, TranslocoModule],
+  imports: [FormsModule, DatePipe, SafePipe, ServerAccountComponent, TranslocoModule],
 })
 export class PeerMenuComponent {
   private readonly t = inject(TRANSLATE_FN);

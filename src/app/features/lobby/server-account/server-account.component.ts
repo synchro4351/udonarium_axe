@@ -38,6 +38,8 @@ export class ServerAccountComponent {
   });
 
   constructor() {
+    // Shown outside the lobby too, where nothing else has asked the server how it logs in.
+    if (this.offersLogin() === null) void this.auth.refreshProviders();
     // A login, however it came, from this button, the lobby's or another tab, starts afresh: the
     // deleting asked about, or failed, was the account before it.
     effect(() => {
