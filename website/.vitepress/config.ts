@@ -194,6 +194,7 @@ export default defineConfig({
         { text: 'はじめに', link: '/start/' },
         { text: 'Axeでできること', link: '/start/features' },
         { text: '招待リンクで参加する', link: '/start/join' },
+        { text: 'はじめてのCoC（PL向け）', link: '/start/coc-player' },
         { text: 'はじめてのセッション（GM）', link: '/start/first-session' },
         { text: '用語集', link: '/start/glossary' },
         { text: 'Udonarium Axeについて', link: '/start/about' },
