@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { domainPeerDisconnect$ } from '@axe/core/event/domain-events';
 import { Network } from '@axe/core/index';
-import { resetPeerContextProvider } from '@axe/core/network/peer-context-source';
+import { IPeerContext } from '@axe/core/network/peer-context';
+import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
@@ -221,6 +222,25 @@ describe('PeerCursor', () => {
       cursor.initialize();
       cursor.peerId = 'peer-xyz';
       expect(PeerCursor.findByPeerId('peer-xyz')).toBe(cursor);
+    });
+
+    it('names a connection by its user where its new peer id has not reached the cursor yet', () => {
+      const cursor = new PeerCursor();
+      cursor.initialize();
+      cursor.userId = 'acct_kai';
+      cursor.peerId = 'peer-before';
+      const contexts = [{ peerId: 'peer-after', userId: 'acct_kai' } as IPeerContext];
+      setPeerContextProvider({
+        peerContext: contexts[0],
+        peerContexts: contexts,
+        peerIds: ['peer-after'],
+        peerId: 'me',
+      });
+
+      expect(PeerCursor.findByPeerId('peer-after')).toBeNull();
+      expect(PeerCursor.forConnection('peer-after')).toBe(cursor);
+      expect(PeerCursor.forConnection('peer-before')).toBe(cursor);
+      expect(PeerCursor.forConnection('peer-unknown')).toBeNull();
     });
 
     it('returns nothing for an identifier that is not there', () => {

@@ -466,13 +466,13 @@ export class PeerMenuComponent {
 
   /** The user ID of the peer with this peer ID, or empty while its cursor has not arrived. */
   findUserId(peerId: string) {
-    const peerCursor = PeerCursor.findByPeerId(peerId);
+    const peerCursor = PeerCursor.forConnection(peerId);
     return peerCursor ? peerCursor.userId : '';
   }
 
   /** The name of the peer with this ID, or empty while its cursor has not arrived. */
   findPeerName(peerId: string) {
-    const peerCursor = PeerCursor.findByPeerId(peerId);
+    const peerCursor = PeerCursor.forConnection(peerId);
     return peerCursor ? peerCursor.name : '';
   }
 
