@@ -312,6 +312,7 @@ const WATER_RIPPLE_LIFT_PX = 0.5;
     '[style.z-index]': 'stackIndex()',
     '(dragstart)': 'onDragstart($event)',
     '(contextmenu)': 'onContextMenu($event)',
+    '(dblclick)': 'onDoubleClick($event)',
   },
 })
 export class GameCharacterComponent {
@@ -1939,6 +1940,15 @@ export class GameCharacterComponent {
    * When several pieces are selected the shared selection menu opens instead. Seen from above with
    * a radial menu style chosen, the menu opens as a radial menu around the piece.
    */
+  /** Opens the piece's sheet, as the menu's 詳細を表示 does, for anyone who may see it. */
+  onDoubleClick(e: Event) {
+    const char = this.gameCharacter();
+    if (!char) return;
+    e.stopPropagation();
+    e.preventDefault();
+    this.showDetail(char);
+  }
+
   onContextMenu(e: Event) {
     e.stopPropagation();
     e.preventDefault();
