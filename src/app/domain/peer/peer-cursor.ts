@@ -1,6 +1,12 @@
 import { domainPeerDisconnect$ } from '@axe/core/event/domain-events';
 import { isNetworkIsolated } from '@axe/core/network/network-isolation';
-import { getAuthorityPeerId, getMyPeerId, getPeerContext, getPeerIds } from '@axe/core/network/peer-context-source';
+import {
+  getAuthorityPeerId,
+  getMyPeerId,
+  getPeerContext,
+  getPeerContexts,
+  getPeerIds,
+} from '@axe/core/network/peer-context-source';
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
@@ -390,6 +396,18 @@ export class PeerCursor extends GameObject {
   /** The cursor for a connection's peer id, which changes when a user reconnects; null for an empty or unknown id. */
   static findByPeerId(peerId: PeerId): PeerCursor | null {
     return this.find(PeerCursor.peerIdMap, peerId, false);
+  }
+
+  /**
+   * The cursor of whoever holds a connection: by its peer id, and failing that by the user the
+   * connection says it is, whose cursor stays the same while the peer id changes on a reconnect.
+   * What names a connection reads this, so a seat back from a dropped line is not shown by its id.
+   */
+  static forConnection(peerId: PeerId): PeerCursor | null {
+    const byPeer = PeerCursor.findByPeerId(peerId);
+    if (byPeer) return byPeer;
+    const userId = getPeerContexts().find((context) => context.peerId === peerId)?.userId ?? '';
+    return userId ? PeerCursor.findByUserId(userId) : null;
   }
 
   private static find(map: Map<string, string>, key: string, isUserId: boolean): PeerCursor | null {

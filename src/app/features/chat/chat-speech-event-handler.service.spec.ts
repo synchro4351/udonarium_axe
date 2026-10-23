@@ -2,6 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { ChatSpeechService } from '@axe/application/chat/chat-speech.service';
 import { emitMessageAdded, fileLoaded$ } from '@axe/core/event/domain-events';
 import { networkMessage$ } from '@axe/core/network/network-messaging';
+import { IPeerContext } from '@axe/core/network/peer-context';
+import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { ChatSpeechEventHandlerService } from '@axe/features/chat/chat-speech-event-handler.service';
@@ -39,6 +41,37 @@ describe('ChatSpeechEventHandlerService', () => {
     const skewed = tab.addMessage({ text: 'new from skewed clock', timestamp: Date.now() - 60_000 });
     expect(speech.readAutomatically).toHaveBeenCalledExactlyOnceWith(skewed);
   });
+  describe('a connection coming and going', () => {
+    afterEach(() => resetPeerContextProvider());
+
+    function inRoom(roomId: string) {
+      const context = { isRoom: true, roomId, roomName: '卓', peerId: 'me' } as IPeerContext;
+      setPeerContextProvider({ peerContext: context, peerContexts: [], peerIds: [], peerId: 'me' });
+    }
+
+    it('keeps reading aloud through a reconnect to the same room, passing over lines already there', () => {
+      inRoom('abc');
+      TestBed.inject(ChatSpeechEventHandlerService);
+      const before = tab.addMessage({ text: 'before', timestamp: Date.now() });
+      speech.readAutomatically.mockClear();
+
+      networkMessage$.emit({ eventName: 'PEER_RECONNECT', data: {}, sendFrom: '', isSendFromSelf: true });
+      networkMessage$.emit({ eventName: 'OPEN_NETWORK', data: {}, sendFrom: '', isSendFromSelf: true });
+      emitMessageAdded({ tabIdentifier: tab.identifier, messageIdentifier: before.identifier });
+
+      expect(speech.disable).not.toHaveBeenCalled();
+      expect(speech.readAutomatically).not.toHaveBeenCalled();
+    });
+
+    it('turns reading aloud off on moving to another room', () => {
+      inRoom('abc');
+      TestBed.inject(ChatSpeechEventHandlerService);
+      inRoom('xyz');
+      networkMessage$.emit({ eventName: 'OPEN_NETWORK', data: {}, sendFrom: '', isSendFromSelf: true });
+      expect(speech.disable).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('disables speech on room close and room load', () => {
     TestBed.inject(ChatSpeechEventHandlerService);
     networkMessage$.emit({ eventName: 'CLOSE_NETWORK', data: {}, sendFrom: '', isSendFromSelf: true });

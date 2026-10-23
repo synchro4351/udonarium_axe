@@ -416,7 +416,7 @@ export class ChatTabComponent {
       };
     }
 
-    const peer = PeerCursor.findByPeerId(peerId);
+    const peer = PeerCursor.forConnection(peerId);
     return {
       peerId,
       speakerIdentifier,
