@@ -40,12 +40,20 @@ import {
 import { CutIn } from '@axe/domain/media/cut-in';
 import { presetSoundLabelKey, soundFileName } from '@axe/domain/media/preset-sound-labels';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import {
+  defaultSwitchDefinition,
+  encodeSwitchDefinition,
+  parseSwitchDefinition,
+  type SwitchAction,
+  type SwitchActionKind,
+} from '@axe/domain/tabletop/board-switch/switch-definition';
 import { RANGE_DEFAULT_BORDER_COLOR, RANGE_DEFAULT_FILL_COLOR } from '@axe/domain/tabletop/range';
 import { isMenuCommandOffered, MENU_COMMANDS } from '@axe/domain/ui/menu-command';
 import { CHARACTER_PANELS, DEFAULT_CHARACTER_PANEL, panelLabelKey } from '@axe/domain/ui/room-panel';
 import { findSlotActor } from '@axe/features/hotbar/hotbar-actor';
 import { HotbarRunnerService } from '@axe/features/hotbar/hotbar-runner.service';
 import { selectControllableCharacters } from '@axe/features/pl-tools/owned-character-list/owned-characters';
+import { SwitchActionListComponent } from '@axe/features/tabletop/board-switch/switch-action-list.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -64,7 +72,7 @@ const DEFAULT_STEP_DELAY_MS = 300;
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'hotbar-slot-editor',
   templateUrl: './hotbar-slot-editor.component.html',
-  imports: [FormsModule, SafePipe, TranslocoModule],
+  imports: [FormsModule, SafePipe, SwitchActionListComponent, TranslocoModule],
 })
 export class HotbarSlotEditorComponent {
   private readonly panelService = inject(PanelService);
@@ -305,6 +313,20 @@ export class HotbarSlotEditorComponent {
       return found ? { ...step, ...found.step, delayMs: step.delayMs } : step;
     });
     this.patchOptions({ steps: settled });
+  }
+
+  /** What the group does of itself after its slots, as a switch would. */
+  protected readonly groupActions = computed<SwitchAction[]>(() => {
+    const options = this.options();
+    return options.kind === 'group' ? parseSwitchDefinition(options.actions ?? '').actions : [];
+  });
+
+  /** Kinds that mean nothing without a switch to stand on. */
+  protected readonly hiddenActionKinds: readonly SwitchActionKind[] = ['removeSelf'];
+
+  protected setGroupActions(actions: SwitchAction[]): void {
+    const written = actions.length > 0 ? encodeSwitchDefinition({ ...defaultSwitchDefinition(), actions }) : '';
+    this.patchOptions({ actions: written });
   }
 
   protected readonly groupSteps = computed<HotbarStep[]>(() => {

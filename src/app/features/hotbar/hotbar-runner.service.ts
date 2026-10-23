@@ -8,6 +8,7 @@ import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { CutInService } from '@axe/application/media/cut-in.service';
 import { FirstPersonService } from '@axe/application/tabletop/first-person.service';
 import { RangeShapeInvokeService } from '@axe/application/tabletop/range-shape-invoke.service';
+import { SwitchPressService } from '@axe/application/tabletop/switch-press.service';
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { TabletopActionService } from '@axe/application/tabletop/tabletop-action.service';
@@ -31,6 +32,7 @@ import { hotbarSlotTag } from '@axe/domain/hotbar/hotbar-tag';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import { parseSwitchDefinition } from '@axe/domain/tabletop/board-switch/switch-definition';
 import { RangeArea } from '@axe/domain/tabletop/range';
 import { menuCommandOf } from '@axe/domain/ui/menu-command';
 import { DEFAULT_CHARACTER_PANEL } from '@axe/domain/ui/room-panel';
@@ -61,6 +63,7 @@ function failed(reason: HotbarFailure): HotbarRunResult {
 
 @Injectable({ providedIn: 'root' })
 export class HotbarRunnerService {
+  private readonly switchPress = inject(SwitchPressService);
   private readonly objectStore = inject(ObjectStore);
   private readonly tabletop = inject(TabletopService);
   private readonly audioStorage = inject(AudioStorage);
@@ -374,7 +377,9 @@ export class HotbarRunnerService {
 
   private runGroup(slot: HotbarSlot, character: GameCharacter | null): HotbarRunResult {
     const options = slot.options;
-    if (options.kind !== 'group' || options.steps.length < 1) return failed('empty');
+    if (options.kind !== 'group') return failed('empty');
+    const own = parseSwitchDefinition(options.actions ?? '');
+    if (options.steps.length < 1 && own.actions.length < 1) return failed('empty');
 
     const hotbar = Hotbar.mine();
     if (!hotbar) return failed('empty');
@@ -382,7 +387,7 @@ export class HotbarRunnerService {
     const steps = options.steps
       .map((step) => ({ step, slot: this.stepSlot(hotbar, step) }))
       .filter((held): held is { step: HotbarStep; slot: HotbarSlot } => held.slot !== null);
-    if (steps.length < 1) return failed('empty');
+    if (steps.length < 1 && own.actions.length < 1) return failed('empty');
 
     let ran = 0;
     let waiting = 0;
@@ -409,6 +414,24 @@ export class HotbarRunnerService {
       if (result?.ok) ran += 1;
       else if (result) firstFailure ??= result.reason;
     });
+
+    // The group's own actions follow its slots, the first of them as the last slot goes.
+    if (own.actions.length > 0) {
+      const runOwn = () => {
+        if (character && !this.objectStore.get(character.identifier)) return;
+        void this.switchPress.runActions(own, character);
+      };
+      if (waitedFor > 0) {
+        const timer = setTimeout(() => {
+          this.pending.delete(timer);
+          runOwn();
+        }, waitedFor);
+        this.pending.add(timer);
+      } else {
+        runOwn();
+      }
+      waiting += 1;
+    }
 
     if (ran > 0 || waiting > 0) return OK;
     return failed(firstFailure ?? 'empty');

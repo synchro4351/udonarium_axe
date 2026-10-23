@@ -6,6 +6,7 @@ import { EffectLibraryService } from '@axe/application/effect/effect-library.ser
 import { CutInService } from '@axe/application/media/cut-in.service';
 import { FirstPersonService } from '@axe/application/tabletop/first-person.service';
 import { RangeShapeInvokeService } from '@axe/application/tabletop/range-shape-invoke.service';
+import { SwitchPressService } from '@axe/application/tabletop/switch-press.service';
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { TabletopActionService } from '@axe/application/tabletop/tabletop-action.service';
 import { TurnOrderService } from '@axe/application/turn/turn-order.service';
@@ -27,6 +28,11 @@ import { hotbarSlotTag } from '@axe/domain/hotbar/hotbar-tag';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { SoundEffect } from '@axe/domain/media/sound-effect';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import {
+  defaultSwitchDefinition,
+  encodeSwitchDefinition,
+  newSwitchAction,
+} from '@axe/domain/tabletop/board-switch/switch-definition';
 import { GameTable } from '@axe/domain/tabletop/game-table';
 import { RangeArea } from '@axe/domain/tabletop/range';
 import { menuCommandOf } from '@axe/domain/ui/menu-command';
@@ -446,6 +452,34 @@ describe('HotbarRunnerService', () => {
 
       expect(run(group, null)).toEqual({ ok: true });
       expect(request.mock.calls.map((call) => call[0])).toEqual(['二つ目', '一つ目']);
+    });
+
+    it('does the switch actions written into a group after its slots, with none of their own needed', () => {
+      const hotbar = Hotbar.ensureMine()!;
+      const first = emptyHotbarSlotDraft('prefill');
+      first.value = '一つ目';
+      hotbar.put(0, 1, first);
+      const runActions = vi.spyOn(TestBed.inject(SwitchPressService), 'runActions').mockResolvedValue();
+      const actions = encodeSwitchDefinition({
+        ...defaultSwitchDefinition(),
+        actions: [{ ...newSwitchAction('say'), text: '続けて言う' }],
+      });
+
+      const withSlot = slotOf('group', '', {
+        kind: 'group',
+        steps: [{ page: 0, slotIndex: 1, slotIdentifier: '', delayMs: 0 }],
+        actions,
+      });
+      expect(run(withSlot, character)).toEqual({ ok: true });
+      expect(runActions).toHaveBeenCalledTimes(1);
+      const [definition, actor] = runActions.mock.calls[0];
+      expect(definition.actions.map((action) => (action.kind === 'say' ? action.text : ''))).toEqual(['続けて言う']);
+      expect(actor).toBe(character);
+
+      const alone = slotOf('group', '', { kind: 'group', steps: [], actions });
+      expect(run(alone, null)).toEqual({ ok: true });
+      expect(runActions).toHaveBeenCalledTimes(2);
+      expect(run(slotOf('group', '', { kind: 'group', steps: [] }), null)).toEqual({ ok: false, reason: 'empty' });
     });
 
     it('follows a step to wherever the reader moved the slot it names', () => {

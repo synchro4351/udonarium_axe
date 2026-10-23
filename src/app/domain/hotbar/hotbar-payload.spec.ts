@@ -101,6 +101,19 @@ describe('hotbar slot payloads', () => {
     expect(parseHotbarPayload('diceDeploy', '')).toEqual({ kind: 'plain' });
   });
 
+  describe('the actions a multi-action does of itself', () => {
+    it('keeps them as written and drops an empty list, so an older group reads as before', () => {
+      const actions = JSON.stringify({ v: 1, actions: [{ kind: 'say', text: 'いくぞ' }] });
+      const payload = parseHotbarPayload('group', JSON.stringify({ steps: [], actions }));
+      expect(payload).toEqual({ kind: 'group', steps: [], actions });
+      expect(parseHotbarPayload('group', encodeHotbarPayload(payload))).toEqual(payload);
+      expect(parseHotbarPayload('group', JSON.stringify({ steps: [], actions: '' }))).toEqual({
+        kind: 'group',
+        steps: [],
+      });
+    });
+  });
+
   describe('what a multi-action waits between its steps', () => {
     it('gives each step a wait of its own', () => {
       const payload = parseHotbarPayload(

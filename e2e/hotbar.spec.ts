@@ -69,6 +69,29 @@ test.describe('the hotbar', () => {
     await expect(page.locator('app-jukebox')).toBeVisible({ timeout: 10000 });
   });
 
+  test('says the lines written into a multi-action itself, with no slot of their own', async ({ page }) => {
+    await slots(page).nth(4).click();
+    const editor = page.locator('hotbar-slot-editor');
+    await expect(editor).toBeVisible({ timeout: 10000 });
+    await page.locator('[data-testid="hotbar-editor-kind"]').selectOption('group');
+    const own = editor.getByTestId('hotbar-editor-group-actions');
+    await expect(own).toBeVisible();
+    // Taking away what a switch stands on means nothing on a hotbar, so it is not offered.
+    await expect(own.getByTestId('switch-action-add-removeSelf')).toHaveCount(0);
+    await own.getByTestId('switch-action-add-say').click();
+    await own.getByTestId('switch-action-text').fill('マルチから直接言う');
+    await own.getByTestId('switch-action-add-say').click();
+    await own.getByTestId('switch-action-text').nth(1).fill('二言目');
+    await page.locator('[data-testid="hotbar-editor-save"]').click();
+    await expect(slots(page).nth(4)).toHaveAttribute('data-filled', 'true');
+
+    await slots(page).nth(4).click();
+
+    const log = page.locator('chat-window chat-message');
+    await expect(log.filter({ hasText: 'マルチから直接言う' })).toHaveCount(1, { timeout: 10000 });
+    await expect(log.filter({ hasText: '二言目' })).toHaveCount(1, { timeout: 10000 });
+  });
+
   test('shows other slots on another page, and the first ones again on going back', async ({ page }) => {
     await slots(page).nth(0).click();
     await expect(page.locator('hotbar-slot-editor')).toBeVisible({ timeout: 10000 });
