@@ -3,6 +3,7 @@ import {
   emitFileLoaded,
   emitFilesTooLarge,
   emitImageDropped,
+  emitJsonLoaded,
   emitXmlLoaded,
   type FileTooLarge,
 } from '@axe/core/event/domain-events';
@@ -45,6 +46,8 @@ export const MAX_IMAGE_FILE_SIZE = MAX_LOADED_IMAGE_BYTES;
 export const MAX_LOADED_AUDIO_BYTES = 10 * MEGA_BYTE;
 const DROP_STACK_OFFSET = 20;
 const XML_MIME_TYPE = 'text/xml';
+/** The largest JSON file read from a drop; an arrangement of the menus is a few kilobytes. */
+const MAX_JSON_BYTES = 1024 * 1024;
 const INTERNAL_DRAG_TYPE = 'application/x-axe-internal-drag';
 
 /** What {@link FileArchiver.loadImages} took in and what it had to leave out. */
@@ -219,6 +222,7 @@ export class FileArchiver {
       if (isImageDropped) droppedImageCount++;
       await this.handleAudio(file, tooLarge);
       await this.handleText(file, dropPoint);
+      await this.handleJson(file);
       await this.handleZip(file, dropPoint, tooLarge);
       emitFileLoaded();
     }
@@ -330,8 +334,20 @@ export class FileArchiver {
     }
   }
 
+  /** Reads a small JSON file and hands its text on; what it is, the one who knows that kind decides. */
+  private async handleJson(file: File): Promise<void> {
+    if (!/\.json$/i.test(file.name) || file.size > MAX_JSON_BYTES) return;
+    try {
+      emitJsonLoaded({ name: file.name, text: await file.text() });
+    } catch (reason) {
+      Logger.warn('[FileArchiver] JSON読み込みエラー', reason);
+    }
+  }
+
   private async handleZip(file: File, dropPoint: { x: number; y: number } | undefined, tooLarge: FileTooLarge[]) {
     if (!file.type.includes('application/') && file.type.length > 0) return;
+    // A JSON file is read on its own, and is no archive to be unpacked.
+    if (/\.json$/i.test(file.name)) return;
     let entries: ZipEntry[];
     try {
       entries = await readZipEntries(file);

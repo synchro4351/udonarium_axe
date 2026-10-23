@@ -5489,7 +5489,8 @@
       },
       "writeOut": "Write out",
       "readIn": "Read in",
-      "readFailed": "That file does not hold an arrangement of the menus"
+      "readFailed": "That file does not hold an arrangement of the menus",
+      "dropped": "Menu arrangement loaded ({{name}})"
     },
     "boardSwitch": {
       "panelTitle": "Switch - {{name}}",
