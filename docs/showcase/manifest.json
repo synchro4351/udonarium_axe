@@ -1,10 +1,5 @@
 [
   {
-    "file": "stamps-picker.png",
-    "source": "17ba32be9c22fad3ccc313553f74aa203ae91355",
-    "sample": "bundled public sample, isolated offline browser"
-  },
-  {
     "file": "chat-stamps-suggestions.png",
     "source": "17ba32be9c22fad3ccc313553f74aa203ae91355",
     "sample": "bundled public sample, isolated offline browser"
@@ -15,17 +10,7 @@
     "sample": "bundled public sample, isolated offline browser"
   },
   {
-    "file": "media-images.png",
-    "source": "17ba32be9c22fad3ccc313553f74aa203ae91355",
-    "sample": "bundled public sample, isolated offline browser"
-  },
-  {
     "file": "image-transparency.png",
-    "source": "17ba32be9c22fad3ccc313553f74aa203ae91355",
-    "sample": "bundled public sample, isolated offline browser"
-  },
-  {
-    "file": "cutin-template.png",
     "source": "17ba32be9c22fad3ccc313553f74aa203ae91355",
     "sample": "bundled public sample, isolated offline browser"
   },
@@ -45,21 +30,6 @@
     "sample": "bundled public sample, isolated offline browser"
   },
   {
-    "file": "shared-note-formatting.png",
-    "source": "2da66388f311ad4fda3d77eb2d71f1c0c9e9e898",
-    "sample": "fictional adventure note, isolated offline browser"
-  },
-  {
-    "file": "cutin-simple-editor.png",
-    "source": "2da66388f311ad4fda3d77eb2d71f1c0c9e9e898",
-    "sample": "bundled public template, isolated offline browser"
-  },
-  {
-    "file": "cutin-detailed-editor.png",
-    "source": "50ea3ac928484eb5a3ee2520ae71ab2b8bd39d88",
-    "sample": "bundled public template and fictional text, isolated offline browser"
-  },
-  {
     "file": "cutin-sample-template.png",
     "source": "2da66388f311ad4fda3d77eb2d71f1c0c9e9e898",
     "sample": "bundled public template, isolated offline browser"
@@ -71,16 +41,6 @@
   },
   {
     "file": "reaction-effect-material.png",
-    "source": "75b16b3a52adfe214953e9b995872b6d1096f18e",
-    "sample": "bundled public sample, isolated offline browser"
-  },
-  {
-    "file": "character-portrait-fit.png",
-    "source": "75b16b3a52adfe214953e9b995872b6d1096f18e",
-    "sample": "bundled public sample, isolated offline browser"
-  },
-  {
-    "file": "chat-text-log.png",
     "source": "75b16b3a52adfe214953e9b995872b6d1096f18e",
     "sample": "bundled public sample, isolated offline browser"
   },
