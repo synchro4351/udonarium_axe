@@ -2,10 +2,11 @@ name: Docs
 
 # Builds the VitePress site in website/ and serves it on GitHub Pages, apart from the app's own
 # S3 deploy (deploy.yml). The repository's Settings → Pages → Source has to be "GitHub Actions".
+# The tyoitashi fork publishes from its own mainline, codex/synwork-integration.
 
 on:
   push:
-    branches: [main]
+    branches: [main, codex/synwork-integration]
     paths:
       - 'website/**'
       - '.github/workflows/docs.yml'
@@ -45,6 +46,11 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          # Point the edit links and share cards at the repository this run publishes.
+          DOCS_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          DOCS_EDIT_BRANCH: ${{ github.ref_name }}
+          DOCS_SITE_ORIGIN: https://${{ github.repository_owner }}.github.io
 
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
