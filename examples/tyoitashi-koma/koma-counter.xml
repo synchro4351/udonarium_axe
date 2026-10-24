@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<character location.name="table" location.x="0" location.y="0" posZ="0" isNpc="true" overViewWidth="270" overViewMaxHeight="250">
+  <data name="character">
+    <data name="image"><data type="image" name="imageIdentifier"></data></data>
+    <data name="common"><data name="name">カウンター</data><data name="size">1</data><data name="altitude">0</data></data>
+    <data name="detail"><data role="section" name="カウンター"><data role="group" name="基本"><data fieldType="resource" type="numberResource" currentValue="0" cs-piece-gauge="true" cs-change-effect="true" cs-change-sound="true" role="field" name="カウント">10</data><data fieldType="text" role="field" name="ラベル">ラウンド</data><data fieldType="longText" type="note" role="field" name="メモ"></data></data></data></data>
+  </data>
+  <chat-palette dicebot="DiceBot">:カウント+1
+:カウント-1
+:カウント=0</chat-palette>
+</character>
