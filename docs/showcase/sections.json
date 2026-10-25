@@ -145,23 +145,6 @@
     "branch": "codex/synwork-integration"
   },
   {
-    "id": "samples",
-    "title": "演出の見本を取り込む",
-    "version": "r10",
-    "text": "短い演出の見本16個は、アプリには入れていません。使いたいときだけGitHubから16個入りのZIPをダウンロードして、いつもの読み込みで部屋に取り込みます。取り込んだ見本は、普通のカットインとして編集できます。",
-    "link": [
-      "16個入りの演出見本ZIPをダウンロード",
-      "https://github.com/synchro4351/udonarium_axe/raw/main/examples/tyoitashi-cut-ins.zip"
-    ],
-    "images": [
-      [
-        "cutin-sample-template.png",
-        "キャラクターの画像と名前を差し込むだけの、簡単なテンプレートです。"
-      ]
-    ],
-    "branch": "codex/cutin-external-examples"
-  },
-  {
     "id": "more",
     "title": "ほかのちょい足し",
     "version": "r10",

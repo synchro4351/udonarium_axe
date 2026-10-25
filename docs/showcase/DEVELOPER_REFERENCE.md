@@ -78,13 +78,6 @@
 
 - `cutin-clock.png`: 撮影ソース [d8d9c8d51ec242f3e2d9de68b8712c85e696df08](https://github.com/synchro4351/udonarium_axe/tree/d8d9c8d51ec242f3e2d9de68b8712c85e696df08)、素材: bundled public sample, isolated offline browser
 
-## 演出の見本を取り込む
-
-- 提供状況: r10
-- 機能のブランチ: [codex/cutin-external-examples](https://github.com/synchro4351/udonarium_axe/tree/codex/cutin-external-examples)
-
-- `cutin-sample-template.png`: 撮影ソース [2da66388f311ad4fda3d77eb2d71f1c0c9e9e898](https://github.com/synchro4351/udonarium_axe/tree/2da66388f311ad4fda3d77eb2d71f1c0c9e9e898)、素材: bundled public template, isolated offline browser
-
 ## ほかのちょい足し
 
 - 提供状況: r10

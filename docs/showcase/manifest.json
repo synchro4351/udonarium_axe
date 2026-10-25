@@ -30,11 +30,6 @@
     "sample": "bundled public sample, isolated offline browser"
   },
   {
-    "file": "cutin-sample-template.png",
-    "source": "2da66388f311ad4fda3d77eb2d71f1c0c9e9e898",
-    "sample": "bundled public template, isolated offline browser"
-  },
-  {
     "file": "reaction-effects.png",
     "source": "75b16b3a52adfe214953e9b995872b6d1096f18e",
     "sample": "bundled public sample, isolated offline browser"
