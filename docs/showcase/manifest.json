@@ -58,5 +58,30 @@
     "file": "multipart-selection.png",
     "source": "70fbd8b1028be73806b83a367d0f7a7caf259176",
     "sample": "original fictional monster drawn for this showcase, isolated offline browser"
+  },
+  {
+    "file": "image-effects.png",
+    "source": "d8d9c8d51ec242f3e2d9de68b8712c85e696df08",
+    "sample": "bundled public sample, isolated offline browser"
+  },
+  {
+    "file": "room-piece-gauges.png",
+    "source": "d8d9c8d51ec242f3e2d9de68b8712c85e696df08",
+    "sample": "bundled public sample, isolated offline browser"
+  },
+  {
+    "file": "multipart-speaker.png",
+    "source": "d8d9c8d51ec242f3e2d9de68b8712c85e696df08",
+    "sample": "bundled public sample, isolated offline browser"
+  },
+  {
+    "file": "hotbar-multi-actions.png",
+    "source": "d8d9c8d51ec242f3e2d9de68b8712c85e696df08",
+    "sample": "bundled public sample, isolated offline browser"
+  },
+  {
+    "file": "cutin-clock.png",
+    "source": "d8d9c8d51ec242f3e2d9de68b8712c85e696df08",
+    "sample": "bundled public sample, isolated offline browser"
   }
 ]

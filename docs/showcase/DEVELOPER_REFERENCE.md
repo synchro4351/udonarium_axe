@@ -31,12 +31,14 @@
 - 提供状況: r10
 - 機能のブランチ: [codex/synwork-integration](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)
 
+- `image-effects.png`: 撮影ソース [d8d9c8d51ec242f3e2d9de68b8712c85e696df08](https://github.com/synchro4351/udonarium_axe/tree/d8d9c8d51ec242f3e2d9de68b8712c85e696df08)、素材: bundled public sample, isolated offline browser
 
 ## 頭上のリソースを部屋でそろえる
 
 - 提供状況: r10
 - 機能のブランチ: [codex/synwork-integration](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)
 
+- `room-piece-gauges.png`: 撮影ソース [d8d9c8d51ec242f3e2d9de68b8712c85e696df08](https://github.com/synchro4351/udonarium_axe/tree/d8d9c8d51ec242f3e2d9de68b8712c85e696df08)、素材: bundled public sample, isolated offline browser
 
 ## 一枚の絵から、部位ごとのコマ
 
@@ -44,6 +46,7 @@
 - 機能のブランチ: [codex/multipart-character-tokens](https://github.com/synchro4351/udonarium_axe/tree/codex/multipart-character-tokens)
 
 - `multipart-selection.png`: 撮影ソース [70fbd8b1028be73806b83a367d0f7a7caf259176](https://github.com/synchro4351/udonarium_axe/tree/70fbd8b1028be73806b83a367d0f7a7caf259176)、素材: original fictional monster drawn for this showcase, isolated offline browser
+- `multipart-speaker.png`: 撮影ソース [d8d9c8d51ec242f3e2d9de68b8712c85e696df08](https://github.com/synchro4351/udonarium_axe/tree/d8d9c8d51ec242f3e2d9de68b8712c85e696df08)、素材: bundled public sample, isolated offline browser
 
 ## 小さな反応を、さっと送る
 
@@ -59,6 +62,7 @@
 - 機能のブランチ: [codex/synwork-integration](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)
 
 - `hotbar-starters.png`: 撮影ソース [17ba32be9c22fad3ccc313553f74aa203ae91355](https://github.com/synchro4351/udonarium_axe/tree/17ba32be9c22fad3ccc313553f74aa203ae91355)、素材: bundled public sample, isolated offline browser
+- `hotbar-multi-actions.png`: 撮影ソース [d8d9c8d51ec242f3e2d9de68b8712c85e696df08](https://github.com/synchro4351/udonarium_axe/tree/d8d9c8d51ec242f3e2d9de68b8712c85e696df08)、素材: bundled public sample, isolated offline browser
 
 ## カットインの文字を一つずつ動かす
 
@@ -72,6 +76,7 @@
 - 提供状況: r10
 - 機能のブランチ: [codex/synwork-integration](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)
 
+- `cutin-clock.png`: 撮影ソース [d8d9c8d51ec242f3e2d9de68b8712c85e696df08](https://github.com/synchro4351/udonarium_axe/tree/d8d9c8d51ec242f3e2d9de68b8712c85e696df08)、素材: bundled public sample, isolated offline browser
 
 ## 演出の見本を取り込む
 
