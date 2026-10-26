@@ -115,3 +115,35 @@ test.describe('square and diamond ranges', () => {
     await expect(hint).toHaveCount(0);
   });
 });
+
+test('lands a range with no caster on a cell or on a crossing, by where it is dropped', async ({ page }) => {
+  await waitAppReady(page);
+  await createCircleRange(page);
+  const range = page.locator('range').first();
+  const positionX = async () =>
+    range
+      .locator('[appmovable]')
+      .first()
+      .evaluate((el) => {
+        const match = /translate(?:3d)?\(\s*(-?[\d.]+)px/.exec((el as HTMLElement).style.transform);
+        return match ? Number(match[1]) : NaN;
+      });
+  const handle = range.locator('.pointer-events-auto').first();
+  const seen = new Set<number>();
+  const landed: number[] = [];
+  for (const distance of [10, 20, 30, 40, 50, 60]) {
+    const box = (await handle.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + distance, box.y + box.height / 2, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(250);
+    const x = await positionX();
+    expect(Number.isNaN(x)).toBe(false);
+    landed.push(x);
+    seen.add(((x % 50) + 50) % 50);
+  }
+  // Every landing is on a half cell, and both kinds are reached.
+  expect([...seen].every((rest) => rest === 0 || rest === 25)).toBe(true);
+  expect(seen.size).toBe(2);
+});

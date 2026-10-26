@@ -48,6 +48,7 @@ import {
   rangeClipPathCss,
   rangeQuadrantCells,
 } from '@axe/features/tabletop/range/range-paint';
+import { halfCellSnapOf } from '@axe/features/tabletop/range/range-snap';
 import { MovableOption } from '@axe/ui/directives/movable.directive';
 import { MovableDirective } from '@axe/ui/directives/movable.directive';
 import { RotableOption } from '@axe/ui/directives/rotable.directive';
@@ -248,7 +249,12 @@ export class RangeComponent {
       target: this.range,
       collideLayers: ['terrain'],
       transformCssOffset: translateZCss(Z_OFFSET_RANGE_PX),
-      snapToSquare: (_, at) => squareCentreAt(this.currentTable, at),
+      snapToSquare: (range, at) =>
+        squareCentreAt(this.currentTable, at) ??
+        halfCellSnapOf(at, this.gridSize, {
+          hex: isHexGrid(this.currentTable.gridType),
+          follows: !!range.followingCharacterIdentifier,
+        }),
       snapOrigin: () => {
         const half = this.gridSize / 2;
         const snapXY = isHexGrid(this.currentTable.gridType) ? 0 : half;
