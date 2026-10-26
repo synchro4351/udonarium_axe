@@ -26,6 +26,22 @@ describe('PeerReconnectScheduler', () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 
+  it('runs a waiting attempt at once when asked, keeping its count, and does nothing with none waiting', () => {
+    const scheduler = new PeerReconnectScheduler([100, 200]);
+    const run = vi.fn();
+    scheduler.schedule('peer-a', run);
+
+    scheduler.runNow('peer-a');
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(scheduler.isScheduled('peer-a')).toBe(false);
+    expect(scheduler.attemptOf('peer-a')).toBe(1);
+    vi.advanceTimersByTime(100);
+    expect(run).toHaveBeenCalledTimes(1);
+
+    scheduler.runNow('peer-a');
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
   it('lengthens the delay with each attempt', () => {
     const scheduler = new PeerReconnectScheduler([100, 200, 400]);
 
