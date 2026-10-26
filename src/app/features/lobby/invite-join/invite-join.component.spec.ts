@@ -1,6 +1,7 @@
 import { signal, type WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RoomJoinService } from '@axe/application/lobby/room-join.service';
+import { ServerAuthService } from '@axe/application/lobby/server-auth.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ConfirmService } from '@axe/application/ui/confirm.service';
 import { LOCAL_MODE_STORAGE_KEY } from '@axe/application/ui/local-mode-preference.service';
@@ -39,6 +40,7 @@ describe('InviteJoinComponent', () => {
   let isCompact: WritableSignal<boolean>;
   let restoreOffered: WritableSignal<boolean>;
   let originalMyCursor: PeerCursor;
+  let auth: unknown = null;
 
   async function setup(hash: string): Promise<void> {
     location.hash = hash;
@@ -55,6 +57,7 @@ describe('InviteJoinComponent', () => {
       ],
     }).compileComponents();
     TestBed.overrideProvider(ModalService, { useValue: { open: modalOpen } });
+    if (auth) TestBed.overrideProvider(ServerAuthService, { useValue: auth });
     fixture = TestBed.createComponent(InviteJoinComponent);
     fixture.detectChanges();
   }
@@ -90,6 +93,7 @@ describe('InviteJoinComponent', () => {
   });
 
   afterEach(() => {
+    auth = null;
     location.hash = '';
     PeerCursor.myCursor = originalMyCursor;
     vi.restoreAllMocks();
@@ -398,6 +402,44 @@ describe('InviteJoinComponent', () => {
 
       await eventually(() => expect(joinServerRoom).toHaveBeenCalledWith(expect.anything(), 'typed'));
       expect(modalOpen.mock.calls[0][1]).toMatchObject({ checkedByServer: true });
+    });
+
+    describe('for somebody who came in without logging in', () => {
+      const stubAuth = (loggedIn: boolean) => {
+        const startLogin = vi.fn().mockResolvedValue(undefined);
+        auth = {
+          isLoggedIn: signal(loggedIn),
+          offersLogin: signal(true),
+          refreshProviders: vi.fn().mockResolvedValue(undefined),
+          startLogin,
+        };
+        return startLogin;
+      };
+
+      it('says they are watching and offers the login that lets them play', async () => {
+        PeerCursor.myCursor.role = PeerRole.Guest;
+        const startLogin = stubAuth(false);
+        const ask = vi.spyOn(ConfirmService.prototype, 'ask').mockResolvedValue(true);
+        findServerRoom.mockResolvedValue(serverRoom(false));
+        await setup(link(''));
+
+        await eventually(() => expect(ask).toHaveBeenCalledOnce());
+        expect(ask.mock.calls[0][0]).toMatchObject({ title: 'いまは見学者です' });
+        await eventually(() => expect(startLogin).toHaveBeenCalledOnce());
+      });
+
+      it('asks nothing of a player, or of anybody logged in', async () => {
+        const startLogin = stubAuth(true);
+        const ask = vi.spyOn(ConfirmService.prototype, 'ask').mockResolvedValue(true);
+        findServerRoom.mockResolvedValue(serverRoom(false));
+        PeerCursor.myCursor.role = PeerRole.Guest;
+        await setup(link(''));
+
+        await eventually(() => expect(joinServerRoom).toHaveBeenCalled());
+        await flush();
+        expect(ask).not.toHaveBeenCalled();
+        expect(startLogin).not.toHaveBeenCalled();
+      });
     });
 
     it('hands the server the invitation the link carries before joining', async () => {

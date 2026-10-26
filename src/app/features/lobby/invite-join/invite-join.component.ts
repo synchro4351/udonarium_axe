@@ -10,7 +10,9 @@ import {
 } from '@angular/core';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { isInAnotherRoom, RoomJoinService, wasLastIn } from '@axe/application/lobby/room-join.service';
+import { ServerAuthService } from '@axe/application/lobby/server-auth.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { ConfirmService } from '@axe/application/ui/confirm.service';
 import { LocalModePreferenceService } from '@axe/application/ui/local-mode-preference.service';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { OverlayModeService } from '@axe/application/ui/overlay-mode.service';
@@ -51,6 +53,8 @@ export class InviteJoinComponent {
   private readonly restoreOffer = inject(RoomRestoreOfferService);
   private readonly reach = inject(NetworkReachService);
   private readonly withheldEntry = inject(WithheldEntryService);
+  private readonly auth = inject(ServerAuthService);
+  private readonly confirm = inject(ConfirmService);
 
   private readonly state = signal<InviteJoinState>('idle');
   private readonly roomName = signal('');
@@ -237,6 +241,25 @@ export class InviteJoinComponent {
     }
 
     this.state.set('done');
+    void this.offerLoginToGuest();
+  }
+
+  /**
+   * Tells somebody who came in by an invitation without logging in that they are watching, and offers
+   * the login that lets them play, where the room server has one. Logging in comes back into the room,
+   * the invitation kept for the account.
+   */
+  private async offerLoginToGuest(): Promise<void> {
+    if (PeerCursor.myCursor?.role !== PeerRole.Guest || this.auth.isLoggedIn()) return;
+    if (this.auth.offersLogin() === null) await this.auth.refreshProviders();
+    if (!this.auth.offersLogin() || this.auth.isLoggedIn()) return;
+    const login = await this.confirm.ask({
+      title: this.t('feature.lobby.invite.guestLoginTitle'),
+      message: this.t('feature.lobby.invite.guestLoginMessage'),
+      okLabel: this.t('feature.lobby.account.login'),
+      cancelLabel: this.t('feature.lobby.invite.guestLoginStay'),
+    });
+    if (login) await this.auth.startLogin();
   }
 
   private async resolvePassword(hasPassword: boolean, given: string, peerContext: PeerContext): Promise<string | null> {

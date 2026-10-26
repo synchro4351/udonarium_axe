@@ -3740,7 +3740,10 @@
         "failed": "Could not join \"{{roomName}}\"",
         "offline": "You are offline, so you cannot join \"{{roomName}}\". To join, switch to online in the connection panel",
         "openLobby": "Open lobby",
-        "dismiss": "Dismiss"
+        "dismiss": "Dismiss",
+        "guestLoginTitle": "You are watching",
+        "guestLoginMessage": "You came in by an invitation without logging in, so you can only watch. Log in with Discord to play.",
+        "guestLoginStay": "Keep watching"
       },
       "account": {
         "login": "Log in with Discord",

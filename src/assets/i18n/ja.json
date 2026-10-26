@@ -3740,7 +3740,10 @@
         "failed": "「{{roomName}}」に参加できませんでした",
         "offline": "オフラインのため「{{roomName}}」に入れません。入るときは、接続パネルでオンラインに切り替えてください",
         "openLobby": "ロビーを開く",
-        "dismiss": "閉じる"
+        "dismiss": "閉じる",
+        "guestLoginTitle": "いまは見学者です",
+        "guestLoginMessage": "招待リンクから、ログインせずに入りました。このままでは見学だけになります。Discordでログインすると、PLとして参加できます。",
+        "guestLoginStay": "見学のまま"
       },
       "account": {
         "login": "Discordでログイン",
