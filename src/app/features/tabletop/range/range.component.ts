@@ -110,7 +110,19 @@ export class RangeComponent {
     return this.tabletopService.currentTable;
   }
 
-  private readonly rangeVersion = computed(() => this.objectChange.versionOf(this.range().identifier)());
+  /**
+   * The range's own version and that of each of its common data: its length, width and paint are
+   * kept there, as elements of their own, so a change to one of them is not a change to the range.
+   */
+  private readonly rangeVersion = computed(() => {
+    for (const id of this.watchedIds()) this.objectChange.versionOf(id)();
+  });
+
+  /** The range and the elements its length, width and paint are kept in. */
+  private watchedIds(): string[] {
+    const range = this.range();
+    return [range.identifier, ...(range.commonDataElement?.children ?? []).map((child) => child.identifier)];
+  }
 
   readonly name = computed(() => {
     this.rangeVersion();
@@ -218,7 +230,7 @@ export class RangeComponent {
       () => {
         if (!this._initialized) return [];
         const range = this.range();
-        return [range.identifier, range.followingCharacterIdentifier, this.currentTable.identifier];
+        return [...this.watchedIds(), range.followingCharacterIdentifier, this.currentTable.identifier];
       },
       (e) => {
         if (!this._initialized) return;
