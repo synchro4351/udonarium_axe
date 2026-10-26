@@ -428,7 +428,19 @@ describe('InviteJoinComponent', () => {
         await eventually(() => expect(startLogin).toHaveBeenCalledOnce());
       });
 
-      it('asks nothing of a player, or of anybody logged in', async () => {
+      it('asks nothing of somebody who came in as a player', async () => {
+        stubAuth(false);
+        const ask = vi.spyOn(ConfirmService.prototype, 'ask').mockResolvedValue(true);
+        findServerRoom.mockResolvedValue(serverRoom(false));
+        PeerCursor.myCursor.role = PeerRole.Player;
+        await setup(link(''));
+
+        await eventually(() => expect(joinServerRoom).toHaveBeenCalled());
+        await flush();
+        expect(ask).not.toHaveBeenCalled();
+      });
+
+      it('asks nothing of a guest who is logged in already', async () => {
         const startLogin = stubAuth(true);
         const ask = vi.spyOn(ConfirmService.prototype, 'ask').mockResolvedValue(true);
         findServerRoom.mockResolvedValue(serverRoom(false));
