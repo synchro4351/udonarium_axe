@@ -14,6 +14,7 @@ import {
   SEND_BUDGET_FRAMES,
   SEND_GATHER_MS,
   SEND_WINDOW_MS,
+  SERVER_RECONNECT_BACKOFF_MS,
   ServerConnection,
   TOKEN_CHECK_MS,
   WELCOME_TIMEOUT_MS,
@@ -640,6 +641,73 @@ describe('ServerConnection', () => {
     }
 
     expect(socket.readyState).toBe(3);
+  });
+
+  describe('a line down for minutes', () => {
+    /** Each try fails as a socket does while the line is down: it closes without opening. */
+    function failEachTry(ms: number): void {
+      const step = 500;
+      for (let waited = 0; waited < ms; waited += step) {
+        const socket = latest();
+        if (socket.readyState === 0) socket.close(1006);
+        vi.advanceTimersByTime(step);
+      }
+    }
+
+    it('keeps trying well past half a minute, saying so once, and is back when the line returns', async () => {
+      const socket = await enterRoom([OTHER]);
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+      socket.close(1006);
+
+      failEachTry(150_000);
+
+      expect(errors).toEqual([]);
+      expect(FakeWebSocket.instances.length).toBeGreaterThan(8);
+      expect(calls.filter((call) => call === 'reconnect retrying')).toHaveLength(1);
+      vi.useRealTimers();
+      welcomeBack(latest());
+      await vi.waitFor(() => expect(calls).toContain('reconnect recovered'));
+    });
+
+    it('gives up only after the long run of tries, about ten minutes', async () => {
+      const socket = await enterRoom();
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+      socket.close(1006);
+      const total = SERVER_RECONNECT_BACKOFF_MS.reduce((sum, ms) => sum + ms, 0);
+      expect(total).toBeGreaterThan(9 * 60_000);
+
+      failEachTry(total - 20_000);
+      expect(errors).toEqual([]);
+      failEachTry(40_000);
+      expect(errors).toHaveLength(1);
+    });
+
+    it('tries at once when the network comes back, rather than at the end of the wait', async () => {
+      const socket = await enterRoom();
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+      socket.close(1006);
+      failEachTry(40_000);
+      const before = FakeWebSocket.instances.length;
+      latest().close(1006);
+
+      window.dispatchEvent(new Event('online'));
+
+      expect(FakeWebSocket.instances.length).toBe(before + 1);
+    });
+  });
+
+  it('asks the server at once when the page is shown again, and takes a link that died meanwhile as lost', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+    const socket = await enterRoom([OTHER]);
+    socket.close = () => {
+      socket.readyState = 2;
+    };
+
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(socket.sent.at(-1)).toBe('ping');
+    vi.advanceTimersByTime(PONG_TIMEOUT_MS);
+
+    expect(calls.slice(-3)).toEqual(['disconnect authority', `disconnect ${OTHER.peerId}`, 'reconnect retrying']);
   });
 
   it('takes a silent link as lost at once, without waiting for a close that may never come', async () => {

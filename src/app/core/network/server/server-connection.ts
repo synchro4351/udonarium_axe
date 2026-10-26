@@ -7,7 +7,7 @@ import {
   ServerCredentialSource,
 } from '@axe/core/network/connection';
 import { IPeerContext, PeerContext } from '@axe/core/network/peer-context';
-import { PeerReconnectScheduler } from '@axe/core/network/peer-reconnect-scheduler';
+import { PEER_RECONNECT_BACKOFF_MS, PeerReconnectScheduler } from '@axe/core/network/peer-reconnect-scheduler';
 import { IRoomInfo } from '@axe/core/network/room-info';
 import { pageActivity } from '@axe/core/network/server/page-activity';
 import { NO_BACKEND, SERVER_UNREACHABLE } from '@axe/core/network/server/server-errors';
@@ -52,6 +52,16 @@ import {
 
 /** How long a connection waits between asking whether the server is still there. */
 export const PING_INTERVAL_MS = 25_000;
+/**
+ * The waits between tries to get back into a room the seat was in: quickly at first, then every
+ * fifteen seconds for about ten minutes, so that a line down for minutes, as a Wi-Fi being changed
+ * or a laptop lid closed for a while, still comes back by itself rather than leaving the seat out
+ * after half a minute. The network coming back, or the page being shown again, tries at once.
+ */
+export const SERVER_RECONNECT_BACKOFF_MS: readonly number[] = [
+  ...PEER_RECONNECT_BACKOFF_MS,
+  ...Array.from({ length: 40 }, () => 15_000),
+];
 /** How long it waits for any answer to that before it takes the connection as lost. */
 export const PONG_TIMEOUT_MS = 10_000;
 /**
@@ -281,7 +291,8 @@ export class ServerConnection implements Connection {
   private comingBack = false;
   private stopped = false;
   private refusal: string | null = null;
-  private readonly reconnectScheduler = new PeerReconnectScheduler();
+  private readonly reconnectScheduler = new PeerReconnectScheduler(SERVER_RECONNECT_BACKOFF_MS);
+  private watchingNetwork = false;
   /** When the room server last heard the page was in use: by the hello that got in, or by active. */
   private reportedAt = 0;
   /** The last use the hello on its way says, which the server takes up once it lets the seat in. */
@@ -351,6 +362,7 @@ export class ServerConnection implements Connection {
   open(userId: string, roomId: string, roomName: string, password: string, roomKey?: string): void {
     this.stopped = false;
     pageActivity.watch();
+    this.watchNetwork();
     void this.openAs(userId, roomId, roomName, password, roomKey);
   }
 
@@ -984,7 +996,38 @@ export class ServerConnection implements Connection {
       this.fail(SERVER_UNREACHABLE, 'the room server stayed out of reach');
       return;
     }
-    this.callback.onReconnect?.(this.me, 'retrying');
+    // Said once for the drop, not again for every try that has yet to get through.
+    if (this.reconnectScheduler.attemptOf(SOCKET_KEY) === 1) this.callback.onReconnect?.(this.me, 'retrying');
+  }
+
+  /**
+   * Hears, once, the network coming back and the page being shown again, as after Wi-Fi changes or a
+   * laptop wakes. Without a window, nothing is heard.
+   */
+  private watchNetwork(): void {
+    if (this.watchingNetwork || typeof window === 'undefined') return;
+    this.watchingNetwork = true;
+    const check = () => this.checkLinkNow();
+    window.addEventListener('online', check);
+    window.addEventListener('pageshow', check);
+    window.document?.addEventListener('visibilitychange', () => {
+      if (window.document.visibilityState === 'visible') check();
+    });
+  }
+
+  /**
+   * Sees to the link at once, rather than at the end of a wait: a try that is waiting to get back in
+   * goes now, and a link that looks open is asked whether the server is still there, so that one
+   * that died while nothing was said is found out within the time an answer may take.
+   */
+  checkLinkNow(): void {
+    if (this.stopped) return;
+    if (this.reconnectScheduler.isScheduled(SOCKET_KEY)) {
+      this.reconnectScheduler.runNow(SOCKET_KEY);
+      return;
+    }
+    const socket = this.socket;
+    if (socket && this.welcomed && socket.readyState === SOCKET_OPEN) this.askIfThere(socket);
   }
 
   /**
@@ -1255,17 +1298,21 @@ export class ServerConnection implements Connection {
     }, WELCOME_TIMEOUT_MS);
     this.pingTimer = setInterval(() => {
       if (socket !== this.socket || socket.readyState !== SOCKET_OPEN) return;
-      socket.send(PING);
-      if (this.pongTimer == null) {
-        this.pongTimer = setTimeout(() => {
-          this.pongTimer = null;
-          if (socket !== this.socket) return;
-          // A dead link may take a minute to report the close; take it as lost now.
-          socket.close(4001, 'no answer to ping');
-          if (socket === this.socket) this.socketClosed();
-        }, PONG_TIMEOUT_MS);
-      }
+      this.askIfThere(socket);
     }, PING_INTERVAL_MS);
+  }
+
+  /** Asks the server whether it is there, and takes the link as lost when nothing answers in time. */
+  private askIfThere(socket: WebSocket): void {
+    socket.send(PING);
+    if (this.pongTimer != null) return;
+    this.pongTimer = setTimeout(() => {
+      this.pongTimer = null;
+      if (socket !== this.socket) return;
+      // A dead link may take a minute to report the close; take it as lost now.
+      socket.close(4001, 'no answer to ping');
+      if (socket === this.socket) this.socketClosed();
+    }, PONG_TIMEOUT_MS);
   }
 
   /** Anything from the server shows it is there, a pong or otherwise. */
