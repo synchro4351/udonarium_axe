@@ -110,6 +110,13 @@ README・`docs/`・`website/` のまとまった日本語は `natural-japanese` 
   出るのは疑いなので、直すか残すかは文脈で決める
 - **コミットメッセージと CHANGELOG は対象外** — 前者は英語、後者は semantic-release の生成物
 
+## クラウドで作業したとき
+
+クラウド（`CLAUDE_CODE_REMOTE` が `true`）で画面に関わる変更をしたら、最後に次の2つを出して終える。
+
+1. 変更を確認できるプレビュー URL（用意できなければ、その旨と手元での確かめ方）
+2. 変更した画面のスクリーンショット
+
 ## 留意事項
 
 - `package.json` の `version` がリリース番号。更新は `chore(release): ...` で
