@@ -292,7 +292,8 @@ export class ServerConnection implements Connection {
   private stopped = false;
   private refusal: string | null = null;
   private readonly reconnectScheduler = new PeerReconnectScheduler(SERVER_RECONNECT_BACKOFF_MS);
-  private watchingNetwork = false;
+  /** Stops hearing the network and the page, once the session is over; null while not hearing them. */
+  private stopWatchingNetwork: (() => void) | null = null;
   /** When the room server last heard the page was in use: by the hello that got in, or by active. */
   private reportedAt = 0;
   /** The last use the hello on its way says, which the server takes up once it lets the seat in. */
@@ -399,6 +400,7 @@ export class ServerConnection implements Connection {
   /** Leaves the room for good, without reporting anything. */
   close(): void {
     this.stopped = true;
+    this.stopWatchingNetwork?.();
     this.teardown();
     this.me.isOpen = false;
     this.members.clear();
@@ -961,7 +963,12 @@ export class ServerConnection implements Connection {
       // Asked back before its first welcome, as while the room changes hands, a seat coming in tries
       // again after the usual wait. One that was coming back unseen is told of the drop below, as
       // after any link that failed.
-      if (!this.everWelcomed && this.reconnectScheduler.schedule(SOCKET_KEY, () => this.connectSocket()) != null) {
+      // A seat not yet let in keeps to the short run of tries: the long one is for getting back in.
+      if (
+        !this.everWelcomed &&
+        this.reconnectScheduler.attemptOf(SOCKET_KEY) < PEER_RECONNECT_BACKOFF_MS.length &&
+        this.reconnectScheduler.schedule(SOCKET_KEY, () => this.connectSocket()) != null
+      ) {
         return;
       }
     }
@@ -1005,14 +1012,20 @@ export class ServerConnection implements Connection {
    * laptop wakes. Without a window, nothing is heard.
    */
   private watchNetwork(): void {
-    if (this.watchingNetwork || typeof window === 'undefined') return;
-    this.watchingNetwork = true;
+    if (this.stopWatchingNetwork || typeof window === 'undefined') return;
     const check = () => this.checkLinkNow();
+    const shown = () => {
+      if (window.document.visibilityState === 'visible') check();
+    };
     window.addEventListener('online', check);
     window.addEventListener('pageshow', check);
-    window.document?.addEventListener('visibilitychange', () => {
-      if (window.document.visibilityState === 'visible') check();
-    });
+    window.document?.addEventListener('visibilitychange', shown);
+    this.stopWatchingNetwork = () => {
+      window.removeEventListener('online', check);
+      window.removeEventListener('pageshow', check);
+      window.document?.removeEventListener('visibilitychange', shown);
+      this.stopWatchingNetwork = null;
+    };
   }
 
   /**
@@ -1070,6 +1083,7 @@ export class ServerConnection implements Connection {
   private fail(code: string, message: string): void {
     const wasOpen = this.me.isOpen;
     this.stopped = true;
+    this.stopWatchingNetwork?.();
     this.teardown();
     this.me.isOpen = false;
     if (wasOpen) this.callback.onClose?.(this.me);

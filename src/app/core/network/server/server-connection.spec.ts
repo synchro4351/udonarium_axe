@@ -405,6 +405,25 @@ describe('ServerConnection', () => {
       await vi.waitFor(() => expect(calls).toEqual(['open', 'connect authority', `connect ${OTHER.peerId}`]));
     });
 
+    it('gives up after the short run of tries when asked back every time before its first welcome', async () => {
+      const socket = await openRoom();
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+      socket.accept();
+      socket.close(1012, 'moved');
+
+      for (let waited = 0; waited < 60_000 && errors.length === 0; waited += 500) {
+        vi.advanceTimersByTime(500);
+        const next = latest();
+        if (next.readyState === 0) {
+          next.accept();
+          next.close(1012, 'moved');
+        }
+      }
+
+      expect(errors).toHaveLength(1);
+      expect(FakeWebSocket.instances.length).toBeLessThanOrEqual(7);
+    });
+
     it('comes back from the cache as after any return, once a return the server asked for was cut short', async () => {
       const socket = await enterRoom([OTHER]);
       socket.close(1012, 'rotate');
@@ -694,6 +713,23 @@ describe('ServerConnection', () => {
 
       expect(FakeWebSocket.instances.length).toBe(before + 1);
     });
+  });
+
+  it('stops hearing the network once the session is closed', async () => {
+    const removed: string[] = [];
+    const remove = vi.spyOn(window, 'removeEventListener').mockImplementation((type: string) => {
+      removed.push(type);
+    });
+    const removeOnDocument = vi.spyOn(document, 'removeEventListener').mockImplementation((type: string) => {
+      removed.push(type);
+    });
+    await enterRoom();
+
+    connection.close();
+
+    expect(removed).toEqual(expect.arrayContaining(['online', 'pageshow', 'visibilitychange']));
+    remove.mockRestore();
+    removeOnDocument.mockRestore();
   });
 
   it('asks the server at once when the page is shown again, and takes a link that died meanwhile as lost', async () => {
