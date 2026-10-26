@@ -3740,7 +3740,10 @@
         "failed": "「{{roomName}}」に参加できませんでした",
         "offline": "オフラインのため「{{roomName}}」に入れません。入るときは、接続パネルでオンラインに切り替えてください",
         "openLobby": "ロビーを開く",
-        "dismiss": "閉じる"
+        "dismiss": "閉じる",
+        "guestLoginTitle": "いまは見学者です",
+        "guestLoginMessage": "招待リンクから、ログインせずに入りました。このままでは見学だけになります。Discordでログインすると、PLとして参加できます。",
+        "guestLoginStay": "見学のまま"
       },
       "account": {
         "login": "Discordでログイン",
@@ -5835,7 +5838,7 @@
       "paletteHint": "クリック: 入力 ／ 2回クリック: 付与",
       "buffColor": "色",
       "buffColorDefault": "既定",
-      "buffInputPlaceholder": "バフ名 [情報] [ラウンド数] [色]",
+      "buffInputPlaceholder": "例：毒 継続ダメージ 3（空白か/で区切る。情報から後は省略可）",
       "grant": "付与",
       "roundManagement": "ラウンド管理",
       "roundDecrease": "R 減少",

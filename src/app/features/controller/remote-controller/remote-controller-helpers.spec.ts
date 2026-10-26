@@ -52,6 +52,11 @@ describe('remote-controller-helpers', () => {
       expect(parseBuffInput('猛攻撃 攻撃+2 5')).toMatchObject({ buffname: '猛攻撃', sub: '攻撃+2', round: 5 });
     });
 
+    it('reads slashes as spaces, as the chat line writes a buff', () => {
+      expect(parseBuffInput('猛攻撃/攻撃+2/5')).toMatchObject({ buffname: '猛攻撃', sub: '攻撃+2', round: 5 });
+      expect(parseBuffInput(' 毒／継続 3 ')).toMatchObject({ buffname: '毒', sub: '継続', round: 3 });
+    });
+
     it('takes a colour and an icon after them', () => {
       const parsed = parseBuffInput('毒 継続2 3 red ☠️');
 

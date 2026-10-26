@@ -73,6 +73,7 @@
       @if (!isCompact() || isToolsOpen()) {
         <ng-select
           name="game-type"
+          [searchFn]="searchDiceBot"
           class="ud-select chat-select chat-select--game-type"
           [class.chat-select--shares-row]="dense()"
           (change)="loadDiceBot($event)"

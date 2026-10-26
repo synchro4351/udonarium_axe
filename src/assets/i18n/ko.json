@@ -3740,7 +3740,10 @@
         "failed": "\"{{roomName}}\"에 참가하지 못했습니다",
         "offline": "오프라인이라 \"{{roomName}}\"에 들어갈 수 없습니다. 들어가려면 연결 패널에서 온라인으로 전환해 주세요",
         "openLobby": "로비 열기",
-        "dismiss": "닫기"
+        "dismiss": "닫기",
+        "guestLoginTitle": "지금은 관전자입니다",
+        "guestLoginMessage": "초대 링크로 로그인하지 않고 들어왔습니다. 이대로는 관전만 할 수 있습니다. Discord로 로그인하면 PL로 참가할 수 있습니다.",
+        "guestLoginStay": "관전 계속"
       },
       "account": {
         "login": "Discord로 로그인",
@@ -5280,7 +5283,7 @@
         "paletteHint": "클릭: 입력 ／ 두 번 클릭: 부여",
         "buffColor": "색",
         "buffColorDefault": "기본",
-        "buffInputPlaceholder": "버프 이름 [정보] [라운드 수] [색]",
+        "buffInputPlaceholder": "예: 독 지속피해 3 (공백이나 /로 구분. 이름 뒤는 생략 가능)",
         "grant": "부여",
         "roundManagement": "라운드 관리",
         "roundDecrease": "R 감소",

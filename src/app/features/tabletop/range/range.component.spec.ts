@@ -85,6 +85,18 @@ describe('RangeComponent', () => {
       void component.name();
       expect(spy).toHaveBeenCalledWith(range.identifier);
     });
+
+    it('follows its length and width, kept in elements of their own, as soon as they change', () => {
+      const range = RangeArea.create('テスト範囲', 3, 5, 1);
+      fixture.componentRef.setInput('range', range);
+      const objectChangeService = TestBed.inject(ObjectChangeService);
+      const spy = vi.spyOn(objectChangeService, 'versionOf');
+      void component.width();
+      const lengthElement = range.commonDataElement!.getFirstElementByName('length')!;
+      const widthElement = range.commonDataElement!.getFirstElementByName('width')!;
+      expect(spy).toHaveBeenCalledWith(lengthElement.identifier);
+      expect(spy).toHaveBeenCalledWith(widthElement.identifier);
+    });
   });
 
   describe('the clip version signal', () => {

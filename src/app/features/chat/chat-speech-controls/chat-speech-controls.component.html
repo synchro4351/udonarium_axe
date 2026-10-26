@@ -1,30 +1,29 @@
-@if (speech.supported && canRead()) {
-  <span class="ml-1 inline-flex items-center gap-0.5 align-middle">
+@if (speech.supported && canRead() && part() === 'buttons') {
+  <span class="inline-flex items-center gap-px">
     <button
       type="button"
-      class="text-ui-dim hover:text-ui-accent inline-flex size-6 cursor-pointer items-center justify-center rounded-sm border-0 bg-transparent p-0"
+      data-testid="chat-message-action-speak"
+      class="text-ui-muted hover:bg-ui-hover hover:text-ui-accent rounded-ui-sm inline-flex size-6.5 cursor-pointer items-center justify-center border-none bg-transparent p-0 transition-colors hover:shadow-none [&_.material-icons]:text-[17px]!"
       [attr.aria-label]="'feature.chat.speech.read' | transloco"
       [title]="'feature.chat.speech.read' | transloco"
       (click)="speak()"
     >
-      <i
-        aria-hidden="true"
-        class="material-icons text-[15px]!"
-        [class.text-ui-accent]="speech.speakingId() === message().identifier"
+      <i aria-hidden="true" class="material-icons" [class.text-ui-accent]="speech.speakingId() === message().identifier"
         >volume_up</i
       >
     </button>
     <button
       type="button"
-      class="text-ui-dim hover:text-ui-accent inline-flex size-6 cursor-pointer items-center justify-center rounded-sm border-0 bg-transparent p-0"
+      data-testid="chat-message-action-speak-stop"
+      class="text-ui-muted hover:bg-ui-hover hover:text-ui-accent rounded-ui-sm inline-flex size-6.5 cursor-pointer items-center justify-center border-none bg-transparent p-0 transition-colors hover:shadow-none [&_.material-icons]:text-[17px]!"
       [attr.aria-label]="'feature.chat.speech.stop' | transloco"
       [title]="'feature.chat.speech.stop' | transloco"
       (click)="stop()"
     >
-      <i aria-hidden="true" class="material-icons text-[15px]!">stop</i>
+      <i aria-hidden="true" class="material-icons">stop</i>
     </button>
   </span>
-  @if (speech.skippedIds().has(message().identifier)) {
-    <span class="text-ui-muted text-[11px]">{{ 'feature.chat.speech.skipped' | transloco }}</span>
-  }
+}
+@if (speech.supported && part() === 'note' && speech.skippedIds().has(message().identifier)) {
+  <span class="text-ui-muted ml-1 text-[11px]">{{ 'feature.chat.speech.skipped' | transloco }}</span>
 }

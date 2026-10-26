@@ -112,6 +112,7 @@
         }}</label>
         <ng-select
           class="ud-select sys-select"
+          [searchFn]="searchDiceBot"
           (change)="loadDiceBot($event)"
           [ngModel]="gameType()"
           (ngModelChange)="setGameType($event)"

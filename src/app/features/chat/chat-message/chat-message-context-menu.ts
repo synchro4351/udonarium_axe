@@ -31,6 +31,8 @@ export interface ChatMessageMenuState {
   selectedText: string;
   /** Whether the pointer is a touch, under which the words of a line are picked out only on asking. */
   isTouch: boolean;
+  /** Whether the browser can read the line aloud to the reader. */
+  canRead: boolean;
 }
 
 export interface ChatMessageMenuCallbacks {
@@ -49,6 +51,7 @@ export interface ChatMessageMenuCallbacks {
   jumpToOriginal: () => void;
   copyText: (text: string) => void;
   selectText: () => void;
+  read: () => void;
 }
 
 /**
@@ -85,6 +88,8 @@ export function buildChatMessageContextMenu(
       words.push({ name: t('feature.chat.message.selectText'), action: () => callbacks.selectText() });
     }
   }
+  // A touch screen has no toolbar over the line, so reading it aloud is offered here as well.
+  if (state.canRead) words.push({ name: t('feature.chat.speech.read'), action: () => callbacks.read() });
 
   const keep: ContextMenuAction[] = [...buildChatBookmarkMenu(state.bookmarkKinds, callbacks.toggleBookmark, t)];
   if (state.canInteract && state.canShareAsMemo) {

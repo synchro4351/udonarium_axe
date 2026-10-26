@@ -39,6 +39,7 @@
             <ng-select
               class="ud-select w-full"
               (change)="loadDiceBot($event)"
+              [searchFn]="searchDiceBot"
               [(ngModel)]="defaultDiceBot"
               [ngModelOptions]="{ standalone: true }"
               [clearable]="false"

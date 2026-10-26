@@ -10,6 +10,7 @@ import { PanelService } from '@axe/application/ui/panel.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { DiceTablePalette } from '@axe/domain/chat/chat-palette';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
+import { diceBotSearchFor, type DiceBotSearchItem } from '@axe/domain/dice/dice-bot-search';
 import { DiceTable } from '@axe/domain/dice/dice-table';
 import { NgSelectWindowDirective } from '@axe/ui/directives/ng-select-window.directive';
 import { TranslocoModule } from '@jsverse/transloco';
@@ -129,6 +130,8 @@ export class DiceTableSettingComponent {
   get diceBotInfos() {
     return this.diceBotCatalog.infos();
   }
+  /** Finds a game system by its name, reading or id, ignoring kana and dots. */
+  readonly searchDiceBot = (term: string, item: DiceBotSearchItem) => diceBotSearchFor(this.diceBotInfos)(term, item);
 
   isEdit = signal(false);
   private readonly _selectedTable = signal<DiceTable | null>(null);

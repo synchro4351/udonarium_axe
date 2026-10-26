@@ -63,7 +63,7 @@
               <span class="tip msg-timestamp">{{ chatMessage.timestamp | date: 'y/M/d H:mm' }}</span>
             </span>
             @if (!isEditing() && !readOnly()) {
-              <chat-speech-controls [message]="chatMessage" />
+              <chat-speech-controls [message]="chatMessage" part="note" />
             }
             @if (bookmarks().shared; as mark) {
               <i
@@ -594,6 +594,7 @@
           <i class="material-icons" aria-hidden="true">delete_outline</i>
         </button>
       }
+      <chat-speech-controls [message]="chatMessage" />
       <span class="bg-ui-border-panel mx-0.5 h-4 w-px" aria-hidden="true"></span>
       <button
         type="button"
