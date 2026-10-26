@@ -59,6 +59,7 @@ import {
 import { imageStampId } from '@axe/domain/chat/stamp-catalog';
 import { DataElement } from '@axe/domain/data/data-element';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
+import { diceBotSearchFor, type DiceBotSearchItem } from '@axe/domain/dice/dice-bot-search';
 import { builtinStampPack, StampPackView } from '@axe/domain/media/builtin-stamps';
 import { stampLabelOf, StampPack } from '@axe/domain/media/stamp-pack';
 import {
@@ -854,6 +855,8 @@ export class ChatInputComponent {
   get diceBotInfos() {
     return this.diceBotCatalog.infos();
   }
+  /** Finds a game system by its name, reading or id, ignoring kana and dots. */
+  readonly searchDiceBot = (term: string, item: DiceBotSearchItem) => diceBotSearchFor(this.diceBotInfos)(term, item);
   /** This seat's own peer cursor. */
   get myPeer(): PeerCursor {
     return PeerCursor.myCursor;

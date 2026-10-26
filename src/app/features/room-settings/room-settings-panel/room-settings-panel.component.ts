@@ -25,6 +25,7 @@ import { type ResourceCatalogEntry, resourceCatalogOf } from '@axe/domain/charac
 import { DataSummarySetting } from '@axe/domain/data/data-summary-setting';
 import { asDiceStage, DICE_STAGES, DiceStage } from '@axe/domain/dice/dice-3d/dice-stage';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
+import { diceBotSearchFor, type DiceBotSearchItem } from '@axe/domain/dice/dice-bot-search';
 import { Party } from '@axe/domain/party/party';
 import { Config } from '@axe/domain/peer/config';
 import { isHexGrid } from '@axe/domain/tabletop/hex-geometry';
@@ -627,6 +628,8 @@ export class RoomSettingsPanelComponent {
   get diceBotInfos() {
     return this.diceBotCatalog.infos();
   }
+  /** Finds a game system by its name, reading or id, ignoring kana and dots. */
+  readonly searchDiceBot = (term: string, item: DiceBotSearchItem) => diceBotSearchFor(this.diceBotInfos)(term, item);
 
   /**
    * The dice bot everyone joining the room starts on, read from the room's config.
