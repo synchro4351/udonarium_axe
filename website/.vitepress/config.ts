@@ -5,12 +5,15 @@ import { defineConfig } from 'vitepress';
 
 import { slugify } from './slugify.mjs';
 
-const repo = 'https://github.com/Xelltis/udonarium_axe';
+// A fork that publishes its own copy passes its repository, branch and origin through these
+// variables (see docs.yml); a local build keeps the upstream ones.
+const repo = process.env['DOCS_REPO_URL'] || 'https://github.com/Xelltis/udonarium_axe';
+const editBranch = process.env['DOCS_EDIT_BRANCH'] || 'main';
 const base = '/udonarium_axe/';
 
 // Social crawlers ignore relative URLs, so the deployed origin has to be
 // spelled out here. Change it together with the Pages settings.
-const siteUrl = `https://xelltis.github.io${base}`;
+const siteUrl = `${process.env['DOCS_SITE_ORIGIN'] || 'https://xelltis.github.io'}${base}`;
 const siteName = 'Udonarium Axe';
 const siteDescription = 'ブラウザで動くTRPGオンラインセッション支援ツールの利用ガイド';
 const ogImage = `${siteUrl}og.jpg`;
@@ -194,6 +197,7 @@ export default defineConfig({
         { text: 'はじめに', link: '/start/' },
         { text: 'Axeでできること', link: '/start/features' },
         { text: '招待リンクで参加する', link: '/start/join' },
+        { text: 'はじめてのCoC（PL向け）', link: '/start/coc-player' },
         { text: 'はじめてのセッション（GM）', link: '/start/first-session' },
         { text: '用語集', link: '/start/glossary' },
         { text: 'Udonarium Axeについて', link: '/start/about' },
@@ -440,7 +444,7 @@ export default defineConfig({
     },
     socialLinks: [{ icon: 'github', link: repo }],
     editLink: {
-      pattern: `${repo}/edit/main/website/:path`,
+      pattern: `${repo}/edit/${editBranch}/website/:path`,
       text: 'このページを編集',
     },
     outline: { level: [2, 3], label: '目次' },
