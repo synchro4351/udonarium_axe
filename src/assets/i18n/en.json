@@ -5835,7 +5835,7 @@
       "paletteHint": "Click: input / Double-click: apply",
       "buffColor": "Colour",
       "buffColorDefault": "Default",
-      "buffInputPlaceholder": "Buff name [info] [rounds] [colour]",
+      "buffInputPlaceholder": "e.g. Poison 2-per-turn 3 (spaces or / between; all after the name is optional)",
       "grant": "Apply",
       "roundManagement": "Round controls",
       "roundDecrease": "Decrease R",

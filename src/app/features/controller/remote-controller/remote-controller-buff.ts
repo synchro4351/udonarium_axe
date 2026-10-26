@@ -23,7 +23,7 @@ export interface ParsedBuffInput {
 /**
  * Reads a line typed into the remote controller's buff field as a buff to put on the targets.
  *
- * The words are, separated by spaces: the buff's name, an optional note such as `攻撃+2`, an optional
+ * The words are, separated by spaces or slashes (as the chat line writes them): the buff's name, an optional note such as `攻撃+2`, an optional
  * number of rounds (3 when missing or not a number), and then any colour, timing, `@trigger` or
  * icon words. A `+` in front of the name asks for the note's number to be added to a buff of that
  * name already standing rather than written over it, and `++` lengthens it by the rounds asked for
@@ -31,7 +31,7 @@ export interface ParsedBuffInput {
  * An empty line is null.
  */
 export function parseBuffInput(text: string): ParsedBuffInput | null {
-  const parts = text.split(/\s+/);
+  const parts = text.trim().split(/[\s/／]+/);
   if (parts.length === 0 || parts[0] === '') return null;
   const marked = parts[0].match(/^([+＋]{1,2})(?=[^+＋])/);
   const piles: BuffPileOn = marked ? (marked[1].length > 1 ? 'extend' : 'stack') : 'none';

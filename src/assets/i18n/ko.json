@@ -5280,7 +5280,7 @@
         "paletteHint": "클릭: 입력 ／ 두 번 클릭: 부여",
         "buffColor": "색",
         "buffColorDefault": "기본",
-        "buffInputPlaceholder": "버프 이름 [정보] [라운드 수] [색]",
+        "buffInputPlaceholder": "예: 독 지속피해 3 (공백이나 /로 구분. 이름 뒤는 생략 가능)",
         "grant": "부여",
         "roundManagement": "라운드 관리",
         "roundDecrease": "R 감소",
