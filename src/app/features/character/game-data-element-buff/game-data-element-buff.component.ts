@@ -13,6 +13,7 @@ import { buffTriggerOptions, selectedTriggerValue } from '@axe/domain/character/
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DataElement, DataElementAttribute, DataElementType } from '@axe/domain/data/data-element';
 import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
+import { CloseOutsideDirective } from '@axe/ui/directives/close-outside.directive';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -20,7 +21,7 @@ import { TranslocoModule } from '@jsverse/transloco';
   selector: 'game-data-element-buff, [game-data-element-buff]',
   templateUrl: './game-data-element-buff.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, SafePipe, TranslocoModule],
+  imports: [FormsModule, SafePipe, TranslocoModule, CloseOutsideDirective],
   host: { '[attr.inert]': "isReadOnly() ? '' : null" },
 })
 export class GameDataElementBuffComponent {

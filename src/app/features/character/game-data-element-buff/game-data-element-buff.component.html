@@ -8,7 +8,7 @@
           >
             <div class="relative flex min-w-0 items-center gap-1">
               @if (!isTagLocked()) {
-                <details class="relative shrink-0">
+                <details class="relative shrink-0" appCloseOutside>
                   <summary
                     class="border-ui-border-panel hover:border-ui-accent flex size-6 cursor-pointer list-none items-center justify-center rounded-full border border-solid text-[13px] leading-none [&::-webkit-details-marker]:hidden"
                     [style.background]="color()"
