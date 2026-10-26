@@ -12,6 +12,11 @@ import { TranslocoModule } from '@jsverse/transloco';
 })
 export class ChatSpeechControlsComponent {
   readonly message = input.required<ChatMessage>();
+  /**
+   * Which part to show: the buttons, as the line's toolbar holds them beside answering and the rest,
+   * or the note that the reading passed the line over, which stays on the line itself.
+   */
+  readonly part = input<'buttons' | 'note'>('buttons');
   protected readonly speech = inject(ChatSpeechService);
   private readonly changes = inject(ObjectChangeService);
 

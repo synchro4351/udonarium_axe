@@ -25,6 +25,7 @@ function state(partial: Partial<ChatMessageMenuState> = {}): ChatMessageMenuStat
     text: 'こんにちは',
     selectedText: '',
     isTouch: false,
+    canRead: false,
     ...partial,
   };
 }
@@ -46,6 +47,7 @@ function callbacks(): ChatMessageMenuCallbacks {
     jumpToOriginal: vi.fn(),
     copyText: vi.fn(),
     selectText: vi.fn(),
+    read: vi.fn(),
   };
 }
 
@@ -314,5 +316,17 @@ describe('buildChatMessageContextMenu()', () => {
 
       expect(menu.map((action) => action.name)).toEqual(['feature.chat.message.bookmarks.personal.add']);
     });
+  });
+
+  it('offers reading the line aloud among its words where the browser can, as a touch screen has no toolbar', () => {
+    const calls = callbacks();
+    const names = (canRead: boolean) =>
+      buildChatMessageContextMenu(state({ canRead }), calls, translate).map((action) => action.name);
+    expect(names(false)).not.toContain('feature.chat.speech.read');
+    expect(names(true)).toContain('feature.chat.speech.read');
+    buildChatMessageContextMenu(state({ canRead: true }), calls, translate).find(
+      (action) => action.name === 'feature.chat.speech.read'
+    )!.action!();
+    expect(calls.read).toHaveBeenCalled();
   });
 });

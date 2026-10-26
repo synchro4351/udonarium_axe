@@ -19,6 +19,7 @@ import { ChatBookmarkService } from '@axe/application/chat/chat-bookmark.service
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { ChatPreferencesService } from '@axe/application/chat/chat-preferences.service';
 import { ChatReactionService, ReactionTally } from '@axe/application/chat/chat-reaction.service';
+import { ChatSpeechService } from '@axe/application/chat/chat-speech.service';
 import { ChatTickerSelectionService } from '@axe/application/chat/chat-ticker-selection.service';
 import { StampRulesService } from '@axe/application/chat/stamp-rules.service';
 import { SystemAvatarKind, SystemAvatarService } from '@axe/application/chat/system-avatar.service';
@@ -132,6 +133,7 @@ export class ChatMessageComponent {
   private readonly confirm = inject(ConfirmService);
   private readonly pointerDeviceService = inject(PointerDeviceService);
   private readonly viewport = inject(ViewportService);
+  private readonly speech = inject(ChatSpeechService);
 
   protected get canRevealSecret(): boolean {
     return this.rolePermission.canSeeHidden;
@@ -425,6 +427,7 @@ export class ChatMessageComponent {
         text: this.readableText(message),
         selectedText,
         isTouch: this.viewport.isTouch(),
+        canRead: this.speech.supported && this.speech.canRead(message),
       },
       {
         reply: () => this.clickReply(),
@@ -448,6 +451,7 @@ export class ChatMessageComponent {
         jumpToOriginal: () => (this.replyPreview() ? this.jumpToReplyTarget() : this.jumpToQuoteTarget()),
         copyText: (text) => this.copyText(text),
         selectText: () => this.selectText(),
+        read: () => this.speech.speak(message),
       },
       this.t
     );
