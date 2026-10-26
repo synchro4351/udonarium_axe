@@ -86,16 +86,21 @@ describe('RangeComponent', () => {
       expect(spy).toHaveBeenCalledWith(range.identifier);
     });
 
-    it('follows its length and width, kept in elements of their own, as soon as they change', () => {
+    it('shows a new length, kept in an element of its own, and a new name as soon as they change', () => {
       const range = RangeArea.create('テスト範囲', 3, 5, 1);
       fixture.componentRef.setInput('range', range);
-      const objectChangeService = TestBed.inject(ObjectChangeService);
-      const spy = vi.spyOn(objectChangeService, 'versionOf');
-      void component.width();
+      const objectChange = TestBed.inject(ObjectChangeService);
+      const before = component.length();
+      expect(component.name()).toBe('テスト範囲');
+
       const lengthElement = range.commonDataElement!.getFirstElementByName('length')!;
-      const widthElement = range.commonDataElement!.getFirstElementByName('width')!;
-      expect(spy).toHaveBeenCalledWith(lengthElement.identifier);
-      expect(spy).toHaveBeenCalledWith(widthElement.identifier);
+      lengthElement.value = before + 3;
+      objectChange.notifyChanged(lengthElement.identifier);
+      expect(component.length()).toBe(before + 3);
+
+      range.name = '新しい名前';
+      objectChange.notifyChanged(range.identifier);
+      expect(component.name()).toBe('新しい名前');
     });
   });
 

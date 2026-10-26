@@ -115,7 +115,11 @@ export class RangeComponent {
    * kept there, as elements of their own, so a change to one of them is not a change to the range.
    */
   private readonly rangeVersion = computed(() => {
-    for (const id of this.watchedIds()) this.objectChange.versionOf(id)();
+    // A sum, so that it changes whenever any of them does: a computed tells those reading it only
+    // when its value changes.
+    let version = 0;
+    for (const id of this.watchedIds()) version += this.objectChange.versionOf(id)();
+    return version;
   });
 
   /** The range and the elements its length, width and paint are kept in. */
