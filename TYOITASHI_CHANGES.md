@@ -2,7 +2,7 @@
 
 [紹介ページ](README.md) · [版ごとの履歴](TYOITASHI_VERSIONS.md)
 
-r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は公式v1.67.0（5128e19f）まで取り込んでいます。ここでは元の機能コミットと、その後の統合を示します。公式の構造変更に合わせた調整もあるため、現在の実装は機能を最初に追加したコミットだけでは分かりません。
+r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は公式v1.68.0まで取り込んでいます。ここでは元の機能コミットと、その後の統合を示します。公式の構造変更に合わせた調整もあるため、現在の実装は機能を最初に追加したコミットだけでは分かりません。
 
 ## 公式v1.67への追従
 
@@ -221,6 +221,15 @@ r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は�
 - 初回ドラッグはChromium・Firefox・WebKitで、チャットフォーカスあり／なしの計6件を確認。
 - 再読み込み後の同一ID再参加・双方向通信・再同期は確認済み。旧接続が残る場合は約1分待ち、他の参加者の強制退出やID変更はしない。
 - 実YouTube動画の再生、すべてのOSのフォント表示、Flyの全保存データの互換性を保証するものではない。
+
+## 公式のコードにも当てはまる修正（r10〜r11）
+
+公式Axe v1.68.0と同じコードにある不具合への修正です。私家版の本流で確かめたもので、無改造の公式版の上では試していません。取り込むときは、取り込み先で改めて試験してください。
+
+- 部屋のサーバー（β）の再接続：切断のあと5回（約30秒）で諦めて部屋を出ていたのを、部屋に入っていた席は約10分のあいだ15秒ごとに試し続けるようにしました。回線の復帰（`online`）・画面の再表示・`pageshow`では待たずにすぐ試し、表示に戻ったときは生存確認のpingを送ります。部屋に入る前の席は従来どおり短く諦めます。[c4ef6bad](https://github.com/synchro4351/udonarium_axe/commit/c4ef6bad3)・[8fdc2a89](https://github.com/synchro4351/udonarium_axe/commit/8fdc2a896)、枝[`codex/server-liveness`](https://github.com/synchro4351/udonarium_axe/tree/codex/server-liveness)。変更は`core/network/server/server-connection.ts`と`core/network/peer-reconnect-scheduler.ts`（SkyWayの再接続は変わりません）とその試験だけです。実卓で、2分半の回線断のあと戻れなかった参加者がきっかけです。
+- 部屋のサーバーで再接続したあと、接続一覧などで名前がIDになる：peer idが変わっても、接続のユーザーIDから参加者を引き直します（`PeerCursor.forConnection`）。[6feb4a2d](https://github.com/synchro4351/udonarium_axe/commit/6feb4a2de)、枝[`codex/server-reconnect-fixes`](https://github.com/synchro4351/udonarium_axe/tree/codex/server-reconnect-fixes)。同じコミットの読み上げの部分は私家版だけの機能です。
+- 再読み込みのあと、ロビーからパスワード付きの部屋へ戻れない：招待リンク（パスワード入り）で入った人は部屋のパスワードを知らないため、ふつうの再読み込みのあとロビーで聞かれて入れませんでした。前回いた部屋は保存済みのパスワードで入り、一覧の先頭に印を付けます。[a97e78b7](https://github.com/synchro4351/udonarium_axe/commit/a97e78b76)、枝[`codex/lobby-last-room`](https://github.com/synchro4351/udonarium_axe/tree/codex/lobby-last-room)。
+- 射程の長さ・幅を変えても描き直されない：長さ・幅は射程の子のデータ要素にあるため、射程自身の変更しか見ていない描画に届いていませんでした。[c9a8056f](https://github.com/synchro4351/udonarium_axe/commit/c9a8056f7)・[e9571543](https://github.com/synchro4351/udonarium_axe/commit/e95715430)（後者は、前者で表示用の値が更新されなくなった誤りの修正。両方をまとめて取り込んでください）、枝[`codex/r11-small-fixes`](https://github.com/synchro4351/udonarium_axe/tree/codex/r11-small-fixes)。
 
 ## 公式へ採用済みの変更
 
