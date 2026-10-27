@@ -3633,7 +3633,8 @@
         "hintListFailed": "룸 목록을 가져오지 못했습니다. \"목록 새로고침\"으로 다시 검색할 수 있습니다.",
         "hintNoBackend": "접속처(config.json의 backend.url)가 설정되어 있지 않습니다",
         "createRoomAfterLogin": "로그인하고 방 만들기",
-        "deleteRoom": "방 삭제"
+        "deleteRoom": "방 삭제",
+        "lastRoom": "지난번 방"
       },
       "roomSetting": {
         "title": " 룸 만들기",

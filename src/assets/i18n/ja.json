@@ -3633,7 +3633,8 @@
         "hintListFailed": "ルーム一覧の取得に失敗しました。「一覧を更新」で再検索できます。",
         "hintNoBackend": "接続先（config.json の backend.url）が設定されていません",
         "createRoomAfterLogin": "ログインして部屋を作る",
-        "deleteRoom": "部屋を削除"
+        "deleteRoom": "部屋を削除",
+        "lastRoom": "前回の部屋"
       },
       "roomSetting": {
         "title": " ルーム作成",

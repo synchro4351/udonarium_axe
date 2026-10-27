@@ -20,6 +20,7 @@ import { Logger } from '@axe/core/logging/logger';
 import { PeerContext } from '@axe/core/network/peer-context';
 import { IRoomInfo } from '@axe/core/network/room-info';
 import { ServerRoomApiError } from '@axe/core/network/server/server-room-api';
+import { loadIdentity } from '@axe/core/storage/identity-storage';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { LeaveRoomService } from '@axe/features/lobby/leave-room';
 import { NetworkReachService } from '@axe/features/lobby/network-reach.service';
@@ -39,6 +40,18 @@ interface LobbyRoom {
   roomName: string;
   info: IRoomInfo;
   peerContexts: PeerContext[];
+  /** Whether this is the room on a room server this tab was last in, which a reload leaves it outside of. */
+  isLast?: boolean;
+}
+
+/**
+ * The key of the room on a room server this tab was last in, with the password it went in by, so
+ * that a reader who comes back to it from the lobby after a reload is not asked for a password they
+ * may never have been told, as one who came in by an invitation carrying it.
+ */
+function lastServerRoom(): { roomKey: string; password: string } | null {
+  const saved = loadIdentity();
+  return saved?.roomKey ? { roomKey: saved.roomKey, password: saved.reConnectPass ?? '' } : null;
 }
 
 @Component({
@@ -69,6 +82,8 @@ export class LobbyComponent {
   protected readonly canCreateRoom = computed(() => !this.isServerTransport || this.auth.offersLogin() !== false);
 
   rooms = signal<LobbyRoom[]>([]);
+  /** The rooms whose kept password has been tried once from this lobby. */
+  private readonly triedKeptPassword = new Set<string>();
 
   isReloading = signal(false);
 
@@ -190,13 +205,17 @@ export class LobbyComponent {
         Network.listAllRooms(),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000)),
       ]);
+      const last = lastServerRoom();
       const roomsList: LobbyRoom[] = roomInfos.map((room) => ({
         alias: room.id + room.name,
         roomName: room.name,
         info: room,
         peerContexts: room.peers as PeerContext[],
+        isLast: !!last && !!room.roomKey && room.roomKey === last.roomKey,
       }));
       roomsList.sort((a, b) => {
+        // The room this tab was last in comes first, to go back to after a reload.
+        if (a.isLast !== b.isLast) return a.isLast ? -1 : 1;
         if (a.alias < b.alias) return -1;
         if (a.alias > b.alias) return 1;
         return 0;
@@ -271,7 +290,20 @@ export class LobbyComponent {
     try {
       if (!(await this.withheldEntry.mayEnter(room.roomKey ?? null))) return;
       let password = '';
-      if (room.hasPassword) {
+      const last = lastServerRoom();
+      const keptPassword =
+        room.hasPassword &&
+        last &&
+        last.password &&
+        room.roomKey === last.roomKey &&
+        !this.triedKeptPassword.has(last.roomKey)
+          ? last.password
+          : null;
+      if (keptPassword !== null && room.roomKey) {
+        // Tried once: should the room's password have changed since, the next try asks for it.
+        this.triedKeptPassword.add(room.roomKey);
+        password = keptPassword;
+      } else if (room.hasPassword) {
         const options: PasswordCheckOptions = { checkedByServer: true, title: `${room.name}/${room.id}` };
         const typed = await this.modalService.open<string>(PasswordCheckComponent, options);
         if (typed == null) return;

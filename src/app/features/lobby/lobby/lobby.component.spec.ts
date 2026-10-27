@@ -11,6 +11,7 @@ import { localDispatch } from '@axe/core/network/network-messaging';
 import { PeerContext } from '@axe/core/network/peer-context';
 import { IRoomInfo } from '@axe/core/network/room-info';
 import { ServerRoomApiError } from '@axe/core/network/server/server-room-api';
+import { clearIdentity, saveIdentity } from '@axe/core/storage/identity-storage';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { markLoadedWithheld, markSeatWithheld } from '@axe/domain/peer/withheld-table';
 import { LobbyComponent } from '@axe/features/lobby/lobby/lobby.component';
@@ -369,6 +370,62 @@ describe('LobbyComponent', () => {
       } finally {
         markLoadedWithheld(false, false);
       }
+    });
+
+    describe('going back to the room this tab was last in', () => {
+      afterEach(() => clearIdentity());
+
+      const keepLastRoom = (roomKey: string, password: string) =>
+        saveIdentity({
+          userId: 'u',
+          roomId: 'Ab3',
+          roomName: '月夜の卓',
+          role: 'pl',
+          reConnectPass: password,
+          roomKey,
+        });
+
+      it('goes in with the password kept from then, asking nothing, and asks on a second try', async () => {
+        keepLastRoom(room.roomKey!, 'kept-pw');
+        const openModal = vi.spyOn(TestBed.inject(ModalService), 'open').mockResolvedValue('typed');
+        const joinServerRoom = vi.spyOn(TestBed.inject(RoomJoinService), 'joinServerRoom').mockResolvedValue(false);
+
+        await component.connectRoom({ alias: '', roomName: room.name, info: room, peerContexts: [] });
+        await vi.waitFor(() => expect(joinServerRoom).toHaveBeenCalledWith(room, 'kept-pw'));
+        expect(openModal).not.toHaveBeenCalled();
+
+        await vi.waitFor(() => expect(component.isJoining()).toBe(false));
+        await component.connectRoom({ alias: '', roomName: room.name, info: room, peerContexts: [] });
+        await vi.waitFor(() => expect(joinServerRoom).toHaveBeenLastCalledWith(room, 'typed'));
+        expect(openModal).toHaveBeenCalledTimes(1);
+      });
+
+      it('still asks for the password of any other room', async () => {
+        keepLastRoom('f'.repeat(32), 'kept-pw');
+        const openModal = vi.spyOn(TestBed.inject(ModalService), 'open').mockResolvedValue('typed');
+        const joinServerRoom = vi.spyOn(TestBed.inject(RoomJoinService), 'joinServerRoom').mockResolvedValue(false);
+
+        await component.connectRoom({ alias: '', roomName: room.name, info: room, peerContexts: [] });
+
+        await vi.waitFor(() => expect(joinServerRoom).toHaveBeenCalledWith(room, 'typed'));
+        expect(openModal).toHaveBeenCalledTimes(1);
+      });
+
+      it('lists the room first and marks it', async () => {
+        keepLastRoom(room.roomKey!, 'kept-pw');
+        const other: IRoomInfo = { ...room, id: 'Aa1', name: 'あ', roomKey: 'e'.repeat(32) };
+        vi.spyOn(Network, 'listAllRooms').mockResolvedValue([other, room]);
+        vi.spyOn(Network, 'isOpen', 'get').mockReturnValue(true);
+
+        await component.reload();
+        fixture.detectChanges();
+
+        expect(component.rooms().map((row) => row.info.id)).toEqual(['Ab3', 'Aa1']);
+        expect(component.rooms()[0].isLast).toBe(true);
+        expect(fixture.nativeElement.querySelector('[data-testid="lobby-last-room"]')?.textContent).toContain(
+          '前回の部屋'
+        );
+      });
     });
 
     it('asks for the password for the server to check, and joins through the server', async () => {
