@@ -8,15 +8,15 @@
 
 ## バージョンとソース
 
-- **固定版：tyoitashi r11／Axe v1.68.0**：[ソース`854af86d`](https://github.com/synchro4351/udonarium_axe/tree/854af86d5bd4b702bae99231e1104fb068d4b119)
-- **開発版：Axe v1.68.0対応**：[`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)
+- **固定版：tyoitashi r12／Axe v1.72.0**：[ソース`c33afff6`](https://github.com/synchro4351/udonarium_axe/tree/c33afff67e4add0af295c4737df5bd386ddd2dac)
+- **開発版：Axe v1.72.0対応**：[`codex/synwork-integration`](https://github.com/synchro4351/udonarium_axe/tree/codex/synwork-integration)
 - [バージョン履歴](TYOITASHI_VERSIONS.md) · [変更内容と再利用用のコミット一覧](TYOITASHI_CHANGES.md)
 
 このリポジトリの既定ブランチは紹介ページです。試す場合は上の固定ソースまたは開発ソースを選び、公式の手順に沿ってビルドしてください。既定ブランチの「Download ZIP」や公式の配布ZIPは、ここに記載した私家版の完成品ではありません。
 
 ## 非公式デモ
 
-[試用サイト](https://udonarium-trial.synwork.work/)で固定版`tyoitashi r11`を試せます。実験的な機能を含むため、動作が不安定な場合があります。大切な卓データは手元へ保存してください。デモのソースは上記の固定コミット`854af86d`です。
+[試用サイト](https://udonarium-trial.synwork.work/)で固定版`tyoitashi r12`を試せます。実験的な機能を含むため、動作が不安定な場合があります。大切な卓データは手元へ保存してください。デモのソースは上記の固定コミット`c33afff6`です。
 
 ## 公式Axeにない主な機能
 
