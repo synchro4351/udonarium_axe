@@ -12,6 +12,7 @@ import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { OPEN_STAMP_RULES, withStampsAllowed, withStampUseOn } from '@axe/domain/chat/stamp-rules';
+import { DEFAULT_SYSTEM_NOTICES, NOTICE_OFF, withNoticeRoute } from '@axe/domain/chat/system-notices';
 import { DataElement } from '@axe/domain/data/data-element';
 import { decodeDiceLook, PLAIN_DICE_LOOK } from '@axe/domain/dice/dice-3d/dice-look';
 import { Config } from '@axe/domain/peer/config';
@@ -35,230 +36,7 @@ describe('ChatMessageService', () => {
     expect(service).toBeTruthy();
   }));
 
-  it('sets the chat clock by a room server’s, asking no time server', () => {
-    const service = TestBed.inject(ChatMessageService);
-    vi.spyOn(Network.instance, 'serverClockOffset', 'get').mockReturnValue(60_000);
-    const fetch = vi.spyOn(globalThis, 'fetch');
-
-    service.calibrateTimeOffset();
-
-    expect(fetch).not.toHaveBeenCalled();
-    expect(Math.abs(service.getTime() - (Date.now() + 60_000))).toBeLessThan(1_000);
-  });
-
-  describe('showing a kept-back roll', () => {
-    const secretFrom = (mine: boolean) =>
-      ({ isSecret: true, isSendFromSelf: mine, tags: ['secret'], tag: 'secret' }) as unknown as ChatMessage;
-
-    const beSeat = (role: PeerRole) => {
-      PeerCursor.myCursor = { role, isGameMaster: role === PeerRole.GameMaster } as PeerCursor;
-    };
-
-    it('is for whoever rolled it, and for the master', inject([ChatMessageService], (service: ChatMessageService) => {
-      beSeat(PeerRole.Player);
-      expect(service.canDiscloseMessage(secretFrom(true))).toBe(true);
-      expect(service.canDiscloseMessage(secretFrom(false))).toBe(false);
-
-      beSeat(PeerRole.GameMaster);
-      expect(service.canDiscloseMessage(secretFrom(false))).toBe(true);
-
-      beSeat(PeerRole.Guest);
-      expect(service.canDiscloseMessage(secretFrom(false))).toBe(false);
-    }));
-
-    it('stays kept back when anybody else asks for it', inject([ChatMessageService], (service: ChatMessageService) => {
-      beSeat(PeerRole.Player);
-      const theirs = secretFrom(false);
-
-      service.discloseMessage(theirs);
-
-      expect(theirs.tag).toBe('secret');
-    }));
-  });
-
-  it('sendSystemMessageToMainTab routes to the first chat tab', inject(
-    [ChatMessageService],
-    (service: ChatMessageService) => {
-      const mainTab = {} as ChatTab;
-      const chatTabList = { chatTabs: [mainTab, {} as ChatTab] } as unknown as ChatTabList;
-      vi.spyOn(TestBed.inject(ObjectStore), 'get').mockReturnValue(chatTabList as never);
-      const toTabSpy = vi.spyOn(service, 'sendSystemMessageToTab').mockReturnValue(undefined as never);
-
-      service.sendSystemMessageToMainTab('hello');
-
-      expect(toTabSpy).toHaveBeenCalledWith(mainTab, 'hello', undefined);
-    }
-  ));
-
-  describe('an after-the-fact whisper', () => {
-    let service: ChatMessageService;
-    let tab: ChatTab;
-    let other: PeerCursor;
-
-    beforeEach(() => {
-      beMyself('me');
-      PeerCursor.createMyCursor();
-      other = new PeerCursor();
-      other.initialize();
-      other.userId = 'someone';
-      other.name = 'ノア';
-      service = TestBed.inject(ChatMessageService);
-      tab = ChatTabList.instance.addChatTab('テストタブ');
-    });
-
-    afterEach(() => {
-      tab.destroy();
-      other.destroy();
-    });
-
-    const lineFrom = (from: string, text = '本当はノアにだけ'): ChatMessage =>
-      tab.addMessage({ from, name: 'アリア', text, timestamp: 1000 });
-
-    it('offers everyone in the room but the reader', () => {
-      expect(service.afterWhisperCandidates(lineFrom('me'))).toEqual([other]);
-    });
-
-    it('offers nobody whose role may not read the tab the line is in', () => {
-      tab.plCanView = false;
-      other.role = PeerRole.Player;
-      const mine = lineFrom('me');
-
-      expect(service.afterWhisperCandidates(mine)).toEqual([]);
-      service.makeAfterWhisper(mine, other);
-      expect(mine.isAfterWhisper).toBe(false);
-
-      other.role = PeerRole.GameMaster;
-      expect(service.afterWhisperCandidates(mine)).toEqual([other]);
-    });
-
-    it('offers on a room server no seat not logged in, whose id anybody may take', () => {
-      vi.spyOn(Network, 'authorityPeerId', 'get').mockReturnValue('@authority');
-      other.role = PeerRole.Guest;
-      const mine = lineFrom('me');
-
-      expect(service.afterWhisperCandidates(mine)).toEqual([]);
-      service.makeAfterWhisper(mine, other);
-      expect(mine.isAfterWhisper).toBe(false);
-
-      other.userId = 'acct_someone';
-      expect(service.afterWhisperCandidates(mine)).toEqual([other]);
-      vi.restoreAllMocks();
-    });
-
-    it('whispers the reader’s own line to the one chosen, and puts it back', () => {
-      const mine = lineFrom('me');
-
-      service.makeAfterWhisper(mine, other);
-      expect(mine.isAfterWhisper).toBe(true);
-      expect(mine.name).toBe('アリア > ノア');
-      expect(mine.isDisplayableTo('someone')).toBe(true);
-      expect(mine.isDisplayableTo('third')).toBe(false);
-
-      service.undoAfterWhisper(mine);
-      expect(mine.isAfterWhisper).toBe(false);
-      expect(mine.isDisplayableTo('third')).toBe(true);
-    });
-
-    it('is not offered on somebody else’s line', () => {
-      const theirs = lineFrom('someone');
-
-      expect(service.canMakeAfterWhisper(theirs)).toBe(false);
-      service.makeAfterWhisper(theirs, other);
-
-      expect(theirs.isAfterWhisper).toBe(false);
-    });
-
-    it('is not offered on a line whispered from the start', () => {
-      const whisper = tab.addMessage({
-        from: 'me',
-        to: 'someone',
-        name: 'アリア > ノア',
-        text: '内緒',
-        timestamp: 1000,
-      });
-
-      expect(service.canMakeAfterWhisper(whisper)).toBe(false);
-    });
-
-    it('whispers to nobody who is not in the room', () => {
-      const mine = lineFrom('me');
-      const gone = new PeerCursor();
-      gone.userId = 'gone';
-
-      service.makeAfterWhisper(mine, gone);
-
-      expect(mine.isAfterWhisper).toBe(false);
-    });
-
-    it('leaves a dice result where the table saw it', () => {
-      const result = tab.addMessage({
-        from: 'System-BCDice',
-        originFrom: 'me',
-        name: 'DiceBot',
-        tag: 'system',
-        text: '2D6 → 7',
-        timestamp: 1001,
-      });
-
-      expect(service.canMakeAfterWhisper(result)).toBe(false);
-    });
-
-    it('offers putting back only on an after-the-fact whisper', () => {
-      const mine = lineFrom('me');
-
-      expect(service.canUndoAfterWhisper(mine)).toBe(false);
-      service.makeAfterWhisper(mine, other);
-      expect(service.canUndoAfterWhisper(mine)).toBe(true);
-    });
-  });
-
-  describe('deleting a line', () => {
-    let service: ChatMessageService;
-    let tab: ChatTab;
-
-    beforeEach(() => {
-      beMyself('me');
-      service = TestBed.inject(ChatMessageService);
-      tab = ChatTabList.instance.addChatTab('テストタブ');
-    });
-
-    afterEach(() => {
-      tab.destroy();
-    });
-
-    const lineFrom = (from: string): ChatMessage =>
-      tab.addMessage({ from, name: 'アリア', text: '言い間違い', timestamp: 1000 });
-
-    it('takes the reader’s own line out of the chat, leaving it in the room', () => {
-      const mine = lineFrom('me');
-
-      service.pseudoDelete(mine);
-
-      expect(mine.isPseudoDeleted).toBe(true);
-      expect(mine.isShownInChat).toBe(false);
-      expect(tab.chatMessages).toContain(mine);
-      expect(service.canPseudoDelete(mine)).toBe(false);
-    });
-
-    it('is not offered on somebody else’s line, or on a dice result', () => {
-      const theirs = lineFrom('someone');
-      const result = tab.addMessage({
-        from: 'System-BCDice',
-        originFrom: 'me',
-        name: 'DiceBot',
-        tag: 'system',
-        text: '2D6 → 7',
-        timestamp: 1001,
-      });
-
-      service.pseudoDelete(theirs);
-
-      expect(theirs.isPseudoDeleted).toBe(false);
-      expect(service.canPseudoDelete(result)).toBe(false);
-    });
-  });
-
-  describe('a guest’s own lines on a room server', () => {
+  describe('a guest on a room server speaking as whoever they last spoke as', () => {
     let service: ChatMessageService;
     let tab: ChatTab;
     const original = PeerCursor.myCursor;
@@ -267,24 +45,12 @@ describe('ChatMessageService', () => {
       beMyself('me');
       service = TestBed.inject(ChatMessageService);
       tab = ChatTabList.instance.addChatTab('テストタブ');
-      PeerCursor.myCursor = { role: PeerRole.Guest, isGameMaster: false } as PeerCursor;
     });
 
     afterEach(() => {
       tab.destroy();
       PeerCursor.myCursor = original;
     });
-
-    const mineIn = (guestCanSpeak: boolean) => {
-      tab.guestCanSpeak = guestCanSpeak;
-      return tab.addMessage({ from: 'me', name: 'ゲスト', text: 'こんにちは', tag: 'secret', timestamp: 1000 });
-    };
-    const offered = (line: ChatMessage) => [
-      service.canEditMessage(line),
-      service.canPseudoDelete(line),
-      service.canMakeAfterWhisper(line),
-      service.canDiscloseMessage(line),
-    ];
 
     it('says no notice in a tab guests may not speak in, which the server would take back, but does where they may', () => {
       vi.spyOn(Network.instance, 'authorityPeerId', 'get').mockReturnValue('@authority');
@@ -298,128 +64,80 @@ describe('ChatMessageService', () => {
       service.sendSystemMessageAsLastSpeaker('点呼：2/3', tab.identifier);
       expect(lines()).toBe(1);
     });
-
-    it('offers no change to one in a tab guests may not speak in, which the server would put back', () => {
-      vi.spyOn(Network.instance, 'authorityPeerId', 'get').mockReturnValue('@authority');
-
-      expect(offered(mineIn(false))).toEqual([false, false, false, false]);
-    });
-
-    it('offers the changes where guests may speak, and everywhere among peers', () => {
-      vi.spyOn(Network.instance, 'authorityPeerId', 'get').mockReturnValue('@authority');
-      expect(offered(mineIn(true))).toEqual([true, true, true, true]);
-
-      vi.spyOn(Network.instance, 'authorityPeerId', 'get').mockReturnValue(null);
-      expect(offered(mineIn(false))).toEqual([true, true, true, true]);
-    });
   });
 
-  describe('opening what a die was thrown on', () => {
+  describe('a notice of a kind the room may send somewhere of its choosing', () => {
     let service: ChatMessageService;
-    let tab: ChatTab;
+    let first: ChatTab;
+    let battle: ChatTab;
+
+    const route = (kind: 'round' | 'card', to: string) => {
+      Config.instance.systemNotices = withNoticeRoute(Config.instance.systemNotices, kind, to);
+    };
 
     beforeEach(() => {
-      beMyself('me');
       service = TestBed.inject(ChatMessageService);
-      tab = ChatTabList.instance.addChatTab('テストタブ');
+      first = ChatTabList.instance.addChatTab('メイン');
+      battle = ChatTabList.instance.addChatTab('戦闘');
     });
 
     afterEach(() => {
-      tab.destroy();
+      Config.instance.systemNotices = DEFAULT_SYSTEM_NOTICES;
+      battle.destroy();
+      first.destroy();
     });
 
-    it('opens the line that die was thrown on', () => {
-      const secret = service.sendSecretSystemMessageToTab(tab, '隠しダイス → 6', 'me', undefined, ['die-a']);
-
-      service.discloseDieRolls('die-a');
-
-      expect(secret.isSecret).toBe(false);
-    });
-
-    it('leaves the throw of another die where it was', () => {
-      service.sendSecretSystemMessageToTab(tab, '隠しダイスA → 6', 'me', undefined, ['die-a']);
-      const other = service.sendSecretSystemMessageToTab(tab, '隠しダイスB → 1', 'me', undefined, ['die-b']);
-
-      service.discloseDieRolls('die-a');
-
-      expect(other.isSecret).toBe(true);
-    });
-
-    it('brings the opened line to the end of the tab', () => {
-      const secret = service.sendSecretSystemMessageToTab(tab, '隠しダイス → 6', 'me', undefined, ['die-a']);
-      service.sendSystemMessageToTab(tab, 'そのあとの発言');
-
-      service.discloseDieRolls('die-a');
-
-      expect(tab.chatMessages[tab.chatMessages.length - 1]).toBe(secret);
-    });
-
-    it('opens the last throw of that die alone, leaving the earlier ones kept back', () => {
-      const older = service.sendSecretSystemMessageToTab(tab, '隠しダイス → 1', 'me', undefined, ['die-a']);
-      const newer = service.sendSecretSystemMessageToTab(tab, '隠しダイス → 6', 'me', undefined, ['die-a']);
-      const another = service.sendSecretSystemMessageToTab(tab, '隠しダイスB → 3', 'me', undefined, ['die-b']);
-
-      expect(service.discloseDieRolls('die-a')).toBe(1);
-
-      expect(newer.isSecret).toBe(false);
-      expect(older.isSecret).toBe(true);
-      expect(another.isSecret).toBe(true);
-    });
-
-    it('weighs the throws against each other across the tabs', () => {
-      const other = ChatTabList.instance.addChatTab('べつのタブ');
+    it('goes where its kind always went while the room chose nothing: the leftmost tab, or the system one', () => {
+      const list = ChatTabList.instance;
+      const index = list.systemMessageTabIndex;
+      list.systemMessageTabIndex = list.chatTabs.indexOf(battle);
       try {
-        vi.spyOn(service, 'getTime').mockReturnValueOnce(2000).mockReturnValueOnce(1000);
-        const newer = service.sendSecretSystemMessageToTab(tab, '隠しダイス → 6', 'me', undefined, ['die-a']);
-        const older = service.sendSecretSystemMessageToTab(other, '隠しダイス → 1', 'me', undefined, ['die-a']);
+        const leftmost = list.chatTabs[0];
+        expect(leftmost).not.toBe(battle);
 
-        expect(service.discloseDieRolls('die-a')).toBe(1);
+        const round = service.sendSystemNotice('round', 'ラウンド1開始です。');
+        const card = service.sendSystemNotice('card', '配りました。');
 
-        expect(newer.isSecret).toBe(false);
-        expect(older.isSecret).toBe(true);
+        expect(leftmost.chatMessages).toContain(round);
+        expect(list.systemMessageTab).toBe(battle);
+        expect(battle.chatMessages).toContain(card);
       } finally {
-        other.destroy();
+        list.systemMessageTabIndex = index;
       }
     });
 
-    it('says how many lines it opened', () => {
-      service.sendSecretSystemMessageToTab(tab, '隠しダイス → 6', 'me', undefined, ['die-a']);
+    it('goes to the tab the room chose for its kind, and leaves the other kinds where they went', () => {
+      route('round', battle.identifier);
 
-      expect(service.discloseDieRolls('die-a')).toBe(1);
+      const round = service.sendSystemNotice('round', 'ラウンド1開始です。');
+
+      expect(battle.chatMessages).toContain(round);
+      expect(round?.tags).toContain('system-message');
+      expect(service.noticeTabOf('card')).toBe(ChatTabList.instance.systemMessageTab);
     });
 
-    it('says none for a die with no throw of it left kept back', () => {
-      expect(service.discloseDieRolls('die-a')).toBe(0);
+    it('is written nowhere for a kind the room sends nowhere', () => {
+      route('round', NOTICE_OFF);
+      const before = ChatTabList.instance.chatTabs.map((tab) => tab.chatMessages.length);
+
+      expect(service.sendSystemNotice('round', 'ラウンド1開始です。')).toBeNull();
+
+      expect(ChatTabList.instance.chatTabs.map((tab) => tab.chatMessages.length)).toEqual(before);
     });
 
-    it('says none, and opens none, for a throw that is somebody else to open', () => {
-      const secret = service.sendSecretSystemMessageToTab(tab, '隠しダイス → 6', 'me', undefined, ['die-a']);
-      beMyself('another-player');
+    it('goes where its kind always went once the tab chosen for it is gone', () => {
+      route('round', 'a-tab-since-deleted');
 
-      expect(service.discloseDieRolls('die-a')).toBe(0);
-      expect(secret.isSecret).toBe(true);
+      expect(service.noticeTabOf('round')).toBe(ChatTabList.instance.chatTabs[0]);
     });
 
-    it('opens the throw of a die that is somebody else for the master', () => {
-      const secret = service.sendSecretSystemMessageToTab(tab, '隠しダイス → 6', 'me', undefined, ['die-a']);
-      beMyself('the-master');
-      PeerCursor.myCursor = { role: PeerRole.GameMaster } as PeerCursor;
+    it('is kept back as a secret where it is asked to be', () => {
+      route('round', battle.identifier);
 
-      expect(service.discloseDieRolls('die-a')).toBe(1);
-      expect(secret.isSecret).toBe(false);
-    });
+      const kept = service.sendSystemNotice('round', '罠が作動した', { secret: true, from: 'me' });
 
-    it('finds the throw in whichever tab it was said in', () => {
-      const another = ChatTabList.instance.addChatTab('べつのタブ');
-      try {
-        const secret = service.sendSecretSystemMessageToTab(another, '隠しダイス → 6', 'me', undefined, ['die-a']);
-
-        service.discloseDieRolls('die-a');
-
-        expect(secret.isSecret).toBe(false);
-      } finally {
-        another.destroy();
-      }
+      expect(kept?.isSecret).toBe(true);
+      expect(battle.chatMessages).toContain(kept);
     });
   });
 

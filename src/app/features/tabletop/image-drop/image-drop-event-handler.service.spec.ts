@@ -64,7 +64,7 @@ describe('ImageDropEventHandlerService', () => {
         {
           provide: RolePermissionService,
           useValue: {
-            get canEditTabletop() {
+            canEditTabletop() {
               return canEditTabletop;
             },
           },

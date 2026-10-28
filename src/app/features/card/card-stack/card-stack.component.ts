@@ -10,7 +10,6 @@ import {
   linkedSignal,
   signal,
 } from '@angular/core';
-import { CardGameService } from '@axe/application/card/card-game.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
@@ -26,7 +25,6 @@ import { PieceContextMenuService } from '@axe/application/ui/piece-context-menu.
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { sheetPanelTitle } from '@axe/application/ui/sheet-panel';
 import { buildSurfaceSwitchContextMenu } from '@axe/application/ui/surface-switch-context-menu';
-import { Network } from '@axe/core/index';
 import { isNetworkIsolated } from '@axe/core/network/network-isolation';
 import { getAuthorityPeerId } from '@axe/core/network/peer-context-source';
 import { imageFileEqual } from '@axe/core/storage/image-file';
@@ -37,6 +35,7 @@ import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { surfaceOf } from '@axe/domain/tabletop/tabletop-object';
 import { CardDrawCountDialogComponent } from '@axe/features/card/card-draw-count-dialog/card-draw-count-dialog.component';
+import { CardGameService } from '@axe/features/card/card-game.service';
 import { buildCardStackContextMenu } from '@axe/features/card/card-stack/card-stack-context-menu';
 import { handTransferActions } from '@axe/features/card/hand-rail/hand-transfer-context-menu';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
@@ -359,7 +358,7 @@ export class CardStackComponent {
    */
   onDoubleClick() {
     this.doubleTap.cancel();
-    if (!this.rolePermission.canEditTabletop) return;
+    if (!this.rolePermission.canEditTabletop()) return;
     if (!this.doubleTap.isInPlace()) return;
     if (this.drawCard() != null) {
       SoundEffect.play(PresetSound.cardDraw);
@@ -378,7 +377,7 @@ export class CardStackComponent {
    */
   onInputStart(e: MouseEvent | TouchEvent) {
     this.startDoubleClickTimer(e);
-    if (this.rolePermission.canEditTabletop) this.cardStack().toTopmost();
+    if (this.rolePermission.canEditTabletop()) this.cardStack().toTopmost();
     this.iconHiding.touch();
 
     this.selectionSignalService.selectObject(this.cardStack().identifier, 'GameCharacter');
@@ -449,7 +448,7 @@ export class CardStackComponent {
 
   private drawCardToHand(): Card | null {
     const card = this.drawCard();
-    if (card) card.toHand(Network.peerContext.userId);
+    if (card) card.toHand(PeerCursor.myUserId);
     return card;
   }
 

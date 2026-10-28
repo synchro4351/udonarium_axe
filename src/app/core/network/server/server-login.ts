@@ -1,9 +1,9 @@
+import { readOperatorContact } from '@axe/core/network/server/operator-contact';
 import { Account, TokenRequest, TokenResponse } from '@axe/core/network/server/server-protocol';
 import { apiUrl, refusal, ServerRoomApiError } from '@axe/core/network/server/server-room-api';
+import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
 import { sha256Base64Url } from '@axe/core/util/crypto-util';
 
-/** Where the login is kept, shared by every tab of the page. */
-export const LOGIN_STORAGE_KEY = 'udonarium-axe.server-login';
 /** Where the PKCE verifier waits while the login page is open, in the tab that opened it. */
 export const LOGIN_VERIFIER_STORAGE_KEY = 'udonarium-axe.server-login-verifier';
 /** The id of the login this tab opened, which the landing page hands back with the code. */
@@ -27,7 +27,11 @@ export interface StoredLogin {
 
 /** A login that did not come back with a code: the reason from its fragment, or a missing verifier. */
 export class ServerLoginError extends Error {
-  constructor(readonly code: string) {
+  constructor(
+    readonly code: string,
+    /** The operator's contact a login turned away for a ban or a stop came back with, if any. */
+    readonly contact: string | null = null
+  ) {
     super(`login failed: ${code}`);
     this.name = 'ServerLoginError';
   }
@@ -63,7 +67,7 @@ function readAccount(value: unknown): Account | null {
 export function readStoredLogin(storage: Storage): StoredLogin | null {
   let value: unknown;
   try {
-    value = JSON.parse(storage.getItem(LOGIN_STORAGE_KEY) ?? 'null');
+    value = JSON.parse(storage.getItem(STORAGE_KEYS.serverLogin) ?? 'null');
   } catch {
     return null;
   }
@@ -182,7 +186,7 @@ export class ServerLogin {
     this.env.session.removeItem(LOGIN_VERIFIER_STORAGE_KEY);
     this.env.session.removeItem(LOGIN_ATTEMPT_STORAGE_KEY);
     const error = params.get('login_error');
-    if (error) throw new ServerLoginError(error);
+    if (error) throw new ServerLoginError(error, readOperatorContact(params.get('login_contact')));
     const code = params.get('login_code');
     if (!code) throw new ServerLoginError('no-code');
     if (!verifier) throw new ServerLoginError('no-verifier');
@@ -316,12 +320,12 @@ export class ServerLogin {
       refreshToken: tokens.refreshToken,
       account: tokens.account,
     };
-    this.env.storage.setItem(LOGIN_STORAGE_KEY, JSON.stringify(login));
+    this.env.storage.setItem(STORAGE_KEYS.serverLogin, JSON.stringify(login));
     this.changed();
   }
 
   private clear(): void {
-    this.env.storage.removeItem(LOGIN_STORAGE_KEY);
+    this.env.storage.removeItem(STORAGE_KEYS.serverLogin);
     this.changed();
   }
 

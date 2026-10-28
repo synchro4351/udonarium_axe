@@ -15,7 +15,7 @@ import { CutIn } from '@axe/domain/media/cut-in';
 import { SoundEffect } from '@axe/domain/media/sound-effect';
 import { Config } from '@axe/domain/peer/config';
 import { cellGridOf, cellIndexOf } from '@axe/domain/tabletop/fog/cell-grid';
-import { GameTable, GridType } from '@axe/domain/tabletop/game-table';
+import { GameTable, GridSnapStyle, GridType } from '@axe/domain/tabletop/game-table';
 import { moveGridOf } from '@axe/domain/tabletop/move/move-grid';
 import { pieceCornerOn } from '@axe/domain/tabletop/move/piece-on-grid';
 import { pieceCellOf } from '@axe/domain/tabletop/move/piece-on-grid';
@@ -84,6 +84,17 @@ describe('TriggerFireService', () => {
 
       expect(firings).toHaveLength(1);
       expect(hpOf(hero)).toBe(7);
+    });
+
+    it('lands a piece carried off on the very cell named, on a table keeping pieces to the cells', () => {
+      table.squareSpan = 2;
+      table.gridSnapStyle = GridSnapStyle.GRID;
+      const hero = heroWith(10);
+      hero.location = { name: 'table', x: 2 * GRID, y: 3 * GRID };
+
+      service.carryTo(hero, 3, 3, table);
+
+      expect([hero.location.x, hero.location.y]).toEqual([3 * GRID, 3 * GRID]);
     });
 
     it('lands a piece carried off by ground on the square holding the cell it names', () => {
@@ -473,6 +484,16 @@ describe('TriggerFireService', () => {
     expect(hpOf(hero)).toBe(20);
   });
 
+  it('brings nothing down that is already past the full, as a resource set to go over it may be', () => {
+    trapAt(5, 5, { amount: '-5' });
+    const hero = heroWith(20);
+    DataElement.findElementByReference(hero.rootDataElement!, 'ライフ')!.currentValue = 23;
+
+    service.walked(hero, grid(), [at(4, 5), at(5, 5)]);
+
+    expect(hpOf(hero)).toBe(23);
+  });
+
   it('takes nothing from a piece that carries no such thing', () => {
     trapAt(5, 5, { element: 'マナ' });
     const hero = heroWith(20);
@@ -505,8 +526,7 @@ describe('TriggerFireService and what the room is told', () => {
     TestBed.inject(TableSelecter).viewTableIdentifier = table.identifier;
     service = TestBed.inject(TriggerFireService);
     chat = TestBed.inject(ChatMessageService);
-    vi.spyOn(chat, 'sendSystemMessageToMainTab').mockReturnValue(null!);
-    vi.spyOn(chat, 'sendSecretSystemMessageToMainTab').mockReturnValue(null!);
+    vi.spyOn(chat, 'sendSystemNotice').mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -532,8 +552,9 @@ describe('TriggerFireService and what the room is told', () => {
     return hero;
   }
 
-  const spoken = () => vi.mocked(chat.sendSystemMessageToMainTab).mock.calls.map((call) => call[0]);
-  const kept = () => vi.mocked(chat.sendSecretSystemMessageToMainTab).mock.calls.map((call) => call[0]);
+  const notices = () => vi.mocked(chat.sendSystemNotice).mock.calls;
+  const spoken = () => notices().flatMap(([, text, options]) => (options?.secret ? [] : [text]));
+  const kept = () => notices().flatMap(([, text, options]) => (options?.secret ? [text] : []));
 
   it('says only that the ground was stepped on where it was given no line', () => {
     trapAt(5, 5);
@@ -542,6 +563,7 @@ describe('TriggerFireService and what the room is told', () => {
 
     expect(spoken()).toHaveLength(1);
     expect(spoken()[0]).toContain('trigger.sprang');
+    expect(notices()[0][0]).toBe('trigger');
   });
 
   it('writes the line the ground was given in place of saying merely that it went off', () => {
@@ -578,11 +600,11 @@ describe('TriggerFireService and what the room is told', () => {
 
     service.walked(heroWith(20), grid(), [at(4, 5), at(5, 5)]);
 
-    expect(vi.mocked(chat.sendSecretSystemMessageToMainTab).mock.calls[0][1]).toBeUndefined();
+    expect(notices()[0][2]).toEqual({ secret: true });
   });
 
   it('takes what it takes whether or not anybody is told', () => {
-    vi.mocked(chat.sendSystemMessageToMainTab).mockImplementation(() => {
+    vi.mocked(chat.sendSystemNotice).mockImplementation(() => {
       throw new Error('no chat tab yet');
     });
     trapAt(5, 5, { element: 'ライフ', amount: '3' });
@@ -710,7 +732,7 @@ describe('TriggerFireService and the roll it asks for', () => {
     TestBed.inject(TableSelecter).viewTableIdentifier = table.identifier;
     service = TestBed.inject(TriggerFireService);
     chat = TestBed.inject(ChatMessageService);
-    vi.spyOn(chat, 'sendSystemMessageToMainTab').mockReturnValue(null!);
+    vi.spyOn(chat, 'sendSystemNotice').mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -727,7 +749,7 @@ describe('TriggerFireService and the roll it asks for', () => {
     table.appendChild(trigger);
   }
 
-  const spoken = () => vi.mocked(chat.sendSystemMessageToMainTab).mock.calls.map((call) => call[0]);
+  const spoken = () => vi.mocked(chat.sendSystemNotice).mock.calls.map((call) => call[1]);
   const walkOn = () => service.walked(GameCharacter.create('英雄', 1, ''), grid(), [at(4, 5), at(5, 5)]);
 
   it('asks for nothing where the ground wants no roll', () => {

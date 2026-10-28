@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
-import { SaveDataService } from '@axe/application/file/save-data.service';
+import { HandRailService } from '@axe/application/card/hand-rail.service';
+import { ActiveCharacterService } from '@axe/application/character/active-character.service';
+import { RoomFilesService } from '@axe/application/file/room-files.service';
 import { LanguageService } from '@axe/application/i18n/language.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
@@ -14,17 +16,16 @@ import { RenderLiteService } from '@axe/application/ui/render-lite.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { ThemeService } from '@axe/application/ui/theme.service';
 import { ViewModePreferenceService } from '@axe/application/ui/view-mode-preference.service';
-import { Network } from '@axe/core/network/network';
-import { FileArchiver } from '@axe/core/storage/file-archiver';
+import { VisualNovelModeService } from '@axe/application/ui/visual-novel-mode.service';
+import { capturePointer } from '@axe/core/input/pointer-capture';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { isOwnedByUser } from '@axe/domain/character/owned-characters';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
-import { ReloadCheck } from '@axe/domain/peer/reload-check';
 import { HAND_CARDS_ICON } from '@axe/domain/ui/custom-icon';
 import { isAudienceOffered } from '@axe/domain/ui/menu-command';
 import { RoomPanelName } from '@axe/domain/ui/room-panel';
 import { nextViewMode, viewModeIcon, viewModeLabelKey } from '@axe/domain/ui/view-mode';
-import { HandRailService } from '@axe/features/card/hand-rail/hand-rail.service';
 import { MobileChatPaneComponent } from '@axe/features/mobile/mobile-chat-pane/mobile-chat-pane.component';
 import {
   gameMasterMobileMenuItems,
@@ -34,9 +35,6 @@ import {
 } from '@axe/features/mobile/mobile-shell/mobile-menu-items';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
-import { ActiveCharacterService } from '@axe/features/pl-tools/active-character.service';
-import { isOwnedByUser } from '@axe/features/pl-tools/owned-character-list/owned-characters';
-import { VisualNovelModeService } from '@axe/features/visual-novel/visual-novel-mode.service';
 import { UiHandCardsIconComponent } from '@axe/ui/components/hand-cards-icon/hand-cards-icon.component';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -49,7 +47,6 @@ import { TranslocoModule } from '@jsverse/transloco';
 export class MobileShellComponent {
   private readonly panelService = inject(PanelService);
   private readonly roomPanels = inject(RoomPanelService);
-  private readonly saveDataService = inject(SaveDataService);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly visualNovel = inject(VisualNovelModeService);
   protected readonly handRail = inject(HandRailService);
@@ -58,7 +55,7 @@ export class MobileShellComponent {
   private readonly activeCharacter = inject(ActiveCharacterService);
   private readonly objectPanels = inject(ObjectPanelService);
   private readonly objectStore = inject(ObjectStore);
-  private readonly fileArchiver = inject(FileArchiver);
+  private readonly roomFiles = inject(RoomFilesService);
   private readonly rolePermission = inject(RolePermissionService);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly theme = inject(ThemeService);
@@ -74,10 +71,7 @@ export class MobileShellComponent {
 
   protected readonly isMenuOpen = signal(false);
 
-  protected readonly isGameMaster = computed(() => {
-    this.objectChange.trackMyCursor();
-    return PeerCursor.isMyselfGameMaster;
-  });
+  protected readonly isGameMaster = computed(() => this.rolePermission.isGameMaster());
 
   protected readonly paneTop = computed(() => {
     const ratio = this.layout.tableRatio() * 100;
@@ -126,10 +120,7 @@ export class MobileShellComponent {
     return sharedMobileMenuItems().filter((item) => isAudienceOffered(item.audience ?? 'anyone', role));
   });
   /** Whether this seat is offered its characters, which a guest, owning none it may play, is not. */
-  protected readonly offersCharacters = computed(() => {
-    this.objectChange.trackMyCursor();
-    return this.rolePermission.canEditTabletop;
-  });
+  protected readonly offersCharacters = computed(() => this.rolePermission.canEditTabletop());
   protected readonly gameMasterItems: MobileMenuItem[] = gameMasterMobileMenuItems();
   protected readonly showGameMasterItems = computed(() => this.isGameMaster());
 
@@ -147,7 +138,7 @@ export class MobileShellComponent {
   protected runMenuAction(action: MobileMenuAction): void {
     this.isMenuOpen.set(false);
     if (action === 'save') {
-      void this.saveRoom();
+      void this.roomFiles.save();
       return;
     }
     if (action === 'visualNovel') {
@@ -179,17 +170,8 @@ export class MobileShellComponent {
   }
 
   protected loadRoomFiles(event: Event): void {
-    const input = event.target as HTMLInputElement;
     this.isMenuOpen.set(false);
-    if (!this.rolePermission.canEditTabletop) {
-      input.value = '';
-      return;
-    }
-    const files = input.files;
-    const reloadCheck = this.objectStore.get<ReloadCheck>('ReloadCheck');
-    reloadCheck?.reloadCheckStart(Network.peerContext.roomName !== '');
-    if (files && files.length) this.fileArchiver.load(files);
-    input.value = '';
+    this.roomFiles.loadChosen(event.target as HTMLInputElement);
   }
 
   protected clearSelection(): void {
@@ -212,7 +194,7 @@ export class MobileShellComponent {
   protected startResize(event: PointerEvent): void {
     if (this.isResizing) return;
     this.isResizing = true;
-    (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
+    capturePointer(event.target, event.pointerId);
     event.preventDefault();
 
     const onMove = (moveEvent: PointerEvent) => {
@@ -247,14 +229,6 @@ export class MobileShellComponent {
       return;
     }
     this.openCharacterList();
-  }
-
-  private async saveRoom(): Promise<void> {
-    const roomName =
-      Network.peerContext && Network.peerContext.roomName.length > 0
-        ? Network.peerContext.roomName
-        : this.t('app.roomDataDefault');
-    await this.saveDataService.saveRoomAsync(roomName);
   }
 
   private resolvePanel(action: MobileMenuAction): RoomPanelName | null {

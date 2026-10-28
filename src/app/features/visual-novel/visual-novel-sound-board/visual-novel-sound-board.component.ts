@@ -4,6 +4,7 @@ import { LanguageService } from '@axe/application/i18n/language.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
+import { SoundEffects } from '@axe/core/storage/sound-effects';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { AudioTag } from '@axe/domain/media/audio-tag';
 import { CutIn } from '@axe/domain/media/cut-in';
@@ -12,6 +13,7 @@ import { Jukebox } from '@axe/domain/media/jukebox';
 import { presetSoundLabelKey } from '@axe/domain/media/preset-sound-labels';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
+import { TextTooltipDirective } from '@axe/ui/directives/text-tooltip.directive';
 import { TranslocoModule } from '@jsverse/transloco';
 
 export interface AttachedSound {
@@ -23,7 +25,7 @@ export interface AttachedSound {
   selector: 'visual-novel-sound-board',
   templateUrl: './visual-novel-sound-board.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslocoModule],
+  imports: [TextTooltipDirective, FormsModule, TranslocoModule],
   host: { class: 'contents' },
 })
 export class VisualNovelSoundBoardComponent {
@@ -159,7 +161,7 @@ export class VisualNovelSoundBoardComponent {
    */
   isSoundEffectPlaying(identifier: string): boolean {
     this.seTick();
-    return this.jukebox?.isSePlaying(identifier) ?? false;
+    return SoundEffects.isPlaying(identifier);
   }
 
   /** The board is asked again about what is playing whenever it is opened. */

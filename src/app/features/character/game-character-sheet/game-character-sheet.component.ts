@@ -13,7 +13,6 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CardGameService } from '@axe/application/card/card-game.service';
 import { SaveDataService } from '@axe/application/file/save-data.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
@@ -29,13 +28,13 @@ import { ModalService } from '@axe/application/ui/modal.service';
 import { MotionService } from '@axe/application/ui/motion.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { buildReorderContextMenu } from '@axe/application/ui/reorder-context-menu';
-import { SheetViewPreferenceService } from '@axe/application/ui/sheet-view-preference.service';
 import { SnackbarService } from '@axe/application/ui/snackbar.service';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { debounce } from '@axe/core/util/debounce';
 import { Card } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
 import { GameCharacter } from '@axe/domain/character/game-character';
@@ -55,6 +54,7 @@ import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
 import { Terrain, TERRAIN_FACES, TerrainFace } from '@axe/domain/tabletop/terrain';
 import { TextNote, TextNoteFormat } from '@axe/domain/tabletop/text-note';
 import { isWithheldHere } from '@axe/domain/tabletop/withheld';
+import { CardGameService } from '@axe/features/card/card-game.service';
 import { CardStackCardListComponent } from '@axe/features/card/card-stack-card-list/card-stack-card-list.component';
 import { CharacterPortraitPanelComponent } from '@axe/features/character/game-character-sheet/character-portrait-panel.component';
 import { buildCharacterSheetMenu } from '@axe/features/character/game-character-sheet/character-sheet-context-menu';
@@ -66,21 +66,23 @@ import {
 } from '@axe/features/character/game-character-sheet/detail-element-reorder-helpers';
 import { GameCharacterSettingsTabComponent } from '@axe/features/character/game-character-sheet/game-character-settings-tab.component';
 import { clampInRange, roundOr } from '@axe/features/character/game-character-sheet/numeric-input-helpers';
+import { SheetViewPreferenceService } from '@axe/features/character/game-character-sheet/sheet-view-preference.service';
 import { openDataElementEditor } from '@axe/features/data-element/data-element-editor/open-data-element-editor';
 import { DataElementDeletionService } from '@axe/features/data-element/game-data-element/data-element-deletion.service';
 import { IN_DATA_ELEMENT_SHEET } from '@axe/features/data-element/game-data-element/data-element-sheet-host';
 import { GameDataElementComponent } from '@axe/features/data-element/game-data-element/game-data-element.component';
 import { DisclosureControlComponent } from '@axe/features/disclosure/disclosure-control/disclosure-control.component';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
+import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
+import { TextFormatSwitchComponent } from '@axe/ui/components/text-format-switch/text-format-switch.component';
+import { TextTooltipDirective } from '@axe/ui/directives/text-tooltip.directive';
+import { SafePipe } from '@axe/ui/pipes/safe.pipe';
+import { formatNoteText } from '@axe/ui/text-decoration/format-note-text';
 import {
   applyTextNoteFormatMark,
   TEXT_NOTE_FORMAT_MARKS,
   TextNoteFormatMark,
-} from '@axe/features/tabletop/text-note/text-note-format-marks';
-import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
-import { TextFormatSwitchComponent } from '@axe/ui/components/text-format-switch/text-format-switch.component';
-import { SafePipe } from '@axe/ui/pipes/safe.pipe';
-import { formatNoteText } from '@axe/ui/text-decoration/format-note-text';
+} from '@axe/ui/text-decoration/text-note-format-marks';
 import { TranslocoModule } from '@jsverse/transloco';
 
 /** How long a section picked from the row of sections stays lit while the sheet scrolls to it. */
@@ -96,6 +98,7 @@ const NARROW_SHEET_REM = 36;
   host: { class: 'block' },
   providers: [{ provide: IN_DATA_ELEMENT_SHEET, useValue: true }],
   imports: [
+    TextTooltipDirective,
     CardStackCardListComponent,
     DisclosureControlComponent,
     FormsModule,
@@ -168,10 +171,7 @@ export class GameCharacterSheetComponent {
   /** The section the reader is at, which the narrow sheet's row of sections lights up. */
   readonly activeSectionId = signal<string | null>(null);
 
-  readonly isReadOnly = computed(() => {
-    this.objectChange.trackMyCursor();
-    return !this.rolePermission.canEditTabletop;
-  });
+  readonly isReadOnly = computed(() => !this.rolePermission.canEditTabletop());
 
   /**
    * Whether the sheet is closed to a reader who may not change the table, as the panels that write
@@ -402,7 +402,7 @@ export class GameCharacterSheetComponent {
     if (!Number.isFinite(value)) return;
     c.size = Math.max(1, Math.min(20, Math.round(value)));
   }
-  private cardFaceTextUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly writeFaceTextSoon = debounce(() => this.flushCardOwnFaceText(), 66);
   private pendingCardFaceText: { card: Card; value: string } | null = null;
 
   /**
@@ -415,7 +415,7 @@ export class GameCharacterSheetComponent {
     this.objectChange.versionOf(c.identifier)();
     if (PeerCursor.myCursor) this.objectChange.versionOf(PeerCursor.myCursor.identifier)();
     const isOwnedByAnotherUser = c.hasOwner && !c.isMine;
-    return this.rolePermission.canSeeHidden || (!isOwnedByAnotherUser && c.isVisible);
+    return this.rolePermission.canSeeHidden() || (!isOwnedByAnotherUser && c.isVisible);
   }
 
   /** The picture on the card's front, or none for a user who may not read the face, so a hidden card never shows it. */
@@ -437,17 +437,15 @@ export class GameCharacterSheetComponent {
    */
   setCardOwnFaceText(c: Card, event: Event): void {
     if (!this.canEditCard() || !this.canReadCardFace(c)) return;
-    if (this.cardFaceTextUpdateTimer) clearTimeout(this.cardFaceTextUpdateTimer);
     this.pendingCardFaceText = { card: c, value: (event.target as HTMLTextAreaElement).value };
-    this.cardFaceTextUpdateTimer = setTimeout(() => this.flushCardOwnFaceText(), 66);
+    this.writeFaceTextSoon();
   }
   /**
    * Writes face text still waiting on its pause to the card at once, when the field loses focus,
    * the piece changes or the panel closes.
    */
   flushCardOwnFaceText(): void {
-    if (this.cardFaceTextUpdateTimer) clearTimeout(this.cardFaceTextUpdateTimer);
-    this.cardFaceTextUpdateTimer = null;
+    this.writeFaceTextSoon.cancel();
     const pending = this.pendingCardFaceText;
     this.pendingCardFaceText = null;
     if (pending && this.cardGame.canEditCard(pending.card) && this.canReadCardFace(pending.card)) {
@@ -985,7 +983,7 @@ export class GameCharacterSheetComponent {
    * of from this user.
    */
   clone() {
-    if (!this.rolePermission.canEditTabletop || !this.tabletopObject) return;
+    if (!this.rolePermission.canEditTabletop() || !this.tabletopObject) return;
     if (isWithheldHere(this.tabletopObject)) {
       this.snackbar.show(this.translateFn('feature.inventory.sheet.copyWithheld'));
       return;

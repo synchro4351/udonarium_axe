@@ -10,8 +10,6 @@ import {
   linkedSignal,
   signal,
 } from '@angular/core';
-import { CardFlipCutInService } from '@axe/application/card/card-flip-cut-in.service';
-import { CardGameService } from '@axe/application/card/card-game.service';
 import { CardTargetService } from '@axe/application/card/card-target.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
@@ -32,6 +30,8 @@ import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { buildCardContextMenu } from '@axe/features/card/card/card-context-menu';
 import { selectOverlappingCards } from '@axe/features/card/card/overlapping-cards';
+import { CardFlipCutInService } from '@axe/features/card/card-flip-cut-in.service';
+import { CardGameService } from '@axe/features/card/card-game.service';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
 import { HandDragService } from '@axe/features/card/hand-rail/hand-drag.service';
 import { handTransferActions } from '@axe/features/card/hand-rail/hand-transfer-context-menu';
@@ -414,7 +414,7 @@ export class CardComponent {
    */
   onDoubleClick() {
     this.doubleTap.cancel();
-    if (!this.rolePermission.canEditTabletop) return;
+    if (!this.rolePermission.canEditTabletop()) return;
     if (!this.doubleTap.isInPlace()) return;
     if (this.ownerIsOnline && !this.isPeeking) return;
     const turnsToFront = !(this.isVisible && !this.isPeeking);
@@ -436,7 +436,7 @@ export class CardComponent {
    */
   onInputStart(e: MouseEvent | TouchEvent) {
     this.startDoubleClickTimer(e);
-    if (this.rolePermission.canEditTabletop) this.card().toTopmost();
+    if (this.rolePermission.canEditTabletop()) this.card().toTopmost();
     this.iconHiding.touch();
   }
 

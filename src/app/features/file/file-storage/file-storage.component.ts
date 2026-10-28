@@ -9,12 +9,18 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AssetOwnershipService } from '@axe/application/file/asset-ownership.service';
+import { AssetRemovalService } from '@axe/application/file/asset-removal.service';
+import { ImageTagLockService } from '@axe/application/file/image-tag-lock.service';
 import { ImageUploadPreferenceService } from '@axe/application/file/image-upload-preference.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
+import { ReportService } from '@axe/application/moderation/report.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { MultipartCharacterService } from '@axe/application/tabletop/multipart-character.service';
+import { ModalService } from '@axe/application/ui/modal.service';
 import { PanelService } from '@axe/application/ui/panel.service';
+import { SnackbarService } from '@axe/application/ui/snackbar.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
 import { emitSelectFile } from '@axe/core/event/domain-events';
 import { FileArchiver, ImageDropPlace, MAX_LOADED_IMAGE_BYTES } from '@axe/core/storage/file-archiver';
@@ -38,7 +44,9 @@ import {
   PickedColor,
 } from '@axe/features/file/file-storage/transparent-background';
 import { MultipartCharacterComponent } from '@axe/features/file/multipart-character/multipart-character.component';
+import { ReportDialogComponent } from '@axe/features/moderation/report-dialog/report-dialog.component';
 import { ImageEditQueue } from '@axe/ui/components/image-editor/image-edit-queue.service';
+import { TextTooltipDirective } from '@axe/ui/directives/text-tooltip.directive';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -104,7 +112,7 @@ export interface PendingImage {
   templateUrl: './file-storage.component.html',
   host: { class: 'block' },
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, SafePipe, TranslocoModule],
+  imports: [TextTooltipDirective, FormsModule, SafePipe, TranslocoModule],
 })
 export class FileStorageComponent implements DroppedImageHolder {
   protected readonly isCompact = inject(ViewportService).isCompact;
@@ -117,6 +125,15 @@ export class FileStorageComponent implements DroppedImageHolder {
   private readonly t = inject(TRANSLATE_FN);
   private readonly multipart = inject(MultipartCharacterService);
   private readonly editQueue = inject(ImageEditQueue);
+  private readonly assetRemoval = inject(AssetRemovalService);
+  private readonly tagLock = inject(ImageTagLockService);
+  private readonly snackbar = inject(SnackbarService);
+  private readonly ownership = inject(AssetOwnershipService);
+  private readonly reports = inject(ReportService);
+  private readonly modalService = inject(ModalService);
+
+  /** Whether this seat may report a picture to the room server's operator, as anyone in its room may. */
+  protected readonly canReport = this.reports.canReport;
   protected readonly uploadPreference = inject(ImageUploadPreferenceService);
 
   get canCreateParts(): boolean {
@@ -151,20 +168,33 @@ export class FileStorageComponent implements DroppedImageHolder {
 
   /** Only the master may keep a picture back, or see one that is being kept. */
   get canKeepSecret(): boolean {
-    return this.rolePermission.canSeeHidden;
+    return this.rolePermission.canSeeHidden();
   }
 
-  /** Whether the current seat may add or edit pictures. */
-  protected readonly canEdit = computed(() => {
+  /**
+   * Whether this seat may bring pictures in, edit them and file them under tags, which a guest may
+   * not. It follows this seat's cursor, so the panel redraws when the role changes.
+   */
+  protected readonly canEdit = computed(() => this.rolePermission.canEditTabletop());
+
+  /**
+   * Whether this seat may remove pictures from the room here: the master always, and a player while
+   * any picture listed is one they added. It follows this seat's cursor, as `canEdit` does, and who
+   * the room says added what.
+   */
+  protected readonly canRemove = computed(() => {
     this.objectChange.trackMyCursor();
-    return this.rolePermission.canEditTabletop;
+    this.ownership.track();
+    if (this.rolePermission.canEditShared()) return true;
+    return this.images().some((image) => this.assetRemoval.mayRemove(image.context.identifier));
   });
 
   /** The master's own view of what is being kept. Everyone else never sees them at all. */
   readonly showSecret = signal(true);
 
   private mayShow(imageFile: ImageFile): boolean {
-    return canBrowseImage(ImageTag.get(imageFile.context.identifier) ?? null, this.canKeepSecret, this.showSecret());
+    const tag = ImageTag.get(imageFile.context.identifier) ?? null;
+    return canBrowseImage(tag, this.canKeepSecret, this.showSecret(), this.tagLock.hides);
   }
 
   /**
@@ -178,6 +208,7 @@ export class FileStorageComponent implements DroppedImageHolder {
   readonly images = computed(() => {
     this.objectChange.fileVersion();
     this.objectChange.collectionOf('image-tag')();
+    this.tagLock.track();
     const imageFileList: ImageFile[] = [];
     if (this.selectTag() == ALL_TAG) return this.getAllImage();
     for (const imageFile of this.fileStorageService.images) {
@@ -213,16 +244,23 @@ export class FileStorageComponent implements DroppedImageHolder {
     return imageTag ? imageTag : ImageTag.create(this.selectedFile.identifier);
   }
 
+  /**
+   * The tags offered above the pictures: untagged first, then all, then each tag a person filed
+   * pictures under, but those someone else keeps from this seat.
+   */
   readonly tagList = computed<string[]>(() => {
     this.objectChange.fileVersion();
     this.objectChange.collectionOf('image-tag')();
+    this.objectChange.trackMyCursor();
+    this.tagLock.track();
     const tags: string[] = [];
     for (const imageFile of this.fileStorageService.images) {
       const identifier = imageFile.context.identifier;
       const imageTag = ImageTag.get(identifier);
       if (imageTag) {
         this.objectChange.versionOf(imageTag.identifier)();
-        if (imageTag.tag && imageTag.tag != SYSTEM_RESERVED_TAG) tags.push(imageTag.tag);
+        const tag = imageTag.tag;
+        if (tag && tag != SYSTEM_RESERVED_TAG && !this.tagLock.hides(tag)) tags.push(tag);
       }
     }
 
@@ -233,6 +271,25 @@ export class FileStorageComponent implements DroppedImageHolder {
   });
 
   fileStorageService = this.imageStorage;
+
+  /** The tags listed that someone keeps to themselves, which only their holder and the master see listed. */
+  protected readonly lockedTags = computed<ReadonlySet<string>>(() => {
+    this.tagLock.track();
+    return new Set(this.tagList().filter((tag) => this.tagLock.isLocked(tag)));
+  });
+
+  /** Whether this seat may lock or unlock the tag picked above the pictures. */
+  protected readonly canLockSelected = computed(() => {
+    this.objectChange.trackMyCursor();
+    this.tagLock.track();
+    const tag = this.selectTag();
+    return tag !== ALL_TAG && this.tagLock.mayToggle(tag);
+  });
+
+  /** Keeps the tag picked above the pictures to this seat and the master, or lets everyone see it again. */
+  toggleSelectedLock(): void {
+    if (this.canLockSelected()) this.tagLock.toggle(this.selectTag());
+  }
 
   /** Keeps the tag name typed into the new-tag field. */
   onInputNewTag(event: Event): void {
@@ -246,10 +303,15 @@ export class FileStorageComponent implements DroppedImageHolder {
    * the tool's own pictures are refused. Tag records are shared, so the change reaches every peer.
    */
   changeTag() {
+    if (!this.rolePermission.canEditTabletop()) return;
     const candidate = this.newTagName();
     if (candidate === ALL_TAG) return;
     if (candidate === SYSTEM_RESERVED_TAG) return;
     if (candidate === this.t('feature.file.fileStorage.all')) return;
+    if (!this.tagLock.mayFileUnder(candidate)) {
+      this.snackbar.show(this.t('feature.file.fileStorage.tagKeptByOther'));
+      return;
+    }
 
     const changeableImages = this.images();
 
@@ -285,6 +347,34 @@ export class FileStorageComponent implements DroppedImageHolder {
     }
   }
 
+  /**
+   * Removes every picture ticked in the current list from the whole room, once the master has said
+   * so, and unticks them.
+   */
+  /** Whether a picture is one that may be reported: one a person added, named by its hash. */
+  protected isReportable(identifier: string): boolean {
+    return this.reports.isReportable(identifier);
+  }
+
+  /** Asks the reader why they report a picture to the room server's operator, and sends it. */
+  protected report(image: ImageFile, event: Event): void {
+    event.stopPropagation();
+    if (!this.canReport()) return;
+    void this.modalService.open(ReportDialogComponent, {
+      target: 'asset',
+      assetId: image.identifier,
+      name: image.name,
+    });
+  }
+
+  async removeChecked(): Promise<void> {
+    if (!this.canRemove()) return;
+    const checked = this.images()
+      .map((image) => image.context.identifier)
+      .filter((identifier) => this.checkedFiles().has(identifier));
+    if ((await this.assetRemoval.removeAfterAsking('image', checked)) > 0) this.checkedFiles.set(new Set());
+  }
+
   readonly selectTag = signal('');
   readonly newTagName = signal<string>('');
 
@@ -311,7 +401,7 @@ export class FileStorageComponent implements DroppedImageHolder {
    */
   handleFileSelect(event: Event) {
     const input = event.target as HTMLInputElement;
-    if (!this.rolePermission.canEditTabletop) {
+    if (!this.rolePermission.canEditTabletop()) {
       input.value = '';
       return;
     }
@@ -327,7 +417,7 @@ export class FileStorageComponent implements DroppedImageHolder {
 
   /** Sends a batch through the official upload queue, which applies the edit-first preference. */
   private async uploadFiles(files: readonly File[]): Promise<void> {
-    if (!this.rolePermission.canEditTabletop || !files.length) return;
+    if (!this.rolePermission.canEditTabletop() || files.length === 0) return;
     this.notice.set('');
     const { oversized } = await this.editQueue.upload(files);
     if (oversized.length)
@@ -337,7 +427,10 @@ export class FileStorageComponent implements DroppedImageHolder {
   /** What the last batch upload or edit asked for has to say, empty when nothing. */
   readonly notice = signal('');
 
-  /** The one checked picture, if exactly one is still in the list. */
+  /**
+   * The one picture ticked among those in the list, which can be edited; null unless exactly one
+   * is. A ticked picture that has left the list, as one replaced by its edit, does not count.
+   */
   checkedImage(): ImageFile | null {
     const checked = this.images().filter((image) => this.checkedFiles().has(image.identifier));
     return checked.length === 1 ? checked[0] : null;
@@ -346,7 +439,7 @@ export class FileStorageComponent implements DroppedImageHolder {
   /** Opens the checked picture in the official editor and replaces it in place when saved. */
   async editChecked(): Promise<void> {
     const image = this.checkedImage();
-    if (!image || !this.rolePermission.canEditTabletop) return;
+    if (!image || !this.rolePermission.canEditTabletop()) return;
     this.notice.set('');
     let blob: Blob;
     try {
@@ -402,7 +495,7 @@ export class FileStorageComponent implements DroppedImageHolder {
    */
   onPaste(event: ClipboardEvent): void {
     event.preventDefault();
-    if (!this.rolePermission.canEditTabletop) {
+    if (!this.rolePermission.canEditTabletop()) {
       this.pendingNotice.set('noPermission');
       return;
     }
@@ -411,7 +504,7 @@ export class FileStorageComponent implements DroppedImageHolder {
 
   /** Reads a picture from the clipboard on request, holding it for confirmation. */
   async readFromClipboard(): Promise<void> {
-    if (!this.rolePermission.canEditTabletop) {
+    if (!this.rolePermission.canEditTabletop()) {
       this.pendingNotice.set('noPermission');
       return;
     }
@@ -610,7 +703,7 @@ export class FileStorageComponent implements DroppedImageHolder {
    * this seat no longer has leave to add, is kept.
    */
   private add(pending: PendingImage): Promise<PendingNotice> {
-    if (!this.rolePermission.canEditTabletop) return Promise.resolve('noPermission');
+    if (!this.rolePermission.canEditTabletop()) return Promise.resolve('noPermission');
     this.pendingAdding.set(true);
     this.pickingColor.set(false);
     const adding = this.store(pending).then((notice) => {

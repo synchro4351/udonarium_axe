@@ -9,8 +9,6 @@ import {
   untracked,
 } from '@angular/core';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
-import { roomDeletionMessageKey, RoomDeletionService } from '@axe/application/lobby/room-deletion.service';
-import { RoomJoinService } from '@axe/application/lobby/room-join.service';
 import { ServerAuthService } from '@axe/application/lobby/server-auth.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ModalService } from '@axe/application/ui/modal.service';
@@ -24,10 +22,13 @@ import { loadIdentity } from '@axe/core/storage/identity-storage';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { LeaveRoomService } from '@axe/features/lobby/leave-room';
 import { NetworkReachService } from '@axe/features/lobby/network-reach.service';
+import { OperatorContactComponent } from '@axe/features/lobby/operator-contact/operator-contact.component';
 import {
   PasswordCheckComponent,
   type PasswordCheckOptions,
 } from '@axe/features/lobby/password-check/password-check.component';
+import { roomDeletionMessageKey, RoomDeletionService } from '@axe/features/lobby/room-deletion.service';
+import { RoomJoinService } from '@axe/features/lobby/room-join.service';
 import { RoomSettingComponent } from '@axe/features/lobby/room-setting/room-setting.component';
 import { ServerAccountComponent } from '@axe/features/lobby/server-account/server-account.component';
 import { WithheldEntryService } from '@axe/features/lobby/withheld-entry';
@@ -59,7 +60,7 @@ function lastServerRoom(): { roomKey: string; password: string } | null {
   selector: 'lobby',
   templateUrl: './lobby.component.html',
   host: { class: 'block' },
-  imports: [ServerAccountComponent, TextTooltipDirective, TranslocoModule],
+  imports: [OperatorContactComponent, ServerAccountComponent, TextTooltipDirective, TranslocoModule],
 })
 export class LobbyComponent {
   private readonly t = inject(TRANSLATE_FN);
@@ -100,6 +101,8 @@ export class LobbyComponent {
   protected readonly waitingForPreviousConnection = this.roomJoin.waitingForPreviousConnection;
 
   help = signal(this.t('feature.lobby.lobby.hintInitial'));
+  /** The operator's contact the room list was refused with, for a ban; null for none. */
+  readonly helpContact = signal<string | null>(null);
 
   /**
    * The id of the room this peer is in, which disables joining that same room from the list; empty
@@ -199,6 +202,7 @@ export class LobbyComponent {
     this.isReloading.set(true);
     if (this.isServerTransport) void this.auth.refreshProviders();
     this.help.set(this.t('feature.lobby.lobby.hintSearching'));
+    this.helpContact.set(null);
     this.rooms.set([]);
     try {
       const roomInfos = await Promise.race([
@@ -224,8 +228,17 @@ export class LobbyComponent {
       this.help.set(this.t('feature.lobby.lobby.hintNoRooms'));
     } catch (e) {
       Logger.error('[Lobby] failed to fetch room list', e);
-      const noBackend = e instanceof ServerRoomApiError && e.code === 'no-backend';
-      this.help.set(this.t(noBackend ? 'feature.lobby.lobby.hintNoBackend' : 'feature.lobby.lobby.hintListFailed'));
+      const code = e instanceof ServerRoomApiError ? e.code : '';
+      this.helpContact.set(e instanceof ServerRoomApiError ? e.contact : null);
+      this.help.set(
+        this.t(
+          code === 'no-backend'
+            ? 'feature.lobby.lobby.hintNoBackend'
+            : code === 'banned'
+              ? 'feature.lobby.lobby.hintBanned'
+              : 'feature.lobby.lobby.hintListFailed'
+        )
+      );
     } finally {
       this.isReloading.set(false);
     }

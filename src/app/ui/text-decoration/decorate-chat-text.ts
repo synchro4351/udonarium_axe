@@ -1,7 +1,17 @@
-/* Decoration shared by chat and shared notes. Ruby is parsed from raw text, then every run
-   is HTML-escaped before quotation styling is applied. Live chat and non-editing notes use
-   the same rendering path. */
+/* Text decoration shared by the chat and the shared notes.
+   Takes a raw text string and returns HTML with the chat's decorations → HTML escaping → ruby → quote-block
+   decoration applied in turn.
+   ChatMessageComponent (live chat) and TextNoteComponent (non-editing mode) use it to draw with the same look. */
 
+import { chatFontWanted$ } from '@axe/core/event/domain-events';
+import {
+  ChatDecoration,
+  chatDecorationMarkup,
+  chatFontsIn,
+  DecoratedRun,
+  decoratedRunsOf,
+  leaningPiecesOf,
+} from '@axe/domain/chat/chat-decoration';
 import { rubyRunsOf } from '@axe/domain/chat/chat-ruby-notation';
 import { replaceRubyNotation, rubyNotationRuns } from '@axe/domain/chat/ruby-notation';
 
@@ -52,32 +62,67 @@ export function escapeHtmlWithRuby(text: string): string {
   );
 }
 
-/** A run of a line: plain text, or text with a reading written over it. */
+/** A run of a line: plain text, or text with a reading written over it, and what it is drawn with. */
 export interface RubyPart {
   readonly text: string;
   /** Empty for plain text. */
   readonly reading: string;
+  /** The chat's decorations on the run, null for a plain one. */
+  readonly decoration: ChatDecoration | null;
 }
 
 /**
- * Cuts a line at the ruby notation, the same way {@link escapeHtmlWithRuby} reads it, a reading
- * split over the letters of its word into one run for each letter.
+ * Cuts a line at the chat's decorations and then at the ruby notation (`|word《reading》` or `|word<reading>`), the same
+ * way {@link decorateChatStyleText} reads them, a reading split over the letters of its word into one
+ * run for each letter.
  *
  * The runs stay text rather than becoming html, for a place that shows a line a little at a time
  * and so cannot hand over a finished piece of markup.
  */
 export function splitRubyNotation(text: string): RubyPart[] {
-  return rubyNotationRuns(text).flatMap((run) =>
-    (run.reading === '' ? [{ base: run.text, reading: '' }] : rubyRunsOf(run.text, run.reading)).map((part) => ({
-      text: part.base.replace(ESCAPED_SPACE, ' '),
-      reading: part.reading.replace(ESCAPED_SPACE, ' '),
-    }))
-  );
+  const runs = decoratedRunsOf(text);
+  askForFonts(runs);
+  return runs.flatMap((run) => rubyPartsOf(run.text, run.decoration));
+}
+
+function rubyPartsOf(text: string, decoration: ChatDecoration | null): RubyPart[] {
+  const parts: RubyPart[] = [];
+  const plain = (raw: string) => {
+    if (raw.length < 1) return;
+    const piece = raw.replace(ESCAPED_SPACE, ' ');
+    if (!decoration?.italic) {
+      parts.push({ text: piece, reading: '', decoration });
+      return;
+    }
+    for (const leaning of leaningPiecesOf(piece)) {
+      const upright = /^\s+$/u.test(leaning);
+      parts.push({ text: leaning, reading: '', decoration: upright ? { ...decoration, italic: false } : decoration });
+    }
+  };
+  for (const run of rubyNotationRuns(text)) {
+    if (run.reading === '') {
+      plain(run.text);
+      continue;
+    }
+    for (const part of rubyRunsOf(run.text, run.reading)) {
+      parts.push({
+        text: part.base.replace(ESCAPED_SPACE, ' '),
+        reading: part.reading.replace(ESCAPED_SPACE, ' '),
+        decoration,
+      });
+    }
+  }
+  return parts;
 }
 
 /** Whether the text holds any ruby notation, read the same way {@link escapeHtmlWithRuby} reads it. */
 export function hasRubyNotation(text: string): boolean {
   return rubyNotationRuns(text).some((run) => run.reading !== '');
+}
+
+/** Asks for the fonts a line is drawn in, so that they are loaded by the time it is seen. */
+function askForFonts(runs: readonly DecoratedRun[]): void {
+  for (const font of chatFontsIn(runs)) chatFontWanted$.emit(font);
 }
 
 /**
@@ -109,7 +154,36 @@ export function decorateQuoteLines(html: string): string {
   return parts.join('\n');
 }
 
-/** Escapes html and applies the ruby notation, then quoted lines (`> ...`) */
+/**
+ * Applies the chat's decorations (`**bold**`, `[明朝]…[/]`), escaping html and applying the ruby
+ * notation (`|word《reading》` or `|word<reading>`) in each piece they leave, then quoted lines (`> ...`).
+ * The ruby is read from each piece as it was typed, before anything is escaped, as
+ * {@link escapeHtmlWithRuby} reads it, so the angle-bracket form is not lost to the escaping.
+ */
 export function decorateChatStyleText(text: string): string {
-  return decorateQuoteLines(escapeHtmlWithRuby(text));
+  const runs = decoratedRunsOf(text);
+  askForFonts(runs);
+  return decorateQuoteLines(
+    chatDecorationMarkup(runs, (piece) => escapeHtmlWithRuby(piece), leaningPiecesKeepingNotation)
+  );
+}
+
+const ESCAPED_SPACE_TOKEN = /\\s/g;
+
+/** The pieces a leaning run breaks between, with a word and its reading, and a `\s`, each kept whole. */
+function leaningPiecesKeepingNotation(text: string): string[] {
+  const pieces: string[] = [];
+  for (const run of rubyNotationRuns(text)) {
+    if (run.reading !== '') {
+      pieces.push(run.raw);
+      continue;
+    }
+    let at = 0;
+    for (const match of run.raw.matchAll(ESCAPED_SPACE_TOKEN)) {
+      pieces.push(...leaningPiecesOf(run.raw.slice(at, match.index)), match[0]);
+      at = match.index + match[0].length;
+    }
+    pieces.push(...leaningPiecesOf(run.raw.slice(at)));
+  }
+  return pieces;
 }

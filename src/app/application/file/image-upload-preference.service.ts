@@ -1,8 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { ImageFile } from '@axe/core/storage/image-file';
-
-const EDIT_FIRST_STORAGE_KEY = 'ui-image-edit-first';
-const SHRINK_LARGE_STORAGE_KEY = 'ui-image-shrink-large';
+import { readLocal, writeLocal } from '@axe/core/storage/local-preference';
+import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
 
 /**
  * The longest side a large added picture is scaled down to. Wide enough for a battle map shown
@@ -42,36 +41,21 @@ export class ImageUploadPreferenceService {
   setShrinkLarge(shrinkLarge: boolean): void {
     this.storedShrink.set(shrinkLarge);
     ImageFile.uploadMaxSide = shrinkLarge ? UPLOAD_MAX_SIDE : 0;
-    try {
-      localStorage.setItem(SHRINK_LARGE_STORAGE_KEY, shrinkLarge ? 'true' : 'false');
-    } catch {
-      // Private browsing refuses the write; the choice still holds for this session.
-    }
+    // Private browsing refuses the write; the choice still holds for this session.
+    writeLocal(STORAGE_KEYS.imageShrinkLarge, shrinkLarge ? 'true' : 'false');
   }
 
   /** Sets whether every picture chosen opens in the editor first, and writes it down. */
   setEditFirst(editFirst: boolean): void {
     this.stored.set(editFirst);
-    try {
-      localStorage.setItem(EDIT_FIRST_STORAGE_KEY, editFirst ? 'true' : 'false');
-    } catch {
-      // Private browsing refuses the write; the choice still holds for this session.
-    }
+    writeLocal(STORAGE_KEYS.imageEditFirst, editFirst ? 'true' : 'false');
   }
 }
 
 function storedEditFirst(): boolean {
-  try {
-    return localStorage.getItem(EDIT_FIRST_STORAGE_KEY) === 'true';
-  } catch {
-    return false;
-  }
+  return readLocal(STORAGE_KEYS.imageEditFirst) === 'true';
 }
 
 function storedShrinkLarge(): boolean {
-  try {
-    return localStorage.getItem(SHRINK_LARGE_STORAGE_KEY) !== 'false';
-  } catch {
-    return true;
-  }
+  return readLocal(STORAGE_KEYS.imageShrinkLarge) !== 'false';
 }

@@ -36,11 +36,17 @@
             (click)="setChoice(choice.value)"
           >
             <span class="size-4 shrink-0" [innerHTML]="choice.glyph | safe: 'html'"></span>
-            <span class="truncate">{{ choice.name }}</span>
+            <span class="truncate" [appTextTooltip]="choice.name">{{ choice.name }}</span>
           </button>
         }
       </div>
     </div>
+    @if (chosenEffect(); as preset) {
+      <div class="flex items-start gap-2">
+        <span class="text-ui-muted w-20 shrink-0 pt-1">{{ 'feature.hotbar.editor.effectPreview' | transloco }}</span>
+        <effect-preview class="min-w-0 flex-1" data-testid="hotbar-editor-effect-preview" [preset]="preset" />
+      </div>
+    }
   } @else if (picksFromList()) {
     <label class="flex items-center gap-2">
       <span class="text-ui-muted w-20 shrink-0">{{ 'feature.hotbar.editor.argument' | transloco }}</span>
@@ -57,6 +63,7 @@
     </label>
   } @else if (
     kind() !== 'diceDeploy' &&
+    kind() !== 'diceRoll' &&
     kind() !== 'focus' &&
     kind() !== 'firstPerson' &&
     kind() !== 'panel' &&
@@ -571,7 +578,7 @@
     <button
       type="button"
       data-testid="hotbar-editor-save"
-      class="rounded-ui-sm bg-ui-accent cursor-pointer border-none px-3 py-1 font-semibold text-white"
+      class="rounded-ui-sm bg-ui-accent-solid cursor-pointer border-none px-3 py-1 font-semibold text-white"
       (click)="save()"
     >
       {{ 'feature.hotbar.editor.save' | transloco }}

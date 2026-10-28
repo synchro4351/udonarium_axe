@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { ChatSpeechService } from '@axe/application/chat/chat-speech.service';
 import { IPeerContext } from '@axe/core/network/peer-context';
 import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
-import { AudioPlayer } from '@axe/core/storage/audio-player';
+import { AudioOutput } from '@axe/core/storage/audio-output';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
@@ -50,7 +50,7 @@ describe('ChatSpeechService', () => {
       }
     }
     vi.stubGlobal('SpeechSynthesisUtterance', UtteranceMock);
-    vi.spyOn(AudioPlayer, 'setSpeechDucking').mockImplementation(() => {});
+    vi.spyOn(AudioOutput, 'setSpeechDucking').mockImplementation(() => {});
     localStorage.clear();
     TestBed.configureTestingModule({ providers: [...TEST_PROVIDERS] });
     ChatTabList.instance.initialize();
@@ -99,7 +99,7 @@ describe('ChatSpeechService', () => {
     service.stop();
     expect(service.enabled()).toBe(true);
     expect(synth.cancel).toHaveBeenCalled();
-    expect(AudioPlayer.setSpeechDucking).toHaveBeenCalledWith(1);
+    expect(AudioOutput.setSpeechDucking).toHaveBeenCalledWith(1);
   });
 
   it('disable stops synthesis and turns automatic reading off', () => {
@@ -236,9 +236,9 @@ describe('ChatSpeechService', () => {
     service.patchSettings({ duckBgm: true, duckLevel: 0.2 });
     service.speak(message());
     lastUtterance().onstart?.({} as SpeechSynthesisEvent);
-    expect(AudioPlayer.setSpeechDucking).toHaveBeenLastCalledWith(0.2);
+    expect(AudioOutput.setSpeechDucking).toHaveBeenLastCalledWith(0.2);
     lastUtterance().onerror?.({} as SpeechSynthesisErrorEvent);
-    expect(AudioPlayer.setSpeechDucking).toHaveBeenLastCalledWith(1);
+    expect(AudioOutput.setSpeechDucking).toHaveBeenLastCalledWith(1);
     expect(service.enabled()).toBe(false);
   });
 });

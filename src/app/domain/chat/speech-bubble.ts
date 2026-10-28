@@ -7,6 +7,7 @@
  * not speech, and get none.
  */
 import { toGraphemes } from '@axe/core/util/graphemes';
+import { withoutChatDecoration } from '@axe/domain/chat/chat-decoration';
 import type { ChatMessage } from '@axe/domain/chat/chat-message';
 import { RUBY_NOTATION } from '@axe/domain/chat/chat-ruby-notation';
 import { largeEmojiCountOf } from '@axe/domain/chat/emoji-only-text';
@@ -62,12 +63,12 @@ function cutShort(text: string): string {
 
 /**
  * The words of a line as a bubble shows them: what is inside 「」 where the line quotes anything,
- * the whole line otherwise, with ruby read as the words it sits on and cut short past
- * {@link SPEECH_BUBBLE_MAX_LETTERS} letters or {@link SPEECH_BUBBLE_MAX_LINES} lines. In strict
- * mode, only Japanese or English quoted parts and emoji-only lines are shown.
+ * the whole line otherwise, with ruby read as the words it sits on, the chat's decorations left out,
+ * and cut short past {@link SPEECH_BUBBLE_MAX_LETTERS} letters or {@link SPEECH_BUBBLE_MAX_LINES} lines.
+ * In strict mode, only Japanese or English quoted parts and emoji-only lines are shown.
  */
 export function speechTextOf(text: string, quotedOnly = false): string {
-  const plain = `${text ?? ''}`.replace(/\r\n?/g, '\n').replace(RUBY_NOTATION, '$1');
+  const plain = withoutChatDecoration(`${text ?? ''}`.replace(/\r\n?/g, '\n')).replace(RUBY_NOTATION, '$1');
   if (quotedOnly) {
     if (largeEmojiCountOf(plain) > 0) return plain.trim();
     return cutShort(quotedSegmentsOf(plain).join('\n'));

@@ -58,6 +58,8 @@ export const MENU_ACTS = [
   'save',
   'zipLoad',
   'importCharacter',
+  'startRoomKeep',
+  'startRoomForget',
   'useMobileLayout',
   'turnNext',
   'turnPrev',
@@ -208,6 +210,7 @@ export const MENU_COMMANDS: readonly MenuCommand[] = [
   panel('cutIn', 'slideshow', 'cutInList', 'app.fab.cutIn'),
   panel('stampPacks', 'collections', 'stampPacks', 'app.fab.stampPacks'),
   panel('effectLibrary', 'auto_awesome', 'effectLibrary', 'feature.effect.title', { audience: 'playing' }),
+  panel('battleCutIn', 'sports_martial_arts', 'battleCutIn', 'feature.battleCutIn.title'),
   panel('skin', 'palette', 'skin', 'app.fab.skin', { testId: 'seat-skin' }),
   panel('soundSettings', 'volume_up', 'soundSettings', 'app.fab.soundSettings', { testId: 'seat-sound-settings' }),
   panel('objectList', 'category', 'objectList', 'app.fab.objectList', { audience: 'gameMaster' }),
@@ -263,6 +266,10 @@ export const MENU_COMMANDS: readonly MenuCommand[] = [
   act('importCharacter', 'person_add', 'app.fab.importCharacter', {
     audience: 'playing',
     testId: 'save-load-import-character',
+  }),
+  act('startRoomKeep', 'home', 'app.fab.startRoomKeep', { testId: 'save-load-start-room-keep' }),
+  act('startRoomForget', 'settings_backup_restore', 'app.fab.startRoomForget', {
+    testId: 'save-load-start-room-forget',
   }),
   act('useMobileLayout', 'smartphone', 'feature.mobile.useMobile', { testId: 'seat-use-mobile' }),
   act('turnNext', 'chevron_right', 'feature.turnOrder.next', { audience: 'gameMaster' }),

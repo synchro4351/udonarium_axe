@@ -3,6 +3,7 @@ import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
 import { GameObject } from '@axe/core/sync/game-object';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { parseAttributesKeepingIdentifier, toAttributesKeepingIdentifier } from '@axe/core/sync/persisted-identifier';
+import { clampOr } from '@axe/core/util/clamp';
 import { graphemesOf } from '@axe/domain/chat/emoji-only-text';
 import {
   EffectKind,
@@ -268,7 +269,5 @@ export function reactionLabelOf(text: string | null | undefined): string {
 }
 
 function clamp(value: number, min: number, max: number, fallback: number): number {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return fallback;
-  return Math.min(Math.max(numeric, min), max);
+  return clampOr(Number(value), min, max, fallback);
 }

@@ -15,12 +15,36 @@
             (change)="resetBtn()"
           />
           <span
-            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text peer-checked:bg-ui-accent-bg peer-checked:text-ui-accent peer-checked:border-ui-accent inline-flex items-center rounded-full border border-solid bg-transparent px-2.5 py-0.75 text-[12px] font-medium whitespace-nowrap transition-[background,color,border-color] select-none"
-            >{{ displayTagName(tag) }}</span
+            class="border-ui-border-panel text-ui-muted hover:bg-ui-hover hover:text-ui-text peer-checked:bg-ui-accent-bg peer-checked:text-ui-accent peer-checked:border-ui-accent inline-flex items-center gap-0.5 rounded-full border border-solid bg-transparent px-2.5 py-0.75 text-[12px] font-medium whitespace-nowrap transition-[background,color,border-color] select-none"
+          >
+            @if (lockedTags().has(tag)) {
+              <i
+                class="material-icons text-[13px]!"
+                data-testid="file-storage-tag-locked"
+                [title]="'feature.file.fileStorage.lockedTag' | transloco"
+                >lock</i
+              >
+            }
+            {{ displayTagName(tag) }}</span
           >
         </label>
       }
     </div>
+    @if (canLockSelected()) {
+      <button
+        type="button"
+        class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex shrink-0 cursor-pointer items-center gap-1 border border-solid px-2 py-0.75 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+        data-testid="file-storage-lock-tag"
+        [title]="'feature.file.fileStorage.lockTagHint' | transloco"
+        (click)="toggleSelectedLock()"
+      >
+        <i class="material-icons">{{ lockedTags().has(selectTag()) ? 'lock_open' : 'lock' }}</i>
+        {{
+          (lockedTags().has(selectTag()) ? 'feature.file.fileStorage.unlockTag' : 'feature.file.fileStorage.lockTag')
+            | transloco
+        }}
+      </button>
+    }
     @if (canKeepSecret) {
       <label class="inline-flex shrink-0 cursor-pointer items-center gap-1 py-0.75">
         <input
@@ -36,95 +60,100 @@
     }
   </div>
 
-  <div
-    #pasteBox
-    class="border-ui-border-panel text-ui-muted focus-within:border-ui-accent hover:border-ui-accent rounded-ui-sm focus:bg-ui-accent-bg mt-3 flex flex-col gap-2 border-2 border-dashed px-2.5 py-2 text-[12px] transition-[background,border-color] outline-none"
-    tabindex="0"
-    role="group"
-    data-testid="paste-box"
-    [attr.aria-label]="'feature.file.fileStorage.pasteHint' | transloco"
-    (paste)="onPaste($event)"
-  >
-    <div class="flex items-center gap-2">
-      <i class="material-icons text-ui-accent text-[26px]! opacity-80" aria-hidden="true">add_photo_alternate</i>
-      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span class="text-ui-text text-[13px] font-medium">{{ 'feature.file.fileStorage.addImage' | transloco }}</span>
-        <span class="leading-snug">{{
-          (isCompact() ? 'feature.file.fileStorage.addImageHintTouch' : 'feature.file.fileStorage.pasteHint')
-            | transloco
-        }}</span>
+  @if (canEdit()) {
+    <div
+      #pasteBox
+      class="border-ui-border-panel text-ui-muted focus-within:border-ui-accent hover:border-ui-accent rounded-ui-sm focus:bg-ui-accent-bg mt-3 flex flex-col gap-2 border-2 border-dashed px-2.5 py-2 text-[12px] transition-[background,border-color] outline-none"
+      tabindex="0"
+      role="group"
+      data-testid="paste-box"
+      [attr.aria-label]="'feature.file.fileStorage.pasteHint' | transloco"
+      (paste)="onPaste($event)"
+    >
+      <div class="flex items-center gap-2">
+        <i class="material-icons text-ui-accent text-[26px]! opacity-80" aria-hidden="true">add_photo_alternate</i>
+        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span class="text-ui-text text-[13px] font-medium">{{
+            'feature.file.fileStorage.addImage' | transloco
+          }}</span>
+          <span class="leading-snug">{{
+            (isCompact() ? 'feature.file.fileStorage.addImageHintTouch' : 'feature.file.fileStorage.pasteHint')
+              | transloco
+          }}</span>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-1.5">
+        <input
+          #fileInput
+          type="file"
+          class="hidden"
+          [disabled]="!canEdit()"
+          (change)="handleFileSelect($event)"
+          multiple
+          accept="image/*"
+        />
+        <button
+          class="bg-ui-elevated border-ui-border-panel text-ui-text rounded-ui-sm hover:bg-ui-hover hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+          type="button"
+          [disabled]="!canEdit()"
+          data-testid="file-choose"
+          (click)="fileInput.click()"
+        >
+          <i class="material-icons" aria-hidden="true">folder_open</i>
+          {{ 'feature.file.fileStorage.chooseFile' | transloco }}
+        </button>
+        <button
+          class="bg-ui-elevated border-ui-border-panel text-ui-text rounded-ui-sm hover:bg-ui-hover hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+          type="button"
+          [disabled]="!canEdit() || pendingAdding()"
+          data-testid="file-storage-paste"
+          (click)="readFromClipboard()"
+        >
+          <i class="material-icons" aria-hidden="true">content_paste_go</i>
+          {{ 'feature.file.fileStorage.paste' | transloco }}
+        </button>
+        <span class="ml-auto text-[11px]">{{ 'feature.file.fileStorage.maxSize' | transloco }}</span>
+        <button
+          class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] disabled:cursor-default disabled:opacity-40 [&_.material-icons]:text-[14px]!"
+          type="button"
+          data-testid="file-storage-edit"
+          [title]="'feature.file.fileStorage.editImageHint' | transloco"
+          [disabled]="!canEdit() || !checkedImage()"
+          (click)="editChecked()"
+        >
+          <i class="material-icons" aria-hidden="true">edit</i>
+          {{ 'feature.file.fileStorage.editImage' | transloco }}
+        </button>
+        <label
+          class="text-ui-muted ml-auto inline-flex cursor-pointer items-center gap-1 text-[12px] whitespace-nowrap select-none"
+          data-testid="file-storage-edit-first"
+          [title]="'ui.imageEditor.editFirstHint' | transloco"
+        >
+          <input
+            type="checkbox"
+            class="[accent-color:var(--ui-accent)]"
+            [checked]="uploadPreference.editFirst()"
+            [disabled]="!canEdit()"
+            (change)="uploadPreference.setEditFirst($any($event.target).checked)"
+          />
+          {{ 'ui.imageEditor.editFirst' | transloco }}
+        </label>
+        <label
+          class="text-ui-muted inline-flex cursor-pointer items-center gap-1 text-[12px] whitespace-nowrap select-none"
+          data-testid="file-storage-shrink-large"
+          [title]="'ui.imageEditor.shrinkLargeHint' | transloco"
+        >
+          <input
+            type="checkbox"
+            class="[accent-color:var(--ui-accent)]"
+            [checked]="uploadPreference.shrinkLarge()"
+            (change)="uploadPreference.setShrinkLarge($any($event.target).checked)"
+          />
+          {{ 'ui.imageEditor.shrinkLarge' | transloco }}
+        </label>
       </div>
     </div>
-    <div class="flex flex-wrap items-center gap-1.5">
-      <input
-        #fileInput
-        type="file"
-        class="hidden"
-        [disabled]="!canEdit()"
-        (change)="handleFileSelect($event)"
-        multiple
-        accept="image/*"
-      />
-      <button
-        class="bg-ui-elevated border-ui-border-panel text-ui-text rounded-ui-sm hover:bg-ui-hover hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
-        type="button"
-        [disabled]="!canEdit()"
-        data-testid="file-choose"
-        (click)="fileInput.click()"
-      >
-        <i class="material-icons" aria-hidden="true">folder_open</i>
-        {{ 'feature.file.fileStorage.chooseFile' | transloco }}
-      </button>
-      <button
-        class="bg-ui-elevated border-ui-border-panel text-ui-text rounded-ui-sm hover:bg-ui-hover hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
-        type="button"
-        [disabled]="!canEdit() || pendingAdding()"
-        (click)="readFromClipboard()"
-      >
-        <i class="material-icons" aria-hidden="true">content_paste_go</i>
-        {{ 'feature.file.fileStorage.paste' | transloco }}
-      </button>
-      <span class="ml-auto text-[11px]">{{ 'feature.file.fileStorage.maxSize' | transloco }}</span>
-      <button
-        class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] disabled:cursor-default disabled:opacity-40 [&_.material-icons]:text-[14px]!"
-        type="button"
-        data-testid="file-storage-edit"
-        [title]="'feature.file.fileStorage.editImageHint' | transloco"
-        [disabled]="!canEdit() || !checkedImage()"
-        (click)="editChecked()"
-      >
-        <i class="material-icons" aria-hidden="true">edit</i>
-        {{ 'feature.file.fileStorage.editImage' | transloco }}
-      </button>
-      <label
-        class="text-ui-muted ml-auto inline-flex cursor-pointer items-center gap-1 text-[12px] whitespace-nowrap select-none"
-        data-testid="file-storage-edit-first"
-        [title]="'ui.imageEditor.editFirstHint' | transloco"
-      >
-        <input
-          type="checkbox"
-          class="[accent-color:var(--ui-accent)]"
-          [checked]="uploadPreference.editFirst()"
-          [disabled]="!canEdit()"
-          (change)="uploadPreference.setEditFirst($any($event.target).checked)"
-        />
-        {{ 'ui.imageEditor.editFirst' | transloco }}
-      </label>
-      <label
-        class="text-ui-muted inline-flex cursor-pointer items-center gap-1 text-[12px] whitespace-nowrap select-none"
-        data-testid="file-storage-shrink-large"
-        [title]="'ui.imageEditor.shrinkLargeHint' | transloco"
-      >
-        <input
-          type="checkbox"
-          class="[accent-color:var(--ui-accent)]"
-          [checked]="uploadPreference.shrinkLarge()"
-          (change)="uploadPreference.setShrinkLarge($any($event.target).checked)"
-        />
-        {{ 'ui.imageEditor.shrinkLarge' | transloco }}
-      </label>
-    </div>
-  </div>
+  }
 
   @if (pendingImage(); as pending) {
     <div
@@ -231,41 +260,54 @@
     <span class="text-ui-dim mt-1 text-[11px]" data-testid="file-storage-notice">{{ message }}</span>
   }
 
-  <div
-    class="bg-ui-panel border-ui-border-panel z-1 mx-[-8] mt-2.5 flex flex-wrap items-center gap-1.5 border-y border-solid px-2.5 py-2"
-  >
-    <input
-      class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm focus:border-ui-accent placeholder:text-ui-dim min-w-0 flex-1 border border-solid px-2 py-1 text-[12px] transition-[border-color] outline-none"
-      maxlength="12"
-      [value]="newTagName()"
-      (input)="onInputNewTag($event)"
-      [placeholder]="'feature.file.fileStorage.newTagPlaceholder' | transloco"
-    />
-    <button
-      class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
-      (click)="changeTag()"
+  @if (canEdit()) {
+    <div
+      class="bg-ui-panel border-ui-border-panel z-1 mx-[-8] mt-2.5 flex flex-wrap items-center gap-1.5 border-y border-solid px-2.5 py-2"
     >
-      <i class="material-icons">label</i>
-      {{ 'feature.file.fileStorage.changeTag' | transloco }}
-    </button>
-    @if (canKeepSecret) {
+      <input
+        class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm focus:border-ui-accent placeholder:text-ui-dim min-w-0 flex-1 border border-solid px-2 py-1 text-[12px] transition-[border-color] outline-none"
+        maxlength="12"
+        [value]="newTagName()"
+        (input)="onInputNewTag($event)"
+        [placeholder]="'feature.file.fileStorage.newTagPlaceholder' | transloco"
+      />
       <button
         class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
-        [title]="'feature.file.fileStorage.makeSecretHint' | transloco"
-        (click)="setCheckedSecret(true)"
+        (click)="changeTag()"
       >
-        <i class="material-icons">visibility_off</i>
-        {{ 'feature.file.fileStorage.makeSecret' | transloco }}
+        <i class="material-icons">label</i>
+        {{ 'feature.file.fileStorage.changeTag' | transloco }}
       </button>
-      <button
-        class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
-        (click)="setCheckedSecret(false)"
-      >
-        <i class="material-icons">visibility</i>
-        {{ 'feature.file.fileStorage.clearSecret' | transloco }}
-      </button>
-    }
-  </div>
+      @if (canKeepSecret) {
+        <button
+          class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+          [title]="'feature.file.fileStorage.makeSecretHint' | transloco"
+          (click)="setCheckedSecret(true)"
+        >
+          <i class="material-icons">visibility_off</i>
+          {{ 'feature.file.fileStorage.makeSecret' | transloco }}
+        </button>
+        <button
+          class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-text hover:border-ui-accent inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+          (click)="setCheckedSecret(false)"
+        >
+          <i class="material-icons">visibility</i>
+          {{ 'feature.file.fileStorage.clearSecret' | transloco }}
+        </button>
+      }
+      @if (canRemove()) {
+        <button
+          class="bg-ui-elevated border-ui-border-panel text-ui-muted rounded-ui-sm hover:bg-ui-hover hover:text-ui-danger hover:border-ui-danger inline-flex cursor-pointer items-center gap-1 border border-solid px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,color,border-color] [&_.material-icons]:text-[14px]!"
+          [title]="'feature.file.fileStorage.removeHint' | transloco"
+          (click)="removeChecked()"
+          data-testid="file-storage-remove"
+        >
+          <i class="material-icons">delete</i>
+          {{ 'feature.file.fileStorage.remove' | transloco }}
+        </button>
+      }
+    </div>
+  }
 
   <button
     type="button"
@@ -296,14 +338,16 @@
             <i class="material-icons">hourglass_empty</i>
           </div>
         }
-        <div class="pointer-events-none absolute top-1 left-1">
-          <input
-            class="size-3.5 [accent-color:var(--ui-accent)]"
-            type="checkbox"
-            [checked]="checkedFiles().has(file.identifier)"
-            tabindex="-1"
-          />
-        </div>
+        @if (canEdit()) {
+          <div class="pointer-events-none absolute top-1 left-1">
+            <input
+              class="size-3.5 [accent-color:var(--ui-accent)]"
+              type="checkbox"
+              [checked]="checkedFiles().has(file.identifier)"
+              tabindex="-1"
+            />
+          </div>
+        }
         @if (isSecret(file)) {
           <div
             class="pointer-events-none absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-amber-500/25 text-amber-300 [&_.material-icons]:text-[13px]!"
@@ -312,7 +356,20 @@
             <i class="material-icons">visibility_off</i>
           </div>
         }
-        <span class="block max-w-full truncate text-center text-[11px] leading-[1.3]">{{ file.name }}</span>
+        @if (canReport() && isReportable(file.identifier)) {
+          <button
+            type="button"
+            class="bg-ui-panel/80 text-ui-muted hover:text-ui-danger absolute right-1 bottom-6 flex size-6 cursor-pointer items-center justify-center rounded-full border-0 p-0 opacity-60 transition-[opacity,color] hover:opacity-100 [&_.material-icons]:text-[14px]!"
+            [title]="'feature.moderation.report.imageButton' | transloco"
+            (click)="report(file, $event)"
+            data-testid="file-storage-report"
+          >
+            <i class="material-icons">flag</i>
+          </button>
+        }
+        <span class="block max-w-full truncate text-center text-[11px] leading-[1.3]" [appTextTooltip]="file.name">{{
+          file.name
+        }}</span>
       </div>
     }
     @if (images().length === 0) {

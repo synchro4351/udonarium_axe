@@ -92,7 +92,7 @@ test('creates two independently named ordinary tokens from selected regions', as
   await expect(page.locator('file-storage img[alt="parts-test.png"]')).toHaveCount(1);
   await page
     .locator('file-storage label')
-    .filter({ hasText: /^全て$/ })
+    .filter({ hasText: /^\s*全て\s*$/ })
     .click();
   const cropped = page.locator('file-storage img[alt="テスト頭部.png"]');
   await expect(cropped).toHaveCount(1);

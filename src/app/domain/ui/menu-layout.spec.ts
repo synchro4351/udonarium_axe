@@ -142,7 +142,7 @@ describe('how a menu is arranged', () => {
       ]);
     });
 
-    it('gathers the images, the music, the cut-ins, the stamps and the effects under media', () => {
+    it('gathers the images, the music, the cut-ins, the stamps, the effects and the battle stage under media', () => {
       const media = DEFAULT_MENU_LAYOUTS.fab.nodes.find((node) => node.id === 'media') as MenuGroup;
 
       expect(media.items.map((item) => item.command)).toEqual([
@@ -151,6 +151,7 @@ describe('how a menu is arranged', () => {
         'cutIn',
         'stampPacks',
         'effectLibrary',
+        'battleCutIn',
       ]);
     });
 

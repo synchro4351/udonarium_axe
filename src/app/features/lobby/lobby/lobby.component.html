@@ -9,7 +9,7 @@
     </button>
     @if (canCreateRoom()) {
       <button
-        class="rounded-ui-sm border-ui-accent bg-ui-accent hover:border-ui-accent-hover hover:bg-ui-accent-hover cursor-pointer border border-solid px-[1em] py-[0.4em] text-[0.875rem] whitespace-nowrap text-white hover:shadow-[0_0_0_3px_var(--ui-accent-glow)]"
+        class="rounded-ui-sm border-ui-accent bg-ui-accent-solid hover:border-ui-accent-hover hover:bg-ui-accent-hover cursor-pointer border border-solid px-[1em] py-[0.4em] text-[0.875rem] whitespace-nowrap text-white hover:shadow-[0_0_0_3px_var(--ui-accent-glow)]"
         data-testid="lobby-create-room"
         (click)="showRoomSetting()"
       >
@@ -98,7 +98,7 @@
               </td>
             }
             <td class="border-ui-border-panel border-b border-solid px-2.5 py-1.75 text-center whitespace-nowrap">
-              {{ room.info.memberCount }}{{ 'feature.lobby.lobby.peopleSuffix' | transloco }}
+              {{ 'feature.lobby.lobby.peopleCount' | transloco: { count: room.info.memberCount } }}
             </td>
             <td class="border-ui-border-panel border-b border-solid px-2.5 py-1.75 text-center whitespace-nowrap">
               @if (0 < room.alias.length) {
@@ -131,6 +131,9 @@
     </table>
   } @else {
     <p class="text-ui-muted text-[0.8rem] leading-[1.6]">{{ help() }}</p>
+    @if (helpContact(); as contact) {
+      <operator-contact [contact]="contact" />
+    }
   }
 } @else {
   <p class="text-ui-muted text-[0.8rem] leading-[1.7]" data-testid="lobby-already-in-room">

@@ -1,16 +1,17 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { SaveDataService } from '@axe/application/file/save-data.service';
+import { StartRoomService } from '@axe/application/file/start-room.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { SnackbarService } from '@axe/application/ui/snackbar.service';
 import { Logger } from '@axe/core/logging/logger';
 import { Network } from '@axe/core/network/network';
 import { isNetworkIsolated } from '@axe/core/network/network-isolation';
 import { FileArchiver } from '@axe/core/storage/file-archiver';
+import { readLocal, writeLocal } from '@axe/core/storage/local-preference';
 import { RoomSnapshotMeta, RoomSnapshotStore, selectExpiredSnapshots } from '@axe/core/storage/room-snapshot-store';
+import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { ReloadCheck } from '@axe/domain/peer/reload-check';
-
-const STOPPED_KEY = 'room-snapshot-stopped';
 
 @Injectable({ providedIn: 'root' })
 export class RoomSnapshotService {
@@ -19,6 +20,7 @@ export class RoomSnapshotService {
   private readonly fileArchiver = inject(FileArchiver);
   private readonly objectStore = inject(ObjectStore);
   private readonly snackbar = inject(SnackbarService);
+  private readonly startRoom = inject(StartRoomService);
   private readonly t = inject(TRANSLATE_FN);
 
   private readonly _snapshots = signal<readonly RoomSnapshotMeta[]>([]);
@@ -44,11 +46,7 @@ export class RoomSnapshotService {
   /** Turns the keeping of room snapshots on or off for this browser, and remembers the choice. */
   setKeeping(keeping: boolean): void {
     this.isKeeping.set(keeping);
-    try {
-      localStorage.setItem(STOPPED_KEY, keeping ? '' : '1');
-    } catch {
-      // Private browsing refuses the write; the choice still holds for this session.
-    }
+    writeLocal(STORAGE_KEYS.roomSnapshotStopped, keeping ? '' : '1');
   }
 
   /** Whether this browser's snapshot store can be used. Every other member does nothing where it cannot. */
@@ -123,9 +121,11 @@ export class RoomSnapshotService {
    * Loads a snapshot back into the room, as a room file dropped on the table would be.
    *
    * Answers false where snapshots are unsupported, while a restore is already running, for an id
-   * the store does not hold, or when loading fails, which is logged. While a replay's board is shown
-   * in place of the table it restores nothing and says why, as the board and what went onto it are
-   * thrown away when the table comes back.
+   * the store does not hold, when the reader declines to overwrite the room, or when the snapshot's
+   * room cannot be read, which is said. A room to start on still being set out at launch is let
+   * finish first, so the snapshot lands on it. While a replay's board is shown in place of the table
+   * it restores nothing and says why, as the board and what went onto it are thrown away when the
+   * table comes back.
    */
   async restore(id: number): Promise<boolean> {
     if (!this.isSupported || this._isRestoring()) return false;
@@ -138,11 +138,16 @@ export class RoomSnapshotService {
       const record = await this.store.get(id);
       if (!record) return false;
 
+      await this.startRoom.whenSettled();
       const reloadCheck = this.objectStore.get<ReloadCheck>('ReloadCheck');
       reloadCheck?.reloadCheckStart(this.currentRoomName() !== '');
 
-      await this.fileArchiver.load([new File([record.blob], 'room-snapshot.zip', { type: 'application/zip' })]);
-      return true;
+      const file = new File([record.blob], 'room-snapshot.zip', { type: 'application/zip' });
+      const { dataRead } = await this.fileArchiver.load([file]);
+      if (!dataRead && (reloadCheck?.isLoadOk() ?? true)) {
+        this.snackbar.show(this.t('feature.roomArchive.restoreUnreadable'));
+      }
+      return dataRead;
     } catch (reason) {
       Logger.warn('[RoomSnapshot] スナップショットの復元に失敗しました', reason);
       return false;
@@ -178,9 +183,5 @@ export class RoomSnapshotService {
 }
 
 function storedStopped(): boolean {
-  try {
-    return localStorage.getItem(STOPPED_KEY) === '1';
-  } catch {
-    return false;
-  }
+  return readLocal(STORAGE_KEYS.roomSnapshotStopped) === '1';
 }

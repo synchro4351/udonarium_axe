@@ -58,6 +58,7 @@ import {
 } from '@axe/features/tabletop/map-image-grid-adjuster/map-image-grid-adjuster.component';
 import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
 import { NgSelectWindowDirective } from '@axe/ui/directives/ng-select-window.directive';
+import { TextTooltipDirective } from '@axe/ui/directives/text-tooltip.directive';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 import { NgOptionComponent, NgSelectComponent } from '@ng-select/ng-select';
@@ -68,6 +69,7 @@ import { NgOptionComponent, NgSelectComponent } from '@ng-select/ng-select';
   templateUrl: './game-table-setting.component.html',
   host: { class: 'block', '[attr.inert]': "isReadOnly() ? '' : null" },
   imports: [
+    TextTooltipDirective,
     NgClass,
     FormsModule,
     NgSelectComponent,
@@ -82,10 +84,7 @@ export class GameTableSettingComponent {
   private readonly rolePermission = inject(RolePermissionService);
   private readonly t = inject(TRANSLATE_FN);
 
-  readonly isReadOnly = computed(() => {
-    this.objectChange.trackMyCursor();
-    return !this.rolePermission.canEditTabletop;
-  });
+  readonly isReadOnly = computed(() => !this.rolePermission.canEditTabletop());
   private readonly saveDataService = inject(SaveDataService);
   private readonly imageService = inject(ImageService);
   private readonly panelService = inject(PanelService);
@@ -521,17 +520,19 @@ export class GameTableSettingComponent {
 
   /**
    * The snap dropdown's value, combining whether snapping is on with the points it snaps to: off,
-   * center, vertex, both or all.
+   * center, vertex, both, all or grid.
    */
   get tableSnapMode(): string {
     if (!this.tableGridSnap) return 'off';
-    switch (this.tableGridSnapStyle) {
+    switch (Number(this.tableGridSnapStyle)) {
       case GridSnapStyle.VERTEX:
         return 'vertex';
       case GridSnapStyle.BOTH:
         return 'both';
       case GridSnapStyle.ALL:
         return 'all';
+      case GridSnapStyle.GRID:
+        return 'grid';
       default:
         return 'center';
     }
@@ -549,7 +550,9 @@ export class GameTableSettingComponent {
             ? GridSnapStyle.BOTH
             : mode === 'all'
               ? GridSnapStyle.ALL
-              : GridSnapStyle.CENTER;
+              : mode === 'grid'
+                ? GridSnapStyle.GRID
+                : GridSnapStyle.CENTER;
     }
   }
 
@@ -732,7 +735,7 @@ export class GameTableSettingComponent {
    * nothing for a reader who may not edit the table.
    */
   createGameTable() {
-    if (!this.rolePermission.canEditTabletop) return;
+    if (!this.rolePermission.canEditTabletop()) return;
     const gameTable = new GameTable();
     gameTable.name = this.t('feature.tabletop.tableSetting.defaultName');
     gameTable.imageIdentifier = ImageFile.Empty.identifier;
@@ -766,7 +769,7 @@ export class GameTableSettingComponent {
    * for a reader who may not edit the table.
    */
   delete() {
-    if (!this.rolePermission.canEditTabletop) return;
+    if (!this.rolePermission.canEditTabletop()) return;
     if (!this.isEmpty && this.selectedTable) {
       this.selectedTableXml = this.selectedTable.toXml();
       this.selectedTable.destroy();
@@ -778,7 +781,7 @@ export class GameTableSettingComponent {
    * not edit the table or when nothing is kept.
    */
   restore() {
-    if (!this.rolePermission.canEditTabletop) return;
+    if (!this.rolePermission.canEditTabletop()) return;
     if (this.selectedTable && this.selectedTableXml) {
       const restoreTable = this.objectSerializer.parseXml(this.selectedTableXml)!;
       this.selectGameTable(restoreTable.identifier);

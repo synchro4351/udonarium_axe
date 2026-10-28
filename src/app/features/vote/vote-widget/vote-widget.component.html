@@ -43,15 +43,15 @@
           @for (choice of activeVote.choices; track choice) {
             <button
               type="button"
-              class="rounded-ui-sm border-ui-accent bg-ui-accent-bg text-ui-accent hover:border-ui-accent hover:bg-ui-accent m-0 inline-flex cursor-pointer flex-col items-center border border-solid px-4 py-1.5 text-[13px] transition-[background,color,box-shadow,transform] hover:text-white hover:shadow-none disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-ui-sm border-ui-accent bg-ui-accent-bg text-ui-accent hover:border-ui-accent hover:bg-ui-accent-solid m-0 inline-flex cursor-pointer flex-col items-center border border-solid px-4 py-1.5 text-[13px] transition-[background,color,box-shadow,transform] hover:text-white hover:shadow-none disabled:cursor-not-allowed disabled:opacity-50"
               (click)="voteSend(choice)"
               [disabled]="!isTarget() || isAnswered()"
             >
               <span class="font-semibold">{{ choice }}</span>
               @if (answersShown()) {
-                <span class="text-[11px] opacity-80" data-testid="vote-widget-choice-count"
-                  >{{ activeVote.votedNumByChoice(choice) }}{{ 'feature.vote.peopleSuffix' | transloco }}</span
-                >
+                <span class="text-[11px] opacity-80" data-testid="vote-widget-choice-count">{{
+                  'feature.vote.peopleCount' | transloco: { count: activeVote.votedNumByChoice(choice) }
+                }}</span>
               }
             </button>
           }
@@ -121,7 +121,7 @@
               }
             </div>
             <div class="min-w-0 flex-1">
-              <div class="text-ui-text truncate text-[13px] font-semibold">
+              <div class="text-ui-text truncate text-[13px] font-semibold" [appTextTooltip]="findPeerName(target)">
                 {{ findPeerName(target) }}
               </div>
               <div class="text-ui-muted mt-0.5 truncate text-[11px]">

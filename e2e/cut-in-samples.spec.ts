@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+
 import { closeFabMenu, openPanel, waitAppReady } from './helpers';
 
 test('keeps the three initial samples and offers no optional example library', async ({ page }) => {

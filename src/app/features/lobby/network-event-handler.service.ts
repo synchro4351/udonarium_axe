@@ -1,5 +1,7 @@
 import { DestroyRef, effect, inject, Injectable, untracked } from '@angular/core';
+import { ChatClockService } from '@axe/application/chat/chat-clock.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
+import { AssetRemovalService } from '@axe/application/file/asset-removal.service';
 import { encodeI18nMessage } from '@axe/application/i18n/i18n-message';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ServerAuthService } from '@axe/application/lobby/server-auth.service';
@@ -11,6 +13,7 @@ import { Network } from '@axe/core/network/network';
 import { isNetworkIsolated } from '@axe/core/network/network-isolation';
 import { networkMessage$ } from '@axe/core/network/network-messaging';
 import { IPeerContext, PeerContext } from '@axe/core/network/peer-context';
+import { operatorContactText } from '@axe/core/network/server/operator-contact';
 import { NO_BACKEND, SERVER_UNREACHABLE } from '@axe/core/network/server/server-errors';
 import { AuthorityEvent, MAX_MEMBERS } from '@axe/core/network/server/server-protocol';
 import { ACCOUNT_USER_ID_PREFIX } from '@axe/core/network/server/server-protocol';
@@ -37,24 +40,38 @@ const ROLE_REJECTED_KEYS: Readonly<Record<string, string>> = {
   'last-game-master': 'feature.lobby.roleRejected.lastGameMaster',
 };
 
+/** Opens the operator's contact apart from the app, giving the page it opens no hold on this one. */
+function openApart(contact: string): void {
+  window.open(contact, '_blank', 'noopener,noreferrer');
+}
+
 /** How long after somebody leaves the room's list of pictures and sounds is read again. */
 const ROOM_ASSET_RELIST_MS = 30_000;
 /** How long the word that the seat is about to be let out stays: until it would be. */
 const IDLE_NOTICE_MS = 5 * 60_000;
 /** How long the word that the seat was let out stays, offering to go back in: as good as for good. */
 const LEFT_ALONE_NOTICE_MS = 24 * 60 * 60_000;
+/** How long the word of uploads the room server's operator held back stays: long enough to read twice. */
+const UPLOAD_NOTICE_MS = 15_000;
 
 @Injectable({ providedIn: 'root' })
 export class NetworkEventHandlerService {
   private readonly destroyRef = inject(DestroyRef);
+  private readonly assetRemoval = inject(AssetRemovalService);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly chatMessageService = inject(ChatMessageService);
+  private readonly chatClock = inject(ChatClockService);
   private readonly reach = inject(NetworkReachService);
   private readonly auth = inject(ServerAuthService);
   private readonly snackbar = inject(SnackbarService);
   private readonly overlayMode = inject(OverlayModeService);
   private readonly t = inject(TRANSLATE_FN);
   private readonly idleSeat = inject(IdleSeatService);
+  private readonly imageStorage = inject(ImageStorage);
+  private readonly audioStorage = inject(AudioStorage);
+  private readonly assetHttpStore = inject(AssetHttpStore);
+  private readonly imageSharingSystem = inject(ImageSharingSystem);
+  private readonly audioSharingSystem = inject(AudioSharingSystem);
 
   /**
    * How often and how slowly it reconnects after a server error, meaning the token backend is out of reach.
@@ -96,11 +113,23 @@ export class NetworkEventHandlerService {
     this.destroyRef.onDestroy(() => {
       this.roomAssetListRetries.clear();
       if (this.roomAssetRelistTimer) clearTimeout(this.roomAssetRelistTimer);
-      ImageStorage.instance.receivedUploadTurn = () => 0;
-      AudioStorage.instance.receivedUploadTurn = () => 0;
+      this.imageStorage.receivedUploadTurn = () => 0;
+      this.audioStorage.receivedUploadTurn = () => 0;
+      this.assetHttpStore.onUploadsPaused = () => {};
+      this.assetHttpStore.onUploadBlocked = () => {};
+      this.assetHttpStore.onRoomStorageFull = () => {};
     });
-    ImageStorage.instance.receivedUploadTurn = () => this.turnToPutUpReceived();
-    AudioStorage.instance.receivedUploadTurn = () => this.turnToPutUpReceived();
+    this.imageStorage.receivedUploadTurn = () => this.turnToPutUpReceived();
+    this.audioStorage.receivedUploadTurn = () => this.turnToPutUpReceived();
+    this.assetHttpStore.onUploadsPaused = (paused) => {
+      if (!paused) {
+        this.imageStorage.resumePaused();
+        this.audioStorage.resumePaused();
+      }
+      this.tellUploadsPaused(paused);
+    };
+    this.assetHttpStore.onUploadBlocked = () => this.tellUploadBlocked();
+    this.assetHttpStore.onRoomStorageFull = () => this.tellRoomStorageFull();
     networkMessage$.subscribe((message) => {
       if (message.eventName !== AuthorityEvent.ROLE_REJECTED || message.sendFrom !== Network.authorityPeerId) return;
       this.tellRoleRejected(message.data as { peerId?: unknown; reason?: unknown } | null);
@@ -147,7 +176,7 @@ export class NetworkEventHandlerService {
       if (Network.transport === 'server' && !peer.isRoom) PeerCursor.myCursor.role = DEFAULT_PEER_ROLE;
       this.rememberIdentity(peer);
       // A room server's clock sets the chat's as the seat comes in, though nobody else may be there.
-      if (peer.isRoom && Network.serverClockOffset !== null) this.chatMessageService.calibrateTimeOffset();
+      if (peer.isRoom && Network.serverClockOffset !== null) this.chatClock.calibrate();
       const account = Network.transport === 'server' ? this.auth.account() : null;
       if (account) this.lendAccountLook(account.name, account.avatarUrl);
     }, this.destroyRef);
@@ -162,6 +191,7 @@ export class NetworkEventHandlerService {
       const roomServerMessage = Network.transport === 'server' ? this.roomServerErrorMessage(errorType) : null;
       if (roomServerMessage) {
         this.chatMessageService.sendSystemMessage(roomServerMessage);
+        if (errorType === 'banned') void this.tellOperatorContact();
         Network.openStandby(this.standbyUserId());
         return;
       }
@@ -203,7 +233,7 @@ export class NetworkEventHandlerService {
       Network.openStandby(this.standbyUserId());
     }, this.destroyRef);
     this.objectChange.peerConnect$.subscribe(() => {
-      this.chatMessageService.calibrateTimeOffset();
+      this.chatClock.calibrate();
     }, this.destroyRef);
     // Somebody who left may still be putting up what it added, and can name it to nobody once it is
     // there; the room's list is read again a little later for it.
@@ -233,7 +263,10 @@ export class NetworkEventHandlerService {
       }
       const key = NetworkEventHandlerService.RECONNECT_MESSAGE_KEYS[event.state];
       if (!key) return;
-      this.chatMessageService.sendSystemMessage(encodeI18nMessage(key, { name: this.resolvePeerName(event.peerId) }));
+      this.chatMessageService.sendSystemNotice(
+        'room',
+        encodeI18nMessage(key, { name: this.resolvePeerName(event.peerId) })
+      );
     }, this.destroyRef);
     this.objectChange.onObjectChangedForAlias(
       ['PeerCursor'],
@@ -315,11 +348,15 @@ export class NetworkEventHandlerService {
 
   /**
    * Plays alone in this browser, where nobody is kept from the table: a seat a room made a guest
-   * before going offline plays as a player, rather than find its own table read-only.
+   * before going offline plays as a player, rather than find its own table read-only. With no
+   * connection to hand the seat a user id, it takes the one it would wait outside a room as, or a new
+   * one, so what it holds, as a mask it scratches, is told from what nobody holds.
    */
   private playAlone(): void {
     const cursor = PeerCursor.myCursor;
-    if (cursor && !canRoleEdit(cursor.role)) cursor.role = DEFAULT_PEER_ROLE;
+    if (!cursor) return;
+    if (!canRoleEdit(cursor.role)) cursor.role = DEFAULT_PEER_ROLE;
+    if (cursor.userId.length < 1) cursor.userId = this.standbyUserId() ?? PeerContext.generateUserId();
   }
 
   /**
@@ -345,15 +382,15 @@ export class NetworkEventHandlerService {
     if (!Network.peerContext.isRoom) return;
     if (role !== 'gm' && role !== 'pl') {
       if (role === 'guest') {
-        ImageStorage.instance.synchronize();
-        AudioStorage.instance.synchronize();
+        this.imageStorage.synchronize();
+        this.audioStorage.synchronize();
       }
       return;
     }
-    ImageStorage.instance.uploadAllToAssetStore();
-    AudioStorage.instance.uploadAllToAssetStore();
+    this.imageStorage.uploadAllToAssetStore();
+    this.audioStorage.uploadAllToAssetStore();
     // What the room is playing goes up ahead of the rest, for everyone to hear it soonest.
-    AudioSharingSystem.instance.preferWaiting();
+    this.audioSharingSystem.preferWaiting();
   }
 
   /**
@@ -367,8 +404,8 @@ export class NetworkEventHandlerService {
     if (Network.transport !== 'server' || !Network.peerContext.isRoom) return;
     const role = Network.serverRole;
     if (role === 'gm' || role === 'pl') {
-      ImageStorage.instance.uploadMissedToAssetStore();
-      AudioStorage.instance.uploadMissedToAssetStore();
+      this.imageStorage.uploadMissedToAssetStore();
+      this.audioStorage.uploadMissedToAssetStore();
     }
     this.fetchRoomAssetList(Network.peerId);
   }
@@ -377,18 +414,19 @@ export class NetworkEventHandlerService {
    * Fetches what the room server's room holds that this seat lacks: the pictures and sounds left in
    * a room everybody had gone from, which no member's catalog names any more. Each room starts with
    * a clean slate of what the store was found to lack. A list the server could not give just then is
-   * asked for again a few times, while the seat is still in the room.
+   * asked for again a few times, while the seat is still in the room. What the list holds that the
+   * room removed is taken out of the store again, when this seat may remove it.
    */
   private fetchRoomAssets(): void {
     this.roomAssetListRetries.clear();
     if (Network.transport !== 'server' || !Network.peerContext.isRoom) return;
-    ImageSharingSystem.instance.forgetMisses();
-    AudioSharingSystem.instance.forgetMisses();
+    this.imageSharingSystem.forgetMisses();
+    this.audioSharingSystem.forgetMisses();
     this.fetchRoomAssetList(Network.peerId);
   }
 
   private fetchRoomAssetList(peerId: string): void {
-    void AssetHttpStore.instance.listRoomAssets().then((assets) => {
+    void this.assetHttpStore.listRoomAssets().then((assets) => {
       if (Network.peerId !== peerId || !Network.peerContext.isRoom) return;
       if (!assets) {
         this.roomAssetListRetries.schedule('list', () => this.fetchRoomAssetList(peerId));
@@ -397,10 +435,11 @@ export class NetworkEventHandlerService {
       this.roomAssetListRetries.forget('list');
       const pictures = assets.filter((asset) => asset.type.startsWith('image/'));
       const sounds = assets.filter((asset) => asset.type.startsWith('audio/'));
-      ImageStorage.instance.forgetUploaded(pictures.map((asset) => asset.id));
-      AudioStorage.instance.forgetUploaded(sounds.map((asset) => asset.id));
-      ImageSharingSystem.instance.fetchListed(pictures);
-      AudioSharingSystem.instance.fetchListed(sounds);
+      this.imageStorage.forgetUploaded(pictures.map((asset) => asset.id));
+      this.audioStorage.forgetUploaded(sounds.map((asset) => asset.id));
+      this.assetRemoval.takeOut(assets.map((asset) => asset.id));
+      this.imageSharingSystem.fetchListed(pictures);
+      this.audioSharingSystem.fetchListed(sounds);
     });
   }
 
@@ -409,7 +448,55 @@ export class NetworkEventHandlerService {
     const reason = typeof data?.reason === 'string' ? data.reason : '';
     const key = ROLE_REJECTED_KEYS[reason] ?? 'feature.lobby.roleRejected.other';
     const name = typeof data?.peerId === 'string' ? this.resolvePeerName(data.peerId) : '';
-    this.chatMessageService.sendSystemMessage(encodeI18nMessage(key, { name, reason }));
+    this.chatMessageService.sendSystemNotice('room', encodeI18nMessage(key, { name, reason }));
+  }
+
+  /**
+   * Tells the reader that the room server's operator has stopped pictures and sounds from going up
+   * for a while, so that what they add reaches nobody else till the stop is over, and then that it
+   * is over and what was held has gone up. A screen made for streaming shows none of it.
+   */
+  private tellUploadsPaused(paused: boolean): void {
+    if (this.overlayMode.active()) return;
+    if (!paused) {
+      this.snackbar.show(this.t('feature.lobby.uploads.resumed'));
+      return;
+    }
+    const contact = this.assetHttpStore.operatorContact;
+    const action = contact
+      ? { label: this.t('feature.lobby.operatorContact.open'), run: () => openApart(contact) }
+      : undefined;
+    this.snackbar.show(this.t('feature.lobby.uploads.paused'), { ms: UPLOAD_NOTICE_MS, action });
+  }
+
+  /**
+   * Writes under the word of a ban the contact the room server's operator gives, for the reader to ask
+   * of it, where the operator gives one. The seat's link has closed, so the server is asked for it.
+   */
+  private async tellOperatorContact(): Promise<void> {
+    const contact = await Network.instance.operatorContact();
+    if (contact) {
+      this.chatMessageService.sendSystemMessage(
+        encodeI18nMessage('feature.lobby.operatorContact.chat', { contact: operatorContactText(contact) })
+      );
+    }
+  }
+
+  /** Tells the reader that the operator barred a picture or sound this seat holds, so it reaches nobody else. */
+  private tellUploadBlocked(): void {
+    if (!this.overlayMode.active()) {
+      this.snackbar.show(this.t('feature.lobby.uploads.blocked'), { ms: UPLOAD_NOTICE_MS });
+    }
+  }
+
+  /**
+   * Tells the reader that the room's store is full, so what they add is kept by nobody: those in the
+   * room now get it from this seat, and nobody who comes in later.
+   */
+  private tellRoomStorageFull(): void {
+    if (!this.overlayMode.active()) {
+      this.snackbar.show(this.t('feature.lobby.uploads.roomFull'), { ms: UPLOAD_NOTICE_MS });
+    }
   }
 
   /**
@@ -497,7 +584,7 @@ export class NetworkEventHandlerService {
       this.lentLook.name = name;
     }
     if (cursor.imageIdentifier === DEFAULT_CURSOR_IMAGE_IDENTIFIER && avatarUrl) {
-      cursor.imageIdentifier = ImageStorage.instance.add(avatarUrl).identifier;
+      cursor.imageIdentifier = this.imageStorage.add(avatarUrl).identifier;
       this.lentLook.imageIdentifier = cursor.imageIdentifier;
     }
   }
@@ -576,6 +663,8 @@ export class NetworkEventHandlerService {
         return encodeI18nMessage('feature.lobby.errors.roomServerNoBackend');
       case 'unauthorized':
         return encodeI18nMessage('feature.lobby.errors.roomServerUnauthorized');
+      case 'banned':
+        return encodeI18nMessage('feature.lobby.errors.roomServerBanned');
       case 'room-deleted':
         return encodeI18nMessage('feature.lobby.errors.roomServerDeleted');
       case 'hello-required':

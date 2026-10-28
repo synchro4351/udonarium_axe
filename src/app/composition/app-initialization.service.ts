@@ -1,13 +1,14 @@
 import { DestroyRef, inject, Injectable } from '@angular/core';
 import { ImageUploadPreferenceService } from '@axe/application/file/image-upload-preference.service';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
+import { JukeboxEngineService } from '@axe/application/media/jukebox-engine.service';
 import { PersonalVolumeService } from '@axe/application/media/personal-volume.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { KeyboardInsetService } from '@axe/application/ui/keyboard-inset.service';
 import { AppConfigService } from '@axe/composition/app-config.service';
 import { initializeNetworkMessaging } from '@axe/core/network/network-messaging';
-import { AudioPlayer } from '@axe/core/storage/audio-player';
+import { AudioOutput } from '@axe/core/storage/audio-output';
 import { AudioSharingSystem } from '@axe/core/storage/audio-sharing-system';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
 import { FileArchiver } from '@axe/core/storage/file-archiver';
@@ -64,6 +65,8 @@ export class AppInitializationService {
   private readonly keyboardInset = inject(KeyboardInsetService);
   private readonly personalVolumes = inject(PersonalVolumeService);
   private readonly imageUploadPreference = inject(ImageUploadPreferenceService);
+  /** Made before the room's jukebox, so the jukebox is heard on this peer from the moment it is. */
+  private readonly jukeboxEngine = inject(JukeboxEngineService);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -78,7 +81,7 @@ export class AppInitializationService {
     initializeNetworkMessaging();
     this.fileArchiver.initialize();
     this.imageUploadPreference.initialize();
-    this.fileArchiver.mayLoadDrops = () => this.rolePermission.canEditTabletop;
+    this.fileArchiver.mayLoadDrops = () => this.rolePermission.canEditTabletop();
     ImageSharingSystem.instance.initialize();
     AudioSharingSystem.instance.initialize();
     ObjectSynchronizer.instance.initialize();
@@ -129,7 +132,7 @@ export class AppInitializationService {
 
     const jukebox = new Jukebox('Jukebox');
     jukebox.initialize();
-    this.personalVolumes.restore();
+    this.personalVolumes.applyToChannels();
     AudioSharingSystem.instance.preferredIdentifiers = () => [
       ...(jukebox.audioIdentifier.length > 0 ? [jukebox.audioIdentifier] : []),
       ...BackgroundSound.playing().map((sound) => sound.audioIdentifier),
@@ -173,7 +176,7 @@ export class AppInitializationService {
   }
 
   private initializeAudioPresets(): void {
-    AudioPlayer.resumeAudioContext();
+    AudioOutput.resumeOnGesture();
 
     const addHidden = (path: string): string => {
       const file = this.audioStorage.add(path);

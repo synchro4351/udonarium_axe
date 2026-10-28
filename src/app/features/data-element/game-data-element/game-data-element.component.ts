@@ -4,14 +4,15 @@ import {
   Component,
   computed,
   DestroyRef,
-  effect,
   ElementRef,
   inject,
   Injector,
   input,
+  linkedSignal,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ResourceSliderService } from '@axe/application/character/resource-slider.service';
 import { EffectCastService } from '@axe/application/effect/effect-cast.service';
 import { EffectLibraryService } from '@axe/application/effect/effect-library.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
@@ -29,7 +30,8 @@ import { ViewportService } from '@axe/application/ui/viewport.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
-import { ResourceSliderRange, resourceSliderRange, showsResourceSlider } from '@axe/domain/character/resource-slider';
+import { allowsOverResource } from '@axe/domain/character/over-resource';
+import { ResourceSliderRange, resourceSliderRange } from '@axe/domain/character/resource-slider';
 import {
   DataElement,
   DataElementAttribute,
@@ -63,12 +65,9 @@ import {
   toContextMenuActions,
 } from '@axe/features/data-element/game-data-element/data-element-actions';
 import { DataElementEditService } from '@axe/features/data-element/game-data-element/data-element-edit.service';
-import {
-  HEADING_ICON_GROUPS,
-  type HeadingIconGroup,
-} from '@axe/features/data-element/game-data-element/data-element-icons';
 import { IN_DATA_ELEMENT_SHEET } from '@axe/features/data-element/game-data-element/data-element-sheet-host';
 import { DataElementTouchDrag } from '@axe/features/data-element/game-data-element/data-element-touch-drag';
+import { ElementTemplateMenuComponent } from '@axe/features/data-element/game-data-element/element-template-menu.component';
 import { FIELD_TYPE_CATALOG } from '@axe/features/data-element/game-data-element/field-type-catalog';
 import {
   canDropStructureElement,
@@ -87,12 +86,19 @@ import {
   isUrlText,
   tableCellLineage,
 } from '@axe/features/data-element/game-data-element/game-data-element-utils';
-import { canStep, numericInputMode, stepValue } from '@axe/features/data-element/game-data-element/value-stepper';
+import { HeadingIconPickerComponent } from '@axe/features/data-element/game-data-element/heading-icon-picker.component';
+import {
+  canStep,
+  clampToBounds,
+  numericInputMode,
+  stepValue,
+} from '@axe/features/data-element/game-data-element/value-stepper';
 import { GameDataElementFieldOptionsComponent } from '@axe/features/data-element/game-data-element-field-options/game-data-element-field-options.component';
 import { GameDataElementRangeShapeComponent } from '@axe/features/data-element/game-data-element-range-shape/game-data-element-range-shape.component';
 import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
 import { TextFormatSwitchComponent } from '@axe/ui/components/text-format-switch/text-format-switch.component';
 import { NgSelectWindowDirective } from '@axe/ui/directives/ng-select-window.directive';
+import { TextTooltipDirective } from '@axe/ui/directives/text-tooltip.directive';
 import { LinkifyPipe } from '@axe/ui/pipes/linkify.pipe';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { escapeHtmlWithRuby, hasRubyNotation } from '@axe/ui/text-decoration/decorate-chat-text';
@@ -108,6 +114,7 @@ export const STEP_COMMIT_MS = 450;
   templateUrl: './game-data-element.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TextTooltipDirective,
     FormsModule,
     LinkifyPipe,
     SafePipe,
@@ -119,6 +126,8 @@ export const STEP_COMMIT_MS = 450;
     GameDataElementRangeShapeComponent,
     TextFormatSwitchComponent,
     GameDataElementFieldOptionsComponent,
+    HeadingIconPickerComponent,
+    ElementTemplateMenuComponent,
   ],
   host: {
     class:
@@ -148,6 +157,7 @@ export class GameDataElementComponent {
   private readonly effectLibrary = inject(EffectLibraryService);
   private readonly effectCast = inject(EffectCastService);
   private readonly rolePermission = inject(RolePermissionService);
+  private readonly resourceSliders = inject(ResourceSliderService);
   private readonly edit = inject(DataElementEditService);
   private readonly bottomSheet = inject(BottomSheetService);
   private readonly hostElement = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -157,10 +167,7 @@ export class GameDataElementComponent {
   /** Whether this row is drawn on a full sheet, which gives it ± buttons and an editor of its own. */
   protected readonly inSheet = inject(IN_DATA_ELEMENT_SHEET, { optional: true }) ?? false;
 
-  readonly isReadOnly = computed(() => {
-    this.objectChange.trackMyCursor();
-    return !this.rolePermission.canEditTabletop;
-  });
+  readonly isReadOnly = computed(() => !this.rolePermission.canEditTabletop());
   private readonly pointerDeviceService = inject(PointerDeviceService);
   private readonly contextMenuService = inject(ContextMenuService);
 
@@ -228,7 +235,25 @@ export class GameDataElementComponent {
     return element.getAttribute(DataElementAttribute.ROW_HEADER_LABEL).trim();
   });
 
-  private readonly _name = signal<string>('');
+  /** The element's name, value and current value as it holds them, read through its version. */
+  private readonly held = computed(() => {
+    const element = this.gameDataElement();
+    this.objectChange.versionOf(element.identifier)();
+    return { name: element.name, value: element.value, currentValue: element.currentValue };
+  });
+
+  /**
+   * Whether the drafts in the row's boxes are kept as typed rather than following the element:
+   * while a change typed into them waits to be written, the element still holds what was there.
+   */
+  private keepsDrafts(): boolean {
+    return this.updateTimer !== null;
+  }
+
+  private readonly _name = linkedSignal<{ name: string }, string>({
+    source: this.held,
+    computation: (held, previous) => (previous && this.keepsDrafts() ? previous.value : held.name),
+  });
   /**
    * The element's name as typed into its name box.
    *
@@ -250,7 +275,10 @@ export class GameDataElementComponent {
     return this.isDuplicateElementName(this._name(), element);
   });
 
-  private readonly _value = signal<number | string>(0);
+  private readonly _value = linkedSignal<{ value: number | string }, number | string>({
+    source: this.held,
+    computation: (held, previous) => (previous && this.keepsDrafts() ? previous.value : held.value),
+  });
   /**
    * The value being edited in this row, which for a resource is its maximum. Setting it writes to
    * the element after a short pause, and does nothing while values are locked.
@@ -264,7 +292,10 @@ export class GameDataElementComponent {
     this.setUpdateTimer();
   }
 
-  private readonly _currentValue = signal<number | string>(0);
+  private readonly _currentValue = linkedSignal<{ currentValue: number | string }, number | string>({
+    source: this.held,
+    computation: (held, previous) => (previous && this.keepsDrafts() ? previous.value : held.currentValue),
+  });
   /**
    * The current value being edited in this row, such as what is left of a resource or the effect
    * chosen. Setting it writes to the element after a short pause, and does nothing while values are
@@ -289,9 +320,21 @@ export class GameDataElementComponent {
 
   /**
    * The highest a resource's current value may be typed as: its maximum while that is a number, or
-   * empty for no limit.
+   * empty for no limit, as for a resource set to go over its maximum.
    */
   currentValueMaxAttr(): string {
+    return this.goesOverMaximum() ? '' : this.maximumText();
+  }
+
+  /** Whether this resource's current value may go over its maximum. */
+  private goesOverMaximum(): boolean {
+    const element = this.gameDataElement();
+    this.objectChange.versionOf(element.identifier)();
+    return allowsOverResource(element);
+  }
+
+  /** The resource's maximum as text while it is a number, or empty. */
+  private maximumText(): string {
     const value = this._value();
     if (typeof value === 'number') return String(value);
     if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) return value;
@@ -320,7 +363,7 @@ export class GameDataElementComponent {
    */
   commitValueBounds(): void {
     if (this.isValueLocked()) return;
-    const clamped = this.clampNumeric(this._value(), this.valueMinAttr(), this.valueMaxAttr());
+    const clamped = clampToBounds(this._value(), { min: this.valueMinAttr(), max: this.valueMaxAttr() });
     if (clamped !== this._value()) {
       this._value.set(clamped);
       this.setUpdateTimer();
@@ -334,7 +377,10 @@ export class GameDataElementComponent {
    */
   commitCurrentValueBounds(): void {
     if (this.isValueLocked()) return;
-    const clamped = this.clampNumeric(this._currentValue(), this.currentValueMinAttr(), this.currentValueMaxAttr());
+    const clamped = clampToBounds(this._currentValue(), {
+      min: this.currentValueMinAttr(),
+      max: this.currentValueMaxAttr(),
+    });
     if (clamped !== this._currentValue()) {
       this._currentValue.set(clamped);
       this.setUpdateTimer();
@@ -393,22 +439,6 @@ export class GameDataElementComponent {
     if (next === null) return;
     this._currentValue.set(next);
     this.setUpdateTimer(STEP_COMMIT_MS);
-  }
-
-  private clampNumeric(input: number | string, minStr: string, maxStr: string): number | string {
-    if (input === '' || input == null) return input;
-    const num = Number(input);
-    if (Number.isNaN(num)) return input;
-    let result = num;
-    if (minStr && minStr.trim() !== '') {
-      const min = Number(minStr);
-      if (!Number.isNaN(min)) result = Math.max(min, result);
-    }
-    if (maxStr && maxStr.trim() !== '') {
-      const max = Number(maxStr);
-      if (!Number.isNaN(max)) result = Math.min(max, result);
-    }
-    return result;
   }
 
   /**
@@ -470,13 +500,6 @@ export class GameDataElementComponent {
   readonly iconPickerOpen = signal(false);
   readonly templateMenuOpen = signal(false);
 
-  static readonly ICON_GROUPS: readonly HeadingIconGroup[] = HEADING_ICON_GROUPS;
-
-  readonly iconGroups = GameDataElementComponent.ICON_GROUPS.map((group) => ({
-    label: this.t(group.labelKey),
-    icons: group.icons,
-  }));
-
   readonly fieldTypeItems: { type: DataElementFieldTypeValue; label: string }[] = FIELD_TYPE_CATALOG.map((entry) => ({
     type: entry.type,
     label: this.t(entry.labelKey),
@@ -491,15 +514,9 @@ export class GameDataElementComponent {
     if (preset && character) this.effectCast.fireFromCharacter(preset, character);
   }
 
-  /** Sets the heading icon picked in the icon picker, and closes the picker. */
+  /** Sets the heading icon picked in the icon picker, or takes it away for empty, and closes the picker. */
   selectIcon(name: string): void {
     this.icon = name;
-    this.iconPickerOpen.set(false);
-  }
-
-  /** Takes the heading icon away, and closes the icon picker. */
-  clearIcon(): void {
-    this.icon = '';
     this.iconPickerOpen.set(false);
   }
 
@@ -507,13 +524,6 @@ export class GameDataElementComponent {
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.touchDrag?.cancel());
-    effect(() => {
-      const element = this.gameDataElement();
-      if (element) {
-        this.objectChange.versionOf(element.identifier)();
-        this.setValues(element);
-      }
-    });
   }
 
   readonly imageFileUrl = computed(() => {
@@ -652,8 +662,7 @@ export class GameDataElementComponent {
    * Deletes a saved template from the template menu without inserting it; the menu closes once no
    * templates are left.
    */
-  deleteTemplate(template: DataElement, event: Event): void {
-    event.stopPropagation();
+  deleteTemplate(template: DataElement): void {
     this.edit.deleteTemplate(template);
     if (this.elementTemplates().length < 1) this.templateMenuOpen.set(false);
   }
@@ -1046,14 +1055,15 @@ export class GameDataElementComponent {
 
   /** Whether this resource is moved with a slider as well as typed, here and in the popup over its piece. */
   hasResourceSlider(): boolean {
-    const element = this.gameDataElement();
-    this.objectChange.versionOf(element.identifier)();
-    return showsResourceSlider(element);
+    return this.resourceSliders.shows(this.gameDataElement());
   }
 
-  /** The span the slider runs over, the same the current value may be typed within; null with nothing to slide over. */
+  /**
+   * The span the slider runs over, from the lowest the current value may be typed as up to the
+   * maximum, even for a resource set to go over it; null with nothing to slide over.
+   */
   resourceSliderSpan(): ResourceSliderRange | null {
-    return resourceSliderRange(this.currentValueMinAttr(), this.currentValueMaxAttr());
+    return resourceSliderRange(this.currentValueMinAttr(), this.maximumText());
   }
 
   /** Shows where the slider is being dragged to in the box beside it, before anything is written. */
@@ -1141,13 +1151,6 @@ export class GameDataElementComponent {
     if (normalizedValue.length > 0) element.setAttribute(attribute, normalizedValue);
     else element.removeAttribute(attribute);
     this.objectChange.notifyChanged(element.identifier);
-  }
-
-  private setValues(object: DataElement) {
-    if (this.updateTimer !== null) return;
-    this._name.set(object.name);
-    this._currentValue.set(object.currentValue);
-    this._value.set(object.value);
   }
 
   private setUpdateTimer(delayMs = 66) {

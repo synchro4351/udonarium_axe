@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+
 import { openPanel, waitAppReady } from './helpers';
 
 test.describe('cut-in progressive disclosure', () => {

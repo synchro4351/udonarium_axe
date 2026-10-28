@@ -143,7 +143,9 @@ describe('FileArchiver', () => {
     });
 
     it('loads as before when the offer is declined', () => {
-      const load = vi.spyOn(FileArchiver.instance, 'load').mockResolvedValue();
+      const load = vi
+        .spyOn(FileArchiver.instance, 'load')
+        .mockResolvedValue({ dataRead: false, images: [], audios: [] });
       FileArchiver.instance.singleFileDropHandler = () => false;
       FileArchiver.instance.initialize();
       const file = png('a.png');
@@ -154,7 +156,9 @@ describe('FileArchiver', () => {
     });
 
     it('does not offer several files together to the preview', () => {
-      const load = vi.spyOn(FileArchiver.instance, 'load').mockResolvedValue();
+      const load = vi
+        .spyOn(FileArchiver.instance, 'load')
+        .mockResolvedValue({ dataRead: false, images: [], audios: [] });
       const handler = vi.fn(() => true);
       FileArchiver.instance.singleFileDropHandler = handler;
       FileArchiver.instance.initialize();
@@ -221,6 +225,7 @@ describe('FileArchiver', () => {
       drop(['Files'], [new File([new Uint8Array([1])], 'a.png', { type: 'image/png' })]);
 
       await vi.waitFor(() => expect(addAsync).toHaveBeenCalled());
+      expect(addAsync.mock.calls[0][1]).toEqual({ putBack: true });
     });
   });
 
@@ -235,6 +240,70 @@ describe('FileArchiver', () => {
         [Symbol.iterator]: function* () {},
       } as unknown as FileList;
       await FileArchiver.instance.load(fileList);
+    });
+  });
+
+  describe('what a load found out', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('says whether the data of a save was read, which a broken archive never is', async () => {
+      const off = xmlLoaded$.subscribe(() => undefined);
+      const saved = new File([zipSync({ 'data.xml': strToU8('<room></room>') }).slice()], 'room.zip', {
+        type: 'application/zip',
+      });
+      const broken = new File([new Uint8Array([0, 1, 2, 3])], 'broken.zip', { type: 'application/zip' });
+      try {
+        expect(await FileArchiver.instance.load([saved])).toMatchObject({ dataRead: true });
+        expect(await FileArchiver.instance.load([broken])).toMatchObject({ dataRead: false });
+      } finally {
+        off();
+      }
+    });
+
+    it('counts the data read once it is handed on, though taking it in then fails partway', async () => {
+      const off = xmlLoaded$.subscribe(() => {
+        throw new Error('a piece that will not go in');
+      });
+      const saved = new File([zipSync({ 'data.xml': strToU8('<room></room>') }).slice()], 'room.zip', {
+        type: 'application/zip',
+      });
+      try {
+        expect(await FileArchiver.instance.load([saved])).toMatchObject({ dataRead: true });
+      } finally {
+        off();
+      }
+    });
+
+    it('names the pictures and sounds it took in', async () => {
+      vi.spyOn(ImageStorage.instance, 'addAsync').mockResolvedValue({ identifier: 'taken-picture' } as ImageFile);
+      vi.spyOn(AudioStorage.instance, 'addAsync').mockResolvedValue({ identifier: 'taken-sound' } as AudioFile);
+
+      const result = await FileArchiver.instance.load([
+        new File([new Uint8Array([137, 80, 78, 71])], 'face.png', { type: 'image/png' }),
+        new File([new Uint8Array([1, 2, 3])], 'theme.mp3', { type: 'audio/mpeg' }),
+      ]);
+
+      expect(result.images).toEqual(['taken-picture']);
+      expect(result.audios).toEqual(['taken-sound']);
+    });
+
+    it('leaves the rest of an archive once it is no longer wanted', async () => {
+      const read: string[] = [];
+      const off = xmlLoaded$.subscribe((event) => read.push(event.xmlElement.tagName));
+      const saved = new File(
+        [zipSync({ 'data.xml': strToU8('<room></room>'), 'config.xml': strToU8('<config></config>') }).slice()],
+        'room.zip',
+        { type: 'application/zip' }
+      );
+
+      try {
+        const result = await FileArchiver.instance.load([saved], undefined, { stillWanted: () => false });
+
+        expect(result).toMatchObject({ dataRead: false });
+        expect(read).toEqual([]);
+      } finally {
+        off();
+      }
     });
   });
 
@@ -280,6 +349,20 @@ describe('FileArchiver', () => {
 
       expect(dropped).toHaveLength(1);
       expect(dropped[0]).toMatchObject({ fileName: 'a.png', dropPoint: { x: 10, y: 20 } });
+    });
+
+    it('places nothing for a picture the room removed and this seat could not put back', async () => {
+      const dropped: ImageDroppedEvent[] = [];
+      const off = imageDropped$.subscribe((event) => dropped.push(event));
+      vi.mocked(ImageStorage.instance.addAsync).mockImplementationOnce(() => Promise.resolve(null));
+
+      try {
+        await FileArchiver.instance.load([imageFile('a.png'), imageFile('b.png')], { x: 10, y: 20 });
+      } finally {
+        off();
+      }
+
+      expect(dropped.map((event) => event.fileName)).toEqual(['b.png']);
     });
 
     it('offsets several images dropped together so they do not stack', async () => {
@@ -483,6 +566,15 @@ describe('FileArchiver', () => {
       expect(result.oversized).toEqual([]);
     });
 
+    it('hands back no picture the room removed that this seat could not put back, nor names it too large', async () => {
+      addAsync.mockImplementationOnce(() => Promise.resolve(null));
+
+      const result = await FileArchiver.instance.loadImages([imageFile('a.png'), imageFile('b.png')]);
+
+      expect(result.images.map((image) => image.identifier)).toEqual(['image-b.png']);
+      expect(result.oversized).toEqual([]);
+    });
+
     it('names an image over the size limit instead of storing it', async () => {
       const result = await FileArchiver.instance.loadImages([
         imageFile('huge.png', 2 * 1024 * 1024 + 1),
@@ -677,7 +769,7 @@ describe('FileArchiver', () => {
 
     it('skips a broken archive without throwing', async () => {
       const badFile = new File([new Uint8Array([0, 1, 2, 3])], 'broken.zip', { type: 'application/zip' });
-      await expect(FileArchiver.instance.load([badFile])).resolves.toBeUndefined();
+      await expect(FileArchiver.instance.load([badFile])).resolves.toMatchObject({ dataRead: false });
     });
 
     it('takes a picture inside it by its bytes where its name does not say what it is', async () => {

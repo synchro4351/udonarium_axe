@@ -41,7 +41,7 @@ describe('MultipartGroupService', () => {
     restoreXml = allowDottedXmlAttributes();
     mode2d.set(true);
     TestBed.configureTestingModule({ providers: [...TEST_PROVIDERS] });
-    TestBed.overrideProvider(RolePermissionService, { useValue: roles });
+    TestBed.overrideProvider(RolePermissionService, { useValue: { canEditTabletop: () => roles.canEditTabletop } });
     TestBed.overrideProvider(TabletopService, { useValue: { mode2d } });
     await settle();
   });

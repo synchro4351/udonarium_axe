@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { CutInSoundService } from '@axe/application/media/cut-in-sound.service';
 import { ShortcutScopeService } from '@axe/application/ui/shortcut-scope.service';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { CutIn } from '@axe/domain/media/cut-in';
@@ -15,6 +14,7 @@ import { posterFrameMs } from '@axe/features/media/cut-in-editor/cut-in-poster-f
 import { CutInSceneEditorComponent } from '@axe/features/media/cut-in-editor/cut-in-scene-editor.component';
 import { CutInTimelineComponent, type TimelineRow } from '@axe/features/media/cut-in-editor/cut-in-timeline.component';
 import { TIMELINE_HEAD_W_PX } from '@axe/features/media/cut-in-editor/cut-in-timeline-geometry';
+import { CutInSoundService } from '@axe/features/media/cut-in-sound.service';
 import { CutInStageComponent } from '@axe/features/media/cut-in-stage/cut-in-stage.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 

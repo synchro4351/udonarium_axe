@@ -1,4 +1,7 @@
 import { computed, inject, Injectable } from '@angular/core';
+import { HandRailService } from '@axe/application/card/hand-rail.service';
+import { RoomFilesService } from '@axe/application/file/room-files.service';
+import { StartRoomService } from '@axe/application/file/start-room.service';
 import { LanguageService } from '@axe/application/i18n/language.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
@@ -19,6 +22,7 @@ import { RenderLiteService, RenderLiteSetting } from '@axe/application/ui/render
 import { Theme, ThemeService } from '@axe/application/ui/theme.service';
 import { ViewModePreferenceService } from '@axe/application/ui/view-mode-preference.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
+import { VisualNovelModeService } from '@axe/application/ui/visual-novel-mode.service';
 import { WidgetVisibilityService } from '@axe/application/ui/widget-visibility.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { BUFF_VIEW_LABEL_KEYS, type BuffViewMode } from '@axe/domain/character/buff-view-mode';
@@ -36,9 +40,7 @@ import {
 } from '@axe/domain/ui/menu-command';
 import { isMenuGroup, MenuLayout, MenuNode } from '@axe/domain/ui/menu-layout';
 import { nextViewMode, viewModeIcon, viewModeLabelKey } from '@axe/domain/ui/view-mode';
-import { HandRailService } from '@axe/features/card/hand-rail/hand-rail.service';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
-import { VisualNovelModeService } from '@axe/features/visual-novel/visual-novel-mode.service';
 
 const THEME_ICONS: Readonly<Record<Theme, string>> = {
   auto: 'brightness_auto',
@@ -60,16 +62,6 @@ const BUFF_VIEW_ICONS: Readonly<Record<BuffViewMode, string>> = {
   detail: 'format_list_bulleted',
   count: 'tag',
 };
-
-/**
- * The two things the screen itself owns rather than any service: saving, which reports its progress
- * where the menu can show it, and the file picker, which is an element of the page.
- */
-export interface MenuHostActions {
-  save(): void;
-  chooseFilesToLoad(): void;
-  isSaving(): boolean;
-}
 
 /** How a press turned out. Anything but `done` means nothing happened. */
 export type MenuRunResult = 'done' | 'notOffered' | 'unavailable' | 'noHost' | 'drawsItself';
@@ -137,6 +129,7 @@ export class MenuCommandService {
   private readonly widgets = inject(WidgetVisibilityService);
   private readonly buttonGuide = inject(ButtonGuideService);
   private readonly firstPerson = inject(FirstPersonService);
+  private readonly startRoom = inject(StartRoomService);
   private readonly contextMenu = inject(ContextMenuService);
   private readonly pointer = inject(PointerDeviceService);
 
@@ -149,11 +142,15 @@ export class MenuCommandService {
   private readonly mobile = inject(MobileLayoutService);
   private readonly viewport = inject(ViewportService);
 
-  private host: MenuHostActions | null = null;
+  private readonly roomFiles = inject(RoomFilesService);
+  private filePicker: (() => void) | null = null;
 
-  /** The screen hands over the two things only it can do. Called once, from the composition root. */
-  registerHost(host: MenuHostActions): void {
-    this.host = host;
+  /**
+   * The screen hands over its file picker, an element of the page, while it draws one; null once it
+   * no longer does.
+   */
+  registerFilePicker(open: (() => void) | null): void {
+    this.filePicker = open;
   }
 
   /**
@@ -400,8 +397,9 @@ export class MenuCommandService {
   disabledOf(command: MenuCommand): boolean {
     const action = command.action;
     if (action.kind !== 'act') return false;
-    if (action.act === 'save') return this.host?.isSaving() ?? false;
+    if (action.act === 'save') return this.roomFiles.isSaving();
     if (action.act === 'zipLoad' || action.act === 'importCharacter') return !this.canEditTabletop();
+    if (action.act === 'startRoomForget') return !this.startRoom.isKept();
     if (action.act === 'firstPersonView') {
       return this.firstPerson.forced() || (!this.firstPerson.showing() && this.firstPerson.seats().length < 1);
     }
@@ -554,15 +552,20 @@ export class MenuCommandService {
   private act(name: MenuActName): MenuRunResult {
     switch (name) {
       case 'save':
-        if (!this.host) return 'noHost';
-        this.host.save();
+        void this.roomFiles.save();
         return 'done';
       case 'zipLoad':
-        if (!this.host) return 'noHost';
-        this.host.chooseFilesToLoad();
+        if (!this.filePicker) return 'noHost';
+        this.filePicker();
         return 'done';
       case 'importCharacter':
         this.roomPanels.open('characterImport');
+        return 'done';
+      case 'startRoomKeep':
+        void this.startRoom.keepCurrent();
+        return 'done';
+      case 'startRoomForget':
+        void this.startRoom.forget();
         return 'done';
       case 'useMobileLayout':
         this.mobile.useMobileLayout();
@@ -586,10 +589,7 @@ export class MenuCommandService {
   }
 
   /** Whether this seat may put things on the table, which loading a room or a character does. */
-  private readonly canEditTabletop = computed(() => {
-    this.objectChange.trackMyCursor();
-    return this.rolePermission.canEditTabletop;
-  });
+  private readonly canEditTabletop = computed(() => this.rolePermission.canEditTabletop());
 
   private readonly darknessEnabled = computed(() => {
     const table = this.tabletop.currentTable;

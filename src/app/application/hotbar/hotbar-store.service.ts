@@ -1,10 +1,11 @@
 import { inject, Injectable } from '@angular/core';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
+import { readLocal, writeLocal } from '@axe/core/storage/local-preference';
+import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
 import { generateUuid } from '@axe/core/util/uuid';
 import { Hotbar } from '@axe/domain/hotbar/hotbar';
 import { HotbarStarterLabels, hotbarStarterSlots } from '@axe/domain/hotbar/hotbar-starter';
 
-const OWNER_KEY = 'ui-hotbar-owner';
 /** Present only while a reader named for the first time is still owed the sample slots. */
 export const HOTBAR_STARTER_KEY = 'ui-hotbar-starter';
 const STARTER_DUE = 'due';
@@ -68,18 +69,13 @@ export class HotbarStoreService {
 }
 
 function readOwnerId(): string {
-  try {
-    const held = localStorage.getItem(OWNER_KEY);
-    if (held && held.length > 0) return held;
+  const held = readLocal(STORAGE_KEYS.hotbarOwner);
+  if (held && held.length > 0) return held;
 
-    const made = generateUuid();
-    localStorage.setItem(OWNER_KEY, made);
-    markStarterDue();
-    return made;
-  } catch {
-    /* storage unavailable — the bar still works for as long as the page is open */
-    return generateUuid();
-  }
+  const made = generateUuid();
+  writeLocal(STORAGE_KEYS.hotbarOwner, made);
+  markStarterDue();
+  return made;
 }
 
 /** A reader named just now has no bar anywhere yet, and is owed the samples on their first. */

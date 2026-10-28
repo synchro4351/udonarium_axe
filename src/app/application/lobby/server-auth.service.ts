@@ -4,10 +4,12 @@ import { Network } from '@axe/core/network/network';
 import {
   fetchLoginProviders,
   LOGIN_CHANNEL,
-  LOGIN_STORAGE_KEY,
   ServerLogin,
+  ServerLoginError,
 } from '@axe/core/network/server/server-login';
 import { Account } from '@axe/core/network/server/server-protocol';
+import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
+import { generateUuid } from '@axe/core/util/uuid';
 
 /** The landing page the login popup comes back to, next to the app. */
 export const LOGIN_CALLBACK_PATH = 'assets/login-callback.html';
@@ -39,6 +41,7 @@ export class ServerAuthService implements ServerCredentialSource {
   private readonly _account = signal<Account | null>(null);
   private readonly _pending = signal(false);
   private readonly _error = signal<string | null>(null);
+  private readonly _errorContact = signal<string | null>(null);
   private readonly _providers = signal<string[] | null>(null);
   /** Every account logged in while the page has been open, which a guest may never go by. */
   private readonly accountUserIds = new Set<string>();
@@ -50,6 +53,8 @@ export class ServerAuthService implements ServerCredentialSource {
   readonly isLoggingIn = this._pending.asReadonly();
   /** Why the last login failed, as a code; null after one that worked. */
   readonly error = this._error.asReadonly();
+  /** The operator's contact the last login came back with, turned away for a ban or a stop; null for none. */
+  readonly errorContact = this._errorContact.asReadonly();
   /**
    * Whether the backend offers a login, without which it keeps neither logins nor rooms; null until
    * it has answered.
@@ -95,10 +100,11 @@ export class ServerAuthService implements ServerCredentialSource {
     const login = this.login;
     if (!login) return;
     this._error.set(null);
+    this._errorContact.set(null);
     const popup = window.open('', 'udonarium-axe-login', POPUP_FEATURES);
     if (popup) {
       this._pending.set(true);
-      const attempt = crypto.randomUUID();
+      const attempt = generateUuid();
       const landing = new URL(LOGIN_CALLBACK_PATH, document.baseURI);
       landing.searchParams.set('attempt', attempt);
       popup.location.href = await login.loginUrl(landing.href);
@@ -199,7 +205,7 @@ export class ServerAuthService implements ServerCredentialSource {
   private listenToOtherTabs(): void {
     if (this.channel) return;
     const onStorage = (event: StorageEvent) => {
-      if (event.key === LOGIN_STORAGE_KEY || event.key === null) this.takeAccount(this.login?.account ?? null);
+      if (event.key === STORAGE_KEYS.serverLogin || event.key === null) this.takeAccount(this.login?.account ?? null);
     };
     const onPageShow = (event: PageTransitionEvent) => {
       if (event.persisted) this.takeAccount(this.login?.account ?? null);
@@ -241,10 +247,12 @@ export class ServerAuthService implements ServerCredentialSource {
     try {
       await login.finishLogin(fragment);
       this._error.set(null);
+      this._errorContact.set(null);
       window.focus();
     } catch (reason) {
       const code = (reason as { code?: unknown } | null)?.code;
       this._error.set(typeof code === 'string' ? code : 'network');
+      this._errorContact.set(reason instanceof ServerLoginError ? reason.contact : null);
     }
   }
 }

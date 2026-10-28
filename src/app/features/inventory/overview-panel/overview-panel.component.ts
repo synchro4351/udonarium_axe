@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { ResourceSliderService } from '@axe/application/character/resource-slider.service';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { GameObjectInventoryService } from '@axe/application/inventory/game-object-inventory.service';
 import { DisclosureService } from '@axe/application/permission/disclosure.service';
@@ -24,7 +25,7 @@ import { turnCache } from '@axe/core/util/turn-cache';
 import { Card } from '@axe/domain/card/card'; //
 import { CardStack } from '@axe/domain/card/card-stack'; //
 import { GameCharacter } from '@axe/domain/character/game-character'; //
-import { ResourceSliderRange, resourceSliderRange, showsResourceSlider } from '@axe/domain/character/resource-slider';
+import { ResourceSliderRange, resourceSliderRange } from '@axe/domain/character/resource-slider';
 import {
   DataElement,
   DataElementAttribute,
@@ -93,12 +94,13 @@ export class OverviewPanelComponent {
   private readonly objectStore = inject(ObjectStore);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly rolePermission = inject(RolePermissionService);
+  private readonly resourceSliders = inject(ResourceSliderService);
   private readonly disclosureService = inject(DisclosureService);
   private readonly destroyRef = inject(DestroyRef);
 
   /** Whether this seat may edit the table, which moving a resource with its slider needs. */
   protected get canEdit(): boolean {
-    return this.rolePermission.canEditTabletop;
+    return this.rolePermission.canEditTabletop();
   }
 
   /** Where a resource's slider is being dragged to, by element, shown in its box before anything is written. */
@@ -106,7 +108,7 @@ export class OverviewPanelComponent {
 
   /** Whether a resource is moved with a slider here as well as typed. */
   hasResourceSlider(element: DataElement): boolean {
-    return showsResourceSlider(element);
+    return this.resourceSliders.shows(element);
   }
 
   /** The span a resource's slider runs over: from its minimum, 0 with none, to its maximum; null with nothing to slide over. */

@@ -93,7 +93,7 @@ export class CharacterPortraitFitComponent {
   /** Whether this user may change the character, as the rest of its sheet is judged. */
   readonly canEdit = computed(() => {
     this.objectChange.trackMyCursor();
-    return this.rolePermission.canEditTabletop;
+    return this.rolePermission.canEditTabletop();
   });
 
   readonly choices = computed(() => {

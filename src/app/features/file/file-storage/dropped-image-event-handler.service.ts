@@ -92,7 +92,7 @@ export class DroppedImageEventHandlerService {
   }
 
   private async add(image: UnconfirmedImage): Promise<boolean> {
-    if (!this.rolePermission.canEditTabletop) return false;
+    if (!this.rolePermission.canEditTabletop()) return false;
     try {
       const { images } = image.place
         ? await this.fileArchiver.loadImages([image.file], image.place)
@@ -104,7 +104,7 @@ export class DroppedImageEventHandlerService {
   }
 
   private take(file: File, place: ImageDropPlace): boolean {
-    if (!isPasteableImage(file.type) || !this.rolePermission.canEditTabletop) return false;
+    if (!isPasteableImage(file.type) || !this.rolePermission.canEditTabletop()) return false;
     const holder = this.holders.at(-1);
     if (holder) {
       holder.holdDroppedImage(file, place);

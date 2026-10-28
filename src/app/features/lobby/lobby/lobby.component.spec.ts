@@ -1,7 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
-import { RoomDeletionService } from '@axe/application/lobby/room-deletion.service';
-import { RoomJoinService } from '@axe/application/lobby/room-join.service';
 import { ServerAuthService } from '@axe/application/lobby/server-auth.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ConfirmService } from '@axe/application/ui/confirm.service';
@@ -16,6 +14,8 @@ import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { markLoadedWithheld, markSeatWithheld } from '@axe/domain/peer/withheld-table';
 import { LobbyComponent } from '@axe/features/lobby/lobby/lobby.component';
 import { NetworkReachService } from '@axe/features/lobby/network-reach.service';
+import { RoomDeletionService } from '@axe/features/lobby/room-deletion.service';
+import { RoomJoinService } from '@axe/features/lobby/room-join.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
 describe('LobbyComponent', () => {
@@ -463,6 +463,27 @@ describe('LobbyComponent', () => {
       await component.reload();
 
       expect(component.help()).toContain('backend.url');
+    });
+
+    it('says the room server’s operator blocked this connection, rather than that the list failed', async () => {
+      vi.spyOn(Network, 'listAllRooms').mockRejectedValue(new ServerRoomApiError(403, 'banned'));
+
+      await component.reload();
+
+      expect(component.help()).toBe('部屋のサーバーの運営者が、この回線を止めています');
+      expect(component.helpContact()).toBeNull();
+    });
+
+    it('keeps the operator’s contact the ban came with, and lets it go on the next look', async () => {
+      const listed = vi.spyOn(Network, 'listAllRooms');
+      listed.mockRejectedValueOnce(new ServerRoomApiError(403, 'banned', 'https://example.com/contact'));
+      await component.reload();
+      expect(component.helpContact()).toBe('https://example.com/contact');
+
+      listed.mockResolvedValueOnce([]);
+      await component.reload();
+
+      expect(component.helpContact()).toBeNull();
     });
   });
 

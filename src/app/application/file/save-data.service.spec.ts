@@ -12,12 +12,17 @@ import { ImageStorage } from '@axe/core/storage/image-storage';
 import * as MimeType from '@axe/core/storage/mime-type';
 import { ZipCodeUnavailableError } from '@axe/core/storage/zip-archive';
 import { ObjectSerializer } from '@axe/core/sync/object-serializer';
+import { ObjectStore } from '@axe/core/sync/object-store';
+import { DEFAULT_BATTLE_SETTINGS } from '@axe/domain/battle/battle-settings';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { exportChatLog } from '@axe/domain/chat/chat-log-export';
 import { ChatReaction } from '@axe/domain/chat/chat-reaction';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
+import { AssetOwner } from '@axe/domain/media/asset-owner';
 import { CutIn } from '@axe/domain/media/cut-in';
 import { CutInLayer } from '@axe/domain/media/cut-in-layer';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
+import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { markLoadedWithheld, markSeatWithheld } from '@axe/domain/peer/withheld-table';
 import { GameTable } from '@axe/domain/tabletop/game-table';
@@ -63,6 +68,88 @@ describe('SaveDataService', () => {
 
     const files = saveAsyncSpy.mock.calls[0][0] as File[];
     expect(files.some((file: File) => file.name.startsWith('image-null-blob.'))).toBe(false);
+  });
+
+  it('writes down the pictures the room holds only as a link to a file the app carries', async () => {
+    const privateApi = TestBed.inject(SaveDataService) as unknown as SaveDataServicePrivateApi;
+    const context = ImageFile.createEmpty('linked-goblin').toContext();
+    context.url = './assets/images/piece_goblin.webp';
+    const linked = ImageStorage.instance.add(context);
+    vi.spyOn(privateApi, 'searchImageFiles').mockReturnValue([linked]);
+    const saveAsyncSpy = vi.spyOn(privateApi, 'saveAsync').mockResolvedValue(undefined);
+
+    try {
+      await privateApi._saveRoomAsync('room');
+
+      const files = saveAsyncSpy.mock.calls[0][0] as File[];
+      const links = await files.find((file) => file.name === 'imagelink.xml')!.text();
+      expect(links).toContain('image="linked-goblin" url="./assets/images/piece_goblin.webp"');
+    } finally {
+      ImageStorage.instance.delete('linked-goblin');
+      vi.restoreAllMocks();
+    }
+  });
+
+  describe('the archive a browser starts on', () => {
+    const held = 'b'.repeat(64);
+
+    beforeEach(() => {
+      ImageStorage.instance.add({
+        identifier: held,
+        name: 'portrait.webp',
+        type: 'image/webp',
+        blob: new Blob(['picture'], { type: 'image/webp' }),
+        url: 'blob:portrait',
+        thumbnail: { type: '', blob: null, url: '' },
+      });
+      vi.spyOn(TestBed.inject(AudioStorage), 'audios', 'get').mockReturnValue([
+        { identifier: 'sound', name: 'theme.mp3', blob: new Blob(['sound'], { type: 'audio/mpeg' }), isHidden: false },
+      ] as never);
+    });
+
+    afterEach(() => {
+      ImageStorage.instance.delete(held);
+      vi.restoreAllMocks();
+    });
+
+    it('carries every picture and sound held here, named by the room or not, which a save leaves out', () => {
+      const privateApi = TestBed.inject(SaveDataService) as unknown as {
+        buildRoomFiles: (pretty: boolean, everything?: boolean) => File[];
+      };
+
+      const whole = privateApi.buildRoomFiles(false, true).map((file) => file.name);
+      const saved = privateApi.buildRoomFiles(false).map((file) => file.name);
+
+      expect(whole).toEqual(expect.arrayContaining([`${held}.webp`, 'theme.mp3']));
+      expect(saved).not.toContain(`${held}.webp`);
+      expect(saved).not.toContain('theme.mp3');
+    });
+  });
+
+  describe('the pictures the room keeps to fight on', () => {
+    const kept = 'e'.repeat(64);
+
+    afterEach(() => {
+      TestBed.inject(Config).battleSettings = { ...DEFAULT_BATTLE_SETTINGS };
+      ImageStorage.instance.delete(kept);
+    });
+
+    it('saves a picture the battle stage keeps, which only the packed settings name', () => {
+      ImageStorage.instance.add({
+        identifier: kept,
+        name: 'arena.webp',
+        type: 'image/webp',
+        blob: new Blob(['picture'], { type: 'image/webp' }),
+        url: 'blob:arena',
+        thumbnail: { type: '', blob: null, url: '' },
+      });
+      TestBed.inject(Config).battleSettings = { ...DEFAULT_BATTLE_SETTINGS, pictures: [kept] };
+      const privateApi = TestBed.inject(SaveDataService) as unknown as {
+        buildRoomFiles: (pretty: boolean, everything?: boolean) => File[];
+      };
+
+      expect(privateApi.buildRoomFiles(false).map((file) => file.name)).toContain(`${kept}.webp`);
+    });
   });
 
   describe('a room saved on a room server', () => {
@@ -334,6 +421,29 @@ describe('SaveDataService', () => {
       await service.createRoomArchiveAsync();
 
       expect(viaArchiver).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('who added the pictures and sounds', () => {
+    afterEach(() => {
+      for (const record of AssetOwner.all()) ObjectStore.instance.remove(record);
+    });
+
+    it('goes into a saved room with its locked tags, and stays out of a piece saved on its own and a replay', async () => {
+      const service = TestBed.inject(SaveDataService);
+      const privateApi = service as unknown as SaveDataServicePrivateApi;
+      const saved = vi.spyOn(privateApi, 'saveAsync').mockResolvedValue(undefined);
+
+      await privateApi._saveRoomAsync('room');
+      await privateApi._saveGameObjectAsync(GameCharacter.create('一人', 1, ''), 'one');
+      const replay = service.buildAssetFiles({ images: new Set(), audios: new Set() }).map((file) => file.name);
+
+      const names = (call: number) => (saved.mock.calls[call][0] as File[]).map((file) => file.name);
+      expect(names(0)).toEqual(expect.arrayContaining(['assetowner.xml', 'imagelock.xml']));
+      expect(names(1)).not.toContain('assetowner.xml');
+      expect(names(1)).not.toContain('imagelock.xml');
+      expect(replay).not.toContain('assetowner.xml');
+      expect(replay).not.toContain('imagelock.xml');
     });
   });
 

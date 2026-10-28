@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { EffectPlaybackService, MAX_ACTIVE_REACTIONS } from '@axe/application/effect/effect-playback.service';
 import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
-import { VolumeType } from '@axe/core/storage/audio-player';
+import { VolumeType } from '@axe/core/storage/audio-output';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { EffectPreset } from '@axe/domain/effect/effect-preset';

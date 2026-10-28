@@ -107,7 +107,7 @@ export async function openPanel(page: Page, dataLabel: string) {
 const SUBMENU_LABELS: Readonly<Record<string, readonly string[]>> = {
   table: ['テーブル設定', 'マップエディター', 'マップ生成', '卓上ディスプレイ', 'ノベルモード'],
   gameResources: ['インベントリ', 'バフマネージャー', '状態異常', 'ダイス表設定', '手札'],
-  media: ['画像', 'ジュークボックス', 'カットイン', 'エフェクト'],
+  media: ['画像', 'ジュークボックス', 'カットイン', 'エフェクト', '戦闘カットイン'],
 };
 
 /**
@@ -197,6 +197,7 @@ export const MENU_GROUP_OF: Readonly<Record<string, string>> = {
   バフの表示: 'バフ・演出',
   登録済み射程を出す: 'バフ・演出',
   演出を発動: 'バフ・演出',
+  戦闘カットイン: 'バフ・演出',
   ダイスを展開する: 'バフ・演出',
   '視界・光源設定…': '視界と視点',
   視界範囲を表示: '視界と視点',
@@ -210,6 +211,7 @@ export const MENU_GROUP_OF: Readonly<Record<string, string>> = {
   手番をもたない: '表示と扱い',
   発言しない: '表示と扱い',
   高度設定: '表示と扱い',
+  リソースのスライダー: '表示と扱い',
   公開範囲: '公開とオーナー',
   オーナー: '公開とオーナー',
   共有イベントリに移動: 'しまう',
@@ -219,6 +221,7 @@ export const MENU_GROUP_OF: Readonly<Record<string, string>> = {
   倒れている: 'コマの状態',
   転んでいる: 'コマの状態',
   その場から動けない: 'コマの状態',
+  'ステルス（GMと持ち主・仲間にだけ見える）': 'コマの状態',
   乗り物にする: '乗り物',
   同乗できる: '乗り物',
   積める数: '乗り物',

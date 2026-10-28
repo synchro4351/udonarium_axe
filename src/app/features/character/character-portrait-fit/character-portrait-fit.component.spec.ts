@@ -56,9 +56,7 @@ describe('CharacterPortraitFitComponent', () => {
         {
           provide: RolePermissionService,
           useValue: {
-            get canEditTabletop() {
-              return canEditTabletop;
-            },
+            canEditTabletop: () => canEditTabletop,
           },
         },
       ],

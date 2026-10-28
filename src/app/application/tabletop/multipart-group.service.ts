@@ -77,7 +77,7 @@ export class MultipartGroupService {
   /** Takes one part out of its group; the rest stay linked. */
   unlink(character: GameCharacter): boolean {
     if (
-      !this.roles.canEditTabletop ||
+      !this.roles.canEditTabletop() ||
       !isLinkedPart(character) ||
       this.objectStore.get(character.identifier) !== character ||
       !this.disclosure.canView(character)
@@ -89,7 +89,7 @@ export class MultipartGroupService {
 
   /** Links a chosen set of distinct characters while keeping their cropped-picture metadata. */
   link(characters: readonly GameCharacter[]): boolean {
-    if (!this.roles.canEditTabletop || characters.length < 2 || characters.some((character) => character.isLock))
+    if (!this.roles.canEditTabletop() || characters.length < 2 || characters.some((character) => character.isLock))
       return false;
     const requested = [...new Set(characters)];
     const groups = new Set(requested.map((character) => character.partGroup).filter(Boolean));
@@ -122,7 +122,7 @@ export class MultipartGroupService {
   /** Copies every member of a linked group once, with its own fresh group key. */
   copyGroup(character: GameCharacter): GameCharacter[] {
     if (
-      !this.roles.canEditTabletop ||
+      !this.roles.canEditTabletop() ||
       this.objectStore.get(character.identifier) !== character ||
       !this.disclosure.canView(character)
     )
@@ -172,7 +172,7 @@ export class MultipartGroupService {
   }
 
   renameGroup(group: string, name: string): boolean {
-    if (!this.roles.canEditTabletop || !group) return false;
+    if (!this.roles.canEditTabletop() || !group) return false;
     const members = this.membersOf(group);
     if (members.length === 0 || members.some((member) => !this.disclosure.canView(member))) return false;
     for (const member of members) {
@@ -184,7 +184,7 @@ export class MultipartGroupService {
 
   renamePart(character: GameCharacter, name: string): boolean {
     if (
-      !this.roles.canEditTabletop ||
+      !this.roles.canEditTabletop() ||
       !isLinkedPart(character) ||
       this.objectStore.get(character.identifier) !== character ||
       !this.disclosure.canView(character)
@@ -247,7 +247,7 @@ export class MultipartGroupService {
     const place = part.location.name;
     this.remember(part);
     if (!event.isSendFromSelf || place !== 'table' || !isLinkedPart(part)) return;
-    if (!this.roles.canEditTabletop) return;
+    if (!this.roles.canEditTabletop()) return;
     // The drag moves its followers itself; it is passed on once the piece is let go.
     if (this.multiMovable.isMoving(part.identifier)) return;
     const linked = this.linkedPartsOf(part);

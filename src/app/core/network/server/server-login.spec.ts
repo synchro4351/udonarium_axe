@@ -2,7 +2,6 @@ import http from '@axe/core/network/server/contract/http.json';
 import {
   fetchLoginProviders,
   LOGIN_ATTEMPT_STORAGE_KEY,
-  LOGIN_STORAGE_KEY,
   LOGIN_VERIFIER_STORAGE_KEY,
   LoginEnvironment,
   readStoredLogin,
@@ -11,6 +10,7 @@ import {
   StoredLogin,
 } from '@axe/core/network/server/server-login';
 import { Account } from '@axe/core/network/server/server-protocol';
+import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
 import { sha256Base64Url } from '@axe/core/util/crypto-util';
 
 class MemoryStorage implements Storage {
@@ -67,7 +67,7 @@ describe('ServerLogin', () => {
   let answer: (url: string, body: Record<string, unknown> | null) => Response | Promise<Response>;
 
   const login = () => new ServerLogin(BASE_URL, env);
-  const store = (stored: StoredLogin) => storage.setItem(LOGIN_STORAGE_KEY, JSON.stringify(stored));
+  const store = (stored: StoredLogin) => storage.setItem(STORAGE_KEYS.serverLogin, JSON.stringify(stored));
   const kept = (serial: number, expiresAt: number): StoredLogin => ({
     accessToken: `access-${serial}`,
     expiresAt,
@@ -144,6 +144,19 @@ describe('ServerLogin', () => {
     expect(requests).toEqual([]);
   });
 
+  it('gives the operator’s contact a login turned away for a ban came back with, and nothing that is not one', async () => {
+    const contact = encodeURIComponent('https://example.com/contact');
+
+    await expect(login().finishLogin(`login_error=banned&login_contact=${contact}`)).rejects.toMatchObject({
+      code: 'banned',
+      contact: 'https://example.com/contact',
+    });
+    await expect(login().finishLogin('login_error=paused&login_contact=javascript%3Aalert(1)')).rejects.toMatchObject({
+      code: 'paused',
+      contact: null,
+    });
+  });
+
   it('ends an attempt that came back without a code, so its verifier answers no later login', async () => {
     env.session.setItem(LOGIN_VERIFIER_STORAGE_KEY, 'v'.repeat(43));
 
@@ -211,7 +224,7 @@ describe('ServerLogin', () => {
     answer = () => json(400, { error: 'invalid-grant' });
 
     expect(await login().accessToken()).toBeNull();
-    expect(storage.getItem(LOGIN_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(STORAGE_KEYS.serverLogin)).toBeNull();
   });
 
   it('keeps the login when the server cannot be reached to refresh it', async () => {
@@ -244,7 +257,7 @@ describe('ServerLogin', () => {
     answer = () => new Response(null, { status: 204 });
     await loggingOut;
 
-    expect(storage.getItem(LOGIN_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(STORAGE_KEYS.serverLogin)).toBeNull();
     expect(requests.at(-1)?.body).toEqual({ refresh_token: 'refresh-2' });
   });
 
@@ -254,7 +267,7 @@ describe('ServerLogin', () => {
 
     await login().logout();
 
-    expect(storage.getItem(LOGIN_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(STORAGE_KEYS.serverLogin)).toBeNull();
     expect(requests).toEqual([
       {
         url: 'https://rooms.example/v1/auth/logout',
@@ -274,7 +287,7 @@ describe('ServerLogin', () => {
     expect(requests.map(({ url, method, authorization }) => ({ url, method, authorization }))).toEqual([
       { url: 'https://rooms.example/v1/account', method: 'DELETE', authorization: 'Bearer access-1' },
     ]);
-    expect(storage.getItem(LOGIN_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(STORAGE_KEYS.serverLogin)).toBeNull();
   });
 
   it('keeps the login and fails when the server turns the token away, the account still being there', async () => {
@@ -283,7 +296,7 @@ describe('ServerLogin', () => {
 
     await expect(login().deleteAccount()).rejects.toMatchObject({ status: 401 });
 
-    expect(storage.getItem(LOGIN_STORAGE_KEY)).not.toBeNull();
+    expect(storage.getItem(STORAGE_KEYS.serverLogin)).not.toBeNull();
   });
 
   it('deletes the account with a fresh token when the server turns down one that still looked good', async () => {
@@ -302,7 +315,7 @@ describe('ServerLogin', () => {
       ['https://rooms.example/v1/auth/token', null],
       ['https://rooms.example/v1/account', `Bearer ${http.tokenResponse.accessToken}`],
     ]);
-    expect(storage.getItem(LOGIN_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(STORAGE_KEYS.serverLogin)).toBeNull();
   });
 
   it('fails without a word to the server when it holds no login to tell it by', async () => {
@@ -317,16 +330,16 @@ describe('ServerLogin', () => {
 
     await login().deleteAccount();
 
-    expect(storage.getItem(LOGIN_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(STORAGE_KEYS.serverLogin)).toBeNull();
   });
 
   it('reads no login from a missing, broken or incomplete value', () => {
     expect(readStoredLogin(storage)).toBeNull();
-    storage.setItem(LOGIN_STORAGE_KEY, '{not json');
+    storage.setItem(STORAGE_KEYS.serverLogin, '{not json');
     expect(readStoredLogin(storage)).toBeNull();
-    storage.setItem(LOGIN_STORAGE_KEY, JSON.stringify({ ...kept(1, NOW), refreshToken: 3 }));
+    storage.setItem(STORAGE_KEYS.serverLogin, JSON.stringify({ ...kept(1, NOW), refreshToken: 3 }));
     expect(readStoredLogin(storage)).toBeNull();
-    storage.setItem(LOGIN_STORAGE_KEY, JSON.stringify({ ...kept(1, NOW), account: { name: 'Kai' } }));
+    storage.setItem(STORAGE_KEYS.serverLogin, JSON.stringify({ ...kept(1, NOW), account: { name: 'Kai' } }));
     expect(readStoredLogin(storage)).toBeNull();
   });
 

@@ -194,7 +194,7 @@ describe('HandOverviewPanelComponent', () => {
     }
 
     beforeEach(() => {
-      vi.spyOn(TestBed.inject(ChatMessageService), 'sendSystemMessage').mockReturnValue(null!);
+      vi.spyOn(TestBed.inject(ChatMessageService), 'sendSystemNotice').mockReturnValue(null!);
       vi.spyOn(component, 'frontImageUrl').mockReturnValue('front.png');
       vi.spyOn(component, 'backImageUrl').mockReturnValue('back.png');
       const original = Object.getOwnPropertyDescriptor(document, 'elementsFromPoint');
@@ -230,7 +230,8 @@ describe('HandOverviewPanelComponent', () => {
       pointer(element, 'pointerup', 40, 40);
 
       expect(held.location.name).toBe(handLocationOf('me'));
-      expect(TestBed.inject(ChatMessageService).sendSystemMessage).toHaveBeenCalledWith(
+      expect(TestBed.inject(ChatMessageService).sendSystemNotice).toHaveBeenCalledWith(
+        'card',
         expect.stringContaining('あいて')
       );
       expect(drag.drawCard()).toBeNull();

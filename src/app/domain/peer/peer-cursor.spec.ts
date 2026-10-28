@@ -2,7 +2,11 @@ import { TestBed } from '@angular/core/testing';
 import { domainPeerDisconnect$ } from '@axe/core/event/domain-events';
 import { Network } from '@axe/core/index';
 import { IPeerContext } from '@axe/core/network/peer-context';
-import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
+import {
+  PeerContextProvider,
+  resetPeerContextProvider,
+  setPeerContextProvider,
+} from '@axe/core/network/peer-context-source';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
@@ -40,6 +44,19 @@ describe('PeerCursor', () => {
 
       PeerCursor.myCursor.userId = '';
       expect(PeerCursor.myUserId).toBe('from-context');
+    });
+
+    it('is empty, not missing, while the line is not open and the peer context holds no id', () => {
+      setPeerContextProvider({
+        peerContext: {} as IPeerContext,
+        peerContexts: [],
+        peerIds: [],
+        peerId: '',
+      } as PeerContextProvider);
+      PeerCursor.createMyCursor();
+      PeerCursor.myCursor.userId = '';
+
+      expect(PeerCursor.myUserId).toBe('');
     });
   });
 

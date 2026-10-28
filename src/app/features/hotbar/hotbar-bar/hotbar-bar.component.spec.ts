@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActiveCharacterService } from '@axe/application/character/active-character.service';
 import { ChatSpeakerService } from '@axe/application/chat/chat-speaker.service';
 import { SaveDataService } from '@axe/application/file/save-data.service';
 import { HOTBAR_STARTER_KEY, HotbarStoreService } from '@axe/application/hotbar/hotbar-store.service';
@@ -21,7 +22,6 @@ import { HotbarService } from '@axe/features/hotbar/hotbar.service';
 import { HotbarBarComponent } from '@axe/features/hotbar/hotbar-bar/hotbar-bar.component';
 import { HotbarRunnerService } from '@axe/features/hotbar/hotbar-runner.service';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
-import { ActiveCharacterService } from '@axe/features/pl-tools/active-character.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 import { FIRST_CHAT_WINDOW } from '@axe/ui/panel-spot';
 import { Z_CONTEXT_MENU_PINNED, Z_HOTBAR } from '@axe/ui/z-layers';
@@ -103,7 +103,9 @@ describe('HotbarBarComponent', () => {
     const reloadCheck = new ReloadCheck('ReloadCheck');
     reloadCheck.initialize();
     const start = vi.spyOn(reloadCheck, 'reloadCheckStart');
-    const load = vi.spyOn(TestBed.inject(FileArchiver), 'load').mockResolvedValue();
+    const load = vi
+      .spyOn(TestBed.inject(FileArchiver), 'load')
+      .mockResolvedValue({ dataRead: true, images: [], audios: [] });
     const input = document.createElement('input');
     Object.defineProperty(input, 'files', { value: [new File(['<hotbar-set/>'], 'hotbar.xml')] });
 

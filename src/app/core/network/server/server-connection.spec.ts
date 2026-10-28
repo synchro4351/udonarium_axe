@@ -1,23 +1,20 @@
 import { IPeerContext } from '@axe/core/network/peer-context';
+import { IDLE_WARNING_MS } from '@axe/core/network/server/idle-watch';
+import { PING_INTERVAL_MS, PONG_TIMEOUT_MS, WELCOME_TIMEOUT_MS } from '@axe/core/network/server/link-heartbeat';
+import { MAX_HELD_BROADCASTS } from '@axe/core/network/server/outbound-events';
 import { pageActivity } from '@axe/core/network/server/page-activity';
 import {
-  ASSET_TOKEN_MARGIN_MS,
-  ASSET_TOKEN_WAIT_MS,
-  IDLE_WARNING_MS,
-  INVITE_TIMEOUT_MS,
-  MAX_HELD_BROADCASTS,
-  MISSING_MEMBER_GRACE_MS,
   PACE_WINDOW_MS,
-  PING_INTERVAL_MS,
-  PONG_TIMEOUT_MS,
   SEND_BUDGET_EVENTS,
   SEND_BUDGET_FRAMES,
-  SEND_GATHER_MS,
   SEND_WINDOW_MS,
+} from '@axe/core/network/server/send-pacer';
+import {
+  INVITE_TIMEOUT_MS,
+  MISSING_MEMBER_GRACE_MS,
+  SEND_GATHER_MS,
   SERVER_RECONNECT_BACKOFF_MS,
   ServerConnection,
-  TOKEN_CHECK_MS,
-  WELCOME_TIMEOUT_MS,
 } from '@axe/core/network/server/server-connection';
 import { NO_BACKEND, SERVER_UNREACHABLE } from '@axe/core/network/server/server-errors';
 import { decodeFrame, MAX_FRAME_BYTES } from '@axe/core/network/server/server-frames';
@@ -30,6 +27,8 @@ import {
   PROTOCOL_VERSION,
   ServerMessage,
 } from '@axe/core/network/server/server-protocol';
+import { ServerRoomApiError } from '@axe/core/network/server/server-room-api';
+import { ASSET_TOKEN_MARGIN_MS, ASSET_TOKEN_WAIT_MS, TOKEN_CHECK_MS } from '@axe/core/network/server/token-renewal';
 import { isCompressed } from '@axe/core/util/compress';
 import * as MessagePack from '@axe/core/util/message-pack';
 
@@ -1573,6 +1572,16 @@ describe('ServerConnection', () => {
     expect(new Headers(fetch.mock.calls[0][1]?.headers).has('Authorization')).toBe(false);
   });
 
+  it('leaves the room at once, without trying again, when the operator banned the seat', async () => {
+    const socket = await enterRoom();
+    socket.deliver({ type: 'error', code: 'banned', protocolVersion: PROTOCOL_VERSION });
+    await settle();
+    socket.close(4000, 'banned');
+    await vi.waitFor(() => expect(errors).toEqual([{ code: 'banned' }]));
+
+    expect(FakeWebSocket.instances.length).toBe(1);
+  });
+
   it('leaves a deleted room at once, without trying again', async () => {
     const socket = await enterRoom();
     socket.deliver({ type: 'error', code: 'room-deleted', protocolVersion: PROTOCOL_VERSION });
@@ -1788,6 +1797,51 @@ describe('ServerConnection', () => {
 
       await vi.waitFor(() => expect(errors).toEqual([{ code: SERVER_UNREACHABLE }]));
       expect(calls).not.toContain('reconnect retrying');
+    });
+
+    it('stops for the ban, rather than getting back in, when a refresh after a refusal is turned away for one', async () => {
+      const socket = await enterRoom();
+      replaceRejected.mockRejectedValueOnce(new ServerRoomApiError(403, 'banned'));
+
+      socket.deliver({ type: 'error', code: 'unauthorized', protocolVersion: PROTOCOL_VERSION });
+      socket.close(4000, 'unauthorized');
+
+      await vi.waitFor(() => expect(errors).toEqual([{ code: 'banned' }]));
+      expect(calls).not.toContain('reconnect retrying');
+      expect(FakeWebSocket.instances.length).toBe(1);
+    });
+
+    it('opens nothing and names the ban when the login cannot be refreshed for one as it opens', async () => {
+      connection.useCredentials({
+        credentials: () => Promise.reject(new ServerRoomApiError(403, 'banned')),
+        accessToken: async () => null,
+        replaceRejected,
+        isAccountUserId: (userId) => userId === account,
+      });
+
+      connection.open('my-user', 'Ab3', '月夜の卓', '', ROOM_KEY);
+
+      await vi.waitFor(() => expect(errors).toEqual([{ code: 'banned' }]));
+      expect(FakeWebSocket.instances).toEqual([]);
+    });
+
+    it('stops for the ban, rather than getting back in, when the login cannot be refreshed for one as it says hello', async () => {
+      const socket = await enterRoom();
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+      connection.useCredentials({
+        credentials: () => Promise.reject(new ServerRoomApiError(403, 'banned')),
+        accessToken: async () => 'token-1',
+        replaceRejected,
+        isAccountUserId: (userId) => userId === account,
+      });
+      socket.close(1006);
+      await vi.advanceTimersByTimeAsync(1000);
+      latest().accept();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(errors).toEqual([{ code: 'banned' }]);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(FakeWebSocket.instances.length).toBe(2);
     });
 
     it('opens nothing, the server being out of reach, when the login cannot be refreshed as it opens', async () => {

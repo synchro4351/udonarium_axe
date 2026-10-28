@@ -6,7 +6,7 @@ import {
   speechChunks,
   SpeechSettings,
 } from '@axe/application/chat/chat-speech-settings';
-import { AudioPlayer } from '@axe/core/storage/audio-player';
+import { AudioOutput } from '@axe/core/storage/audio-output';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
@@ -112,7 +112,7 @@ export class ChatSpeechService {
     this.speakingId.set(null);
     this.pendingCount.set(0);
     this.synth?.cancel();
-    AudioPlayer.setSpeechDucking(1);
+    AudioOutput.setSpeechDucking(1);
     this.status.set('feature.chat.speech.stopped');
   }
 
@@ -179,7 +179,7 @@ export class ChatSpeechService {
     const item = this.queue.shift();
     this.pendingCount.set(this.queue.length);
     if (!item) {
-      this.releaseTimer = setTimeout(() => AudioPlayer.setSpeechDucking(1), 250);
+      this.releaseTimer = setTimeout(() => AudioOutput.setSpeechDucking(1), 250);
       this.status.set('feature.chat.speech.ready');
       return;
     }
@@ -256,7 +256,7 @@ export class ChatSpeechService {
     return message ? (this.store.get<ChatTab>(message.tabIdentifier)?.name ?? '') : '';
   }
   private duck(): void {
-    AudioPlayer.setSpeechDucking(this.settings().duckBgm ? this.settings().duckLevel : 1);
+    AudioOutput.setSpeechDucking(this.settings().duckBgm ? this.settings().duckLevel : 1);
   }
   private clearTimers(): void {
     clearTimeout(this.watchdog);

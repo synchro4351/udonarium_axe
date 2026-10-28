@@ -45,7 +45,9 @@ describe('MultipartCharacterService', () => {
     crops = 0;
     beforeCrop = () => {};
     TestBed.configureTestingModule({ providers: [...TEST_PROVIDERS] });
-    TestBed.overrideProvider(RolePermissionService, { useValue: roles });
+    TestBed.overrideProvider(RolePermissionService, {
+      useValue: { canEditTabletop: () => roles.canEditTabletop, canSeeHidden: () => roles.canSeeHidden },
+    });
     TestBed.overrideProvider(TabletopService, { useValue: tabletop });
     disclosure.canView = () => true;
     TestBed.overrideProvider(DisclosureService, { useValue: disclosure });

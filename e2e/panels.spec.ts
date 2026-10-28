@@ -56,7 +56,7 @@ test.describe('opening panels from the left menu', () => {
     await expect(page.locator('dice-table-setting')).toBeVisible({ timeout: 10000 });
   });
 
-  test('画像・ジュークボックス・カットイン・エフェクト・スタンプは「メディア」の小窓にまとまり、選ぶと小窓が閉じること', async ({
+  test('gathers images, the jukebox, cut-ins, stamps, effects and the battle stage in the media small menu, which closes once one is chosen', async ({
     page,
   }) => {
     await openFabMenu(page);
@@ -64,7 +64,8 @@ test.describe('opening panels from the left menu', () => {
 
     await page.locator('[data-testid="fab-entry-media"]').click();
     const media = page.locator('[data-testid="fab-submenu-media"]');
-    await expect(media.locator('[data-label]')).toHaveCount(5);
+    await expect(media.locator('[data-label]')).toHaveCount(6);
+    await expect(media.getByTestId('fab-entry-battleCutIn')).toBeVisible();
     await expect(page.locator('[data-testid="fab-entry-media"]')).toHaveAttribute('aria-expanded', 'true');
 
     await media.getByTestId('fab-entry-jukebox').click();
@@ -276,5 +277,28 @@ test.describe('saving', () => {
     await menu.getByTestId('save-load-save').click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.zip$/);
+  });
+});
+
+test.describe('the keyboard on a panel', () => {
+  test.beforeEach(async ({ page }) => {
+    await waitAppReady(page);
+  });
+
+  test("shows where the keyboard is among the title bar's buttons, though they turn the browser's outline off", async ({
+    page,
+  }) => {
+    await openPanel(page, 'カットイン');
+    const minimize = page
+      .locator('app-cut-in-list')
+      .locator('xpath=ancestor::*[contains(@class, "draggable-panel")]')
+      .getByRole('button', { name: '最小化' });
+    await minimize.focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+
+    await expect(minimize).toBeFocused();
+    await expect(minimize).toHaveCSS('outline-style', 'solid');
+    await expect(minimize).toHaveCSS('outline-width', '2px');
   });
 });

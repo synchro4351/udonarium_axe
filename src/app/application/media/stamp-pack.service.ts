@@ -90,7 +90,7 @@ export class StampPackService {
 
   /** Whether this seat may make, change and throw away packs. */
   get canEdit(): boolean {
-    return this.rolePermission.canEditTabletop;
+    return this.rolePermission.canEditTabletop();
   }
 
   /** Makes an empty pack under the name given. */
@@ -130,7 +130,8 @@ export class StampPackService {
     if (pack.items.length >= STAMP_LIMITS.stampsPerPack) return 'stampLimit';
     const prepared = await this.prepareImage(file);
     if (isStampProblem(prepared)) return prepared;
-    const image = await this.imageStorage.addAsync(prepared);
+    const image = await this.imageStorage.addAsync(prepared, { putBack: true });
+    if (!image) return 'notImage';
     this.fileAsStamp(image.identifier);
     return this.appendStamp(pack, image.identifier, file.name);
   }
@@ -153,7 +154,8 @@ export class StampPackService {
 
     const prepared = await this.prepareImage(new File([blob], fileName, { type: blob.type }));
     if (isStampProblem(prepared)) return prepared;
-    const copy = await this.imageStorage.addAsync(prepared);
+    const copy = await this.imageStorage.addAsync(prepared, { putBack: true });
+    if (!copy) return 'notImage';
     this.fileAsStamp(copy.identifier);
     return this.appendStamp(pack, copy.identifier, fileName);
   }

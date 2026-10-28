@@ -29,10 +29,10 @@ export class MultipartCharacterService {
   mayUse(identifier: string): boolean {
     const image = this.images.get(identifier);
     return (
-      this.roles.canEditTabletop &&
+      this.roles.canEditTabletop() &&
       !!image &&
       image.state >= ImageState.COMPLETE &&
-      canBrowseImage(ImageTag.get(identifier) ?? null, this.roles.canSeeHidden)
+      canBrowseImage(ImageTag.get(identifier) ?? null, this.roles.canSeeHidden())
     );
   }
 

@@ -1,5 +1,4 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { CardGameService } from '@axe/application/card/card-game.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ConfirmService } from '@axe/application/ui/confirm.service';
@@ -12,6 +11,7 @@ import { handLocationOf } from '@axe/domain/card/hand-location';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
+import { CardGameService } from '@axe/features/card/card-game.service';
 import { OrphanHandRescueComponent } from '@axe/features/card/hand-draw/orphan-hand-rescue.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 

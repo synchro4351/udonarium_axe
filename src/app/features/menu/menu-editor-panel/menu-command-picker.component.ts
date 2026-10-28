@@ -16,6 +16,7 @@ import { HAND_CARDS_ICON } from '@axe/domain/ui/custom-icon';
 import { MenuCommand } from '@axe/domain/ui/menu-command';
 import { AnchoredPopover } from '@axe/ui/anchored-popover';
 import { UiHandCardsIconComponent } from '@axe/ui/components/hand-cards-icon/hand-cards-icon.component';
+import { TextTooltipDirective } from '@axe/ui/directives/text-tooltip.directive';
 import { TranslocoModule } from '@jsverse/transloco';
 
 const LIST_WIDTH = 320;
@@ -32,7 +33,7 @@ const LIST_MIN_HEIGHT = 220;
   selector: 'menu-command-picker',
   templateUrl: './menu-command-picker.component.html',
   host: { class: 'flex' },
-  imports: [FormsModule, TranslocoModule, UiHandCardsIconComponent],
+  imports: [TextTooltipDirective, FormsModule, TranslocoModule, UiHandCardsIconComponent],
 })
 export class MenuCommandPickerComponent {
   protected readonly handCardsIcon = HAND_CARDS_ICON;

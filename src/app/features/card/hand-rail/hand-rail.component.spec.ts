@@ -1,10 +1,12 @@
 import { Injector, Type, ViewContainerRef, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HandRailService } from '@axe/application/card/hand-rail.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { CoordinateService } from '@axe/application/input/coordinate.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
+import { OverlayLayers } from '@axe/application/ui/overlay-layers';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
@@ -18,10 +20,9 @@ import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { HandRailComponent } from '@axe/features/card/hand-rail/hand-rail.component';
-import { HandRailService } from '@axe/features/card/hand-rail/hand-rail.service';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
-import { TooltipDirective, TooltipPanelInstance } from '@axe/ui/directives/tooltip.directive';
+import { TooltipPanelInstance, TooltipPanelSource } from '@axe/ui/directives/tooltip.directive';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('HandRailComponent', () => {
@@ -565,12 +566,12 @@ describe('HandRailComponent', () => {
   describe('the detail of a hand card under the pointer', () => {
     /** Every detail the rail raised, standing in for the real panel so the test can read what it was given. */
     const raised: { instance: Partial<TooltipPanelInstance>; destroyed: boolean }[] = [];
-    let previousLayer: ViewContainerRef;
+    let previousLayer: ViewContainerRef | null;
     const showing = () => raised.filter((entry) => !entry.destroyed);
 
     beforeEach(() => {
-      previousLayer = ContextMenuService.defaultParentViewContainerRef;
-      ContextMenuService.defaultParentViewContainerRef = {
+      previousLayer = TestBed.inject(OverlayLayers).main;
+      TestBed.inject(OverlayLayers).main = {
         injector: TestBed.inject(Injector),
         length: 0,
         createComponent: () => {
@@ -588,7 +589,7 @@ describe('HandRailComponent', () => {
           };
         },
       } as unknown as ViewContainerRef;
-      TooltipDirective.TooltipPanelComponentClass = class {} as Type<TooltipPanelInstance>;
+      TestBed.inject(TooltipPanelSource).panel = class {} as Type<TooltipPanelInstance>;
     });
 
     afterEach(() => {
@@ -596,8 +597,8 @@ describe('HandRailComponent', () => {
       vi.useRealTimers();
       vi.restoreAllMocks();
       raised.length = 0;
-      ContextMenuService.defaultParentViewContainerRef = previousLayer;
-      TooltipDirective.TooltipPanelComponentClass = null;
+      TestBed.inject(OverlayLayers).main = previousLayer;
+      TestBed.inject(TooltipPanelSource).panel = null;
     });
 
     async function hoverFirstCard(): Promise<void> {
@@ -726,7 +727,7 @@ describe('HandRailComponent', () => {
       otherPlayer('other', 'あいて');
       const card = handCard();
       const open = vi.spyOn(TestBed.inject(ContextMenuService), 'open').mockImplementation(() => undefined);
-      const announce = vi.spyOn(TestBed.inject(ChatMessageService), 'sendSystemMessage').mockReturnValue(null!);
+      const announce = vi.spyOn(TestBed.inject(ChatMessageService), 'sendSystemNotice').mockReturnValue(null!);
 
       await hoverOverTheHand();
       giveButton()!.click();

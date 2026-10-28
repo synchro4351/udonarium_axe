@@ -32,7 +32,7 @@ export class ImageDropEventHandlerService {
   }
 
   private createCharacter(event: ImageDroppedEvent): void {
-    if (!this.rolePermission.canEditTabletop) return;
+    if (!this.rolePermission.canEditTabletop()) return;
 
     const dropTarget = (
       event.dropTarget !== undefined

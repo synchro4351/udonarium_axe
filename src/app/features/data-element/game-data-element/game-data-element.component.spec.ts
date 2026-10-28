@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ResourceSliderService } from '@axe/application/character/resource-slider.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
@@ -1127,6 +1128,25 @@ describe('GameDataElementComponent', () => {
       expect(component.currentValue).toBe(100);
     });
 
+    it('sets no cap to type, step or clamp against for a resource set to go over its maximum, and slides up to it', () => {
+      const element = DataElement.create('命中V', 1, {
+        currentValue: 1,
+        fieldType: DataElementFieldType.RESOURCE,
+        type: DataElementType.NUMBER_RESOURCE,
+        [DataElementAttribute.OVER_RESOURCE]: 'true',
+      });
+      fixture.componentRef.setInput('isEdit', true);
+      fixture.componentRef.setInput('gameDataElement', element);
+      fixture.detectChanges();
+
+      expect(component.currentValueMaxAttr()).toBe('');
+      expect(component.canStepCurrentValue(1)).toBe(true);
+      component.currentValue = 3;
+      component.commitCurrentValueBounds();
+      expect(component.currentValue).toBe(3);
+      expect(component.resourceSliderSpan()).toEqual({ min: 0, max: 1 });
+    });
+
     it('keeps the original maximum apart from the current one', () => {
       const element = DataElement.create('HP', 200, {
         currentValue: 50,
@@ -1187,6 +1207,25 @@ describe('GameDataElementComponent', () => {
       await new Promise((resolve) => queueMicrotask(() => resolve(null)));
 
       expect(component.value).toBe(50);
+    });
+
+    it('takes up a name and a value changed elsewhere while nothing typed here waits to be written', async () => {
+      const element = DataElement.create('HP', 10, {
+        currentValue: 10,
+        fieldType: DataElementFieldType.RESOURCE,
+        type: DataElementType.NUMBER_RESOURCE,
+      });
+      fixture.componentRef.setInput('isEdit', true);
+      fixture.componentRef.setInput('gameDataElement', element);
+      fixture.detectChanges();
+      expect([component.name, component.currentValue]).toEqual(['HP', 10]);
+
+      element.name = '体力';
+      element.currentValue = 4;
+      TestBed.inject(ObjectChangeService).notifyChanged(element.identifier);
+      fixture.detectChanges();
+
+      expect([component.name, component.currentValue]).toEqual(['体力', 4]);
     });
 
     it('clamps a value outside the bounds when the field loses focus', () => {
@@ -1512,7 +1551,39 @@ describe('GameDataElementComponent', () => {
       expect(field.getAttribute(DataElementAttribute.RESOURCE_SLIDER)).toBe('true');
 
       option.click();
-      expect(field.getAttribute(DataElementAttribute.RESOURCE_SLIDER)).toBe('');
+      expect(field.getAttribute(DataElementAttribute.RESOURCE_SLIDER)).toBe('false');
+    });
+
+    describe('where the room gives every resource one', () => {
+      beforeEach(() => TestBed.inject(ResourceSliderService).setRoomDefault(true));
+      afterEach(() => TestBed.inject(ResourceSliderService).setRoomDefault(false));
+
+      it('is drawn for a resource that says nothing of its own', () => {
+        show(resourceField());
+
+        expect(slider()).not.toBeNull();
+      });
+
+      it('is not drawn for a resource set to have none', () => {
+        show(resourceField({ [DataElementAttribute.RESOURCE_SLIDER]: 'false' }));
+
+        expect(slider()).toBeNull();
+      });
+
+      it('is taken off a resource from the field options, and stays off', () => {
+        const field = resourceField();
+        show(field, { isEdit: true });
+        component.toggleFieldOptions();
+        fixture.detectChanges();
+        const option = fixture.nativeElement.querySelector('input[name="data-resource-slider"]') as HTMLInputElement;
+        expect(option.checked).toBe(true);
+
+        option.click();
+        fixture.detectChanges();
+
+        expect(field.getAttribute(DataElementAttribute.RESOURCE_SLIDER)).toBe('false');
+        expect(slider()).toBeNull();
+      });
     });
   });
 });

@@ -159,6 +159,18 @@
     }
   },
   "feature": {
+    "gpuNotice": {
+      "title": "Graphics acceleration is turned off",
+      "body": "This browser is drawing the page without the GPU, which makes Udonarium Axe very slow. We strongly recommend turning graphics acceleration on in the browser’s settings.",
+      "steps": {
+        "chrome": "In Chrome, turn on “Use graphics acceleration when available” under System in Settings.",
+        "edge": "In Edge, turn on “Use graphics acceleration when available” under System and performance in Settings.",
+        "firefox": "In Firefox, go to Performance under General in Settings, uncheck “Use recommended performance settings” and check “Use hardware acceleration when available”.",
+        "other": "Look for “hardware acceleration” or “graphics acceleration” in the browser’s settings and turn it on."
+      },
+      "restart": "Restart the browser once the setting is changed.",
+      "close": "Close"
+    },
     "zone": {
       "menu": {
         "title": "Engagement zone",
@@ -217,6 +229,8 @@
         "leaveKindHint": "A piece leaves a zone holding more than its limit at once by this kind of move.",
         "interrupt": "Let moves be stepped into",
         "interruptHint": "Before a planned move is walked, the side of every enemy that can reach the way is asked whether to step in. A piece that steps in stops the move at that point, and a new engagement zone forms there with both. While turns are kept, it is forming until the turn ends. A move into an engagement zone, or one out of a zone the piece stands in, is also put to the side in the zone, which chooses whether to stop it; a piece it stops moves to the centre and joins. A zone nobody can answer for, and every zone while this is off, always stops it.",
+        "stealthUnseen": "Count a piece in stealth as unseen",
+        "stealthUnseenHint": "When on, a piece in stealth is treated like one marked unseen by hand: its moves cannot be stopped, and one it stops makes a zone there and then.",
         "interruptKind": "Kind used to step in",
         "interruptKindFirst": "The first kind",
         "blockRadius": "Line of fire block radius (m)",
@@ -384,6 +398,7 @@
         "notFound": "What this slot points at is gone",
         "noTab": "There is no chat tab to speak into",
         "empty": "This slot is empty",
+        "noDice": "None of the dice held are on the table",
         "offTable": "The piece is not on the table",
         "notAllowed": "Your current role may not use this entry",
         "unavailable": "This entry cannot be used just now"
@@ -447,6 +462,7 @@
         "stepsNone": "Fill another slot and it can be chosen here.",
         "stepDelay": "Gap",
         "effectOnSelf": "Ignore targets, play on self",
+        "effectPreview": "Preview",
         "stepsOrder": "Order and waits",
         "stepAtOnce": "at once",
         "stepUp": "Move up",
@@ -468,6 +484,7 @@
         "effect": "Effect",
         "range": "Lay out or clear a range",
         "diceDeploy": "Lay out or put away dice",
+        "diceRoll": "Re-roll held dice",
         "panel": "Open a panel",
         "menu": "Menu entry",
         "focus": "Look at the piece",
@@ -501,6 +518,7 @@
         "effect": "Chosen from the effects the table holds. It goes off from the piece you are working.",
         "range": "Choose the shape of the range. Its name, its size, its colours and how it paints, and whether it docks to the piece are set below. Press it again to clear the range this slot laid.",
         "diceDeploy": "Lays out the dice the character is holding. Press it again while they are on the table to put them away.",
+        "diceRoll": "Rolls again, as one throw, the character's dice that are laid out on the table. Dice put away on the sheet are not rolled. A die with an owner shows its result to its owner alone.",
         "panel": "Opens one of that character's panels. Press it again to close it.",
         "menu": "Pick an entry of the floating menu or a toolbar. Pressing the slot does what pressing that entry does. An entry your current role may not use does nothing.",
         "focus": "Moves the camera to that character's piece.",
@@ -672,6 +690,7 @@
         "ownVolumeNote": "Only you hear it; saved in this browser",
         "roomVolumeHeading": "Room volume",
         "roomVolumeNote": "Applies to everyone in the room; only the GM can change it",
+        "remove": "Delete from the room",
         "roomGmTooltip": "Shared GM control",
         "addToPlaylist": "Add to playlist"
       },
@@ -713,6 +732,7 @@
         "selectFromList": "Select a cut-in from the list",
         "save": "Save",
         "delete": "Delete",
+        "deleteConfirm": "Delete the cut-in \"{{name}}\"? It disappears from everyone's list and cannot be brought back.",
         "defaultName": "Untitled cut-in",
         "panelTitleWith": "Cut-in : {{name}}",
         "selectImageTitle": "Select image",
@@ -1425,7 +1445,8 @@
         "emptyEntry": "(no entries)",
         "palettePlaceholder": "Enter the dice table, one entry per line...",
         "save": "Save",
-        "delete": "Delete"
+        "delete": "Delete",
+        "deleteConfirm": "Delete the dice table \"{{name}}\"? It disappears from everyone's list and cannot be brought back."
       },
       "message": {
         "rolled": "{{who}} rolled {{name}} → {{face}}",
@@ -1464,7 +1485,8 @@
         "trouble_notPicture": "That could not be read as a picture.",
         "trouble_tooLarge": "Pictures over 8 MB cannot be used.",
         "trouble_unstored": "The picture could not be kept in this browser.",
-        "trouble_notAllowed": "Guests cannot put a picture on their dice."
+        "trouble_notAllowed": "Guests cannot put a picture on their dice.",
+        "trouble_removed": "The GM deleted this picture from the room."
       }
     },
     "effect": {
@@ -1756,6 +1778,16 @@
       "advanceRoundAnnounce": "The round was moved on.",
       "undoAnnounce": "The turn was put back one step.",
       "acted": "Acted",
+      "held": "Waiting to step in",
+      "hold": "Hold",
+      "holdCurrent": "Have the piece whose turn it is wait, to step in later",
+      "interrupt": "Step in",
+      "holdAnnounce": "{{name}} holds back for now.",
+      "holdAnnounceUnseen": "Someone unseen holds back for now.",
+      "interruptAnnounce": "{{name}} steps in and acts.",
+      "interruptAnnounceUnseen": "Someone unseen steps in and acts.",
+      "resumeAnnounce": "Back to {{name}}'s turn.",
+      "resumeAnnounceUnseen": "Back to the turn of someone unseen.",
       "undo": "Step back",
       "retreatRound": "Take the round back",
       "retreatRoundAnnounce": "Back to round {{n}}.",
@@ -1946,7 +1978,12 @@
         "hide": "Hidden",
         "nonTalk": "Don't speak",
         "pieceSetting": "Piece settings",
-        "specifyKomaHeight": "Specify piece height",
+        "specifyKomaSize": "Set the piece image size",
+        "komaWidth": "Width",
+        "komaHeight": "Height",
+        "komaKeepAspect": "Keep proportions",
+        "komaAspectLinked": "Proportions are kept. Press to change the width and height apart",
+        "komaAspectUnlinked": "The width and height are set apart. Press to go back to the image's proportions",
         "altitude": "Altitude",
         "altitudeUnit": "cells",
         "seatHeight": "Rider height",
@@ -2007,6 +2044,10 @@
         "filterSettings": "Filtering and display settings",
         "sortOrder1": "Sort 1st",
         "sortOrder2": "Sort 2nd",
+        "sortOrderN": "Sort #{{n}}",
+        "addSortKey": "Add a sort",
+        "removeSortKey": "Remove this sort",
+        "sortByName": "Name",
         "tagPlaceholder": "Tag name",
         "asc": "Ascending",
         "desc": "Descending",
@@ -2018,6 +2059,9 @@
         "delete": "Delete",
         "hideInInventory": "Hide in inventory",
         "showInInventory": "Show in inventory",
+        "resourceSliders": "Sliders",
+        "resourceSlidersShowAll": "Show every resource slider",
+        "resourceSlidersHideAll": "Hide every resource slider",
         "cancel": "Cancel",
         "menu": "Menu",
         "emptyMessage": "{{name}} inventory is empty",
@@ -2032,6 +2076,9 @@
         "filterPanelTitle": "Search and display settings",
         "filterNone": "Nothing narrowed",
         "displayItemsHint": "Name a registered state and that column becomes a box to tick",
+        "displayCandidates": "Suggest",
+        "displayCandidatesTitle": "Pick from the items the characters on the table have",
+        "displayCandidatesEmpty": "No characters on the table",
         "inventoryVisibility": "Visibility",
         "viewRound": "Round",
         "showParts": "Strips to show",
@@ -2042,7 +2089,13 @@
         "displayItemsRich": "Display items (full)",
         "displayItemsTable": "Display items (table)",
         "foldsOnOpen": "Open with the folders folded up",
-        "foldsOnOpenHint": "Takes effect on the next inventory opened. Pieces in no folder are shown as before"
+        "foldsOnOpenHint": "Takes effect on the next inventory opened. Pieces in no folder are shown as before",
+        "searchBar": "Show a search box above the list",
+        "compact": "Fold up the rows of the Full view",
+        "compactHint": "Rows not picked show only the name and bars for number resources. Pick a row to change its values.",
+        "roundInPlay": "Show the round controls only once a round has begun",
+        "roundInPlayHint": "Before then, ▶ beside the tabs begins it. With the tabs put away they show as usual.",
+        "beginRound": "Begin the round"
       },
       "portraitFit": {
         "frameBust": "Head and shoulders",
@@ -2199,6 +2252,13 @@
         "pasteWithKeys": "The browser did not hand the clipboard over. Click this list and press Ctrl+V",
         "editImage": "Edit",
         "editImageHint": "Edits the one ticked picture and puts the result in its place, wherever it is used",
+        "remove": "Delete",
+        "removeHint": "Delete the checked images from the room, for the other players too. Anyone but the GM can delete only images they added",
+        "lockedTag": "A tag kept to one person: only they and the GM see it",
+        "lockTag": "Keep to myself",
+        "unlockTag": "Stop keeping to myself",
+        "lockTagHint": "Show this tag's images only to you and the GM. They no longer appear in anyone else's image lists or pickers. Images already on the table are still seen by everyone",
+        "tagKeptByOther": "Someone else keeps that tag to themselves. Choose another name",
         "clearBackground": "Clear background",
         "clearBackgroundHint": "Adds a copy of the one ticked picture with its background cleared",
         "addImage": "Add images",
@@ -2236,6 +2296,22 @@
         "audioLimit": "sounds up to {{mb}} MB",
         "imageLimit": "images up to {{mb}} MB",
         "separator": ", "
+      },
+      "removal": {
+        "imageTitle": "Delete images",
+        "imageConfirm": "Delete {{count}} image(s) from the room. They disappear for the other players too.",
+        "imageRemoved": "Deleted {{count}} image(s)",
+        "audioTitle": "Delete sounds",
+        "audioConfirm": "Delete {{count}} sound(s) from the room. They disappear for the other players too, and stop if playing.",
+        "audioRemoved": "Deleted {{count}} sound(s)",
+        "uses": "They are used in {{uses}} place(s) in the room.",
+        "restore": "This cannot be undone. If the GM adds the same file again, it comes back wherever it was used.",
+        "ok": "Delete",
+        "imageRefused": "This image was deleted from the room. Only the GM can add it again.",
+        "audioRefused": "This sound was deleted from the room. Only the GM can add it again.",
+        "notRemovable": "Bundled files, files linked by URL and system-reserved images cannot be deleted.",
+        "notYours": "You cannot delete what someone else added. Only the person who added it, or the GM, can.",
+        "othersKept": "{{count}} added by someone else will be kept."
       },
       "multipart": {
         "title": "Create part tokens",
@@ -2312,6 +2388,16 @@
         "disclosureGroup": "Visibility and owner",
         "putAwayGroup": "Put away",
         "conditionGroup": "State of the piece",
+        "stealth": "Stealth (only the GM, the owner and their party see it)",
+        "resourceSliders": "Resource sliders",
+        "resourceSlidersShowAll": "Show them all",
+        "resourceSlidersHideAll": "Hide them all",
+        "battle": "Battle cut-in",
+        "battlePlay": "Attack with this piece",
+        "battleEffect": "Choose attack effect…",
+        "battleSide_left": "Put on the left",
+        "battleSide_right": "Put on the right",
+        "battleSide_none": "Leave out of the lineup",
         "splitParts": "Split into parts",
         "unlinkPart": "Unlink this part",
         "linkSelected": "Link selected characters",
@@ -2453,7 +2539,10 @@
       "moveMode_climb": "Climbing",
       "moveMode_swim": "Swimming",
       "moveMode_crawl": "Crawling",
-      "moveMode_fly": "Flying"
+      "moveMode_fly": "Flying",
+      "stealth": {
+        "mark": "In stealth (only the GM, its owner and their party can see it)"
+      }
     },
     "light": {
       "contextMenu": {
@@ -2877,6 +2966,8 @@
         "snapVertex": "Vertex",
         "snapBoth": "Cell + vertex",
         "snapAll": "Cell + vertex + edge",
+        "snapGrid": "Grid",
+        "snapGridHint": "Snaps to each cell, as Cell does. With one square for moves and ranges at 2×2 or more, pieces stay on the cell they are put down on instead of going to the middle of the square, and Strict movement can aim at any cell of the square too. Moves and ranges are still counted in squares.",
         "sectionDisplay": "Display mode",
         "cellDistance": "One cell stands for",
         "sectionDarkness": "Darkness (vision & lighting)",
@@ -2897,7 +2988,7 @@
         "cellSize": "Cell size (px)",
         "squareSpan": "One square for moves and ranges",
         "squareSpanOption": "{{span}}×{{span}} cells",
-        "squareSpanHint": "At 2×2 or more, moves, paths, ranges and zones of control count this many cells as one square, and pieces stop in the middle of a square. Square grids only.",
+        "squareSpanHint": "At 2×2 or more, moves, paths, ranges and zones of control count this many cells as one square, and pieces stop in the middle of a square, or with the Grid snap, on any cell inside it. Square grids only.",
         "cellSizeHint": "Changing it moves what is on the table so that it stays on the same cells.",
         "showWall": "Show",
         "imageNorthWall": "North wall",
@@ -3325,9 +3416,6 @@
       "controllerResourcesHintAll": "Every value and resource the pieces in this room carry, by name. All of them are shown now. One you turn off leaves both the resource buttons and the piece cards of the remote.",
       "controllerResourcesHintPicked": "The remote shows only the items picked here. An item added to a sheet later stays off until it is picked.",
       "controllerResourcesEmpty": "No piece in the room carries a value or a resource.",
-      "sectionPieceGauges": "Resources shown over pieces",
-      "pieceGaugesHint": "The picked resources show as a bar over every piece in the room, including pieces placed later. To change one piece, switch \"Show a bar on the piece\" in that resource's settings; it takes priority.",
-      "pieceGaugesEmpty": "No piece in the room has a resource with a maximum.",
       "facingMark": "Which way a piece faces",
       "facingMark_none": "Do not show",
       "facingMark_turn": "Turn the picture",
@@ -3395,6 +3483,9 @@
       "sectionScreenAndWindows": "The screen and its windows",
       "sectionView3d": "Seen along the table",
       "imageBillboard": "Keep piece images facing the reader",
+      "sectionSheet": "Character sheets",
+      "resourceSliderByDefault": "Give number resources a slider by default",
+      "resourceSliderByDefaultHint": "A resource set to show or not show its own slider keeps to that. A piece's menu can switch every resource of the piece at once, under Display and handling.",
       "tickerHint": "Runs a line sent with the ticker button in the chat input around the four edges of the screen.",
       "sectionMeasure": "Measuring this screen",
       "measureHint": "Measures this screen against an ID-1 card. What is measured stays on this screen for this session alone.",
@@ -3413,7 +3504,7 @@
       "wipeBrowserData": "Erase all data in this browser",
       "wipeBrowserDataHint": "Erases everything kept in this browser, such as your settings, the room's automatic saves and recorded replays, then reloads the page. Try it when something keeps looking or acting wrong. This cannot be undone.",
       "wipeConfirmTitle": "Erase all data in this browser?",
-      "wipeConfirmMessage": "The following will be erased and the page reloaded. This cannot be undone.\n- Your settings (display, volumes, skins, widget layout and so on)\n- The room's automatic saves and recorded replays\n- The pictures for your dice and skins\n- Your login to the room server, and what takes you back to the same seat when the page reloads\n\nReloading takes you out of the current room for now. If you came in through an invite link, it takes you back in: through SkyWay as someone else, your hand and the GM's role staying with your old seat, and on a room server as a guest until you log in again. If you came in from the lobby, you are left outside the room. Through SkyWay or offline, if you are playing alone, anything in the room you have not saved is lost too.\nIf the app is open in other tabs, close them first.",
+      "wipeConfirmMessage": "The following will be erased and the page reloaded. This cannot be undone.\n- Your settings (display, volumes, skins, widget layout and so on)\n- The room's automatic saves and recorded replays\n- The room this browser starts on\n- The pictures for your dice and skins\n- Your login to the room server, and what takes you back to the same seat when the page reloads\n\nReloading takes you out of the current room for now. If you came in through an invite link, it takes you back in: through SkyWay as someone else, your hand and the GM's role staying with your old seat, and on a room server as a guest until you log in again. If you came in from the lobby, you are left outside the room. Through SkyWay or offline, if you are playing alone, anything in the room you have not saved is lost too.\nIf the app is open in other tabs, close them first.",
       "wipeConfirmOk": "Erase all and reload",
       "hostilityBy": "How the sides are told apart",
       "hostilityBy_npc": "By whom the master runs",
@@ -3423,6 +3514,29 @@
       "squeezes": "Let an oversized piece squeeze through a gap too small for it, at a step apiece",
       "jumpCells": "How far one leap carries, in cells (0 carries as far as the move has left)",
       "tab_stamp": "Stamps",
+      "tab_notice": "Notices",
+      "sectionNotices": "Where system notices go",
+      "notices": {
+        "hint": "Choose which tab each kind of notice the system writes into the chat goes to. If the chosen tab is deleted, it goes to the default again.",
+        "default_main": "Default (leftmost tab)",
+        "default_system": "Default (system tab)",
+        "off": "Do not send",
+        "openFromRound": "Choose where notices go",
+        "kind_round": "Round and turn progress",
+        "kindHint_round": "Rounds starting and ending, turns, buffs running out or swept off",
+        "kind_diceReveal": "Dice revealed on the table",
+        "kindHint_diceReveal": "The face of a hidden die when it is opened",
+        "kind_trigger": "Triggers",
+        "kindHint_trigger": "A trigger set on a cell going off. A hidden trigger stays secret",
+        "kind_movement": "Movement, engagement zones and riding",
+        "kindHint_movement": "Entering and leaving engagement zones, interrupts, battle placement, mounting and dismounting",
+        "kind_card": "Cards",
+        "kindHint_card": "Dealing, drawing, handing over and discarding pairs",
+        "kind_bgm": "BGM playback settings",
+        "kindHint_bgm": "Turning shuffle and repeat on and off",
+        "kind_room": "Connection and room upkeep",
+        "kindHint_room": "Reconnecting, a role change refused, a full sync, a room imported"
+      },
       "stampUse_line": "Stamps as lines",
       "stampUse_reaction": "Reactions",
       "stampUseOn_line": "Let stamps be sent as lines",
@@ -3435,6 +3549,9 @@
       "moveKindsHint": "Rows of \"name:factor:cap (m)\" separated by commas. Movement is multiplied by the factor, and a kind with a cap goes no further than that. Leave the cap empty for none. The first kind is the default, and another can be chosen from the band while a move is worked out. Leave empty for a single kind that goes as far as the movement says.",
       "pathMove": "Draw the way as straight legs on a table with no grid",
       "pathMoveHint": "On a table with no grid, a move is worked out as a way of straight legs measured in metres instead of in cells. Terrain and engagement zones stop it as they do on a grid. Tables with a grid move as before.",
+      "sectionPieceGauges": "Resources shown over pieces",
+      "pieceGaugesHint": "The picked resources show as a bar over every piece in the room, including pieces placed later. To change one piece, switch \"Show a bar on the piece\" in that resource's settings; it takes priority.",
+      "pieceGaugesEmpty": "No piece in the room has a resource with a maximum.",
       "sectionHandCards": "Hand cards",
       "allowsHandDraw": "Allow drawing a card from another participant's hand",
       "allowsHandGive": "Allow giving a card to another participant",
@@ -3568,6 +3685,27 @@
       "matColor": "Mat colour",
       "matHint": "What the dice roll on in a chat frame. A picture is laid over the colour. Only this screen sees the mat; nobody else’s changes."
     },
+    "moderation": {
+      "report": {
+        "title": "Report to the operator",
+        "leadAsset": "Report \"{{name}}\" to the room server's operator.",
+        "leadRoom": "Report this room, \"{{name}}\", to the room server's operator.",
+        "reason": "Reason",
+        "reasonPlaceholder": "Say what is wrong (up to {{max}} characters)",
+        "note": "Your connection and account details are sent with the report, so the operator can tell false reports apart.",
+        "send": "Send",
+        "cancel": "Cancel",
+        "close": "Close",
+        "taken": "Your report was received. Reference: {{id}}",
+        "trouble_unsupported": "This room server does not take reports.",
+        "trouble_rateLimited": "Too many reports. Please wait a while before sending another.",
+        "trouble_refused": "This report could not be taken. Please rewrite the reason.",
+        "trouble_failed": "The report could not be sent. Check your connection and try again.",
+        "imageButton": "Report this image to the operator",
+        "audioButton": "Report this sound to the operator",
+        "roomButton": "Report this room to the operator"
+      }
+    },
     "lobby": {
       "peerMenu": {
         "changeIcon": "Change icon",
@@ -3575,6 +3713,8 @@
         "id": "ID:",
         "roomName": "Room:",
         "password": "Password:",
+        "showPassword": "Show password",
+        "hidePassword": "Hide password",
         "reconnect": "Reconnect",
         "fullSync": "Re-sync room data",
         "fullSyncHint": "Use this when objects or chat differ from what others see. The connection stays up.",
@@ -3592,7 +3732,6 @@
         "inviteIncludePassword": "Include password",
         "inviteCopy": "Copy",
         "inviteCopied": "Copied",
-        "inviteCopyFailed": "Could not copy. Copy the selected link with Ctrl+C (⌘+C on a Mac)",
         "inviteOverlay": "For streaming (transparent)",
         "inviteOverlayHint": "Makes a URL for an OBS browser source: no table, no panels — just speech and turns on a transparent background",
         "connectionMode": "Connection",
@@ -3608,7 +3747,8 @@
         "inviteFailed": "The room server gave no invitation. Please open this again later.",
         "inviteExpires": "This invitation works until {{date}}. It sets the role of someone logged in on their first visit.",
         "deleteRoom": "Delete room",
-        "deleteRoomHint": "Everyone in the room leaves, and the room is removed from the server. Only a GM of the room can delete it."
+        "deleteRoomHint": "Everyone in the room leaves, and the room is removed from the server. Only a GM of the room can delete it.",
+        "inviteCopyFailed": "Could not copy. Copy the selected link with Ctrl+C (⌘+C on a Mac)"
       },
       "lobby": {
         "title": "Lobby",
@@ -3619,7 +3759,7 @@
         "pw": "PW",
         "participants": "Members",
         "connect": "Join",
-        "peopleSuffix": "",
+        "peopleCount": "{{count}}",
         "alreadyConnected": "Disconnect from other peers before joining another room.",
         "alreadyConnectedHint": "(Use \"Leave the room\" below to disconnect.)",
         "alreadyInRoomServer": "You cannot enter another room while you are in one.",
@@ -3634,6 +3774,7 @@
         "hintNoBackend": "No server is configured (backend.url in config.json)",
         "createRoomAfterLogin": "Log in to create a room",
         "deleteRoom": "Delete room",
+        "hintBanned": "The room server's operator has blocked this connection.",
         "lastRoom": "Last room"
       },
       "roomSetting": {
@@ -3656,7 +3797,9 @@
         "alreadyInRoomServer": "You cannot create a room while you are in one.",
         "defaultRoomName": "My room",
         "createFailed": "The room could not be created ({{reason}})",
-        "loginRequired": "Creating a room needs a login."
+        "loginRequired": "Creating a room needs a login.",
+        "paused": "The room server's operator has stopped making rooms for now. Please try again later.",
+        "banned": "The room server's operator has blocked this account or connection, so it cannot make rooms."
       },
       "passwordCheck": {
         "title": "Password",
@@ -3696,7 +3839,8 @@
         "roomServerNoBackend": "No server is configured (backend.url in config.json)",
         "roomServerRefused": "The room server refused the connection ({{code}})",
         "roomServerUnauthorized": "Your login expired, or you logged in as someone else. Please join the room again.",
-        "roomServerDeleted": "The room's GM deleted the room"
+        "roomServerDeleted": "The room's GM or the room server's operator deleted the room",
+        "roomServerBanned": "The room server's operator has blocked this account or connection, so you cannot be in the room."
       },
       "deleteRoom": {
         "confirmTitle": "Delete room",
@@ -3739,6 +3883,7 @@
         "joining": "Joining \"{{roomName}}\"…",
         "notFound": "\"{{roomName}}\" was not found",
         "failed": "Could not join \"{{roomName}}\"",
+        "banned": "Cannot join \"{{roomName}}\". The room server's operator has blocked this connection.",
         "offline": "You are offline, so you cannot join \"{{roomName}}\". To join, switch to online in the connection panel",
         "openLobby": "Open lobby",
         "dismiss": "Dismiss",
@@ -3758,15 +3903,17 @@
         "deleteFailed": "The account could not be deleted. Please try again later.",
         "deleteFailedLoggedOut": "Could not delete the account. Log in again, then delete it once more.",
         "guestHint": "Without logging in you join as a guest. Log in to create rooms and move things on the table.",
-        "forgotHint": "Forgot your Discord password? Scan the QR code on the login page with the Discord app on your phone to sign in without it, or reset it from \"Forgot your password?\"",
         "unavailable": "This server offers no login, so it has no rooms.",
         "errors": {
           "denied": "The login was cancelled.",
           "providerFailed": "Talking to Discord failed. Please try again later.",
           "rateLimited": "Too many login attempts. Please wait a while.",
           "network": "The login server cannot be reached.",
-          "retry": "Please log in again."
-        }
+          "retry": "Please log in again.",
+          "banned": "The room server's operator has blocked this account or connection.",
+          "paused": "The room server's operator has stopped new logins for now. Please try again later."
+        },
+        "forgotHint": "Forgot your Discord password? Scan the QR code on the login page with the Discord app on your phone to sign in without it, or reset it from \"Forgot your password?\""
       },
       "idle": {
         "soon": "Nothing has been done here for a while, so you will soon leave the room. Use the page a little to stay.",
@@ -3792,6 +3939,17 @@
         "title": "This table holds withheld parts",
         "message": "The table on screen holds things a room server handed over only in their withheld shape (cards whose face you cannot see, others' dice faces, blacked-out notes, the contents of secret rolls and so on). Going into a room now spreads the table there in that shape. Saves taken on this screen after going in, as the GM too, ask before they are loaded; saves others in the room take hold the withheld shapes without asking.",
         "ok": "Go in anyway"
+      },
+      "operatorContact": {
+        "label": "Contact:",
+        "open": "Contact",
+        "chat": "The room server operator's contact: {{contact}}"
+      },
+      "uploads": {
+        "paused": "The room server's operator has stopped putting up pictures and sounds for now. What you add now reaches the other players only once that is over.",
+        "resumed": "Pictures and sounds can be put up again. What was held back now reaches the other players too.",
+        "blocked": "There is a picture or sound the room server's operator has barred. It does not reach the other players.",
+        "roomFull": "The room's storage is full, so the pictures and sounds you add are not kept in the room. Those here now get them, but nobody who joins later will."
       }
     },
     "chat": {
@@ -3871,6 +4029,36 @@
         "stamp": "Send a stamp (with what you have typed, if anything)",
         "speakerWhole": "Whole",
         "speakerPartHint": "Speak as one part. \"Whole\" speaks under the name and picture from before it was split"
+      },
+      "decoration": {
+        "title": "Text decoration",
+        "button": "Style",
+        "bold": "Bold",
+        "italic": "Italic",
+        "strike": "Strikethrough",
+        "size": "Size",
+        "small": "Small",
+        "large": "Large",
+        "huge": "Huge",
+        "font": "Font",
+        "mincho": "Mincho",
+        "rounded": "Rounded",
+        "hand": "Handwriting",
+        "pop": "Pop",
+        "pixel": "Pixel",
+        "gothic": "Gothic (the usual font)",
+        "color": "Color",
+        "red": "Red",
+        "orange": "Orange",
+        "yellow": "Yellow",
+        "green": "Green",
+        "cyan": "Cyan",
+        "blue": "Blue",
+        "purple": "Purple",
+        "pink": "Pink",
+        "gray": "Gray",
+        "white": "White",
+        "black": "Black"
       },
       "tab": {
         "unnamedCharacter": "Unnamed character",
@@ -4435,9 +4623,13 @@
       "cutInPlay": "Play for everybody",
       "cutInsEmpty": "No cut-ins",
       "portraitPattern": "Portrait pattern",
+      "portraitPrevious": "Previous portrait",
+      "portraitNext": "Next portrait",
       "flip": "Flip portrait",
       "seAttach": "Play with next message",
       "seAttached": "Plays with the next message",
+      "seDetach": "Don't play with the next message",
+      "controls": "Message options",
       "edit": {
         "title": "Edit",
         "save": "Save",
@@ -4743,6 +4935,8 @@
         "visible": "Visible",
         "locked": "Locked",
         "opacity": "Opacity",
+        "raise": "Move up",
+        "lower": "Move down",
         "delete": "Delete",
         "deleteConfirm": "Delete this layer?",
         "kinds": {
@@ -4813,7 +5007,25 @@
         "restoreConfirm": "Load the snapshot from {{savedAt}}? The current room data will be overwritten.",
         "removeConfirm": "Delete the snapshot from {{savedAt}}?",
         "clearConfirm": "Delete all stored snapshots?"
-      }
+      },
+      "startRoom": {
+        "kept": "This browser will start on this room from now on.",
+        "keepFailed": "The room to start on could not be kept.",
+        "unsupported": "This browser cannot keep a room to start on.",
+        "replaceTitle": "Replace the room to start on?",
+        "replaceMessage": "The room this browser starts on now will be replaced with this one.",
+        "replaceOk": "Replace",
+        "forgetTitle": "Start on the sample room again?",
+        "forgetMessage": "The room kept to start on will be removed, and the next start sets out the sample table and pieces.",
+        "forgetOk": "Remove it",
+        "forgotten": "The next start sets out the sample room.",
+        "loadFailed": "The room to start on could not be read, so the sample room was set out instead.",
+        "forgetFailed": "The room to start on could not be removed.",
+        "withheld": "A table holding things a room server withheld from you cannot be the room you start on.",
+        "backAfterJoin": "The room could not be joined, so the room to start on was set out again. Changes not kept are not back.",
+        "whileJoining": "The room cannot be kept to start on while a room is being joined."
+      },
+      "restoreUnreadable": "The room in this snapshot could not be read."
     },
     "mobile": {
       "menu": "Menu",
@@ -4939,7 +5151,13 @@
         "boardStop": "Give it back",
         "boardConfirm": "This shows the recorded board. Your table is held aside and restored when you leave, and nothing you do meanwhile reaches the other players. Continue?",
         "timeline": "How busy each moment was. Drag to move through it",
-        "chapter": "Chapter"
+        "chapter": "Chapter",
+        "toStart": "To the start",
+        "previous": "Previous",
+        "play": "Play",
+        "pause": "Pause",
+        "next": "Next",
+        "toEnd": "To the end"
       },
       "editor": {
         "begin": "Edit",
@@ -5528,7 +5746,8 @@
         "spawn": "Call up pieces",
         "showTable": "Switch the table",
         "carry": "Carry the presser's piece",
-        "tableSetting": "Change table settings"
+        "tableSetting": "Change table settings",
+        "battle": "Battle cut-in"
       },
       "delay": "Wait (s)",
       "moveUp": "Move up",
@@ -5619,7 +5838,8 @@
         "keep": "Leave as is",
         "on": "On",
         "off": "Off"
-      }
+      },
+      "battleHint": "Plays a battle cut-in for everyone with the pieces the GM put on the left and right. The attacker is, of the pieces in the lineup, the one whose turn it is, then the presser's piece, then the first on the left."
     },
     "soundSettings": {
       "ownHeading": "Your volume",
@@ -5740,6 +5960,59 @@
       "offerActionUp_rider": "Get up and ride",
       "offerActionUp_passenger": "Get up and ride behind",
       "offerActionUp_cargo": "Get up and be loaded"
+    },
+    "battleCutIn": {
+      "title": "Battle cut-in",
+      "defeated": "Defeated",
+      "close": "Close",
+      "shownHere": "Show battle cut-ins on this screen",
+      "shownHereHint": "This applies to your screen only. When it is off, you see the attack and defeat effects on the table instead.",
+      "playHeading": "Play",
+      "bout": "Attacker: {{attacker}} → {{defenders}}",
+      "boutByTurn": "Attacker: {{attacker}} (their turn) → {{defenders}}",
+      "noLineup": "Put pieces on both the left and the right to play.",
+      "playForRoom": "Play for everyone",
+      "playHere": "Preview on my screen",
+      "otherWays": "You can also play it with 《vs》 in the chat, the remote controller, a switch, or a piece's context menu.",
+      "watcherPlaysHere": "While watching, you can play it on your own screen only.",
+      "lineupHeading": "Lineup",
+      "lineupHint": "The GM splits the pieces on the table into left and right. When the lineup is played, the piece whose turn it is attacks if it stands in the lineup, and the pieces on the other side (up to 4) take the blow.",
+      "left": "Left",
+      "right": "Right",
+      "removeFromLineup": "Remove from the lineup",
+      "onTable": "Pieces on the table",
+      "toLeft": "To left",
+      "toRight": "To right",
+      "effectHeading": "Attack effect of a piece",
+      "effectHint": "An attack that names no effect plays the effect set on the piece. Without one, an effect that suits the amount of damage or healing plays.",
+      "piece": "Piece",
+      "effect": "Effect",
+      "stageEffect": "(None)",
+      "noPieces": "There are no pieces on the table.",
+      "roomHeading": "Room settings",
+      "roomMasterOnly": "Only the GM can change these.",
+      "defeatOn": "Play a defeat effect when the resource reaches 0",
+      "defeatResource": "Resource",
+      "defeatResourceHint": "e.g. HP",
+      "defeatEffect": "Defeat effect",
+      "defaultDefeatEffect": "Default (崩壊)",
+      "stage": "Stage",
+      "genre": {
+        "fantasy": "Fantasy",
+        "modern": "Modern",
+        "horror": "Horror",
+        "cyberpunk": "Cyberpunk",
+        "mecha": "Mecha"
+      },
+      "time": {
+        "night": "Night",
+        "day": "Day"
+      },
+      "themeLabel": "{{genre}} ({{time}})",
+      "pictures": "Room pictures",
+      "addPicture": "Add picture",
+      "removePicture": "Remove “{{name}}”",
+      "picturesHint": "Pictures added here can be chosen as the stage, up to {{limit}}."
     }
   },
   "app": {
@@ -5783,6 +6056,8 @@
       "save": "Save",
       "saveLoad": "Save & load",
       "importCharacter": "Import Character",
+      "startRoomKeep": "Start on this room",
+      "startRoomForget": "Start on the sample room again",
       "roomSnapshot": "Auto save / restore",
       "createObject": "Create a piece",
       "replay": "Replay",
@@ -5853,7 +6128,7 @@
       "maxLimit": "Max limit",
       "minLimit": "0 lower limit",
       "slotSectionTitle": "Slot",
-      "slotNameSeparator": " ",
+      "slotName": "{{name}} {{slot}}",
       "slotNow": "current",
       "slotMax": "maximum",
       "slotMaxBase": "max base",
@@ -5881,7 +6156,11 @@
       "mobileResourceTab": "Resources",
       "mobileTargetSummary": "{{count}} target(s): {{names}}",
       "mobileNoTarget": "No target selected. Pick one under \"Targets\".",
-      "mobileAppliesTo": "Applies to the {{count}} selected"
+      "mobileAppliesTo": "Applies to the {{count}} selected",
+      "battleOnChange": "Also show on the battle cut-in",
+      "battlePlay": "Battle cut-in",
+      "battlePlayHint": "Plays a battle cut-in for everyone, with this remote's character attacking the targets. Without targets, it attacks the pieces on the other side of the lineup.",
+      "battleNoBout": "The battle cut-in cannot be played. Choose targets, or ask the GM to set up the lineup."
     }
   },
   "feature.alarm": {
@@ -5933,7 +6212,7 @@
     "rollCallFinish": "Roll call finished ({{voted}}/{{total}})",
     "voteFinish": "Vote finished ({{title}})",
     "tallyEntry": "{{choice}}: {{count}}",
-    "peopleSuffix": "",
+    "peopleCount": "{{count}}",
     "minimize": "Minimize",
     "expand": "Open",
     "absentAction": "Mark absent",
@@ -5999,6 +6278,8 @@
       "pieceGauge": "Show a bar on the piece",
       "resourceSlider": "Slider",
       "gaugeInverted": "Negative resource",
+      "overResource": "Over-resource",
+      "overResourceHint": "Lets the current value go over the maximum, so a temporary bonus can be tracked with the maximum as the value it returns to",
       "changeEffect": "Effect on change",
       "changeSound": "Sound on change",
       "changeSoundSet": "Sound type",
@@ -6140,9 +6421,9 @@
       "overLimit": "This picture is {{size}}MB, over the 2MB limit. Adding it converts it to a lighter format; if it still does not fit, crop it or lower the output size",
       "editFirst": "Edit before adding",
       "editFirstHint": "When ticked, each picture chosen opens in the editor before it is added. A picture over 2MB opens in the editor either way",
+      "saveFailed": "The picture could not be stored. Please try again",
       "shrinkLarge": "Shrink large pictures",
-      "shrinkLargeHint": "Pictures longer than 2560px are scaled down and stored as WebP as they are added. Everyone at the table receives the same smaller file, which helps players on slow connections. Pictures already in the room and those in save data are left as they are",
-      "saveFailed": "The picture could not be stored. Please try again"
+      "shrinkLargeHint": "Pictures longer than 2560px are scaled down and stored as WebP as they are added. Everyone at the table receives the same smaller file, which helps players on slow connections. Pictures already in the room and those in save data are left as they are"
     },
     "fileSelecter": {
       "panelTitle": "Files",
@@ -6175,6 +6456,10 @@
     "panel": {
       "menuTitle": "Menu",
       "rotate90": "Rotate 90° clockwise",
+      "minimize": "Minimize",
+      "restore": "Restore",
+      "fullScreen": "Full screen",
+      "close": "Close",
       "transparency": "Transparency",
       "ghost": "Ghost mode",
       "tabClose": "Close this panel"

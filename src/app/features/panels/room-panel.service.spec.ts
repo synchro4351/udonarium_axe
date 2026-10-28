@@ -3,11 +3,11 @@ import { TestBed } from '@angular/core/testing';
 import { PanelOption, PanelService } from '@axe/application/ui/panel.service';
 import { RoomPanelName } from '@axe/domain/ui/room-panel';
 import { DiceTableSettingComponent } from '@axe/features/dice/dice-table-setting/dice-table-setting.component';
+import { DungeonGeneratorComponent } from '@axe/features/dungeon-generator/dungeon-generator.component';
 import { MapEditorPanelComponent } from '@axe/features/map-editor/editor/map-editor-panel.component';
 import { StampPackListComponent } from '@axe/features/media/stamp-pack-list/stamp-pack-list.component';
 import { PanelWindowRequest, PanelWindowService } from '@axe/features/panels/panel-window.service';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
-import { DungeonGeneratorComponent } from '@axe/features/tabletop/dungeon-generator/dungeon-generator.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
 describe('RoomPanelService', () => {
@@ -43,6 +43,17 @@ describe('RoomPanelService', () => {
 
     expect(option().controls?.map((control) => control.icon)).toEqual(['open_in_new']);
     expect(option().windowed).toBe(false);
+  });
+
+  it('shows the button only while this browser lets a panel out, as that can change once a mouse is seen', () => {
+    const supported = vi.spyOn(TestBed.inject(PanelWindowService), 'isSupported', 'get').mockReturnValue(false);
+    service.open('cutInList');
+    const control = option().controls![0];
+    expect(control.shown?.()).toBe(false);
+
+    supported.mockReturnValue(true);
+
+    expect(control.shown?.()).toBe(true);
   });
 
   it('does nothing when the button travelled to a window with the panel it was made for', () => {
@@ -99,6 +110,13 @@ describe('RoomPanelService', () => {
     service.open('inventory');
 
     expect(option().minimizeToContent).toBeFalsy();
+  });
+
+  it('opens a panel without a place of its own clear of the toolbars along the top, each next one a step lower', () => {
+    service.open('diceTableSetting');
+    service.open('statusAilment');
+
+    expect(openLazy.mock.calls.map(([, given]) => (given as PanelOption).top)).toEqual([64, 84]);
   });
 
   it('loads the dice table settings, so the menu and the chat window open the same panel', async () => {

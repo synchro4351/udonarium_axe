@@ -1,8 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { LOGIN_CALLBACK_PATH, ServerAuthService } from '@axe/application/lobby/server-auth.service';
 import { Network } from '@axe/core/network/network';
-import { LOGIN_CHANNEL, LOGIN_STORAGE_KEY, ServerLogin } from '@axe/core/network/server/server-login';
+import { LOGIN_CHANNEL, ServerLogin, ServerLoginError } from '@axe/core/network/server/server-login';
 import { Account } from '@axe/core/network/server/server-protocol';
+import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
 
 const ACCOUNT: Account = { userId: 'acct_1234', name: 'Kai', avatarUrl: null };
 
@@ -94,6 +95,15 @@ describe('ServerAuthService', () => {
     expect(service.isLoggedIn()).toBe(false);
   });
 
+  it('keeps the operator’s contact a login turned away for a ban came back with', async () => {
+    login.finishLogin.mockRejectedValueOnce(new ServerLoginError('banned', 'https://example.com/contact'));
+    history.replaceState(null, '', `${location.pathname}#login_error=banned`);
+    configure();
+
+    await vi.waitFor(() => expect(service.error()).toBe('banned'));
+    expect(service.errorContact()).toBe('https://example.com/contact');
+  });
+
   it('opens the login in a popup that comes back to the landing page', async () => {
     const popup = { location: { href: '' }, closed: false };
     vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
@@ -157,7 +167,7 @@ describe('ServerAuthService', () => {
     configure();
     login.account = ACCOUNT;
 
-    window.dispatchEvent(new StorageEvent('storage', { key: LOGIN_STORAGE_KEY }));
+    window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEYS.serverLogin }));
 
     expect(service.account()).toEqual(ACCOUNT);
   });
@@ -177,7 +187,7 @@ describe('ServerAuthService', () => {
     login.account = unprefixed;
     configure();
     login.account = null;
-    window.dispatchEvent(new StorageEvent('storage', { key: LOGIN_STORAGE_KEY }));
+    window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEYS.serverLogin }));
 
     expect(service.account()).toBeNull();
     expect(service.isAccountUserId(unprefixed.userId)).toBe(true);

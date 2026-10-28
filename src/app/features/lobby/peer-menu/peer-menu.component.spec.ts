@@ -2,20 +2,24 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { encodeI18nMessage } from '@axe/application/i18n/i18n-message';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
-import { RoomDeletionService } from '@axe/application/lobby/room-deletion.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ConfirmService } from '@axe/application/ui/confirm.service';
-import { LOCAL_MODE_STORAGE_KEY, LocalModePreferenceService } from '@axe/application/ui/local-mode-preference.service';
+import { LocalModePreferenceService } from '@axe/application/ui/local-mode-preference.service';
+import { ModalService } from '@axe/application/ui/modal.service';
 import { Network } from '@axe/core/network/network';
 import { setNetworkIsolated } from '@axe/core/network/network-isolation';
 import { localDispatch } from '@axe/core/network/network-messaging';
+import { AssetHttpStore } from '@axe/core/storage/asset-http-store';
 import { loadIdentity, saveIdentity } from '@axe/core/storage/identity-storage';
 import { ImageStorage } from '@axe/core/storage/image-storage';
+import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
 import { ObjectSynchronizer } from '@axe/core/sync/object-synchronizer';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { IdleSeatService } from '@axe/features/lobby/idle-seat.service';
 import { PeerMenuComponent } from '@axe/features/lobby/peer-menu/peer-menu.component';
+import { RoomDeletionService } from '@axe/features/lobby/room-deletion.service';
+import { ReportDialogComponent } from '@axe/features/moderation/report-dialog/report-dialog.component';
 import { RoomArchiveEventHandlerService } from '@axe/features/room-archive/room-archive-event-handler.service';
 import { expectPanelDragRecovery, PanelDragTestHostComponent } from '@axe/testing/panel-drag-recovery';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -318,6 +322,27 @@ describe('PeerMenuComponent', () => {
       vi.restoreAllMocks();
     });
 
+    it('offers any seat in the room to report it to the operator, and opens the report for the room', () => {
+      PeerCursor.myCursor.role = PeerRole.Guest;
+      vi.spyOn(Network.instance, 'peerContext', 'get').mockReturnValue({
+        isRoom: true,
+        roomId: 'Ab3',
+        roomName: '卓',
+        password: '',
+        hasPassword: false,
+      } as never);
+      vi.spyOn(AssetHttpStore.instance, 'isEnabled', 'get').mockReturnValue(true);
+      const opened = vi.spyOn(TestBed.inject(ModalService), 'open').mockResolvedValue(null);
+      fixture.detectChanges();
+
+      const report = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+        '[data-testid="peer-menu-report-room"]'
+      );
+      report!.click();
+
+      expect(opened).toHaveBeenCalledWith(ReportDialogComponent, { target: 'room', name: '卓' });
+    });
+
     it('offers the lobby, where the reader logs in or leaves, however many are in the room', () => {
       vi.spyOn(Network.instance, 'peerIds', 'get').mockReturnValue(['peer-a', 'peer-b', 'peer-c']);
       const lobby = () => (fixture.nativeElement as HTMLElement).querySelector('[data-testid="peer-menu-show-lobby"]');
@@ -344,13 +369,16 @@ describe('PeerMenuComponent', () => {
       vi.spyOn(Network.instance, 'peerIds', 'get').mockReturnValue([]);
       vi.spyOn(Network.instance, 'authorityPeerId', 'get').mockReturnValue('@authority');
       vi.spyOn(ObjectSynchronizer.instance, 'requestFullSync').mockReturnValue(1);
-      const said = vi.spyOn(TestBed.inject(ChatMessageService), 'sendSystemMessage').mockReturnValue(null!);
+      const said = vi.spyOn(TestBed.inject(ChatMessageService), 'sendSystemNotice').mockReturnValue(null);
 
       expect(component.canRequestFullSync).toBe(true);
       expect(component.shouldShowReconnectButton).toBe(true);
       component.requestFullSync();
 
-      expect(said).toHaveBeenCalledWith(encodeI18nMessage('feature.lobby.peerMenu.fullSyncRequestedFromServer'));
+      expect(said).toHaveBeenCalledWith(
+        'room',
+        encodeI18nMessage('feature.lobby.peerMenu.fullSyncRequestedFromServer')
+      );
     });
 
     it('shows your own role as the server gave it, with nothing to press', () => {
@@ -752,7 +780,7 @@ describe('PeerMenuComponent', () => {
       await component.chooseConnectionMode('offline');
 
       expect(TestBed.inject(LocalModePreferenceService).enabled()).toBe(true);
-      expect(localStorage.getItem(LOCAL_MODE_STORAGE_KEY)).toBe('1');
+      expect(localStorage.getItem(STORAGE_KEYS.localMode)).toBe('1');
       expect(letGo).toHaveBeenCalledTimes(1);
       expect(reload).toHaveBeenCalledTimes(1);
     });
