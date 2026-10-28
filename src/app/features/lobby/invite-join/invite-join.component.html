@@ -7,7 +7,7 @@
     <i class="material-icons text-ui-accent text-[20px]" [class.vibration-amine]="isJoining()">
       {{ isJoining() ? 'meeting_room' : 'error_outline' }}
     </i>
-    <span class="min-w-0 text-[0.82rem] break-words" role="status">{{ message() }}</span>
+    <span class="min-w-0 text-[0.82rem] wrap-break-word" role="status">{{ message() }}</span>
     @if (bannedContact(); as contact) {
       <operator-contact class="shrink-0" [contact]="contact" />
     }
