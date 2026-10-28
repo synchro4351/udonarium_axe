@@ -551,17 +551,25 @@
                 }
                 @if (!isPoster() && 0 < imageFile().url.length && labelsInPicture()) {
                   @if (specifyKomaImageFlag() && !imageView.fitsInCell()) {
+                    @let partPictureWidth = komaImageWidthApart();
                     <div
                       class="relative inset-x-0 bottom-0 m-auto align-bottom [-webkit-transform-style:preserve-3d] transform-3d"
                       [appBillboard]="imageView.komaFacing()"
                       [ngStyle]="{
                         height: komaImageHeightSignal() * imageView.supersample() + 'px',
-                        width: 'auto',
+                        width: partPictureWidth === null ? 'auto' : partPictureWidth * imageView.supersample() + 'px',
                         maxWidth: 'none',
                         display: 'inline-block',
                       }"
                     >
-                      <ng-container *ngTemplateOutlet="partPicture; context: { fit: 'h-full w-auto max-w-none' }" />
+                      <ng-container
+                        *ngTemplateOutlet="
+                          partPicture;
+                          context: {
+                            fit: partPictureWidth === null ? 'h-full w-auto max-w-none' : 'size-full max-w-none',
+                          }
+                        "
+                      />
                     </div>
                   } @else if (imageView.fitsInCell()) {
                     <div
@@ -1042,6 +1050,7 @@
     class="image chrome-smooth-image-trick pointer-events-auto block"
     [ngClass]="fit"
     data-testid="part-picture"
+    [class.opacity-50]="inStealth()"
     [style.clip-path]="partClip()"
     [style.filter]="imageEffect().filter"
     [style.--image-effect-filter]="imageEffect().filter"

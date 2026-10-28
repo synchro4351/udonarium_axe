@@ -255,7 +255,7 @@ export class StampPackService {
 
     for (const [identifier, image] of archive.images) {
       if (this.holds(identifier)) continue;
-      await this.imageStorage.addAsync(image);
+      await this.imageStorage.addAsync(image, { putBack: true });
       this.fileAsStamp(identifier);
     }
 
