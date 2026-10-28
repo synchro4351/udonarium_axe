@@ -257,7 +257,8 @@ describe('the cut-ins a new room starts with', () => {
   });
 
   it('leaves nothing behind when the scene ends', () => {
-    for (const cutIn of made()) {
+    // A looping scene starts over instead of ending; the cut-in closing is what clears it.
+    for (const cutIn of made().filter((cutIn) => !cutIn.scene!.sceneLoop)) {
       const scene = cutIn.scene!;
       for (const layer of scene.layers) {
         const frames = toWebAnimationFrames(layer, sceneDurationOf(scene));
@@ -266,6 +267,21 @@ describe('the cut-ins a new room starts with', () => {
         expect(frames[frames.length - 1].opacity).toBe(0);
       }
     }
+  });
+
+  it('lines the samples up with the break screen last', () => {
+    expect(made().map((cutIn) => cutIn.name)).toEqual(['Sample1', 'Sample2', 'Sample_Template', 'Sample_Rest']);
+  });
+
+  it('keeps the break screen up for ten minutes, counting down the time left', () => {
+    const rest = made().find((cutIn) => cutIn.name === 'Sample_Rest')!;
+    const scene = rest.scene!;
+
+    expect(scene.sceneLoop).toBe(true);
+    expect(rest.outTime).toBe(600);
+    expect(scene.layers.some((layer) => layer.text.includes('{remaining'))).toBe(true);
+    // Nothing fades in or out, so the loop shows no seam each time it starts over.
+    expect(scene.layers.every((layer) => !layer.trackSet.opacity)).toBe(true);
   });
 
   it('wipes the band open rather than fading it in', () => {

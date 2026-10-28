@@ -23,6 +23,10 @@ import { PresetSound } from '@axe/domain/media/sound-effect';
  * face is drawn — bands, lines, dots and words — so opening either in the scene editor
  * shows how it was put together, and the face is one field to change.
  *
+ * The fourth is a break screen rather than a summoning: it stays up for the length of the break,
+ * looping, and counts down the time left with `{remaining}`, so it shows what a text layer can be
+ * told to read off the clock.
+ *
  * The identifiers are fixed, so everyone in a room ends up with the same samples rather than
  * a copy each, the way the built-in effects work.
  */
@@ -74,10 +78,14 @@ interface LayerSeed {
   letterSpacingPx?: number;
   fontSizePx?: number;
   fontWeight?: number;
+  fontFamily?: string;
   color?: string;
   textAlign?: CutInTextAlign;
   strokeColor?: string;
   strokeWidthPx?: number;
+  letterMotion?: string;
+  letterIntervalMs?: number;
+  letterDurationMs?: number;
 }
 
 interface SoundSeed {
@@ -94,6 +102,10 @@ interface CutInSeed {
   width: number;
   height: number;
   durationMs: number;
+  /** Whether the scene plays over and over until the cut-in closes. */
+  sceneLoop?: boolean;
+  /** How long the cut-in stays up, in seconds; 0 or left out for as long as the scene runs. */
+  outTimeSec?: number;
   sounds: SoundSeed[];
   layers: LayerSeed[];
 }
@@ -136,6 +148,10 @@ const RIP_OPEN: CutInTrackSet = {
 };
 
 /** The word snapping in at the end of the band, both parts of it together. */
+/** The rounded faces of the break screen, gentler than the bold faces the summonings shout in. */
+const ROUNDED_FONT =
+  '"Hiragino Maru Gothic ProN", "HG丸ｺﾞｼｯｸM-PRO", "M PLUS Rounded 1c", "Kosugi Maru", "Arial Rounded MT Bold", sans-serif';
+
 const WORD_IN: CutInTrackSet = {
   scaleX: [
     { t: 170, v: 0.45, e: 'outBack' },
@@ -493,6 +509,126 @@ export const DEFAULT_CUT_IN_SEEDS: readonly CutInSeed[] = [
       },
     ],
   },
+  {
+    identifier: 'cutInSampleRest',
+    sceneIdentifier: 'cutInSampleRest_scene',
+    name: 'Sample_Rest',
+    width: 640,
+    height: 300,
+    durationMs: 4000,
+    sceneLoop: true,
+    // Ten minutes, the length of a usual break; the time left counts down from it.
+    outTimeSec: 600,
+    sounds: [],
+    layers: [
+      {
+        identifier: 'cutInSampleRest_panel',
+        name: '下地',
+        kind: 'fill',
+        x: 20,
+        y: 30,
+        width: 600,
+        height: 240,
+        fillShape: 'linear',
+        fillFrom: '#1c2740',
+        fillTo: '#2f4570',
+        fillAngleDeg: 135,
+        opacity: 0.94,
+      },
+      {
+        identifier: 'cutInSampleRest_stripeTop',
+        name: '縞 : 上',
+        kind: 'fill',
+        x: 20,
+        y: 30,
+        width: 600,
+        height: 10,
+        fillShape: 'stripes',
+        fillFrom: '#ffd36e',
+        fillTo: '#f2a93b',
+        fillAngleDeg: 45,
+        fillScalePx: 8,
+      },
+      {
+        identifier: 'cutInSampleRest_stripeBottom',
+        name: '縞 : 下',
+        kind: 'fill',
+        x: 20,
+        y: 260,
+        width: 600,
+        height: 10,
+        fillShape: 'stripes',
+        fillFrom: '#ffd36e',
+        fillTo: '#f2a93b',
+        fillAngleDeg: 45,
+        fillScalePx: 8,
+      },
+      {
+        identifier: 'cutInSampleRest_cup',
+        name: 'カップ',
+        kind: 'text',
+        x: 46,
+        y: 62,
+        width: 110,
+        height: 100,
+        text: '☕',
+        fontSizePx: 72,
+        effect: 'float',
+        effectStrength: 1,
+      },
+      {
+        identifier: 'cutInSampleRest_title',
+        name: '文字 : 休憩中',
+        kind: 'text',
+        x: 150,
+        y: 58,
+        width: 300,
+        height: 90,
+        text: '休憩中',
+        fontSizePx: 60,
+        fontWeight: 800,
+        fontFamily: ROUNDED_FONT,
+        color: '#ffffff',
+        textAlign: 'left',
+        letterSpacingPx: 6,
+        letterMotion: 'wave',
+        letterIntervalMs: 120,
+        letterDurationMs: 900,
+      },
+      {
+        identifier: 'cutInSampleRest_clock',
+        name: '文字 : いまの時刻',
+        kind: 'text',
+        x: 420,
+        y: 74,
+        width: 180,
+        height: 40,
+        text: 'いま {time}',
+        fontSizePx: 22,
+        fontFamily: ROUNDED_FONT,
+        color: '#c9d4ea',
+        textAlign: 'right',
+      },
+      {
+        identifier: 'cutInSampleRest_remaining',
+        name: '文字 : 残り時間',
+        kind: 'text',
+        x: 40,
+        y: 160,
+        width: 560,
+        height: 80,
+        text: '再開まで あと {remaining:2}',
+        fontSizePx: 52,
+        fontWeight: 800,
+        fontFamily: ROUNDED_FONT,
+        color: '#ffe28a',
+        strokeColor: '#1c2740',
+        strokeWidthPx: 4,
+        effect: 'pulse',
+        effectStrength: 0.4,
+      },
+    ],
+  },
 ] as const;
 
 /**
@@ -565,9 +701,11 @@ function applyCutInSeed(cutIn: CutIn, seed: CutInSeed, pictures: SamplePictures)
   cutIn.imageIdentifier = '';
   cutIn.frameless = true;
   cutIn.chatActivate = true;
+  if (seed.outTimeSec) cutIn.outTime = seed.outTimeSec;
 
   scene.cutInIdentifier = cutIn.identifier;
   scene.durationMs = seed.durationMs;
+  if (seed.sceneLoop) scene.sceneLoop = true;
   scene.sounds = encodeCutInSounds(soundsOf(seed));
   for (const layerSeed of seed.layers) scene.appendChild(makeLayer(layerSeed, pictures));
   return true;
@@ -622,10 +760,14 @@ function makeLayer(seed: LayerSeed, pictures: SamplePictures): CutInLayer {
   if (seed.letterSpacingPx !== undefined) layer.letterSpacingPx = seed.letterSpacingPx;
   if (seed.fontSizePx !== undefined) layer.fontSizePx = seed.fontSizePx;
   if (seed.fontWeight !== undefined) layer.fontWeight = seed.fontWeight;
+  if (seed.fontFamily) layer.fontFamily = seed.fontFamily;
   if (seed.color) layer.color = seed.color;
   if (seed.textAlign) layer.textAlign = seed.textAlign;
   if (seed.strokeColor) layer.strokeColor = seed.strokeColor;
   if (seed.strokeWidthPx !== undefined) layer.strokeWidthPx = seed.strokeWidthPx;
+  if (seed.letterMotion) layer.letterMotion = seed.letterMotion;
+  if (seed.letterIntervalMs !== undefined) layer.letterIntervalMs = seed.letterIntervalMs;
+  if (seed.letterDurationMs !== undefined) layer.letterDurationMs = seed.letterDurationMs;
 
   return layer;
 }
