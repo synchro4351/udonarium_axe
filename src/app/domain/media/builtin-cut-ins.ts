@@ -23,9 +23,6 @@ import { PresetSound } from '@axe/domain/media/sound-effect';
  * face is drawn — bands, lines, dots and words — so opening either in the scene editor
  * shows how it was put together, and the face is one field to change.
  *
- * The break shows how a cut-in can tell the time: it stays on for ten minutes, says what time
- * it is and how long is left, and breathes gently while it waits.
- *
  * The identifiers are fixed, so everyone in a room ends up with the same samples rather than
  * a copy each, the way the built-in effects work.
  */
@@ -97,10 +94,6 @@ interface CutInSeed {
   width: number;
   height: number;
   durationMs: number;
-  /** How long the cut-in stays on, in seconds; left out, it closes when its scene ends. */
-  outTimeSec?: number;
-  /** Whether the scene runs again from the top until the cut-in closes. */
-  sceneLoop?: boolean;
   sounds: SoundSeed[];
   layers: LayerSeed[];
 }
@@ -500,81 +493,6 @@ export const DEFAULT_CUT_IN_SEEDS: readonly CutInSeed[] = [
       },
     ],
   },
-  {
-    identifier: 'cutInSampleBreak',
-    sceneIdentifier: 'cutInSampleBreak_scene',
-    name: 'Sample_休憩',
-    width: 640,
-    height: 360,
-    durationMs: 4000,
-    outTimeSec: 600,
-    sceneLoop: true,
-    sounds: [],
-    layers: [
-      {
-        identifier: 'cutInSampleBreak_backing',
-        name: '下地',
-        kind: 'fill',
-        x: 0,
-        y: 0,
-        width: 640,
-        height: 360,
-        fillShape: 'linear',
-        fillFrom: '#1f3b4d',
-        fillTo: '#2f6f6a',
-        fillAngleDeg: 135,
-        opacity: 0.9,
-      },
-      {
-        identifier: 'cutInSampleBreak_title',
-        name: '文字 : 休憩中',
-        kind: 'text',
-        x: 20,
-        y: 60,
-        width: 600,
-        height: 100,
-        text: '☕ 休憩中',
-        fontSizePx: 72,
-        fontWeight: 700,
-        color: '#ffffff',
-        textAlign: 'center',
-        tracks: {
-          opacity: [
-            { t: 0, v: 1, e: 'inOutQuad' },
-            { t: 2000, v: 0.7, e: 'inOutQuad' },
-            { t: 4000, v: 1 },
-          ],
-        },
-      },
-      {
-        identifier: 'cutInSampleBreak_clock',
-        name: '文字 : いまの時刻',
-        kind: 'text',
-        x: 20,
-        y: 180,
-        width: 600,
-        height: 40,
-        text: 'いま {time}',
-        fontSizePx: 28,
-        color: '#d7efe9',
-        textAlign: 'center',
-      },
-      {
-        identifier: 'cutInSampleBreak_remaining',
-        name: '文字 : 残り時間',
-        kind: 'text',
-        x: 20,
-        y: 230,
-        width: 600,
-        height: 64,
-        text: 'あと {remaining}',
-        fontSizePx: 48,
-        fontWeight: 700,
-        color: '#ffffff',
-        textAlign: 'center',
-      },
-    ],
-  },
 ] as const;
 
 /**
@@ -650,8 +568,6 @@ function applyCutInSeed(cutIn: CutIn, seed: CutInSeed, pictures: SamplePictures)
 
   scene.cutInIdentifier = cutIn.identifier;
   scene.durationMs = seed.durationMs;
-  if (seed.sceneLoop) scene.sceneLoop = true;
-  if (seed.outTimeSec !== undefined) cutIn.outTime = seed.outTimeSec;
   scene.sounds = encodeCutInSounds(soundsOf(seed));
   for (const layerSeed of seed.layers) scene.appendChild(makeLayer(layerSeed, pictures));
   return true;
