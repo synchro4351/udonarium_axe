@@ -6,6 +6,12 @@
 
 この番号は2026-09-24から導入した、固定コミットに対する私家版の識別名です。GitHub Release・Gitタグ・アプリ内のバージョン表示とは別であり、現時点では公式由来のpackage.jsonや配布ZIP名を変更していません。どの版かを厳密に確認する場合はコミットを参照してください。
 
+## tyoitashi r13／Axe v1.72.0（2026-10-29）
+
+- 固定ソースは[`af9799a0`](https://github.com/synchro4351/udonarium_axe/tree/af9799a0f5761eb833d74d4ae12600d55ff50914)。試用サイトもこの版へ更新しました。
+- 新しい部屋の最初のカットインに、休憩の見本`Sample_Rest`を加えました。10分間、現在時刻と「再開まで あと mm:ss」を出し続けます。時刻の書き方（`{time}`・`{remaining:2}`）の見本も兼ねます。
+- 全体テスト19,501件成功・1件skip、production build成功。
+
 ## tyoitashi r12／Axe v1.72.0（2026-10-28）
 
 - 固定ソースは[`c33afff6`](https://github.com/synchro4351/udonarium_axe/tree/c33afff67e4add0af295c4737df5bd386ddd2dac)。試用サイトもこの版へ更新しました。
