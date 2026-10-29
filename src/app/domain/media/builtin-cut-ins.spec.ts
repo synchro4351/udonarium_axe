@@ -9,6 +9,7 @@ import {
   SAMPLE_PORTRAIT_IDENTIFIER,
 } from '@axe/domain/media/builtin-cut-ins';
 import { CutIn } from '@axe/domain/media/cut-in';
+import { cutInPlaybackMs } from '@axe/domain/media/cut-in-playback-window';
 import { portraitFrameOf } from '@axe/domain/media/cut-in-portrait';
 import { CutInScene } from '@axe/domain/media/cut-in-scene';
 import { sceneDurationOf, toWebAnimationFrames } from '@axe/domain/media/cut-in-scene-timeline';
@@ -84,6 +85,16 @@ describe('the cut-ins a new room starts with', () => {
     expect(store.get<CutIn>(template.identifier)).toBe(template);
     expect(template.name).toBe('My template');
     expect(template.scene!.layers[0].fillFrom).toBe('#123456');
+  });
+
+  it('adds a break that stays ten minutes, telling the time and what is left, and breathes while it waits', () => {
+    const rest = made().find((cutIn) => cutIn.name === 'Sample_休憩')!;
+    const texts = rest.scene!.layers.filter((layer) => layer.kind === 'text').map((layer) => layer.text);
+
+    expect(rest.outTime).toBe(600);
+    expect(rest.scene!.sceneLoop).toBe(true);
+    expect(texts).toEqual(['☕ 休憩中', 'いま {time}', 'あと {remaining}']);
+    expect(cutInPlaybackMs(rest, rest.scene)).toBe(600_000);
   });
 
   it('registers the faces it comes with, one identifier each', () => {
@@ -256,8 +267,9 @@ describe('the cut-ins a new room starts with', () => {
     }
   });
 
-  it('leaves nothing behind when the scene ends', () => {
-    for (const cutIn of made()) {
+  it('leaves nothing behind when a scene played once ends', () => {
+    // The break runs its scene again and again until it closes, so it does not fade out each time.
+    for (const cutIn of made().filter((made) => !made.scene!.sceneLoop)) {
       const scene = cutIn.scene!;
       for (const layer of scene.layers) {
         const frames = toWebAnimationFrames(layer, sceneDurationOf(scene));

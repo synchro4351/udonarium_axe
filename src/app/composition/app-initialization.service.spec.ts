@@ -93,11 +93,11 @@ describe('AppInitializationService', () => {
       expect(objectStore.get<SoundEffect>('SoundEffect')).toBeTruthy();
     });
 
-    it('lays down fixed-image samples and a character portrait template', () => {
+    it('lays down fixed-image samples, a character portrait template and a break', () => {
       const cutIns = objectStore.getObjects(CutIn);
 
-      expect(cutIns.map((cutIn) => cutIn.name)).toEqual(['Sample1', 'Sample2', 'Sample_Template']);
-      for (const cutIn of cutIns.filter((sample) => sample.name !== 'Sample_Template')) {
+      expect(cutIns.map((cutIn) => cutIn.name)).toEqual(['Sample1', 'Sample2', 'Sample_Template', 'Sample_休憩']);
+      for (const cutIn of cutIns.filter((sample) => sample.name === 'Sample1' || sample.name === 'Sample2')) {
         expect(cutIn.isComposed).toBe(true);
         expect(cutIn.scene?.layers.some((layer) => layer.imageIdentifier.length > 0)).toBe(true);
         expect(cutIn.scene?.soundList.length).toBeGreaterThan(0);
