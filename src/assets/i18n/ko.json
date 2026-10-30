@@ -6003,7 +6003,8 @@
       "writeOut": "내보내기",
       "readIn": "불러오기",
       "readFailed": "메뉴 배열로 읽을 수 없는 파일입니다",
-      "dropped": "메뉴 배치를 불러왔습니다({{name}})"
+      "dropped": "메뉴 배치를 불러왔습니다({{name}})",
+      "kept": "메뉴 편집은 뺄 수 없습니다. 빼면 메뉴를 다시 정리할 입구가 없어지기 때문입니다."
     },
     "boardSwitch": {
       "panelTitle": "스위치 - {{name}}",

@@ -5715,7 +5715,8 @@
       "writeOut": "Write out",
       "readIn": "Read in",
       "readFailed": "That file does not hold an arrangement of the menus",
-      "dropped": "Menu arrangement loaded ({{name}})"
+      "dropped": "Menu arrangement loaded ({{name}})",
+      "kept": "The menu editor stays on this menu, so there is always a way back into arranging the menus."
     },
     "boardSwitch": {
       "panelTitle": "Switch - {{name}}",

@@ -38,21 +38,42 @@ describe('MenuLayoutService', () => {
 
     menus.save('fab', mine);
 
-    expect(menus.layoutOf('fab')().nodes).toHaveLength(1);
+    expect(menus.layoutOf('fab')().nodes).toHaveLength(2);
     expect(
       fresh()
         .layoutOf('fab')()
         .nodes.map((node) => node.id)
-    ).toEqual(['a']);
+    ).toEqual(['a', 'menuEditor']);
   });
 
-  it('keeps a menu somebody emptied empty, rather than handing back the way it came', () => {
+  it('keeps a menu somebody emptied empty but for the way back into arranging it', () => {
     const menus = fresh();
 
     menus.save('fab', { nodes: [] });
 
     expect(menus.isArranged('fab')).toBe(true);
-    expect(fresh().layoutOf('fab')().nodes).toEqual([]);
+    expect(fresh().layoutOf('fab')().nodes).toEqual([{ id: 'menuEditor', command: 'menuEditor' }]);
+  });
+
+  it('puts the menu editor back on the end of a drawer arranged without it, from a file or an older visit', () => {
+    localStorage.setItem(KEY, JSON.stringify([{ id: 'chat', command: 'chat' }]));
+
+    expect(
+      fresh()
+        .layoutOf('fab')()
+        .nodes.map((node) => node.id)
+    ).toEqual(['chat', 'menuEditor']);
+  });
+
+  it('leaves the menu editor where somebody put it, inside a small menu', () => {
+    const menus = fresh();
+    const mine: MenuLayout = {
+      nodes: [{ id: 'tools', icon: 'folder', items: [{ id: 'menuEditor', command: 'menuEditor' }] }],
+    };
+
+    menus.save('fab', mine);
+
+    expect(menus.layoutOf('fab')()).toEqual(mine);
   });
 
   it('puts a menu back the way it came, and forgets it was ever arranged', () => {
@@ -89,7 +110,11 @@ describe('MenuLayoutService', () => {
     });
 
     expect(() => menus.save('fab', { nodes: [] })).not.toThrow();
-    expect(menus.layoutOf('fab')().nodes).toEqual([]);
+    expect(
+      menus
+        .layoutOf('fab')()
+        .nodes.map((node) => node.id)
+    ).toEqual(['menuEditor']);
   });
 
   it('hands back a menu of its own each time, so changing one does not change the way it came', () => {

@@ -33,6 +33,8 @@ import {
   addMenuGroup,
   addMenuItem,
   dropMenuNode,
+  holdsMenuCommand,
+  KEPT_MENU_COMMANDS,
   menuDropSpot,
   MenuParent,
   moveMenuNode,
@@ -186,7 +188,17 @@ export class MenuEditorPanelComponent {
     );
   }
 
+  /**
+   * Whether the row can be taken off: not the entry this menu keeps, nor a small menu holding it,
+   * which would take it along.
+   */
+  protected canRemove(row: EditorRow): boolean {
+    const kept = KEPT_MENU_COMMANDS[this.surface()];
+    return !kept || !holdsMenuCommand(row.node, kept);
+  }
+
   protected remove(row: EditorRow): void {
+    if (!this.canRemove(row)) return;
     this.write(removeMenuNode(this.layout(), row.node.id));
   }
 

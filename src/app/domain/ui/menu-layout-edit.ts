@@ -1,4 +1,5 @@
-import { isMenuGroup, MenuGroup, MenuItem, MenuLayout, MenuNode } from '@axe/domain/ui/menu-layout';
+import { MenuSurface } from '@axe/domain/ui/menu-command';
+import { isMenuGroup, MenuGroup, MenuItem, menuItemsOf, MenuLayout, MenuNode } from '@axe/domain/ui/menu-layout';
 
 /** Where an entry sits: on the menu itself, or inside one of its small menus. */
 export type MenuParent = string | null;
@@ -256,4 +257,20 @@ export function placeMenuNode(layout: MenuLayout, id: string, spot: MenuDropSpot
 export function dropMenuNode(layout: MenuLayout, id: string, over: string, side: MenuDropSide): MenuLayout {
   const spot = menuDropSpot(layout, id, over, side);
   return spot === null ? layout : placeMenuNode(layout, id, spot);
+}
+
+/**
+ * The command each menu keeps on it whatever somebody arranges: the drawer keeps the way into
+ * arranging the menus, since somebody who took that off would have no menu left to put it back from.
+ */
+export const KEPT_MENU_COMMANDS: Readonly<Partial<Record<MenuSurface, string>>> = { fab: 'menuEditor' };
+
+/** Whether taking the node off would take the command with it, as the entry itself or inside a small menu. */
+export function holdsMenuCommand(node: MenuNode, command: string): boolean {
+  return isMenuGroup(node) ? node.items.some((item) => item.command === command) : node.command === command;
+}
+
+/** The menu with the command on it, put back on the end where it is missing. */
+export function keepingMenuCommand(layout: MenuLayout, command: string): MenuLayout {
+  return menuItemsOf(layout).some((item) => item.command === command) ? layout : addMenuItem(layout, command, null);
 }

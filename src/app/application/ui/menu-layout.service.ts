@@ -4,6 +4,7 @@ import { STORAGE_KEY_PREFIXES, storageKeyFor } from '@axe/core/storage/storage-k
 import { defaultMenuLayout } from '@axe/domain/ui/builtin-menu-layouts';
 import { MENU_SURFACES, MenuSurface } from '@axe/domain/ui/menu-command';
 import { encodeMenuLayout, MenuLayout, parseMenuLayout } from '@axe/domain/ui/menu-layout';
+import { keepingMenuCommand, KEPT_MENU_COMMANDS } from '@axe/domain/ui/menu-layout-edit';
 import { MenuLayoutFile } from '@axe/domain/ui/menu-layout-file';
 
 function storageKey(surface: MenuSurface): string {
@@ -37,10 +38,19 @@ export class MenuLayoutService {
     return this.slot(surface)() !== null;
   }
 
-  /** The menu as this screen has it, which is the way it came until somebody says otherwise. */
+  /**
+   * The menu as this screen has it, which is the way it came until somebody says otherwise.
+   *
+   * A command the menu keeps is put back on the end where an arrangement has none, whether it was
+   * made before the command was kept or read in from a file.
+   */
   layoutOf(surface: MenuSurface): Signal<MenuLayout> {
     const slot = this.slot(surface);
-    return computed(() => slot() ?? defaultMenuLayout(surface));
+    const kept = KEPT_MENU_COMMANDS[surface];
+    return computed(() => {
+      const layout = slot() ?? defaultMenuLayout(surface);
+      return kept ? keepingMenuCommand(layout, kept) : layout;
+    });
   }
 
   /** Writes the menu down as it now stands. */

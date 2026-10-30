@@ -53,12 +53,16 @@ describe('FabDrawerComponent', () => {
       vi.restoreAllMocks();
     });
 
-    it('is on the drawer button, which is no part of any arrangement', () => {
+    it('is on the drawer button, which is no part of any arrangement, and stays in the drawer itself', () => {
       emptyEveryMenu();
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('[data-testid="fab-toggle"]')).toBeTruthy();
-      expect(fixture.nativeElement.querySelectorAll('[data-testid^="fab-entry-"]').length).toBe(0);
+      expect(
+        Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('[data-testid^="fab-entry-"]')).map(
+          (entry) => entry.dataset['testid']
+        )
+      ).toEqual(['fab-entry-menuEditor']);
     });
 
     it('offers the editor and a way to put every menu back, with nothing left on any of them', () => {
@@ -437,7 +441,7 @@ describe('FabDrawerComponent', () => {
 
         expect(guide.shown()).toBe(true);
         expect(fixture.nativeElement.querySelector('[data-testid="fab-submenu-tools"]')).toBeNull();
-        expect(names()).toEqual(['道具']);
+        expect(names()).toEqual(['道具', 'メニューの編集']);
         expect(entry('名前を見る')).toBeTruthy();
         expect(entry('持ち物')).toBeTruthy();
       });

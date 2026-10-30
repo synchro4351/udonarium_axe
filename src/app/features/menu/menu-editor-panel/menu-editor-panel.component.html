@@ -113,8 +113,9 @@
 
         <button
           type="button"
-          class="rounded-ui-sm text-ui-dim flex size-6 shrink-0 cursor-pointer items-center justify-center border-none bg-transparent transition-colors hover:bg-red-500/20 hover:text-red-500 [&_i]:text-[16px]!"
-          [title]="'feature.menuEditor.remove' | transloco"
+          class="rounded-ui-sm text-ui-dim flex size-6 shrink-0 cursor-pointer items-center justify-center border-none bg-transparent transition-colors hover:bg-red-500/20 hover:text-red-500 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-current [&_i]:text-[16px]!"
+          [disabled]="!canRemove(row)"
+          [title]="(canRemove(row) ? 'feature.menuEditor.remove' : 'feature.menuEditor.kept') | transloco"
           [attr.data-testid]="'menu-editor-remove-' + row.node.id"
           (click)="remove(row)"
         >

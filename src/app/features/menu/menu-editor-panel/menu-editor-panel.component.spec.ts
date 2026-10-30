@@ -116,6 +116,21 @@ describe('MenuEditorPanelComponent', () => {
     ).not.toContain('chat');
   });
 
+  it('will not take the menu editor off the drawer, nor the small menu holding it', async () => {
+    const entry = query<HTMLButtonElement>('menu-editor-remove-menuEditor')!;
+    const group = query<HTMLButtonElement>('menu-editor-remove-display')!;
+
+    expect(entry.disabled).toBe(true);
+    expect(group.disabled).toBe(true);
+    expect(entry.title).toContain('外せません');
+    entry.click();
+    group.click();
+    await settle();
+
+    expect(rowIds()).toContain('menuEditor');
+    expect(layouts.isArranged('fab')).toBe(false);
+  });
+
   it('puts an entry in order when it is dragged past another', async () => {
     await drag('peerMenu', 'chat', 'after');
 
@@ -284,7 +299,7 @@ describe('MenuEditorPanelComponent', () => {
         layouts
           .layoutOf('fab')()
           .nodes.map((node) => node.id)
-      ).toEqual(['a']);
+      ).toEqual(['a', 'menuEditor']);
       expect(query('menu-editor-failed')).toBeNull();
     });
 
