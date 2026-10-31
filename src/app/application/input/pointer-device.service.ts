@@ -1,4 +1,5 @@
 import { Injectable, signal, untracked } from '@angular/core';
+import { AttachedDocuments } from '@axe/domain/ui/attached-documents';
 
 export interface PointerCoordinate {
   x: number;
@@ -202,7 +203,42 @@ export class PointerDeviceService {
     return false;
   }
 
+  /** The bodies of the windows panels were taken out into, followed as well as the page's own. */
+  private readonly followedAbroad = new Set<HTMLElement>();
+  private stopFollowingWindows: (() => void) | null = null;
+
+  /**
+   * Follows the pointer in a window a panel was taken out into as on the page itself, so a press
+   * there is known where it was made and a context menu may open from it.
+   */
+  private followWindows(documents: readonly Document[]): void {
+    const bodies = new Set(documents.filter((held) => held !== document && held.body).map((held) => held.body));
+    for (const body of [...this.followedAbroad]) {
+      if (bodies.has(body)) continue;
+      this.listenOn(body, false);
+      this.followedAbroad.delete(body);
+    }
+    for (const body of bodies) {
+      if (this.followedAbroad.has(body)) continue;
+      this.listenOn(body, true);
+      this.followedAbroad.add(body);
+    }
+  }
+
+  private listenOn(body: HTMLElement, on: boolean): void {
+    const change = on ? body.addEventListener.bind(body) : body.removeEventListener.bind(body);
+    change('mousedown', this.callbackOnPointerDown, true);
+    change('mousemove', this.callbackOnPointerMove, true);
+    change('mouseup', this.callbackOnPointerUp, true);
+    change('touchstart', this.callbackOnPointerDown, true);
+    change('touchmove', this.callbackOnPointerMove, true);
+    change('touchend', this.callbackOnPointerUp, true);
+    change('touchcancel', this.callbackOnPointerUp, true);
+    change('contextmenu', this.callbackOnContextMenu, true);
+  }
+
   private addEventListeners() {
+    this.stopFollowingWindows ??= AttachedDocuments.onChange((documents) => this.followWindows(documents));
     document.body.addEventListener('mousedown', this.callbackOnPointerDown, true);
     document.body.addEventListener('mousemove', this.callbackOnPointerMove, true);
     document.body.addEventListener('mouseup', this.callbackOnPointerUp, true);
@@ -217,6 +253,10 @@ export class PointerDeviceService {
   }
 
   private removeEventListeners() {
+    this.stopFollowingWindows?.();
+    this.stopFollowingWindows = null;
+    for (const body of this.followedAbroad) this.listenOn(body, false);
+    this.followedAbroad.clear();
     document.body.removeEventListener('mousedown', this.callbackOnPointerDown, true);
     document.body.removeEventListener('mousemove', this.callbackOnPointerMove, true);
     document.body.removeEventListener('mouseup', this.callbackOnPointerUp, true);

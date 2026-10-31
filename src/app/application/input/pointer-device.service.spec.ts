@@ -1,6 +1,7 @@
 import { ApplicationRef, effect, Injector, signal } from '@angular/core';
 import { inject, TestBed } from '@angular/core/testing';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
+import { AttachedDocuments } from '@axe/domain/ui/attached-documents';
 
 describe('PointerDeviceService', () => {
   let service: PointerDeviceService;
@@ -31,6 +32,26 @@ describe('PointerDeviceService', () => {
     expect(service.pointers[0]).toEqual(before);
     expect(Number.isFinite(service.pointers[0].x)).toBe(true);
     expect(Number.isFinite(service.pointers[0].y)).toBe(true);
+  });
+
+  it('follows the pointer in a window a panel was taken out into, until the window goes', () => {
+    const abroad = document.implementation.createHTMLDocument('panel');
+    AttachedDocuments.attach(abroad);
+    try {
+      abroad.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      expect(service.isAllowedToOpenContextMenu).toBe(true);
+
+      service.isDragging = true;
+      abroad.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      expect(service.isDragging).toBe(false);
+    } finally {
+      AttachedDocuments.detach(abroad);
+    }
+
+    service.isDragging = true;
+    abroad.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+    expect(service.isDragging).toBe(true);
   });
 
   it('stops dragging when the button comes up', () => {

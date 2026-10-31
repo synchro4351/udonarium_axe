@@ -120,13 +120,28 @@ export class ContextMenuComponent {
   private readonly hideSubMenuLater = debounce(() => this.subMenu.set(undefined), 1200);
 
   private callbackOnOutsideClick = (e: Event) => this.onOutsideClick(e);
+  /** The document the outside presses are heard on, kept so the same one is let go. */
+  private listenedDocument: Document | null = null;
+
+  /**
+   * The document the menu is drawn in, and the window around it. A menu opened from a panel taken
+   * out into a window of its own is drawn in that window, whose size and presses are its own.
+   */
+  private ownDocument(): Document {
+    return this.elementRef.nativeElement.ownerDocument ?? document;
+  }
+
+  private ownWindow(): { innerWidth: number; innerHeight: number } {
+    return this.ownDocument().defaultView ?? window;
+  }
 
   constructor() {
     afterNextRender(() => {
       if (!this.isSubmenu()) {
         this.adjustPositionRoot();
-        document.addEventListener('touchstart', this.callbackOnOutsideClick, true);
-        document.addEventListener('mousedown', this.callbackOnOutsideClick, true);
+        this.listenedDocument = this.ownDocument();
+        this.listenedDocument.addEventListener('touchstart', this.callbackOnOutsideClick, true);
+        this.listenedDocument.addEventListener('mousedown', this.callbackOnOutsideClick, true);
       }
       this.indexMenuPosion();
     });
@@ -140,8 +155,8 @@ export class ContextMenuComponent {
     this.destroyRef.onDestroy(() => {
       clearTimeout(this.showSubMenuTimer);
       this.hideSubMenuLater.cancel();
-      document.removeEventListener('touchstart', this.callbackOnOutsideClick, true);
-      document.removeEventListener('mousedown', this.callbackOnOutsideClick, true);
+      this.listenedDocument?.removeEventListener('touchstart', this.callbackOnOutsideClick, true);
+      this.listenedDocument?.removeEventListener('mousedown', this.callbackOnOutsideClick, true);
     });
   }
 
@@ -207,15 +222,15 @@ export class ContextMenuComponent {
     let diffLeft = 0;
     let diffTop = 0;
 
-    if (window.innerWidth < panelBox.right + diffLeft) {
-      diffLeft += window.innerWidth - (panelBox.right + diffLeft);
+    if (this.ownWindow().innerWidth < panelBox.right + diffLeft) {
+      diffLeft += this.ownWindow().innerWidth - (panelBox.right + diffLeft);
     }
     if (panelBox.left + diffLeft < 0) {
       diffLeft += 0 - (panelBox.left + diffLeft);
     }
 
-    if (window.innerHeight < panelBox.bottom + diffTop) {
-      diffTop += window.innerHeight - (panelBox.bottom + diffTop);
+    if (this.ownWindow().innerHeight < panelBox.bottom + diffTop) {
+      diffTop += this.ownWindow().innerHeight - (panelBox.bottom + diffTop);
     }
     if (panelBox.top + diffTop < 0) {
       diffTop += 0 - (panelBox.top + diffTop);
@@ -253,14 +268,14 @@ export class ContextMenuComponent {
     const screenX =
       placed.left < margin
         ? margin - placed.left
-        : placed.right > window.innerWidth - margin
-          ? window.innerWidth - margin - placed.right
+        : placed.right > this.ownWindow().innerWidth - margin
+          ? this.ownWindow().innerWidth - margin - placed.right
           : 0;
     const screenY =
       placed.top < margin
         ? margin - placed.top
-        : placed.bottom > window.innerHeight - margin
-          ? window.innerHeight - margin - placed.bottom
+        : placed.bottom > this.ownWindow().innerHeight - margin
+          ? this.ownWindow().innerHeight - margin - placed.bottom
           : 0;
     const localCorrection = screenDeltaToMenuDelta(screenX, screenY, this.contextMenuService.rotationDegrees);
     left += localCorrection.x;
@@ -274,7 +289,7 @@ export class ContextMenuComponent {
     submenu.style.left = `${left}px`;
     submenu.style.top = `${top}px`;
     const placed = submenu.getBoundingClientRect();
-    return Math.max(0, margin - placed.left) + Math.max(0, placed.right - (window.innerWidth - margin));
+    return Math.max(0, margin - placed.left) + Math.max(0, placed.right - (this.ownWindow().innerWidth - margin));
   }
 
   /** How far the list this row sits in has been scrolled, which its own offset knows nothing of. */
