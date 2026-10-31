@@ -6115,7 +6115,7 @@
       "paletteHint": "Click: input / Double-click: apply",
       "buffColor": "Colour",
       "buffColorDefault": "Default",
-      "buffInputPlaceholder": "e.g. Poison 2-per-turn 3 (spaces or / between; all after the name is optional)",
+      "buffInputPlaceholder": "e.g. Poison 2-per-turn 3 (name, effect, then rounds, split by spaces or /; the name alone is enough, and rounds default to 3)",
       "grant": "Apply",
       "roundManagement": "Round controls",
       "roundDecrease": "Decrease R",

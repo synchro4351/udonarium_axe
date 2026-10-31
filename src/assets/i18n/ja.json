@@ -6115,7 +6115,7 @@
       "paletteHint": "クリック: 入力 ／ 2回クリック: 付与",
       "buffColor": "色",
       "buffColorDefault": "既定",
-      "buffInputPlaceholder": "例：毒 継続ダメージ 3（空白か/で区切る。情報から後は省略可）",
+      "buffInputPlaceholder": "例：毒 継続ダメージ 3（バフ名・効果・ラウンド数の順に、空白か/で区切る。バフ名だけでも付き、ラウンド数を省くと3）",
       "grant": "付与",
       "roundManagement": "ラウンド管理",
       "roundDecrease": "R 減少",
