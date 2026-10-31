@@ -64,8 +64,26 @@ describe('remote-controller-helpers', () => {
       expect(parsed!.bufftext).toContain('red');
     });
 
-    it('leaves both empty when neither is given', () => {
-      expect(parseBuffInput('猛攻撃')!.appearance).toEqual({});
+    it('leaves the colour and icon empty when neither is given', () => {
+      expect(parseBuffInput('猛攻撃 攻撃+2 3')!.appearance).toEqual({});
+    });
+
+    it('holds a buff given no rounds until it is taken off, and says so in the chat line', () => {
+      for (const line of ['猛攻撃', '猛攻撃 攻撃+2', '猛攻撃 攻撃+2 赤']) {
+        const parsed = parseBuffInput(line)!;
+        expect(parsed.appearance.timing).toBe('none');
+        expect(parsed.bufftext).toMatch(/\/永続/);
+        expect(parsed.bufftext).not.toMatch(/\dR/);
+      }
+    });
+
+    it('lets a timing word decide for a buff given no rounds', () => {
+      expect(parseBuffInput('猛攻撃 攻撃+2 x 手番開始')!.appearance.timing).toBe('turnStart');
+    });
+
+    it('keeps the rounds of a standing buff piled on without a number', () => {
+      const parsed = parseBuffInput('+猛攻撃 攻撃+2')!;
+      expect(parsed.appearance.timing).toBeUndefined();
     });
 
     it('reads nothing from an empty line', () => {

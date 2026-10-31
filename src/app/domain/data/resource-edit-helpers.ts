@@ -383,19 +383,20 @@ export function applyBuffEdit(buff: BuffEdit, character: GameCharacter): string 
       sub = splittext[1];
       bufftext = `${bufftext}/${splittext[1]}`;
     }
-    if (splittext.length > 2) {
-      if (splittext[2]) {
-        round = parseInt(splittext[2]);
-        if (Number.isNaN(round)) {
-          round = 3;
-        }
-      } else {
-        round = 3;
-      }
-      bufftext = `${bufftext}/${round}R`;
+    if (splittext.length > 2 && splittext[2]) {
+      const written = parseInt(splittext[2]);
+      if (!Number.isNaN(written)) round = written;
     }
 
     const appearance = parseBuffAppearance(splittext.slice(3));
+    // A buff put on without a number of rounds stays until it is taken off, unless a timing word
+    // says otherwise; one piled on a standing buff without a number keeps that buff's rounds.
+    if (round === undefined && piles === 'none' && !appearance.timing) {
+      appearance.timing = 'none';
+      bufftext = `${bufftext}/永続`;
+    } else if (round !== undefined) {
+      bufftext = `${bufftext}/${round}R`;
+    }
     for (const token of splittext.slice(3)) {
       if (token) bufftext = `${bufftext}/${token}`;
     }

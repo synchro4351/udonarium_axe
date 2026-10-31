@@ -1,4 +1,5 @@
 import { resolveBuffColor } from '@axe/domain/character/buff-appearance';
+import { buffExpires } from '@axe/domain/character/buff-timing';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DataElement, DataElementAttribute } from '@axe/domain/data/data-element';
 import {
@@ -189,6 +190,17 @@ describe('resource-edit-helpers', () => {
 
       expect(text).toContain('バフを付与');
       expect(text).toContain('マッスルベアー');
+    });
+
+    it('holds a buff given no rounds until it is taken off', () => {
+      for (const command of ['&見張り', '&見張り/警戒', '&見張り/警戒/']) {
+        const text = applyBuffEdit({ command, object: character, targeted: false }, character);
+        const data = character.buffDataElement!.children[0].children[0] as DataElement;
+
+        expect(text).toContain('/永続');
+        expect(buffExpires(data)).toBe(false);
+        character.buffs.delete('見張り');
+      }
     });
 
     it('takes the look of that buff after the first three words', () => {
