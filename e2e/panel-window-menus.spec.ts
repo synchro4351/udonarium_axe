@@ -20,6 +20,11 @@ test('opens a context menu, and its submenus, from the inventory taken out into 
   const item = popup.locator('game-object-inventory [data-testid="inventory-item"]').first();
   await expect(item).toBeVisible({ timeout: 10000 });
 
+  // The pointer goes on about the page before it reaches the window, which on the page alone
+  // reads as a press dragged away rather than one to open a menu from.
+  await page.mouse.move(400, 300);
+  await page.mouse.move(600, 500, { steps: 5 });
+
   await item.click({ button: 'right' });
 
   const menu = popup.locator('[data-context-menu-root]').first();
