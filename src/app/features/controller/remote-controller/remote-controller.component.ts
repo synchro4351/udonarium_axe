@@ -57,6 +57,7 @@ import {
   parseBuffInput,
   pileBuffRound,
   RemoteControllerSelect,
+  removeBuffNamed,
 } from '@axe/features/controller/remote-controller/remote-controller-buff';
 import {
   getGameObjects,
@@ -404,6 +405,35 @@ export class RemoteControllerComponent {
         ? 'feature.controller.remote.addBuffMessage'
         : 'feature.controller.remote.stackBuffMessage';
     this.announce(this.t(message, { buff: bufftext, targets: parts }), {
+      portraitIndex: ci.portraitIndex(),
+      color: ci.selectChatColor,
+    });
+    this.errorMessageBuff = '';
+    this.text.set('');
+  }
+
+  /**
+   * Takes the buff named in the buff field off every ticked target and announces it in the chat,
+   * as the chat's `&name-` does, so taking a buff off is on the record as putting it on is.
+   *
+   * Only the name is read; anything after it is left alone. With no ticked target, or none that
+   * has the buff, an error is shown instead.
+   */
+  removeBuffChat(): void {
+    const name = parseBuffInput(this.text().trim())?.buffname;
+    if (!name) return;
+    const gameCharacters = this.getTargetCharacters(true);
+    if (gameCharacters.length <= 0) {
+      this.errorMessageBuff = this.t('feature.controller.remote.noTarget');
+      return;
+    }
+    const targets = removeBuffNamed(gameCharacters, name);
+    if (!targets) {
+      this.errorMessageBuff = this.t('feature.controller.remote.removeBuffNone', { buff: name });
+      return;
+    }
+    const ci = this.controllerInputComponent();
+    this.announce(this.t('feature.controller.remote.removeBuffMessage', { buff: name, targets }), {
       portraitIndex: ci.portraitIndex(),
       color: ci.selectChatColor,
     });

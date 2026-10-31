@@ -4,6 +4,7 @@ import {
   decreaseBuffRound,
   deleteZeroRoundBuffs,
   pileBuffRound,
+  removeBuffNamed,
 } from '@axe/features/controller/remote-controller/remote-controller-buff';
 
 describe('the buffs a remote controller works on', () => {
@@ -36,6 +37,22 @@ describe('the buffs a remote controller works on', () => {
 
     expect(targets).toBe('[相手]');
     expect(held.buffs.find('毒')).toBeNull();
+  });
+
+  it('takes a buff off by name and names only those that had it', () => {
+    const first = character('相手A');
+    const second = character('相手B');
+    const third = character('相手C');
+    addBuffRound([first, second], '毒', '継続', 3);
+    addBuffRound([third], '祝福', '', 3);
+
+    const targets = removeBuffNamed([first, second, third], '毒');
+
+    expect(targets).toBe('[相手A][相手B]');
+    expect(first.buffs.find('毒')).toBeNull();
+    expect(second.buffs.find('毒')).toBeNull();
+    expect(third.buffs.find('祝福')).not.toBeNull();
+    expect(removeBuffNamed([first], '毒')).toBe('');
   });
 
   it('names nobody when it was given nobody, so the panel says nothing', () => {

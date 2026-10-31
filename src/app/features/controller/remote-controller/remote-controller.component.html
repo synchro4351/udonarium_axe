@@ -218,6 +218,14 @@
             >
               {{ 'feature.controller.remote.grant' | transloco }}
             </button>
+            <button
+              class="text-ui-muted border-ui-border-panel hover:bg-ui-danger-bg hover:border-ui-danger hover:text-ui-danger rounded-ui-sm inline-flex cursor-pointer items-center gap-0.75 border border-solid bg-transparent px-2.5 py-1 text-[12px] whitespace-nowrap transition-[background,border-color] select-none"
+              data-testid="remote-buff-remove"
+              [title]="'feature.controller.remote.removeBuffHint' | transloco"
+              (click)="removeBuffChat()"
+            >
+              {{ 'feature.controller.remote.removeBuff' | transloco }}
+            </button>
           </div>
 
           <div

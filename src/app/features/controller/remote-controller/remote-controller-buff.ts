@@ -114,6 +114,17 @@ export function deleteZeroRoundBuffs(characters: readonly GameCharacter[]): stri
   return actOnBuffs(characters, (character) => character.buffs.deleteZeroRound());
 }
 
+/**
+ * Takes the buff of that name off the given pieces, and names the pieces that had it; empty where
+ * none did.
+ */
+export function removeBuffNamed(characters: readonly GameCharacter[], name: string): string {
+  return characters
+    .filter((character) => character.buffs.delete(name))
+    .map((character) => `[${character.name}]`)
+    .join('');
+}
+
 function actOnBuffs(characters: readonly GameCharacter[], act: (character: GameCharacter) => void): string {
   if (characters.length < 1) return '';
   const names: string[] = [];
