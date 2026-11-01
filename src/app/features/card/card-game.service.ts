@@ -148,9 +148,6 @@ export class CardGameService {
     if (holder === myUserId) return true;
     const character = this.characterOf(holder);
     if (character === null || !character.isVisibleOnTable) return false;
-    // A room server sends a hand's fronts to the participant it is held under and to the game
-    // master, and knows of no character holding one, so there only the game master holds for one.
-    if (Network.transport === 'server' && PeerCursor.myRole !== PeerRole.GameMaster) return false;
     return seesCharacterHand(character, { userId: myUserId, role: PeerCursor.myRole });
   }
 
