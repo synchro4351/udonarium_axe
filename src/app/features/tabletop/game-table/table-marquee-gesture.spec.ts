@@ -108,11 +108,26 @@ describe('TableMarqueeGesture', () => {
     expect(gesture.isArmed).toBe(false);
   });
 
-  it('arms nothing while a modifier is held', () => {
+  it('arms nothing while Ctrl, Meta, or Shift with Alt is held', () => {
     const gesture = new TableMarqueeGesture(identityScreenToTable);
     expect(gesture.arm(makeEvent({ ctrl: true }))).toBe(false);
     expect(gesture.arm(makeEvent({ meta: true }))).toBe(false);
-    expect(gesture.arm(makeEvent({ alt: true }))).toBe(false);
+    expect(gesture.arm(makeEvent({ alt: true, shift: true }))).toBe(false);
+  });
+
+  it('opens at once with Alt held, and hands back a marquee that aims rather than selects', () => {
+    const gesture = new TableMarqueeGesture(identityScreenToTable);
+    const start = vi.fn();
+    const end = vi.fn();
+    gesture.onMarqueeStart = start;
+    gesture.onMarqueeEnd = end;
+
+    expect(gesture.arm(makeEvent({ alt: true, clientX: 0, clientY: 0 }))).toBe(true);
+    expect(start).toHaveBeenCalledWith({ x: 0, y: 0 }, expect.objectContaining({ target: true }));
+    gesture.updatePointer(40, 30);
+    gesture.release(makeEvent({ clientX: 40, clientY: 30 }) as PointerEvent);
+
+    expect(end).toHaveBeenCalledWith({ x1: 0, y1: 0, x2: 40, y2: 30 }, expect.objectContaining({ target: true }));
   });
 
   it('disarms on a move past the threshold', () => {

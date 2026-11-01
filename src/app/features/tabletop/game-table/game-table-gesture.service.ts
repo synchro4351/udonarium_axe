@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { CoordinateService } from '@axe/application/input/coordinate.service';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
+import { PieceTargetService } from '@axe/application/tabletop/piece-target.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { BackdropFrameService } from '@axe/application/ui/backdrop-frame.service';
 import { BillboardFrameService } from '@axe/application/ui/billboard-frame.service';
@@ -73,6 +74,7 @@ export class GameTableGestureService {
   private readonly backdropFrame = inject(BackdropFrameService);
   private readonly selectionSignalService = inject(SelectionSignalService);
   private readonly tabletopService = inject(TabletopService);
+  private readonly pieceTarget = inject(PieceTargetService);
   private readonly coordinateService = inject(CoordinateService);
   private readonly switchPresses = inject(SwitchPressService);
   private readonly switchNotices = inject(SwitchNoticeService);
@@ -434,6 +436,14 @@ export class GameTableGestureService {
 
   private onMarqueeEnd(rect: MarqueeRect, modifiers: MarqueeModifiers): void {
     this.selectionSignalService.marqueeState.set(null);
+    if (modifiers.target) {
+      // Alt and a drag aims at the pieces inside, as Alt and a click aims at one, and leaves the
+      // selection alone.
+      const pieces = this.tabletopService.characters;
+      const hits = new Set(selectByRect(pieces, rect, { gridSize: this.tabletopService.gridSize() }));
+      this.pieceTarget.aimAlso(pieces.filter((piece) => hits.has(piece.identifier)));
+      return;
+    }
     const candidates = this.collectSelectableObjects();
     const hits = selectByRect(candidates, rect, { gridSize: this.tabletopService.gridSize() });
     const joins = marqueeApply(modifiers, this.selectionSignalService.selectionSize() > 0);

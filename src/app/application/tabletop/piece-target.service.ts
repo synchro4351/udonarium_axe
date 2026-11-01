@@ -32,6 +32,15 @@ export class PieceTargetService {
     }
   }
 
+  /** Aims at these pieces as well, leaving the aim on every other piece as it was. */
+  aimAlso(pieces: readonly GameCharacter[]): void {
+    for (const piece of pieces) {
+      if (piece.targeted) continue;
+      piece.targeted = true;
+      this.uiSignal.notifyTargetChange(piece.identifier, piece.aliasName);
+    }
+  }
+
   anything(): boolean {
     return this.objectStore.getObjects<GameCharacter>(GameCharacter).some((piece) => piece.targeted);
   }

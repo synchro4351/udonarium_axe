@@ -14,6 +14,8 @@ export interface MarqueeModifiers {
   shift: boolean;
   ctrl: boolean;
   touch: boolean;
+  /** Whether the marquee aims at the pieces inside rather than selecting what is there: Alt was held. */
+  target?: boolean;
 }
 
 export type MarqueeStartHandler = (point: MarqueePoint, modifiers: MarqueeModifiers) => void;
@@ -36,6 +38,8 @@ export class TableMarqueeGesture {
   private active = false;
   private isTouchGesture = false;
   private dragged = false;
+  /** Whether the marquee open now aims rather than selects. */
+  private aiming = false;
   private startScreenX = 0;
   private startScreenY = 0;
   private startTablePoint: MarqueePoint | null = null;
@@ -54,20 +58,30 @@ export class TableMarqueeGesture {
   /**
    * Starts the long press that opens a marquee, dropping any marquee before it.
    *
-   * Only a primary press without Ctrl, Alt or Meta is taken up, which is what the answer says. The
-   * marquee opens once the press has been held long enough, a little sooner for touch and pen.
+   * Only a primary press without Ctrl or Meta is taken up, which is what the answer says. The
+   * marquee opens once the press has been held long enough, a little sooner for touch and pen. With
+   * Alt held it opens at once and aims at the pieces inside instead, as Alt and a click aims at one;
+   * Shift with Alt is left alone, being the keys that clear every aim and that some systems take for
+   * switching the keyboard.
    */
   arm(event: PointerEvent | MouseEvent): boolean {
     this.cancel();
     this.dragged = false;
+    this.aiming = false;
     if (event.button !== 0) return false;
-    if (event.ctrlKey || event.metaKey || event.altKey) return false;
+    if (event.ctrlKey || event.metaKey) return false;
+    if (event.altKey && event.shiftKey) return false;
     const pointerType = (event as PointerEvent).pointerType ?? 'mouse';
     const isTouchLike = pointerType === 'touch' || pointerType === 'pen';
     this.isTouchGesture = isTouchLike;
-    const delay = isTouchLike ? MARQUEE_TOUCH_LONG_PRESS_MS : MARQUEE_MOUSE_LONG_PRESS_MS;
     this.startScreenX = event.pageX;
     this.startScreenY = event.pageY;
+    if (event.altKey) {
+      this.aiming = true;
+      this.fire({ shift: false, ctrl: false, touch: isTouchLike, target: true });
+      return true;
+    }
+    const delay = isTouchLike ? MARQUEE_TOUCH_LONG_PRESS_MS : MARQUEE_MOUSE_LONG_PRESS_MS;
     const modifiers: MarqueeModifiers = { shift: event.shiftKey, ctrl: event.ctrlKey, touch: isTouchLike };
     this.timer = setTimeout(() => {
       this.timer = null;
@@ -128,6 +142,7 @@ export class TableMarqueeGesture {
       shift: event?.shiftKey ?? false,
       ctrl: event?.ctrlKey ?? false,
       touch: this.isTouchGesture,
+      ...(this.aiming ? { target: true } : {}),
     };
     const rect: MarqueeRect = { x1: start.x, y1: start.y, x2: end.x, y2: end.y };
     this.reset();
@@ -147,6 +162,7 @@ export class TableMarqueeGesture {
   private reset(): void {
     this.active = false;
     this.dragged = false;
+    this.aiming = false;
     this.startTablePoint = null;
     this.currentTablePoint = null;
   }

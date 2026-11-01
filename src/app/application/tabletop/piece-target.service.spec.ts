@@ -49,4 +49,15 @@ describe('PieceTargetService', () => {
 
     expect([one.targeted, two.targeted, three.targeted]).toEqual([false, true, true]);
   });
+
+  it('aims at the pieces given as well, leaving every other aim as it was', () => {
+    const one = GameCharacter.create('一', 1, '');
+    const two = GameCharacter.create('二', 1, '');
+    const three = GameCharacter.create('三', 1, '');
+    service().toggle(one);
+
+    service().aimAlso([two, one]);
+
+    expect([one.targeted, two.targeted, three.targeted]).toEqual([true, true, false]);
+  });
 });
