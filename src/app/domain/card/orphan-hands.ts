@@ -1,5 +1,5 @@
 import { Card } from '@axe/domain/card/card';
-import { handHolderOf } from '@axe/domain/card/hand-location';
+import { characterOfHandHolder, handHolderOf } from '@axe/domain/card/hand-location';
 
 /** How many leading characters of a user id are shown to tell absent participants apart. */
 const SHORT_USER_ID_LENGTH = 6;
@@ -11,8 +11,8 @@ export interface OrphanHand {
 }
 
 /**
- * The hands held by nobody in the room: every hand location whose user is not among the present
- * ones, each with at least one card.
+ * The hands held by nobody in the room: every participant's hand location whose user is not among
+ * the present ones, each with at least one card. A character's hand is never one.
  *
  * Cards keep their hand order, and the hands are sorted by user id so the list stays still while
  * cards come and go.
@@ -21,7 +21,8 @@ export function selectOrphanHands(cards: readonly Card[], presentUserIds: Readon
   const byUser = new Map<string, Card[]>();
   for (const card of cards) {
     const holder = handHolderOf(card.location.name);
-    if (holder === null || presentUserIds.has(holder)) continue;
+    // A character's hand is held for the character, not for anybody who may have left.
+    if (holder === null || presentUserIds.has(holder) || characterOfHandHolder(holder) !== null) continue;
     const hand = byUser.get(holder);
     if (hand) hand.push(card);
     else byUser.set(holder, [card]);

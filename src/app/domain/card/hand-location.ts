@@ -21,3 +21,21 @@ export function isHandOf(locationName: string, userId: string): boolean {
   if (!userId) return false;
   return handHolderOf(locationName) === userId;
 }
+
+/**
+ * What a character's hand is held under, in place of a user id: the same `hand:` locations as a
+ * player's hand, so every way of moving a card into or out of a hand works on it unchanged.
+ */
+export const CHARACTER_HAND_HOLDER_PREFIX = 'chr:';
+
+/** The holder a character's hand goes by. */
+export function characterHandHolderOf(characterIdentifier: string): string {
+  return CHARACTER_HAND_HOLDER_PREFIX + characterIdentifier;
+}
+
+/** The character a holder stands for, or null for a player's hand or a holder with no character. */
+export function characterOfHandHolder(holder: string): string | null {
+  return holder.startsWith(CHARACTER_HAND_HOLDER_PREFIX) && holder.length > CHARACTER_HAND_HOLDER_PREFIX.length
+    ? holder.slice(CHARACTER_HAND_HOLDER_PREFIX.length)
+    : null;
+}

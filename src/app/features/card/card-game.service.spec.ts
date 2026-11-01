@@ -6,7 +6,9 @@ import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/netw
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card, CardState } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
+import { handHolderForCharacter } from '@axe/domain/card/character-hands';
 import { handLocationOf } from '@axe/domain/card/hand-location';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
@@ -698,6 +700,118 @@ describe('CardGameService', () => {
 
       expect(service.discardPairs(service.handCardsOf('me'))).toEqual([]);
       expect(sendSystemNotice).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('character hands', () => {
+    function character(name: string, owner = ''): GameCharacter {
+      const piece = GameCharacter.create(name, 1, '');
+      piece.owner = owner;
+      piece.setLocation('table');
+      created.push(piece);
+      return piece;
+    }
+
+    it('offers the characters on the table as recipients beside the participants', () => {
+      peer('other', 'あいて');
+      const blaze = character('ブレイズ', 'me');
+
+      const names = service.giveRecipients().map((seat) => seat.name);
+
+      expect(names).toEqual(['あいて', 'ブレイズ']);
+      expect(service.giveRecipients(handHolderForCharacter(blaze)).map((seat) => seat.name)).toEqual([
+        'わたし',
+        'あいて',
+      ]);
+    });
+
+    it('gives a card from your hand into a character, and from the character on to someone else', () => {
+      const other = peer('other', 'あいて');
+      const blaze = character('ブレイズ', 'me');
+      const holder = handHolderForCharacter(blaze);
+      const card = trumpCard('s01');
+      card.toHand('me');
+
+      expect(service.giveFromHand(card, holder)).toBe(true);
+      expect(card.location.name).toBe(handLocationOf(holder));
+      expect(sendSystemNotice.mock.calls[0][1]).toContain('ブレイズ');
+
+      expect(service.giveFromHand(card, other.userId, holder)).toBe(true);
+      expect(card.location.name).toBe(handLocationOf(other.userId));
+      expect(card.lastHandGiverName).toBe('ブレイズ');
+    });
+
+    it('lets the owner and the game master hold for a character, and nobody else', () => {
+      const mine = character('ブレイズ', 'me');
+      const theirs = character('ローゼ', 'other');
+      const npc = character('ゴブリン');
+
+      expect(service.canHoldFor(handHolderForCharacter(mine))).toBe(true);
+      expect(service.canHoldFor(handHolderForCharacter(theirs))).toBe(false);
+      expect(service.canHoldFor(handHolderForCharacter(npc))).toBe(false);
+
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      expect(service.canHoldFor(handHolderForCharacter(theirs))).toBe(true);
+      expect(service.canHoldFor(handHolderForCharacter(npc))).toBe(true);
+    });
+
+    it('will not give from a character you do not hold for', () => {
+      const theirs = character('ローゼ', 'other');
+      const card = trumpCard('s01');
+      card.toHand(handHolderForCharacter(theirs));
+
+      expect(service.giveFromHand(card, 'me', handHolderForCharacter(theirs))).toBe(false);
+      expect(card.location.name).toBe(handLocationOf(handHolderForCharacter(theirs)));
+    });
+
+    it("draws from a character's hand into yours, and from a player's hand into a character you own", () => {
+      const other = peer('other', 'あいて');
+      const npc = character('ゴブリン');
+      const blaze = character('ブレイズ', 'me');
+      const fromNpc = trumpCard('s01');
+      fromNpc.toHand(handHolderForCharacter(npc));
+      const fromOther = trumpCard('s02');
+      fromOther.toHand(other.userId);
+
+      expect(service.drawFromHand(fromNpc, 'ゴブリン')).toBe(true);
+      expect(fromNpc.location.name).toBe(handLocationOf('me'));
+      expect(service.drawFromHand(fromOther, 'あいて', handHolderForCharacter(blaze))).toBe(true);
+      expect(fromOther.location.name).toBe(handLocationOf(handHolderForCharacter(blaze)));
+    });
+
+    it('lists your own hand first, then the characters you own, and for the game master any character holding cards', () => {
+      const blaze = character('ブレイズ', 'me');
+      const npc = character('ゴブリン');
+      character('ローゼ', 'other');
+      trumpCard('s01').toHand(handHolderForCharacter(npc));
+
+      expect(service.heldHands().map((seat) => seat.name)).toEqual(['わたし', 'ブレイズ']);
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      expect(service.heldHands().map((seat) => seat.userId)).toEqual([
+        'me',
+        handHolderForCharacter(blaze),
+        handHolderForCharacter(npc),
+      ]);
+    });
+
+    it("shows a character's hand as its owner chose for their own, and keeps one nobody owns hidden", () => {
+      const other = peer('other', 'あいて');
+      const theirs = character('ローゼ', 'other');
+      const npc = character('ゴブリン');
+
+      expect(service.handPublicOf(handHolderForCharacter(theirs))).toBe(false);
+      other.handPublic = true;
+      expect(service.handPublicOf(handHolderForCharacter(theirs))).toBe(true);
+      expect(service.handPublicOf(handHolderForCharacter(npc))).toBe(false);
+      Config.instance.handVisibilityMode = 'public';
+      expect(service.handPublicOf(handHolderForCharacter(npc))).toBe(true);
+    });
+
+    it("never counts a character's hand as left behind", () => {
+      const npc = character('ゴブリン');
+      trumpCard('s01').toHand(handHolderForCharacter(npc));
+
+      expect(service.orphanHands()).toEqual([]);
     });
   });
 });

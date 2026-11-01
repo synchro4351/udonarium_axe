@@ -3,6 +3,7 @@ import { getAuthorityPeerId } from '@axe/core/network/peer-context-source';
 import { ImageFile } from '@axe/core/storage/image-file';
 import { Attributes } from '@axe/core/sync/attributes';
 import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
+import { seesCharacterHandAt } from '@axe/domain/card/character-hands';
 import { handLocationOf, isHandLocation, isHandOf } from '@axe/domain/card/hand-location';
 import { DataElement, DataElementType } from '@axe/domain/data/data-element';
 import { TextFormat, toTextFormat } from '@axe/domain/data/text-format';
@@ -151,9 +152,19 @@ export class Card extends OwnedTabletopObject {
   get isInAnyHand(): boolean {
     return isHandLocation(this.location.name);
   }
-  /** Whether this user can see the card's front: it is face up, they are peeking, or it is in their hand. */
+  /**
+   * Whether the card is in the hand of a character whose cards this user sees: one they own, or
+   * any character's for the game master.
+   */
+  get isInCharacterHandISee(): boolean {
+    return seesCharacterHandAt(this.location.name, { userId: PeerCursor.myUserId, role: PeerCursor.myRole });
+  }
+  /**
+   * Whether this user can see the card's front: it is face up, they are peeking, or it is in their
+   * hand or the hand of a character whose cards they see.
+   */
   get isVisible(): boolean {
-    return this.isPeeking || this.isFront || this.isInMyHand;
+    return this.isPeeking || this.isFront || this.isInMyHand || this.isInCharacterHandISee;
   }
 
   /**

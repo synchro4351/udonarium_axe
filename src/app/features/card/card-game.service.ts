@@ -7,10 +7,12 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { planDeal } from '@axe/domain/card/card-deal';
 import { CardStack } from '@axe/domain/card/card-stack';
+import { handHolderForCharacter, seesCharacterHand } from '@axe/domain/card/character-hands';
 import { selectHandCardsOf } from '@axe/domain/card/hand-cards';
-import { handHolderOf } from '@axe/domain/card/hand-location';
+import { characterOfHandHolder, handHolderOf } from '@axe/domain/card/hand-location';
 import { appendHandOrderAfter, OrphanHand, selectOrphanHands, shortUserIdOf } from '@axe/domain/card/orphan-hands';
 import { findTrumpPairs, selectExtraJokers, trumpRankOf } from '@axe/domain/card/trump-card';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
@@ -18,9 +20,15 @@ import { canRoleEdit, canRoleSeeHidden, PeerRole } from '@axe/domain/peer/peer-r
 
 const DISCARD_STACK_OFFSET = 150;
 
+/**
+ * A hand cards can be held in: a participant's, or a character's. `userId` is what the hand is held
+ * under, a user id for a participant and the character's holder for a character.
+ */
 export interface CardSeat {
   userId: string;
   name: string;
+  /** The character the hand belongs to; absent for a participant's own hand. */
+  characterIdentifier?: string;
 }
 
 /** How a game master's attempt to hand over an orphaned hand ended; anything but `moved` left every card where it was. */
@@ -61,9 +69,66 @@ export class CardGameService {
     return seats;
   }
 
-  /** The cards in a user's hand, in the order they were taken into it. */
-  handCardsOf(userId: string): Card[] {
-    return selectHandCardsOf(this.objectStore.getObjects<Card>(Card), userId);
+  /** The cards in a hand, a participant's or a character's, in the order they were taken into it. */
+  handCardsOf(holder: string): Card[] {
+    return selectHandCardsOf(this.objectStore.getObjects<Card>(Card), holder);
+  }
+
+  /** The characters on the table, each with the hand it holds cards in. */
+  characterSeats(): CardSeat[] {
+    return this.objectStore
+      .getObjects<GameCharacter>(GameCharacter)
+      .filter((character) => character.isVisibleOnTable)
+      .map((character) => ({
+        userId: handHolderForCharacter(character),
+        name: character.name,
+        characterIdentifier: character.identifier,
+      }));
+  }
+
+  /**
+   * Whether you may play, sort and give from a hand, and take cards into it: your own, and a
+   * character's whose cards you see, which is one you own or, for the game master, any.
+   */
+  canHoldFor(holder: string): boolean {
+    if (!canRoleEdit(PeerCursor.myRole)) return false;
+    const myUserId = this.myUserId();
+    if (myUserId.length < 1) return false;
+    if (holder === myUserId) return true;
+    const character = this.characterOf(holder);
+    return character !== null && seesCharacterHand(character, { userId: myUserId, role: PeerCursor.myRole });
+  }
+
+  /**
+   * The hands you hold for, your own first: then each character you own, and for the game master
+   * every character with a card in hand as well.
+   */
+  heldHands(): CardSeat[] {
+    const myUserId = this.myUserId();
+    if (myUserId.length < 1 || !canRoleEdit(PeerCursor.myRole)) return [];
+    const own: CardSeat = { userId: myUserId, name: PeerCursor.myCursor?.name ?? '' };
+    const characters = this.characterSeats().filter((seat) => {
+      if (!this.canHoldFor(seat.userId)) return false;
+      const character = this.characterOf(seat.userId);
+      return character?.owner === myUserId || this.handCardsOf(seat.userId).length > 0;
+    });
+    return [own, ...characters];
+  }
+
+  /** The character a hand belongs to, or null for a participant's hand or a character gone. */
+  private characterOf(holder: string): GameCharacter | null {
+    const identifier = characterOfHandHolder(holder);
+    if (identifier === null) return null;
+    const character = this.objectStore.get(identifier);
+    return character instanceof GameCharacter ? character : null;
+  }
+
+  /** What a hand is called in the chat: the participant's name, or the character's. */
+  private holderName(holder: string): string {
+    const character = this.characterOf(holder);
+    if (character) return character.name;
+    if (holder === this.myUserId()) return PeerCursor.myCursor?.name ?? '';
+    return PeerCursor.findByUserId(holder)?.name ?? '';
   }
 
   /**
@@ -113,11 +178,16 @@ export class CardGameService {
     return this.objectStore.get<Config>('Config')?.allowsHandGive ?? true;
   }
 
-  /** Room rules override a participant's own public-hand choice without changing their cursor. */
-  handPublicOf(userId: string): boolean {
+  /**
+   * Room rules override a participant's own public-hand choice without changing their cursor. A
+   * character's hand is shown as its owner chose for their own, and one nobody owns is kept hidden.
+   */
+  handPublicOf(holder: string): boolean {
     const mode = this.objectStore.get<Config>('Config')?.handVisibilityMode ?? 'choice';
     if (mode !== 'choice') return mode === 'public';
-    return PeerCursor.findByUserId(userId)?.handPublic ?? false;
+    const character = this.characterOf(holder);
+    if (character) return character.owner.length > 0 && (PeerCursor.findByUserId(character.owner)?.handPublic ?? false);
+    return PeerCursor.findByUserId(holder)?.handPublic ?? false;
   }
 
   /** Card property edits are GM-only until the room explicitly permits players. Guests never edit. */
@@ -145,10 +215,12 @@ export class CardGameService {
     return this.myUserId().length > 0 && canRoleEdit(PeerCursor.myRole) && this.allowsHandGive();
   }
 
-  /** The participants a card can be given to, which is everyone who holds cards except yourself. */
-  giveRecipients(): CardSeat[] {
-    const myUserId = this.myUserId();
-    return this.participants().filter((seat) => seat.userId !== myUserId);
+  /**
+   * The hands a card can be given to: every participant who holds cards and every character on the
+   * table, except the hand it is given from, which is yours unless said otherwise.
+   */
+  giveRecipients(fromHolder: string = this.myUserId()): CardSeat[] {
+    return [...this.participants(), ...this.characterSeats()].filter((seat) => seat.userId !== fromHolder);
   }
 
   /**
@@ -158,27 +230,31 @@ export class CardGameService {
    * no other hand, when the room forbids drawing from hands, or when the holder is no longer in the
    * room: an orphaned hand is only for the game master to hand over.
    */
-  drawFromHand(card: Card, fromName: string): boolean {
-    const myUserId = this.myUserId();
-    if (myUserId.length < 1 || !canRoleEdit(PeerCursor.myRole) || !this.allowsHandDraw()) return false;
+  drawFromHand(card: Card, fromName: string, intoHolder: string = this.myUserId()): boolean {
+    if (!this.canHoldFor(intoHolder) || !this.allowsHandDraw()) return false;
     const holder = handHolderOf(card.location.name);
-    if (!holder || holder === myUserId || !PeerCursor.findByUserId(holder)) return false;
+    if (!holder || holder === intoHolder) return false;
+    if (!this.characterOf(holder) && !PeerCursor.findByUserId(holder)) return false;
 
-    card.toHand(myUserId);
+    card.toHand(intoHolder);
     SoundEffect.play(PresetSound.cardDraw);
     this.chatMessageService.sendSystemNotice(
       'card',
-      this.t('feature.card.message.drewFromHand', { from: fromName, to: PeerCursor.myCursor?.name ?? '' })
+      this.t('feature.card.message.drewFromHand', { from: fromName, to: this.holderName(intoHolder) })
     );
     return true;
   }
 
-  /** Gives one of your hand cards to another participant, keeping it hidden in their hand. False while the room forbids it. */
-  giveFromHand(card: Card, recipientUserId: string): boolean {
-    const recipient = this.recipientForGive(recipientUserId);
-    if (!recipient || !this.handCardsOf(this.myUserId()).includes(card)) return false;
+  /**
+   * Gives a card from a hand you hold for, yours unless said otherwise, to another hand, keeping it
+   * hidden there. False while the room forbids it.
+   */
+  giveFromHand(card: Card, recipientUserId: string, fromHolder: string = this.myUserId()): boolean {
+    if (!this.canHoldFor(fromHolder)) return false;
+    const recipient = this.recipientForGive(recipientUserId, fromHolder);
+    if (!recipient || !this.handCardsOf(fromHolder).includes(card)) return false;
 
-    this.finishGiving(card, recipient, true);
+    this.finishGiving(card, recipient, true, fromHolder);
     return true;
   }
 
@@ -295,20 +371,20 @@ export class CardGameService {
     return present;
   }
 
-  private recipientForGive(userId: string): CardSeat | null {
+  private recipientForGive(userId: string, fromHolder: string = this.myUserId()): CardSeat | null {
     if (!this.canGiveCards()) return null;
-    return this.giveRecipients().find((seat) => seat.userId === userId) ?? null;
+    return this.giveRecipients(fromHolder).find((seat) => seat.userId === userId) ?? null;
   }
 
-  private finishGiving(card: Card, recipient: CardSeat, fromHand: boolean): void {
+  private finishGiving(card: Card, recipient: CardSeat, fromHand: boolean, fromHolder = this.myUserId()): void {
     card.toHand(recipient.userId);
     card.lastHandGiverUserId = this.myUserId();
-    card.lastHandGiverName = PeerCursor.myCursor?.name ?? '';
+    card.lastHandGiverName = this.holderName(fromHolder);
     SoundEffect.play(PresetSound.cardDraw);
     this.chatMessageService.sendSystemNotice(
       'card',
       this.t(fromHand ? 'feature.card.message.gaveFromHand' : 'feature.card.message.gaveCard', {
-        from: PeerCursor.myCursor?.name ?? '',
+        from: this.holderName(fromHolder),
         to: recipient.name,
       })
     );
