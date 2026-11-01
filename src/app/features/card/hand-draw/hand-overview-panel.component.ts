@@ -3,13 +3,15 @@ import { ImageService } from '@axe/application/storage/image.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
+import { handHolderOf } from '@axe/domain/card/hand-location';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
 import { CardGameService } from '@axe/features/card/card-game.service';
 import { OrphanHandRescueComponent } from '@axe/features/card/hand-draw/orphan-hand-rescue.component';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
 import { HandDragService } from '@axe/features/card/hand-rail/hand-drag.service';
-import { isOwnHandDrawTargetAt } from '@axe/features/card/hand-rail/hand-drop-target';
+import { handDrawTargetAt } from '@axe/features/card/hand-rail/hand-drop-target';
 import { CardFacePreviewComponent } from '@axe/ui/components/card-face-preview/card-face-preview.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
@@ -17,7 +19,12 @@ import { TranslocoModule } from '@jsverse/transloco';
 export interface HandOverviewSection {
   userId: string;
   name: string;
+  /** Your own hand. */
   isSelf: boolean;
+  /** A hand you hold for: your own, or a character's whose cards you see. */
+  heldByMe: boolean;
+  /** The character the hand belongs to; absent for a participant's. */
+  characterIdentifier?: string;
   handPublic: boolean;
   cards: Card[];
 }
@@ -50,8 +57,8 @@ export class HandOverviewPanelComponent {
 
   /** The participant whose card is being drawn, empty while no draw drag is under way. */
   protected readonly drawFromUserId = signal('');
-  /** Whether the card being drawn is over your own section, where letting go draws it. */
-  protected readonly overOwnSection = signal(false);
+  /** The hand the card being drawn is over, among those you may draw into; empty over anything else. */
+  protected readonly drawTarget = signal('');
 
   constructor() {
     // A draw drag ends when its card leaves that hand (someone else drew it, or the participant left)
@@ -73,12 +80,16 @@ export class HandOverviewPanelComponent {
   }
 
   /**
-   * Every participant who may hold cards, each with their hand as everyone else sees it: fronts only
-   * while that hand is public.
+   * Every participant who may hold cards, then each character holding cards or held for by you, each
+   * with their hand as everyone else sees it: fronts only while that hand is public.
    */
   readonly sections = computed<HandOverviewSection[]>(() => {
     this.objectChange.collectionOf(Card.aliasName)();
     this.objectChange.collectionOf(PeerCursor.aliasName)();
+    this.objectChange.collectionOf(GameCharacter.aliasName)();
+    for (const character of this.objectStore.getObjects<GameCharacter>(GameCharacter)) {
+      this.objectChange.versionOf(character.identifier)();
+    }
     this.objectChange.versionOf('Config')();
     this.objectChange.trackMyCursor();
     for (const cursor of this.objectStore.getObjects<PeerCursor>(PeerCursor)) {
@@ -87,13 +98,24 @@ export class HandOverviewPanelComponent {
     for (const card of this.objectStore.getObjects<Card>(Card)) this.objectChange.versionOf(card.identifier)();
 
     const myUserId = this.cardGame.myUserId();
-    return this.cardGame.participants().map((seat) => ({
+    const characters = this.cardGame
+      .characterSeats()
+      .filter((seat) => this.cardGame.canHoldFor(seat.userId) || this.cardGame.handCardsOf(seat.userId).length > 0);
+    return [...this.cardGame.participants(), ...characters].map((seat) => ({
       userId: seat.userId,
       name: seat.name,
       isSelf: seat.userId === myUserId,
+      heldByMe: this.cardGame.canHoldFor(seat.userId),
+      characterIdentifier: seat.characterIdentifier,
       handPublic: this.cardGame.handPublicOf(seat.userId),
       cards: this.cardGame.handCardsOf(seat.userId),
     }));
+  });
+
+  /** The hand the card being dragged out of the rail came from, which takes no card back. */
+  protected readonly draggedFrom = computed(() => {
+    const card = this.drag.card();
+    return card ? (handHolderOf(card.location.name) ?? '') : '';
   });
 
   /** Whether the room lets you give cards away; while it does not, no section takes a dropped card. */
@@ -138,7 +160,7 @@ export class HandOverviewPanelComponent {
   }
 
   protected onCardPointerDown(event: PointerEvent, section: HandOverviewSection, card: Card): void {
-    if (section.isSelf || !this.canDraw()) return;
+    if (section.heldByMe || !this.canDraw()) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     event.preventDefault();
     this.drawPending = {
@@ -174,7 +196,7 @@ export class HandOverviewPanelComponent {
     } else {
       this.drag.move(event.clientX, event.clientY);
     }
-    this.overOwnSection.set(this.isOverOwnSection(event.clientX, event.clientY));
+    this.drawTarget.set(this.drawTargetAt(event.clientX, event.clientY));
   }
 
   protected onCardPointerUp(event: PointerEvent): void {
@@ -182,13 +204,13 @@ export class HandOverviewPanelComponent {
     if (!pending || pending.pointerId !== event.pointerId) return;
     this.releaseCapture(event);
     const wasDragging = pending.dragging && this.drawing();
-    const over = wasDragging && this.isOverOwnSection(event.clientX, event.clientY);
+    const into = wasDragging ? this.drawTargetAt(event.clientX, event.clientY) : '';
     this.cancelDraw();
-    if (!over) return;
+    if (!into) return;
 
     const source = this.sections().find((section) => section.userId === pending.fromUserId);
     if (!source || !source.cards.includes(pending.card)) return;
-    this.cardGame.drawFromHand(pending.card, source.name);
+    this.cardGame.drawFromHand(pending.card, source.name, into);
   }
 
   protected onCardPointerCancel(event: PointerEvent): void {
@@ -198,15 +220,19 @@ export class HandOverviewPanelComponent {
     this.cancelDraw();
   }
 
-  private isOverOwnSection(clientX: number, clientY: number): boolean {
-    if (!this.canDraw()) return false;
-    return isOwnHandDrawTargetAt(elementsAt(clientX, clientY), this.cardGame.myUserId());
+  /** The hand you hold for under the pointer, other than the one being drawn from; empty elsewhere. */
+  private drawTargetAt(clientX: number, clientY: number): string {
+    if (!this.canDraw()) return '';
+    const holders = this.sections()
+      .filter((section) => section.heldByMe && section.userId !== this.drawFromUserId())
+      .map((section) => section.userId);
+    return handDrawTargetAt(elementsAt(clientX, clientY), holders);
   }
 
   private cancelDraw(): void {
     this.drawPending = null;
     this.drawFromUserId.set('');
-    this.overOwnSection.set(false);
+    this.drawTarget.set('');
     this.drag.endDraw();
   }
 

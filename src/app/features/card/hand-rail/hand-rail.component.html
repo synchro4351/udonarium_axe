@@ -48,6 +48,34 @@
       </div>
     </div>
 
+    @if (heldHands().length > 1) {
+      <div
+        class="border-ui-border-panel flex flex-wrap items-center gap-1 border-b border-solid px-2 py-1"
+        role="tablist"
+        data-testid="hand-tabs"
+        [attr.aria-label]="'feature.card.hand.tabs' | transloco"
+      >
+        @for (seat of heldHands(); track seat.userId; let first = $first) {
+          <button
+            class="rounded-ui-sm m-0 inline-flex h-5.5 max-w-36 cursor-pointer items-center gap-1 border border-solid px-2 text-[11px] font-medium transition-colors"
+            [ngClass]="
+              holder() === seat.userId
+                ? 'border-ui-accent bg-ui-accent-bg text-ui-accent'
+                : 'border-ui-border-panel bg-ui-elevated text-ui-text hover:bg-ui-hover'
+            "
+            type="button"
+            role="tab"
+            [attr.aria-selected]="holder() === seat.userId"
+            [attr.data-testid]="first ? 'hand-tab-own' : 'hand-tab-' + seat.characterIdentifier"
+            (click)="pickHand(seat.userId)"
+          >
+            <i class="material-icons text-[13px]!" aria-hidden="true">{{ first ? 'person' : 'badge' }}</i>
+            <span class="truncate">{{ first ? ('feature.card.hand.ownTab' | transloco) : seat.name }}</span>
+          </button>
+        }
+      </div>
+    }
+
     <div class="border-ui-border-panel flex items-center justify-center gap-2 border-b border-solid px-2 py-1">
       <button
         class="rounded-ui-sm focus-visible:ring-ui-accent m-0 inline-flex h-5.5 cursor-pointer items-center gap-1 border border-solid px-2 text-[11px] font-bold transition-colors outline-none focus-visible:ring-2"
@@ -58,7 +86,7 @@
         "
         type="button"
         data-testid="hand-public-status"
-        [disabled]="!handVisibilityChoice()"
+        [disabled]="!handVisibilityChoice() || !isOwnHand()"
         [attr.aria-pressed]="handPublic()"
         [attr.aria-expanded]="handPublic() ? null : confirmPublic()"
         [title]="

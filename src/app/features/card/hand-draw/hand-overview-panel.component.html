@@ -8,25 +8,31 @@
   }}</span>
 </p>
 @for (section of sections(); track section.userId) {
-  @let target = (dropping() && !section.isSelf) || (drawing() && section.isSelf);
-  @let active = dropping() ? drag.dropUserId() === section.userId : drawing() && section.isSelf && overOwnSection();
-  @let drawable = !section.isSelf && canDraw();
+  @let source = dropping() && section.userId === draggedFrom();
+  @let drawInto = drawing() && section.heldByMe && section.userId !== drawFromUserId();
+  @let target = (dropping() && !source) || drawInto;
+  @let active = dropping() ? drag.dropUserId() === section.userId : drawInto && drawTarget() === section.userId;
+  @let drawable = !section.heldByMe && canDraw();
   <section
     class="rounded-ui mb-2 border-2 border-solid p-2 transition-colors"
     data-testid="hand-overview-section"
-    [attr.data-hand-drop-user-id]="section.isSelf || !allowsGive() ? null : section.userId"
-    [attr.data-hand-draw-target]="section.isSelf && canDraw() ? section.userId : null"
+    [attr.data-hand-drop-user-id]="(dropping() ? source : section.isSelf) || !allowsGive() ? null : section.userId"
+    [attr.data-hand-draw-target]="section.heldByMe && canDraw() ? section.userId : null"
     [class.border-ui-border-panel]="!target"
     [class.border-dashed]="target && !active"
     [class.border-ui-accent]="target"
     [class.bg-ui-hover]="active"
-    [class.opacity-50]="dropping() && section.isSelf"
+    [class.opacity-50]="source"
     [attr.aria-label]="section.name"
   >
     <header class="mb-1 flex items-center gap-2 text-sm">
       <span class="truncate font-bold">{{ section.name || ('feature.card.hand.unnamed' | transloco) }}</span>
       @if (section.isSelf) {
         <span class="text-ui-dim shrink-0 text-xs">{{ 'feature.card.handOverview.you' | transloco }}</span>
+      } @else if (section.characterIdentifier) {
+        <span class="text-ui-dim shrink-0 text-xs" data-testid="hand-overview-character">{{
+          'feature.card.handOverview.character' | transloco
+        }}</span>
       }
       <span
         class="rounded-ui-sm inline-flex shrink-0 items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-bold"
@@ -47,12 +53,12 @@
         {{ 'feature.card.handOverview.cardCount' | transloco: { count: section.cards.length } }}
       </span>
     </header>
-    @if (dropping() && !section.isSelf) {
+    @if (dropping() && !source) {
       <p class="text-ui-accent m-0 mb-1 text-[11px] font-bold" data-testid="hand-overview-drop-hint">
         {{ 'feature.card.handOverview.dropHere' | transloco: { name: section.name } }}
       </p>
     }
-    @if (drawing() && section.isSelf) {
+    @if (drawInto) {
       <p class="text-ui-accent m-0 mb-1 text-[11px] font-bold" data-testid="hand-overview-draw-drop-hint">
         {{ 'feature.card.handOverview.drawHere' | transloco }}
       </p>

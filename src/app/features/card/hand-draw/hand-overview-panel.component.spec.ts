@@ -4,7 +4,9 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { Network } from '@axe/core/network/network';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
+import { handHolderForCharacter } from '@axe/domain/card/character-hands';
 import { handLocationOf } from '@axe/domain/card/hand-location';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
@@ -236,6 +238,36 @@ describe('HandOverviewPanelComponent', () => {
       );
       expect(drag.drawCard()).toBeNull();
       expect(drag.drawImageUrl()).toBe('');
+    });
+
+    it("draws from a player's hand into a character you own, and lists characters holding cards", () => {
+      peer('other', 'あいて');
+      const blaze = GameCharacter.create('ブレイズ', 1, '');
+      blaze.owner = 'me';
+      blaze.setLocation('table');
+      const npc = GameCharacter.create('ゴブリン', 1, '');
+      npc.setLocation('table');
+      created.push(blaze, npc);
+      card('s02', handHolderForCharacter(npc));
+      const held = card('s01', 'other');
+      fixture.detectChanges();
+
+      expect(component.sections().map((section) => section.name)).toEqual(['わたし', 'あいて', 'ブレイズ', 'ゴブリン']);
+      expect(
+        sectionOf(handHolderForCharacter(npc)).querySelector('[data-testid="hand-overview-character"]')
+      ).toBeTruthy();
+
+      pickUp(cardElementOf('other'));
+      expect(
+        sectionOf(handHolderForCharacter(blaze)).querySelector('[data-testid="hand-overview-draw-drop-hint"]')
+      ).toBeTruthy();
+      expect(
+        sectionOf(handHolderForCharacter(npc)).querySelector('[data-testid="hand-overview-draw-drop-hint"]')
+      ).toBeNull();
+      under = [sectionOf(handHolderForCharacter(blaze))];
+      pointer(cardElementOf('other'), 'pointerup', 40, 40);
+
+      expect(held.location.name).toBe(handLocationOf(handHolderForCharacter(blaze)));
     });
 
     it('does not draw when released outside your section or over a window covering it', () => {

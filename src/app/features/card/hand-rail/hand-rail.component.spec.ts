@@ -15,7 +15,9 @@ import { IPeerContext } from '@axe/core/network/peer-context';
 import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card, CardState } from '@axe/domain/card/card';
+import { handHolderForCharacter } from '@axe/domain/card/character-hands';
 import { handLocationOf } from '@axe/domain/card/hand-location';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
@@ -66,6 +68,29 @@ describe('HandRailComponent', () => {
     makeCard('table');
 
     expect(component.cards()).toEqual([mine]);
+  });
+
+  it("switches to a character's hand from its tab, and back to your own", () => {
+    const blaze = GameCharacter.create('ブレイズ', 1, '');
+    blaze.owner = 'me';
+    blaze.setLocation('table');
+    const mine = makeCard(handLocationOf('me'));
+    const hers = makeCard(handLocationOf(handHolderForCharacter(blaze)));
+    TestBed.inject(HandRailService).open();
+    fixture.detectChanges();
+
+    const tabs = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    expect(Array.from(tabs).map((tab) => tab.querySelector('span')?.textContent?.trim())).toEqual(['自分', 'ブレイズ']);
+    expect(component.cards()).toEqual([mine]);
+
+    tabs[1].click();
+    fixture.detectChanges();
+    expect(component.cards()).toEqual([hers]);
+    expect(component['giveRecipients']().map((seat) => seat.name)).not.toContain('ブレイズ');
+
+    tabs[0].click();
+    expect(component.cards()).toEqual([mine]);
+    blaze.destroy();
   });
 
   it('leaves a card owned but left on the table out of the hand', () => {

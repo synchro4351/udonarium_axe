@@ -29,6 +29,7 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { isHandCardOf } from '@axe/domain/card/hand-cards';
 import { findTrumpPairs } from '@axe/domain/card/trump-card';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
@@ -172,10 +173,45 @@ export class HandRailComponent {
 
   readonly canHoldCards = computed(() => this.rolePermission.canEditTabletop());
 
+  /** The tab picked on the rail: '' for your own hand, or the holder of a character's hand. */
+  protected readonly pickedHolder = signal('');
+
+  /**
+   * The hands this seat holds for, as tabs: its own first, then the characters it owns, and for the
+   * game master every character with cards in hand. Kept current as cards, pieces and seats change.
+   */
+  protected readonly heldHands = computed(() => {
+    this.objectChange.collectionOf(Card.aliasName)();
+    this.objectChange.collectionOf(GameCharacter.aliasName)();
+    this.objectChange.trackMyCursor();
+    for (const character of this.objectStore.getObjects<GameCharacter>(GameCharacter)) {
+      this.objectChange.versionOf(character.identifier)();
+    }
+    for (const card of this.objectStore.getObjects<Card>(Card)) this.objectChange.versionOf(card.identifier)();
+    return this.cardGame.heldHands();
+  });
+
+  /** The hand the rail shows and works on: the picked tab while it is still one to hold for, your own otherwise. */
+  protected readonly holder = computed(() => {
+    const picked = this.pickedHolder();
+    if (picked && this.heldHands().some((seat) => seat.userId === picked)) return picked;
+    this.objectChange.trackMyCursor();
+    return this.cardGame.myUserId();
+  });
+
+  /** Whether the rail shows your own hand, which alone carries the public switch: a character's follows its owner's. */
+  protected readonly isOwnHand = computed(() => this.holder() === this.cardGame.myUserId());
+
+  protected pickHand(holder: string): void {
+    this.pickedHolder.set(holder === this.cardGame.myUserId() ? '' : holder);
+    this.hovered.set(null);
+    this.sourceCardId.set('');
+  }
+
   protected readonly handPublic = computed(() => {
     this.objectChange.trackMyCursor();
     this.objectChange.versionOf('Config')();
-    return this.cardGame.handPublicOf(this.cardGame.myUserId());
+    return this.cardGame.handPublicOf(this.holder());
   });
 
   protected readonly handVisibilityChoice = computed(() => {
@@ -197,7 +233,7 @@ export class HandRailComponent {
     for (const cursor of this.objectStore.getObjects<PeerCursor>(PeerCursor)) {
       this.objectChange.versionOf(cursor.identifier)();
     }
-    return this.cardGame.giveRecipients();
+    return this.cardGame.giveRecipients(this.holder());
   });
 
   protected readonly confirmPublic = signal(false);
@@ -235,10 +271,10 @@ export class HandRailComponent {
   readonly cards = computed<Card[]>(() => {
     this.objectChange.collectionOf(Card.aliasName)();
     this.objectChange.trackMyCursor();
-    const userId = this.cardGame.myUserId();
+    const holder = this.holder();
     const all = this.objectStore.getObjects<Card>(Card);
     for (const card of all) this.objectChange.versionOf(card.identifier)();
-    const hand = selectHandCards(all, userId);
+    const hand = selectHandCards(all, holder);
     return this.autoSort() ? autoSortHandCards(hand) : hand;
   });
 
@@ -385,7 +421,7 @@ export class HandRailComponent {
     if (!this.cardGame.canGiveCards()) return [];
     return this.giveRecipients().map((recipient) => ({
       name: recipient.name || this.t('feature.card.hand.unnamed'),
-      action: () => this.cardGame.giveFromHand(card, recipient.userId),
+      action: () => this.cardGame.giveFromHand(card, recipient.userId, this.holder()),
     }));
   }
 
@@ -427,8 +463,8 @@ export class HandRailComponent {
 
   private recipientAt(targets: readonly HTMLElement[]): string {
     if (!this.allowsGive()) return '';
-    const participantIds = this.cardGame.participants().map((seat) => seat.userId);
-    return handDropRecipientAt(targets, this.cardGame.myUserId(), participantIds);
+    const recipientIds = this.cardGame.giveRecipients(this.holder()).map((seat) => seat.userId);
+    return handDropRecipientAt(targets, this.holder(), recipientIds);
   }
 
   private insertIndexAt(clientX: number, clientY: number): number | null {
@@ -468,7 +504,7 @@ export class HandRailComponent {
 
     const recipient = this.recipientAt(targets);
     if (recipient) {
-      this.cardGame.giveFromHand(pending.card, recipient);
+      this.cardGame.giveFromHand(pending.card, recipient, this.holder());
       return;
     }
     // Your own section, or one whose participant has left, is not a table under the overview.
@@ -493,7 +529,7 @@ export class HandRailComponent {
    * it.
    */
   private playAt(card: Card, at: PointerCoordinate, faceUp: boolean): void {
-    if (!isHandCardOf(card, this.cardGame.myUserId())) return;
+    if (!isHandCardOf(card, this.holder())) return;
     card.location.x = at.x - (card.size * this.gridSize) / 2;
     card.location.y = at.y - (card.size * this.gridSize) / 2;
     card.posZ = at.z;
