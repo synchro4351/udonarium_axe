@@ -883,13 +883,13 @@ describe('CardGameService', () => {
       expect(service.giveRecipients().map((seat) => seat.name)).toEqual(['謎の影']);
     });
 
-    it('lets only the game master hold for a character on a room server, which sends nobody else its fronts', () => {
+    it("lets the owner hold for a character on a room server too, which sends them its hand's fronts", () => {
       vi.spyOn(Network, 'transport', 'get').mockReturnValue('server');
       const mine = character('ブレイズ', 'me');
+      const theirs = character('ローゼ', 'other');
 
-      expect(service.canHoldFor(handHolderForCharacter(mine))).toBe(false);
-      PeerCursor.myCursor.role = PeerRole.GameMaster;
       expect(service.canHoldFor(handHolderForCharacter(mine))).toBe(true);
+      expect(service.canHoldFor(handHolderForCharacter(theirs))).toBe(false);
     });
 
     it('will not draw into a character you do not hold for', () => {
