@@ -5,7 +5,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { ConfirmService } from '@axe/application/ui/confirm.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
-import { OrphanHand, shortUserIdOf } from '@axe/domain/card/orphan-hands';
+import { OrphanHand } from '@axe/domain/card/orphan-hands';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { CardGameService, CardSeat, OrphanHandRescueResult } from '@axe/features/card/card-game.service';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
@@ -67,7 +67,7 @@ export class OrphanHandRescueComponent {
   });
 
   protected shortId(userId: string): string {
-    return shortUserIdOf(userId);
+    return this.cardGame.orphanHandLabel(userId);
   }
 
   /** The recipient picked for a hand, forgotten once they can no longer take it. */
@@ -97,7 +97,7 @@ export class OrphanHandRescueComponent {
     if (!recipient) return;
     const confirmed = hand.cards.map((card) => card.identifier);
     const params = {
-      from: shortUserIdOf(hand.userId),
+      from: this.cardGame.orphanHandLabel(hand.userId),
       count: confirmed.length,
       to: recipient.name || this.t('feature.card.hand.unnamed'),
     };

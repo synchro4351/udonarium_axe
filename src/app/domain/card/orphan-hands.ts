@@ -11,18 +11,23 @@ export interface OrphanHand {
 }
 
 /**
- * The hands held by nobody in the room: every participant's hand location whose user is not among
- * the present ones, each with at least one card. A character's hand is never one.
+ * The hands held by nobody in the room: every hand whose participant is not among the present ones,
+ * or whose character is not among those still on the table, each with at least one card.
  *
  * Cards keep their hand order, and the hands are sorted by user id so the list stays still while
  * cards come and go.
  */
-export function selectOrphanHands(cards: readonly Card[], presentUserIds: ReadonlySet<string>): OrphanHand[] {
+export function selectOrphanHands(
+  cards: readonly Card[],
+  presentUserIds: ReadonlySet<string>,
+  presentCharacterHolders: ReadonlySet<string> = new Set()
+): OrphanHand[] {
   const byUser = new Map<string, Card[]>();
   for (const card of cards) {
     const holder = handHolderOf(card.location.name);
-    // A character's hand is held for the character, not for anybody who may have left.
-    if (holder === null || presentUserIds.has(holder) || characterOfHandHolder(holder) !== null) continue;
+    if (holder === null) continue;
+    const present = characterOfHandHolder(holder) === null ? presentUserIds : presentCharacterHolders;
+    if (present.has(holder)) continue;
     const hand = byUser.get(holder);
     if (hand) hand.push(card);
     else byUser.set(holder, [card]);

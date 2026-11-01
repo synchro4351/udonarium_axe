@@ -216,6 +216,11 @@ export class HandRailComponent {
   protected readonly handPublic = computed(() => {
     this.objectChange.trackMyCursor();
     this.objectChange.versionOf('Config')();
+    // A character's hand follows its owner's choice, which is on the owner's cursor.
+    this.objectChange.collectionOf(PeerCursor.aliasName)();
+    for (const cursor of this.objectStore.getObjects<PeerCursor>(PeerCursor)) {
+      this.objectChange.versionOf(cursor.identifier)();
+    }
     return this.cardGame.handPublicOf(this.holder());
   });
 

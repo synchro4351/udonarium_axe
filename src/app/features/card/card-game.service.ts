@@ -81,9 +81,14 @@ export class CardGameService {
       .filter((character) => character.isVisibleOnTable)
       .map((character) => ({
         userId: handHolderForCharacter(character),
-        name: character.name,
+        name: this.characterName(character),
         characterIdentifier: character.identifier,
       }));
+  }
+
+  /** A character's name as this seat may read it: none where the piece hides it from those who see no secrets. */
+  private characterName(character: GameCharacter): string {
+    return character.hideName && !canRoleSeeHidden(PeerCursor.myRole) ? '' : character.name;
   }
 
   /**
@@ -96,7 +101,11 @@ export class CardGameService {
     if (myUserId.length < 1) return false;
     if (holder === myUserId) return true;
     const character = this.characterOf(holder);
-    return character !== null && seesCharacterHand(character, { userId: myUserId, role: PeerCursor.myRole });
+    if (character === null || !character.isVisibleOnTable) return false;
+    // A room server sends a hand's fronts to the participant it is held under and to the game
+    // master, and knows of no character holding one, so there only the game master holds for one.
+    if (Network.transport === 'server' && PeerCursor.myRole !== PeerRole.GameMaster) return false;
+    return seesCharacterHand(character, { userId: myUserId, role: PeerCursor.myRole });
   }
 
   /**
@@ -123,10 +132,13 @@ export class CardGameService {
     return character instanceof GameCharacter ? character : null;
   }
 
-  /** What a hand is called in the chat: the participant's name, or the character's. */
+  /**
+   * What a hand is called in the chat, which everyone reads: the participant's name, or the
+   * character's, and the unnamed label for a character whose name is hidden.
+   */
   private holderName(holder: string): string {
     const character = this.characterOf(holder);
-    if (character) return character.name;
+    if (character) return character.hideName ? this.t('feature.card.hand.unnamed') : character.name;
     if (holder === this.myUserId()) return PeerCursor.myCursor?.name ?? '';
     return PeerCursor.findByUserId(holder)?.name ?? '';
   }
@@ -296,7 +308,28 @@ export class CardGameService {
    * for a while and may still come back to their hand.
    */
   orphanHands(): OrphanHand[] {
-    return selectOrphanHands(this.objectStore.getObjects<Card>(Card), this.presentUserIds());
+    return selectOrphanHands(
+      this.objectStore.getObjects<Card>(Card),
+      this.presentUserIds(),
+      this.presentCharacterHolders()
+    );
+  }
+
+  /**
+   * What a hand left behind is shown as: a short user id for a participant's, and for a character's
+   * its name while it is still somewhere, or a word saying it is gone.
+   */
+  orphanHandLabel(holder: string): string {
+    if (characterOfHandHolder(holder) === null) return shortUserIdOf(holder);
+    const character = this.characterOf(holder);
+    return character
+      ? this.characterName(character) || this.t('feature.card.hand.unnamed')
+      : this.t('feature.card.orphanHand.characterGone');
+  }
+
+  /** The hands of the characters on the table, which are held for and so never left behind. */
+  private presentCharacterHolders(): Set<string> {
+    return new Set(this.characterSeats().map((seat) => seat.userId));
   }
 
   /** Whether you may hand an orphaned hand over to someone: only the game master may. */
@@ -331,7 +364,7 @@ export class CardGameService {
     confirmedCardIdentifiers: readonly string[]
   ): OrphanHandRescueResult {
     if (!this.canRescueOrphanHands()) return 'notGameMaster';
-    if (this.presentUserIds().has(fromUserId)) return 'sourcePresent';
+    if (this.presentUserIds().has(fromUserId) || this.presentCharacterHolders().has(fromUserId)) return 'sourcePresent';
     const recipient = this.orphanHandRecipients().find((seat) => seat.userId === toUserId);
     if (!recipient) return 'recipientUnavailable';
 
@@ -349,7 +382,7 @@ export class CardGameService {
       'card',
       this.t('feature.card.message.rescuedOrphanHand', {
         gm: PeerCursor.myCursor?.name ?? '',
-        from: shortUserIdOf(fromUserId),
+        from: this.orphanHandLabel(fromUserId),
         count: cards.length,
         to: recipient.name,
       })

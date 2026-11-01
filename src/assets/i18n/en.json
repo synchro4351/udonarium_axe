@@ -1235,6 +1235,7 @@
         "title": "Hands of absent participants ({{count}})",
         "hint": "Hands held by participants who are not in the room. Only the GM sees this. Moved cards join the end of the recipient's hand, face down.",
         "absent": "Absent participant ({{id}})",
+        "characterGone": "(a character no longer here)",
         "recipient": "Recipient",
         "chooseRecipient": "Choose a recipient",
         "move": "Move hand",

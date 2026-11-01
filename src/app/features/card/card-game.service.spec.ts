@@ -807,11 +807,61 @@ describe('CardGameService', () => {
       expect(service.handPublicOf(handHolderForCharacter(npc))).toBe(true);
     });
 
-    it("never counts a character's hand as left behind", () => {
+    it("keeps a character's hand held while it stands on the table, and lets the game master hand it over once it is gone", () => {
+      const npc = character('ゴブリン');
+      const held = trumpCard('s01');
+      held.toHand(handHolderForCharacter(npc));
+      expect(service.orphanHands()).toEqual([]);
+
+      npc.setLocation('graveyard');
+      expect(service.orphanHands().map((hand) => service.orphanHandLabel(hand.userId))).toEqual(['ゴブリン']);
+
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      expect(service.rescueOrphanHand(handHolderForCharacter(npc), 'me', [held.identifier])).toBe('moved');
+      expect(held.location.name).toBe(handLocationOf('me'));
+    });
+
+    it('names a hand whose character was deleted as gone', () => {
       const npc = character('ゴブリン');
       trumpCard('s01').toHand(handHolderForCharacter(npc));
+      const holder = handHolderForCharacter(npc);
+      npc.destroy();
 
-      expect(service.orphanHands()).toEqual([]);
+      expect(service.orphanHands().map((hand) => hand.userId)).toEqual([holder]);
+      expect(service.orphanHandLabel(holder)).not.toContain('ゴブリン');
+    });
+
+    it('keeps a hidden name hidden from a player in the recipients and the chat, and shows it to the game master', () => {
+      const npc = character('謎の影');
+      npc.hideName = true;
+      const card = trumpCard('s01');
+      card.toHand('me');
+
+      expect(service.giveRecipients().map((seat) => seat.name)).toEqual(['']);
+      service.giveFromHand(card, handHolderForCharacter(npc));
+      expect(sendSystemNotice.mock.calls[0][1]).not.toContain('謎の影');
+
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      expect(service.giveRecipients().map((seat) => seat.name)).toEqual(['謎の影']);
+    });
+
+    it('lets only the game master hold for a character on a room server, which sends nobody else its fronts', () => {
+      vi.spyOn(Network, 'transport', 'get').mockReturnValue('server');
+      const mine = character('ブレイズ', 'me');
+
+      expect(service.canHoldFor(handHolderForCharacter(mine))).toBe(false);
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      expect(service.canHoldFor(handHolderForCharacter(mine))).toBe(true);
+    });
+
+    it('will not draw into a character you do not hold for', () => {
+      const other = peer('other', 'あいて');
+      const theirs = character('ローゼ', 'other');
+      const card = trumpCard('s01');
+      card.toHand(other.userId);
+
+      expect(service.drawFromHand(card, 'あいて', handHolderForCharacter(theirs))).toBe(false);
+      expect(card.location.name).toBe(handLocationOf(other.userId));
     });
   });
 });
