@@ -446,6 +446,142 @@
           }
         }
       }
+    ],
+    "characterHandCard": [
+      {
+        "aliasName": "character",
+        "identifier": "char1",
+        "majorVersion": 1,
+        "minorVersion": 0.5,
+        "syncData": {
+          "attributes": {
+            "owner": "u-owner",
+            "location": {
+              "name": "table"
+            }
+          }
+        }
+      },
+      {
+        "aliasName": "card",
+        "identifier": "card1",
+        "majorVersion": 1,
+        "minorVersion": 0.5,
+        "syncData": {
+          "attributes": {
+            "state": 1,
+            "owner": "",
+            "location": {
+              "name": "hand:chr:char1"
+            }
+          }
+        }
+      },
+      {
+        "aliasName": "data",
+        "identifier": "root1",
+        "majorVersion": 1,
+        "minorVersion": 0.5,
+        "syncData": {
+          "parentIdentifier": "card1",
+          "attributes": {
+            "name": "card"
+          }
+        }
+      },
+      {
+        "aliasName": "data",
+        "identifier": "image1",
+        "majorVersion": 1,
+        "minorVersion": 0.5,
+        "syncData": {
+          "parentIdentifier": "root1",
+          "attributes": {
+            "name": "image"
+          }
+        }
+      },
+      {
+        "aliasName": "data",
+        "identifier": "front1",
+        "majorVersion": 1,
+        "minorVersion": 0.5,
+        "syncData": {
+          "parentIdentifier": "image1",
+          "value": "front.webp",
+          "attributes": {
+            "name": "front"
+          }
+        }
+      }
+    ],
+    "npcHandCard": [
+      {
+        "aliasName": "character",
+        "identifier": "char1",
+        "majorVersion": 1,
+        "minorVersion": 0.5,
+        "syncData": {
+          "attributes": {
+            "owner": "",
+            "location": {
+              "name": "table"
+            }
+          }
+        }
+      },
+      {
+        "aliasName": "card",
+        "identifier": "card1",
+        "majorVersion": 1,
+        "minorVersion": 0.5,
+        "syncData": {
+          "attributes": {
+            "state": 1,
+            "owner": "",
+            "location": {
+              "name": "hand:chr:char1"
+            }
+          }
+        }
+      },
+      {
+        "aliasName": "data",
+        "identifier": "root1",
+        "majorVersion": 1,
+        "minorVersion": 0.5,
+        "syncData": {
+          "parentIdentifier": "card1",
+          "attributes": {
+            "name": "card"
+          }
+        }
+      },
+      {
+        "aliasName": "data",
+        "identifier": "image1",
+        "majorVersion": 1,
+        "minorVersion": 0.5,
+        "syncData": {
+          "parentIdentifier": "root1",
+          "attributes": {
+            "name": "image"
+          }
+        }
+      },
+      {
+        "aliasName": "data",
+        "identifier": "front1",
+        "majorVersion": 1,
+        "minorVersion": 0.5,
+        "syncData": {
+          "parentIdentifier": "image1",
+          "value": "front.webp",
+          "attributes": {
+            "name": "front"
+          }
+        }
+      }
     ]
   },
   "cases": [
@@ -602,6 +738,26 @@
     {
       "room": "gmOnlyTab",
       "identifier": "gmLine",
+      "expect": {
+        "gm": "full",
+        "owner": "hidden",
+        "player": "hidden",
+        "guest": "hidden"
+      }
+    },
+    {
+      "room": "characterHandCard",
+      "identifier": "front1",
+      "expect": {
+        "gm": "full",
+        "owner": "full",
+        "player": "hidden",
+        "guest": "hidden"
+      }
+    },
+    {
+      "room": "npcHandCard",
+      "identifier": "front1",
       "expect": {
         "gm": "full",
         "owner": "hidden",
