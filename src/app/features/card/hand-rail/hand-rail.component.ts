@@ -191,16 +191,21 @@ export class HandRailComponent {
     return this.cardGame.heldHands();
   });
 
-  /** The hand the rail shows and works on: the picked tab while it is still one to hold for, your own otherwise. */
-  protected readonly holder = computed(() => {
+  /**
+   * The hand the rail shows and works on: the picked tab while it is still one to hold for, your own
+   * otherwise. Read afresh each time rather than kept, as your own user id can arrive after the rail
+   * is first drawn without anything the rail follows changing.
+   */
+  protected holder(): string {
     const picked = this.pickedHolder();
     if (picked && this.heldHands().some((seat) => seat.userId === picked)) return picked;
-    this.objectChange.trackMyCursor();
     return this.cardGame.myUserId();
-  });
+  }
 
   /** Whether the rail shows your own hand, which alone carries the public switch: a character's follows its owner's. */
-  protected readonly isOwnHand = computed(() => this.holder() === this.cardGame.myUserId());
+  protected isOwnHand(): boolean {
+    return this.holder() === this.cardGame.myUserId();
+  }
 
   protected pickHand(holder: string): void {
     this.pickedHolder.set(holder === this.cardGame.myUserId() ? '' : holder);
