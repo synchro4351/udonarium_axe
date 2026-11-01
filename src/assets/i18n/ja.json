@@ -2403,6 +2403,8 @@
         "battleSide_right": "右の組に入れる",
         "battleSide_none": "組に入れない",
         "splitParts": "部位に分ける",
+        "giveHand": "手札を持たせる",
+        "holdsHand": "手札を持つ",
         "unlinkPart": "部位の連動を外す",
         "linkSelected": "連動させる",
         "imageEffect": {

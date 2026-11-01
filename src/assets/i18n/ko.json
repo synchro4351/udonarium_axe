@@ -2403,6 +2403,8 @@
         "battleSide_right": "오른쪽 편성에 넣기",
         "battleSide_none": "편성에 넣지 않기",
         "splitParts": "부위로 나누기",
+        "giveHand": "손패를 갖게 하기",
+        "holdsHand": "손패를 가짐",
         "unlinkPart": "부위 연동 해제",
         "linkSelected": "연동하기",
         "imageEffect": {

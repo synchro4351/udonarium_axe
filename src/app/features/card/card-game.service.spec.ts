@@ -704,13 +704,51 @@ describe('CardGameService', () => {
   });
 
   describe('character hands', () => {
-    function character(name: string, owner = ''): GameCharacter {
+    function character(name: string, owner = '', withHand = true): GameCharacter {
       const piece = GameCharacter.create(name, 1, '');
       piece.owner = owner;
       piece.setLocation('table');
+      if (withHand) Config.instance.characterHands = [...Config.instance.characterHands, piece.identifier];
       created.push(piece);
       return piece;
     }
+
+    afterEach(() => {
+      Config.instance.characterHands = [];
+    });
+
+    it('offers only the characters given a hand, not every piece on the table', () => {
+      character('ブレイズ', 'me');
+      character('通行人', '', false);
+
+      expect(service.giveRecipients().map((seat) => seat.name)).toEqual(['ブレイズ']);
+    });
+
+    it('gives a hand to a character you hold for, and takes it away only while it is empty', () => {
+      const blaze = character('ブレイズ', 'me', false);
+      const theirs = character('ローゼ', 'other', false);
+
+      expect(service.setHand(theirs, true)).toBe(false);
+      expect(service.setHand(blaze, true)).toBe(true);
+      expect(service.hasHand(blaze)).toBe(true);
+
+      const card = trumpCard('s01');
+      card.toHand(handHolderForCharacter(blaze));
+      expect(service.setHand(blaze, false)).toBe(false);
+      card.toHand('me');
+      expect(service.setHand(blaze, false)).toBe(true);
+      expect(service.hasHand(blaze)).toBe(false);
+    });
+
+    it('notes a hand for a character a card is drawn into', () => {
+      const other = peer('other', 'あいて');
+      const blaze = character('ブレイズ', 'me', false);
+      const card = trumpCard('s01');
+      card.toHand(other.userId);
+
+      expect(service.drawFromHand(card, 'あいて', handHolderForCharacter(blaze))).toBe(true);
+      expect(Config.instance.characterHands).toEqual([blaze.identifier]);
+    });
 
     it('offers the characters on the table as recipients beside the participants', () => {
       peer('other', 'あいて');
@@ -779,10 +817,10 @@ describe('CardGameService', () => {
       expect(fromOther.location.name).toBe(handLocationOf(handHolderForCharacter(blaze)));
     });
 
-    it('lists your own hand first, then the characters you own, and for the game master any character holding cards', () => {
+    it('lists your own hand first, then the characters with a hand you own, and for the game master every character with one', () => {
       const blaze = character('ブレイズ', 'me');
-      const npc = character('ゴブリン');
-      character('ローゼ', 'other');
+      const npc = character('ゴブリン', '', false);
+      character('ローゼ', 'other', false);
       trumpCard('s01').toHand(handHolderForCharacter(npc));
 
       expect(service.heldHands().map((seat) => seat.name)).toEqual(['わたし', 'ブレイズ']);

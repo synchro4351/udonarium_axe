@@ -74,16 +74,62 @@ export class CardGameService {
     return selectHandCardsOf(this.objectStore.getObjects<Card>(Card), holder);
   }
 
-  /** The characters on the table, each with the hand it holds cards in. */
+  /**
+   * The characters on the table with a hand of their own, each with the hand it holds cards in: one
+   * given a hand, or holding cards already. The rest of the table is left out, so the lists stay
+   * short.
+   */
   characterSeats(): CardSeat[] {
     return this.objectStore
       .getObjects<GameCharacter>(GameCharacter)
-      .filter((character) => character.isVisibleOnTable)
+      .filter((character) => character.isVisibleOnTable && this.hasHand(character))
       .map((character) => ({
         userId: handHolderForCharacter(character),
         name: this.characterName(character),
         characterIdentifier: character.identifier,
       }));
+  }
+
+  /** Whether the character has a hand of its own: it was given one, or it holds cards. */
+  hasHand(character: GameCharacter): boolean {
+    if (this.config()?.characterHands.includes(character.identifier)) return true;
+    return this.handCardsOf(handHolderForCharacter(character)).length > 0;
+  }
+
+  /** Whether you may give the character a hand or take its empty one away: one you hold for. */
+  canSetHand(character: GameCharacter): boolean {
+    return this.canHoldFor(handHolderForCharacter(character));
+  }
+
+  /**
+   * Gives the character a hand of its own, or takes it away. A hand still holding cards is kept,
+   * as taking it away would leave the cards with nobody to reach them. False when nothing changed.
+   */
+  setHand(character: GameCharacter, held: boolean): boolean {
+    const config = this.config();
+    if (!config || !this.canSetHand(character)) return false;
+    const listed = config.characterHands;
+    if (held) {
+      if (listed.includes(character.identifier)) return false;
+      config.characterHands = [...listed, character.identifier];
+      return true;
+    }
+    if (!listed.includes(character.identifier)) return false;
+    if (this.handCardsOf(handHolderForCharacter(character)).length > 0) return false;
+    config.characterHands = listed.filter((identifier) => identifier !== character.identifier);
+    return true;
+  }
+
+  /** Notes a character's hand as one it has, once a card has gone into it. */
+  private noteHand(holder: string): void {
+    const identifier = characterOfHandHolder(holder);
+    const config = this.config();
+    if (identifier === null || !config || config.characterHands.includes(identifier)) return;
+    config.characterHands = [...config.characterHands, identifier];
+  }
+
+  private config(): Config | null {
+    return Config.instance ?? null;
   }
 
   /** A character's name as this seat may read it: none where the piece hides it from those who see no secrets. */
@@ -109,19 +155,14 @@ export class CardGameService {
   }
 
   /**
-   * The hands you hold for, your own first: then each character you own, and for the game master
-   * every character with a card in hand as well.
+   * The hands you hold for, your own first: then each character with a hand that you own, and for
+   * the game master every character with a hand.
    */
   heldHands(): CardSeat[] {
     const myUserId = this.myUserId();
     if (myUserId.length < 1 || !canRoleEdit(PeerCursor.myRole)) return [];
     const own: CardSeat = { userId: myUserId, name: PeerCursor.myCursor?.name ?? '' };
-    const characters = this.characterSeats().filter((seat) => {
-      if (!this.canHoldFor(seat.userId)) return false;
-      const character = this.characterOf(seat.userId);
-      return character?.owner === myUserId || this.handCardsOf(seat.userId).length > 0;
-    });
-    return [own, ...characters];
+    return [own, ...this.characterSeats().filter((seat) => this.canHoldFor(seat.userId))];
   }
 
   /** The character a hand belongs to, or null for a participant's hand or a character gone. */
@@ -249,6 +290,7 @@ export class CardGameService {
     if (!this.characterOf(holder) && !PeerCursor.findByUserId(holder)) return false;
 
     card.toHand(intoHolder);
+    this.noteHand(intoHolder);
     SoundEffect.play(PresetSound.cardDraw);
     this.chatMessageService.sendSystemNotice(
       'card',
@@ -411,6 +453,7 @@ export class CardGameService {
 
   private finishGiving(card: Card, recipient: CardSeat, fromHand: boolean, fromHolder = this.myUserId()): void {
     card.toHand(recipient.userId);
+    this.noteHand(recipient.userId);
     card.lastHandGiverUserId = this.myUserId();
     card.lastHandGiverName = this.holderName(fromHolder);
     SoundEffect.play(PresetSound.cardDraw);

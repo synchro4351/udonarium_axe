@@ -248,6 +248,7 @@ describe('HandOverviewPanelComponent', () => {
       const npc = GameCharacter.create('ゴブリン', 1, '');
       npc.setLocation('table');
       created.push(blaze, npc);
+      Config.instance.characterHands = [blaze.identifier];
       card('s02', handHolderForCharacter(npc));
       const held = card('s01', 'other');
       fixture.detectChanges();
@@ -268,6 +269,7 @@ describe('HandOverviewPanelComponent', () => {
       pointer(cardElementOf('other'), 'pointerup', 40, 40);
 
       expect(held.location.name).toBe(handLocationOf(handHolderForCharacter(blaze)));
+      Config.instance.characterHands = [];
     });
 
     it('does not draw when released outside your section or over a window covering it', () => {

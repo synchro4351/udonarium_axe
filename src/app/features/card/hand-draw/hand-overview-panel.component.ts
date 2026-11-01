@@ -80,7 +80,7 @@ export class HandOverviewPanelComponent {
   }
 
   /**
-   * Every participant who may hold cards, then each character holding cards or held for by you, each
+   * Every participant who may hold cards, then each character with a hand of its own, each
    * with their hand as everyone else sees it: fronts only while that hand is public.
    */
   readonly sections = computed<HandOverviewSection[]>(() => {
@@ -98,10 +98,8 @@ export class HandOverviewPanelComponent {
     for (const card of this.objectStore.getObjects<Card>(Card)) this.objectChange.versionOf(card.identifier)();
 
     const myUserId = this.cardGame.myUserId();
-    const characters = this.cardGame
-      .characterSeats()
-      .filter((seat) => this.cardGame.canHoldFor(seat.userId) || this.cardGame.handCardsOf(seat.userId).length > 0);
-    return [...this.cardGame.participants(), ...characters].map((seat) => ({
+    this.objectChange.versionOf('Config')();
+    return [...this.cardGame.participants(), ...this.cardGame.characterSeats()].map((seat) => ({
       userId: seat.userId,
       name: seat.name,
       isSelf: seat.userId === myUserId,

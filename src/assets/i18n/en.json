@@ -2403,6 +2403,8 @@
         "battleSide_right": "Put on the right",
         "battleSide_none": "Leave out of the lineup",
         "splitParts": "Split into parts",
+        "giveHand": "Give a hand of cards",
+        "holdsHand": "Holds a hand of cards",
         "unlinkPart": "Unlink this part",
         "linkSelected": "Link selected characters",
         "imageEffect": {

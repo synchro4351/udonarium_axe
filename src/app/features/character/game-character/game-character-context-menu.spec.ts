@@ -287,6 +287,33 @@ describe('buildGameCharacterContextMenu()', () => {
     });
   });
 
+  describe('a hand of its own', () => {
+    function build(hand?: { held: boolean; set?: (held: boolean) => void }) {
+      return buildGameCharacterContextMenuModel(
+        makeChar() as unknown as GameCharacter,
+        50,
+        makeService(),
+        { ...callbacks(), hand },
+        t
+      ).actions;
+    }
+
+    it('offers to give the piece a hand, and to take an empty one away', () => {
+      const set = vi.fn();
+      build({ held: false, set }).find((action) => action.name === '手札を持たせる')!.action!();
+      build({ held: true, set }).find((action) => action.name === '✔ 手札を持つ')!.action!();
+
+      expect(set.mock.calls).toEqual([[true], [false]]);
+    });
+
+    it('shows a hand holding cards as held, without letting it be taken away, and says nothing to a seat that may not', () => {
+      const holding = build({ held: true }).find((action) => action.name === '✔ 手札を持つ')!;
+
+      expect(holding.enabled).toBe(false);
+      expect(names(build())).not.toContain('手札を持たせる');
+    });
+  });
+
   it('leads with the sheet, which opens the group at the top', () => {
     const char = makeChar();
     const menu = buildGameCharacterContextMenu(char as unknown as GameCharacter, 50, makeService(), callbacks(), t);

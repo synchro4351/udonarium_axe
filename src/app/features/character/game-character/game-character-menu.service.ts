@@ -30,10 +30,12 @@ import { sheetPanelBox, sheetPanelTitle } from '@axe/application/ui/sheet-panel'
 import { buildSurfaceSwitchContextMenu } from '@axe/application/ui/surface-switch-context-menu';
 import { TabletopOverlapService } from '@axe/application/ui/tabletop-overlap.service';
 import { isInStore, ObjectStore } from '@axe/core/sync/object-store';
+import { handHolderForCharacter } from '@axe/domain/card/character-hands';
 import { type BuffViewMode } from '@axe/domain/character/buff-view-mode';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { isLinkedPart } from '@axe/domain/character/part-group';
 import { multiAngleFontScaleFactor } from '@axe/domain/tabletop/multi-angle-font-scale';
+import { CardGameService } from '@axe/features/card/card-game.service';
 import { buildConditionContextMenu } from '@axe/features/character/game-character/condition-context-menu';
 import {
   buildGameCharacterContextMenuModel,
@@ -111,6 +113,7 @@ export class GameCharacterMenuService {
   private readonly disclosureService = inject(DisclosureService);
   private readonly battle = inject(BattleLaunchLoaderService);
   private readonly roomPanels = inject(RoomPanelService);
+  private readonly cardGame = inject(CardGameService);
   private readonly multipart = inject(MultipartCharacterService);
   private readonly partGroups = inject(MultipartGroupService);
 
@@ -169,6 +172,7 @@ export class GameCharacterMenuService {
         onPlanMove: this.mayPlanMove(char) ? () => void this.movePlan.begin(char) : undefined,
         onToggleTarget: () => this.pieceTarget.toggle(char),
         onClearTargets: this.pieceTarget.anything() ? () => this.pieceTarget.clear() : undefined,
+        hand: this.handEntryOf(char),
         onSplitParts: this.multipart.mayLink(char) ? () => this.objectPanels.openPartSplit(char) : undefined,
         onCopy: isLinkedPart(char) ? () => void this.partGroups.copyGroup(char) : undefined,
         onUnlinkPart:
@@ -302,6 +306,20 @@ export class GameCharacterMenuService {
       },
       this.translateFn
     );
+  }
+
+  /**
+   * The menu's word on the piece's hand: given one or not, and how to change that, for a seat that
+   * holds for the piece. Taking the hand away is offered only while it holds no cards.
+   */
+  private handEntryOf(char: GameCharacter): { held: boolean; set?: (held: boolean) => void } | undefined {
+    if (!this.cardGame.canSetHand(char)) return undefined;
+    const held = this.cardGame.hasHand(char);
+    const holdsCards = this.cardGame.handCardsOf(handHolderForCharacter(char)).length > 0;
+    return {
+      held,
+      set: held && holdsCards ? undefined : (next) => void this.cardGame.setHand(char, next),
+    };
   }
 
   /**

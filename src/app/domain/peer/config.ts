@@ -66,6 +66,8 @@ export class Config extends withRuleAnswers() implements InnerXml {
   @SyncVar('_controllerResources') private _controllerResources: string = '';
   /** The resources every piece shows as a bar over it, one name a line; empty for none. */
   @SyncVar('_pieceGaugeNames') private _pieceGaugeNames: string = '';
+  /** The characters given a hand of their own, by identifier, one a line; empty for none. */
+  @SyncVar('_characterHands') private _characterHands: string = '';
   // Blank allows, so a room saved before these existed keeps letting hands trade cards.
   @SyncVar('_handDrawForbidden') private _handDrawForbidden: string = '';
   @SyncVar('_handGiveForbidden') private _handGiveForbidden: string = '';
@@ -182,6 +184,17 @@ export class Config extends withRuleAnswers() implements InnerXml {
   }
   set pieceGaugeNames(names: readonly string[]) {
     this._pieceGaugeNames = uniqueNames(names).join('\n');
+  }
+
+  /**
+   * The characters given a hand of their own, by identifier: those somebody gave one, or that were
+   * handed a card. Only these are offered as hands to give to, so the table's every piece is not.
+   */
+  get characterHands(): string[] {
+    return uniqueNames(this._characterHands.split('\n'));
+  }
+  set characterHands(identifiers: readonly string[]) {
+    this._characterHands = uniqueNames(identifiers).join('\n');
   }
 
   get controllerResources(): ControllerResourcePick {

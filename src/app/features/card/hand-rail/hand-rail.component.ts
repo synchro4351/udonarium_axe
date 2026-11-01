@@ -177,10 +177,11 @@ export class HandRailComponent {
   protected readonly pickedHolder = signal('');
 
   /**
-   * The hands this seat holds for, as tabs: its own first, then the characters it owns, and for the
-   * game master every character with cards in hand. Kept current as cards, pieces and seats change.
+   * The hands this seat holds for, as tabs: its own first, then the characters with a hand that it
+   * owns, and for the game master every character with a hand. Kept current as cards, pieces and seats change.
    */
   protected readonly heldHands = computed(() => {
+    this.objectChange.versionOf('Config')();
     this.objectChange.collectionOf(Card.aliasName)();
     this.objectChange.collectionOf(GameCharacter.aliasName)();
     this.objectChange.trackMyCursor();

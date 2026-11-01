@@ -71,6 +71,11 @@ export interface GameCharacterContextMenuCallbacks {
   onUnlinkPart?: () => void;
   /** Copies every member of the piece's linked group. */
   onCopy?: () => void;
+  /**
+   * Whether the piece has a hand of its own, and how to give it one or take an empty one away. Left
+   * out for a seat that may not; `set` left out where it may not change now, as a hand holding cards.
+   */
+  hand?: { held: boolean; set?: (held: boolean) => void };
   /** Opens a first-person view from the piece. Left out where it may not be viewed from. */
   onViewFirstPerson?: () => void;
   /** Shares the first-person view with the room. Left out for anyone but the GM. */
@@ -562,6 +567,17 @@ export function buildGameCharacterContextMenuModel(
           {
             name: t('feature.character.contextMenu.unlinkPart'),
             action: () => callbacks.onUnlinkPart?.(),
+          } as ContextMenuAction,
+        ]
+      : []),
+    ...(callbacks.hand
+      ? [
+          {
+            name: callbacks.hand.held
+              ? '✔ ' + t('feature.character.contextMenu.holdsHand')
+              : t('feature.character.contextMenu.giveHand'),
+            enabled: callbacks.hand.set !== undefined,
+            action: () => callbacks.hand?.set?.(!callbacks.hand.held),
           } as ContextMenuAction,
         ]
       : []),
