@@ -85,3 +85,16 @@ export const Z_VISUAL_NOVEL_PANEL_ABOVE = Z_VISUAL_NOVEL_PANEL + 1;
  * and anything above them, which the reader opened and is in the middle of using.
  */
 export const Z_BATTLE_CUT_IN = 900;
+
+/**
+ * The box showing where a panel dragged to the side of the screen would dock: over the panels,
+ * which are numbered from one as they are brought forward, and under a context menu at 9900.
+ */
+export const Z_PANEL_DOCK_PREVIEW = 9800;
+
+/**
+ * A panel docked against a side of the screen: just over the toolbars and the hotbar at 150,
+ * whose floating bars would otherwise cover its title bar at the top, and under the visual novel
+ * overlay at 160. Left out of the ordinary stack, which only shuffles panels among themselves.
+ */
+export const Z_PANEL_DOCKED = 151;

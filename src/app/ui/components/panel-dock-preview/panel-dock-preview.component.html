@@ -1,0 +1,12 @@
+@if (preview(); as box) {
+  <div
+    class="border-ui-accent bg-ui-accent-bg rounded-ui-lg pointer-events-none fixed box-border border-2 border-solid opacity-60"
+    data-testid="panel-dock-preview"
+    aria-hidden="true"
+    [style.left.px]="box.left"
+    [style.top.px]="box.top"
+    [style.width.px]="box.width"
+    [style.height.px]="box.height"
+    [style.zIndex]="layer"
+  ></div>
+}

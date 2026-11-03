@@ -22,6 +22,8 @@ import { TabletopDisplayService } from '@axe/application/tabletop/tabletop-displ
 import { KeyboardInsetService } from '@axe/application/ui/keyboard-inset.service';
 import { CARD_STACK_LIST_COMPONENT, CHAT_PORTRAIT_COMPONENT } from '@axe/application/ui/overlay-components';
 import { PanelFrame, PanelHandoff, PanelRotationDegrees, PanelService } from '@axe/application/ui/panel.service';
+import { PanelDockFrame, PanelDockService } from '@axe/application/ui/panel-dock.service';
+import { DockBox } from '@axe/application/ui/panel-dock-helpers';
 import { PanelDragService, PanelDropFrame } from '@axe/application/ui/panel-drag.service';
 import { PanelDropZone, pointerOf, tearOffBox } from '@axe/application/ui/panel-drag-helpers';
 import { PanelTransparencyService } from '@axe/application/ui/panel-transparency.service';
@@ -33,6 +35,7 @@ import { PanelTabStripComponent } from '@axe/ui/components/ui-panel/panel-tab-st
 import { DraggableDirective } from '@axe/ui/directives/draggable.directive';
 import { ResizableDirective } from '@axe/ui/directives/resizable.directive';
 import { TextTooltipDirective } from '@axe/ui/directives/text-tooltip.directive';
+import { Z_PANEL_DOCKED } from '@axe/ui/z-layers';
 
 const PANEL_FLOOR_OPACITY = 0.25;
 
@@ -76,7 +79,7 @@ interface PanelTab extends PanelTabHandle {
     PanelTabStripComponent,
   ],
 })
-export class UIPanelComponent implements PanelFrame, PanelDropFrame {
+export class UIPanelComponent implements PanelFrame, PanelDropFrame, PanelDockFrame {
   panelService = inject(PanelService);
   private readonly pointerDeviceService = inject(PointerDeviceService);
   private readonly destroyRef = inject(DestroyRef);
@@ -85,6 +88,7 @@ export class UIPanelComponent implements PanelFrame, PanelDropFrame {
   private readonly tabletopDisplay = inject(TabletopDisplayService);
   private readonly panelTransparency = inject(PanelTransparencyService);
   private readonly panelDrag = inject(PanelDragService);
+  private readonly panelDock = inject(PanelDockService);
   private readonly t = inject(TRANSLATE_FN);
 
   readonly isCompact = this.viewport.isCompact;
@@ -106,10 +110,18 @@ export class UIPanelComponent implements PanelFrame, PanelDropFrame {
 
   readonly transparency = computed(() => this.panelTransparency.valueOf(this.activePanel().panelKind()));
 
-  /** The shelf this panel was opened on, where whatever opened it asked for one. */
+  /**
+   * The shelf this panel was opened on, where whatever opened it asked for one. A docked panel
+   * stands on a shelf of its own over the toolbars, which would otherwise cover its title bar at
+   * the top of the screen and leave no way to take it off its side.
+   */
   protected layer(): number {
+    if (this.docked()) return Z_PANEL_DOCKED;
     return this.panelService.layer;
   }
+
+  /** Whether the frame is docked against a side of the screen. */
+  private readonly docked = signal(false);
 
   readonly restingOpacity = computed(() => 1 - (this.transparency() / 100) * (1 - PANEL_FLOOR_OPACITY));
 
@@ -226,19 +238,47 @@ export class UIPanelComponent implements PanelFrame, PanelDropFrame {
     const from = event.target;
     if (!(from instanceof Node) || !this.titleBar().nativeElement.contains(from)) return;
     if (this.isCompact() || !this.activePanel().isTabbable) return;
+    this.panelDock.undock(this);
     this.panelDrag.begin(this);
   }
 
   protected onFrameDragMove(event: MouseEvent | TouchEvent): void {
     const at = pointerOf(event);
-    if (at) this.panelDrag.move(at.x, at.y);
+    if (!at || !this.panelDrag.held()) return;
+    this.panelDrag.move(at.x, at.y);
+    // Over another frame's bar the panel joins it; only away from every frame does it dock.
+    if (this.panelDrag.target()) this.panelDock.clearHover();
+    else this.panelDock.hover(this, at.x, at.y);
   }
 
   protected onFrameDragEnd(): void {
     const target = this.panelDrag.end();
-    if (!target || target === (this as PanelDropFrame)) return;
+    if (!target) {
+      this.panelDock.drop(this);
+      return;
+    }
+    this.panelDock.clearHover();
+    if (target === (this as PanelDropFrame)) return;
     for (const handoff of this.handOverAll()) target.takeIn(handoff);
     this.dismissFrame();
+  }
+
+  /** The height the frame had before it was docked, given back when it is taken off its side. */
+  private heightBeforeDock: number | null = null;
+
+  /** Puts the frame in the place it is docked at, or back to standing free at its own height. */
+  applyDock(box: DockBox | null): void {
+    const panel = this.draggablePanel().nativeElement;
+    this.docked.set(box !== null);
+    if (box) {
+      this.heightBeforeDock ??= this.height;
+      this.applyPanelBox(panel, box.left, box.top, box.width, box.height);
+    } else if (this.heightBeforeDock !== null) {
+      const height = this.heightBeforeDock;
+      this.heightBeforeDock = null;
+      this.applyPanelBox(panel, panel.offsetLeft, panel.offsetTop, this.width, height);
+    }
+    this.sizeVersion.update((version) => version + 1);
   }
 
   /**
@@ -462,6 +502,7 @@ export class UIPanelComponent implements PanelFrame, PanelDropFrame {
       },
     });
     afterNextRender({ read: () => this.destroyRef.onDestroy(this.panelDrag.register(this)) });
+    this.destroyRef.onDestroy(() => this.panelDock.forget(this));
     this.destroyRef.onDestroy(() => {
       if (this.timerCheckWindowSize) {
         clearInterval(this.timerCheckWindowSize);
@@ -821,6 +862,9 @@ export class UIPanelComponent implements PanelFrame, PanelDropFrame {
     this.width = panel.offsetWidth;
     this.height = panel.offsetHeight;
     this.clampPanelToViewport(panel);
+    // A docked frame keeps the width it was given and goes back into its place.
+    const edge = this.panelDock.edgeOf(this);
+    if (edge) this.panelDock.relayout(edge);
   }
 
   private applyFullScreenLayout(panel: HTMLElement): void {

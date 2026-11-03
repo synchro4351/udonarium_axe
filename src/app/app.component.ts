@@ -100,6 +100,7 @@ import { CompassComponent } from '@axe/features/widgets/compass/compass.componen
 import { ConnectionQualityComponent } from '@axe/features/widgets/connection-quality/connection-quality.component';
 import { DigitalClockComponent } from '@axe/features/widgets/digital-clock/digital-clock.component';
 import { RenderStatsComponent } from '@axe/features/widgets/render-stats/render-stats.component';
+import { PanelDockPreviewComponent } from '@axe/ui/components/panel-dock-preview/panel-dock-preview.component';
 import { PieceDragGhostComponent } from '@axe/ui/components/piece-drag-ghost/piece-drag-ghost.component';
 import { SnackbarComponent } from '@axe/ui/components/snackbar/snackbar.component';
 import { ReloadNoticeDirective } from '@axe/ui/directives/reload-notice.directive';
@@ -127,6 +128,7 @@ import { version as APP_VERSION } from '@pkg';
     CompassComponent,
     VoteWidgetComponent,
     HotbarBarComponent,
+    PanelDockPreviewComponent,
     MobileShellComponent,
     ShortcutSheetComponent,
     RoomRestoreBannerComponent,
