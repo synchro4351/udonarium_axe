@@ -29,6 +29,11 @@ export class PanelDockService {
 
   /** The box a panel let go of now would fill, shown while it is being dragged. */
   readonly preview = signal<DockBox | null>(null);
+  /**
+   * How wide each side's docked panels stand, so what floats at that side of the screen, such as
+   * the menu, can stand clear of them. Zero for a side with none.
+   */
+  readonly insets = signal<Record<DockEdge, number>>({ left: 0, right: 0 });
   private pending: { edge: DockEdge; y: number } | null = null;
 
   constructor() {
@@ -88,7 +93,7 @@ export class PanelDockService {
 
   /**
    * Docks the frame let go of where the pointer last showed, and says whether it did. A frame let
-   * go of on a full side is folded into the docked frame nearer the pointer, and goes.
+   * go of over the middle of a docked frame, or anywhere on a full side, is folded into it, and goes.
    */
   drop(frame: PanelDockFrame): boolean {
     const pending = this.pending;
@@ -117,6 +122,10 @@ export class PanelDockService {
       const boxes = dockBoxes(edge, this.widthsOn(edge), viewport);
       frames.forEach((frame, at) => frame.applyDock(boxes[at]));
     }
+    this.insets.set({
+      left: Math.max(0, ...this.widthsOn('left')),
+      right: Math.max(0, ...this.widthsOn('right')),
+    });
   }
 
   private widthsOn(edge: DockEdge): number[] {

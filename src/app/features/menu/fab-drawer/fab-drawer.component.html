@@ -3,6 +3,7 @@
   class="group fixed top-0 left-0 z-200 flex w-14 cursor-grab justify-center active:cursor-grabbing"
   data-testid="fab-menu"
   [class.open]="fabOpen() || guide.shown()"
+  [style.translate]="dockShift()"
   appDraggable
   [appWidgetPlace]="fabWidget"
   [widgetFallback]="fabFallback"

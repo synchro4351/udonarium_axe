@@ -26,8 +26,9 @@ describe('panel dock helpers', () => {
     expect(dockBoxes('left', [1200], viewport)[0].width).toBe(1000);
   });
 
-  it('takes a place on a side with room, above or below by the pointer, and a tab on a full side', () => {
+  it('splits a docked panel over its top or bottom third, joins it over the middle, and only joins on a full side', () => {
     expect(dockPlacement(0, 700, 800)).toEqual({ kind: 'slot', index: 0 });
+    expect(dockPlacement(1, 400, 800)).toEqual({ kind: 'tab', index: 0 });
     expect(dockPlacement(1, 100, 800)).toEqual({ kind: 'slot', index: 0 });
     expect(dockPlacement(1, 700, 800)).toEqual({ kind: 'slot', index: 1 });
     expect(dockPlacement(2, 100, 800)).toEqual({ kind: 'tab', index: 0 });
@@ -36,6 +37,7 @@ describe('panel dock helpers', () => {
 
   it('previews the place a panel would take, or the docked panel it would join', () => {
     expect(dockPreviewBox('left', [300], 250, 700, viewport)).toEqual({ left: 0, top: 400, width: 250, height: 400 });
+    expect(dockPreviewBox('left', [300], 250, 400, viewport)).toEqual({ left: 0, top: 0, width: 300, height: 800 });
     expect(dockPreviewBox('left', [300, 200], 250, 700, viewport)).toEqual({
       left: 0,
       top: 400,

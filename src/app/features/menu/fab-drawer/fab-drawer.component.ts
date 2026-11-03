@@ -21,6 +21,7 @@ import { ButtonGuideService } from '@axe/application/ui/button-guide.service';
 import { ConfirmService } from '@axe/application/ui/confirm.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { MenuLayoutService } from '@axe/application/ui/menu-layout.service';
+import { PanelDockService } from '@axe/application/ui/panel-dock.service';
 import { WIDGET_FAB } from '@axe/application/ui/widget-place';
 import { emptyHotbarSlotDraft } from '@axe/domain/hotbar/hotbar-draft';
 import { HAND_CARDS_ICON } from '@axe/domain/ui/custom-icon';
@@ -96,6 +97,23 @@ export class FabDrawerComponent {
   protected readonly fabWidget = WIDGET_FAB;
   protected readonly fabFallback = () => ({ left: FAB_MARGIN_PX, top: FAB_MARGIN_PX });
   private readonly fabMenuRef = viewChild<ElementRef<HTMLElement>>('fabMenu');
+  private readonly panelDock = inject(PanelDockService);
+  /** Where the button stands across the screen, as it was put, before any shift clear of a docked panel. */
+  private readonly fabSpan = signal<{ left: number; right: number } | null>(null);
+
+  /**
+   * How far the button is shifted to stand clear of the panels docked on the side it is at, which
+   * would otherwise sit under it. Nothing while it is clear of them already.
+   */
+  protected readonly dockShift = computed(() => {
+    const span = this.fabSpan();
+    const insets = this.panelDock.insets();
+    if (!span) return null;
+    if (insets.left > 0 && span.left < insets.left) return `${insets.left - span.left}px 0`;
+    const clear = window.innerWidth - insets.right;
+    if (insets.right > 0 && span.right > clear) return `${clear - span.right}px 0`;
+    return null;
+  });
   private readonly fabSide = signal<FabDrawerSide>({ up: false, left: false });
 
   /**
@@ -228,6 +246,7 @@ export class FabDrawerComponent {
     if (!element) return;
     const box = element.getBoundingClientRect();
     if (box.width < 1 && box.height < 1) return;
+    this.fabSpan.set({ left: element.offsetLeft, right: element.offsetLeft + element.offsetWidth });
     this.fabSide.set(fabDrawerSide(box, { width: window.innerWidth, height: window.innerHeight }));
   }
 

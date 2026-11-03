@@ -44,20 +44,29 @@ export function dockBoxes(
   });
 }
 
+/** How far into a docked panel, from its top or bottom, a panel let go of splits it rather than joining it. */
+export const DOCK_SPLIT_REACH = 1 / 3;
+
 /**
- * What letting go of a panel on a side does, given the panels already there top first: take a
- * place of its own at `index`, or join the docked panel at `index` as a tab once the side is
- * full. The half of the screen the pointer is in picks which.
+ * What letting go of a panel on a side does, given how many panels are there already, top first:
+ * take a place of its own at `index`, or join the docked panel at `index` as a tab.
+ *
+ * Over the top or bottom third of a docked panel it splits the height with it, above or below;
+ * over the middle it joins it as a tab. A side holding two already only takes tabs.
  */
 export function dockPlacement(
   docked: number,
   pointerY: number,
   viewportHeight: number
 ): { kind: 'slot'; index: number } | { kind: 'tab'; index: number } {
-  const upper = pointerY < viewportHeight / 2;
-  if (docked >= DOCK_SLOTS_PER_EDGE) return { kind: 'tab', index: upper ? 0 : docked - 1 };
   if (docked === 0) return { kind: 'slot', index: 0 };
-  return { kind: 'slot', index: upper ? 0 : docked };
+  const share = viewportHeight / docked;
+  const index = Math.min(docked - 1, Math.max(0, Math.floor(pointerY / share)));
+  if (docked >= DOCK_SLOTS_PER_EDGE) return { kind: 'tab', index };
+  const into = (pointerY - index * share) / share;
+  if (into < DOCK_SPLIT_REACH) return { kind: 'slot', index };
+  if (into > 1 - DOCK_SPLIT_REACH) return { kind: 'slot', index: index + 1 };
+  return { kind: 'tab', index };
 }
 
 /**

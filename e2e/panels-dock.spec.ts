@@ -87,4 +87,24 @@ test.describe('docking panels against the sides of the screen', () => {
     expect(Math.round(freed!.height)).toBeLessThan(800);
     await expect.poll(async () => Math.round((await frameOf(gathered).boundingBox())!.height)).toBe(800);
   });
+
+  test('moves the menu clear of a panel docked on the left, and back once it is gone', async ({ page }) => {
+    await openPanel(page, 'テーブル設定');
+    const table = page.locator('ui-panel', { has: page.locator('game-table-setting') });
+    const menu = page.getByTestId('fab-menu');
+    const before = (await menu.boundingBox())!;
+
+    await dragBarTo(page, table, 2, 400);
+    const docked = (await frameOf(table).boundingBox())!;
+    expect(Math.round(docked.x)).toBe(0);
+    await expect.poll(async () => Math.round((await menu.boundingBox())!.x)).toBe(Math.round(docked.width));
+
+    await closeFabMenu(page);
+    const grip = await restingBox(barOf(table));
+    await page.mouse.move(grip.x + 40, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(640, 300, { steps: 16 });
+    await page.mouse.up();
+    await expect.poll(async () => Math.round((await menu.boundingBox())!.x)).toBe(Math.round(before.x));
+  });
 });

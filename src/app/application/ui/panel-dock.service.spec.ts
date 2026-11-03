@@ -91,6 +91,21 @@ describe('PanelDockService', () => {
     expect(service.edgeOf(third)).toBeNull();
   });
 
+  it('folds a panel let go of over the middle of a docked one into it, and tells how wide each side stands', () => {
+    const first = frame(300);
+    const second = frame(250);
+    dock(first, 5, 300);
+    expect(service.insets()).toEqual({ left: 300, right: 0 });
+
+    expect(dock(second, 5, 400)).toBe(true);
+    expect(first.taken).toHaveLength(1);
+    expect(second.dismissed).toBe(true);
+    expect(first.box).toEqual({ left: 0, top: 0, width: 300, height: 800 });
+
+    service.undock(first);
+    expect(service.insets()).toEqual({ left: 0, right: 0 });
+  });
+
   it('closes up the side when a docked panel is picked up or taken down', () => {
     const first = frame(300);
     const second = frame(300);
