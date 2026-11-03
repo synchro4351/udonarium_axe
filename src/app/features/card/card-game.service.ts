@@ -230,14 +230,36 @@ export class CardGameService {
 
   /**
    * Room rules override a participant's own public-hand choice without changing their cursor. A
-   * character's hand is shown as its owner chose for their own, and one nobody owns is kept hidden.
+   * character's hand has a switch of its own, which its owner and the GM work.
    */
   handPublicOf(holder: string): boolean {
-    const mode = this.objectStore.get<Config>('Config')?.handVisibilityMode ?? 'choice';
+    const config = this.objectStore.get<Config>('Config');
+    const mode = config?.handVisibilityMode ?? 'choice';
     if (mode !== 'choice') return mode === 'public';
-    const character = this.characterOf(holder);
-    if (character) return character.owner.length > 0 && (PeerCursor.findByUserId(character.owner)?.handPublic ?? false);
+    const identifier = characterOfHandHolder(holder);
+    if (identifier !== null) return config?.publicCharacterHands.includes(identifier) ?? false;
     return PeerCursor.findByUserId(holder)?.handPublic ?? false;
+  }
+
+  /**
+   * Shows a hand face up to everyone or hides it again: your own, or a character's you hold for.
+   * False when the room decides instead, or the hand is not yours to change.
+   */
+  setHandPublic(holder: string, shown: boolean): boolean {
+    const config = this.config();
+    if ((config?.handVisibilityMode ?? 'choice') !== 'choice' || !this.canHoldFor(holder)) return false;
+    const identifier = characterOfHandHolder(holder);
+    if (identifier === null) {
+      const cursor = PeerCursor.myCursor;
+      if (!cursor || cursor.handPublic === shown) return false;
+      cursor.handPublic = shown;
+      return true;
+    }
+    if (!config) return false;
+    const listed = config.publicCharacterHands;
+    if (listed.includes(identifier) === shown) return false;
+    config.publicCharacterHands = shown ? [...listed, identifier] : listed.filter((id) => id !== identifier);
+    return true;
   }
 
   /** Card property edits are GM-only until the room explicitly permits players. Guests never edit. */
@@ -451,7 +473,8 @@ export class CardGameService {
   private finishGiving(card: Card, recipient: CardSeat, fromHand: boolean, fromHolder = this.myUserId()): void {
     card.toHand(recipient.userId);
     this.noteHand(recipient.userId);
-    card.lastHandGiverUserId = this.myUserId();
+    // A card a character gave names the character, so its giver mark shows the piece's picture.
+    card.lastHandGiverUserId = characterOfHandHolder(fromHolder) === null ? this.myUserId() : fromHolder;
     card.lastHandGiverName = this.holderName(fromHolder);
     SoundEffect.play(PresetSound.cardDraw);
     this.chatMessageService.sendSystemNotice(

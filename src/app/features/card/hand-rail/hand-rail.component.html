@@ -86,7 +86,7 @@
         "
         type="button"
         data-testid="hand-public-status"
-        [disabled]="!handVisibilityChoice() || !isOwnHand()"
+        [disabled]="!handVisibilityChoice()"
         [attr.aria-pressed]="handPublic()"
         [attr.aria-expanded]="handPublic() ? null : confirmPublic()"
         [title]="

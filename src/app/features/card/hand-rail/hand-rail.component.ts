@@ -28,6 +28,7 @@ import { capturePointer, releasePointer } from '@axe/core/input/pointer-capture'
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { isHandCardOf } from '@axe/domain/card/hand-cards';
+import { characterOfHandHolder } from '@axe/domain/card/hand-location';
 import { findTrumpPairs } from '@axe/domain/card/trump-card';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
@@ -203,13 +204,14 @@ export class HandRailComponent {
     return this.cardGame.myUserId();
   }
 
-  /** Whether the rail shows your own hand, which alone carries the public switch: a character's follows its owner's. */
+  /** Whether the rail shows your own hand rather than a character's. */
   protected isOwnHand(): boolean {
     return this.holder() === this.cardGame.myUserId();
   }
 
   protected pickHand(holder: string): void {
     this.pickedHolder.set(holder === this.cardGame.myUserId() ? '' : holder);
+    this.confirmPublic.set(false);
     this.hovered.set(null);
     this.sourceCardId.set('');
   }
@@ -250,23 +252,27 @@ export class HandRailComponent {
   protected readonly confirmPublic = signal(false);
 
   protected toggleHandPublic(): void {
-    const cursor = PeerCursor.myCursor;
-    if (!cursor || !this.canHoldCards() || !this.handVisibilityChoice()) return;
-    if (!cursor.handPublic) {
+    if (!this.canHoldCards() || !this.handVisibilityChoice()) return;
+    if (!this.handPublic()) {
       this.confirmPublic.set(!this.confirmPublic());
       return;
     }
-    cursor.handPublic = false;
     this.confirmPublic.set(false);
-    this.objectChange.notifyChanged(cursor.identifier);
+    this.setHandPublic(false);
   }
 
   protected confirmHandPublic(): void {
-    const cursor = PeerCursor.myCursor;
-    if (!cursor || !this.canHoldCards() || !this.handVisibilityChoice() || !this.confirmPublic()) return;
-    cursor.handPublic = true;
+    if (!this.canHoldCards() || !this.handVisibilityChoice() || !this.confirmPublic()) return;
     this.confirmPublic.set(false);
-    this.objectChange.notifyChanged(cursor.identifier);
+    this.setHandPublic(true);
+  }
+
+  /** Shows or hides the hand on the rail, your own or the picked character's, for everyone. */
+  private setHandPublic(shown: boolean): void {
+    if (!this.cardGame.setHandPublic(this.holder(), shown)) return;
+    const cursor = PeerCursor.myCursor;
+    if (this.isOwnHand() && cursor) this.objectChange.notifyChanged(cursor.identifier);
+    else this.objectChange.notifyChanged('Config');
   }
 
   protected toggleAutoSort(): void {
@@ -355,6 +361,13 @@ export class HandRailComponent {
   protected giverImageUrl(card: Card): string {
     this.objectChange.collectionOf(PeerCursor.aliasName)();
     this.objectChange.fileVersion();
+    const pieceIdentifier = characterOfHandHolder(card.lastHandGiverUserId);
+    if (pieceIdentifier !== null) {
+      // A character gave it: the piece's picture, as on the table.
+      this.objectChange.versionOf(pieceIdentifier)();
+      const piece = this.objectStore.get(pieceIdentifier);
+      return piece instanceof GameCharacter ? (piece.imageFile?.url ?? '') : '';
+    }
     const giver = PeerCursor.findByUserId(card.lastHandGiverUserId);
     if (giver) this.objectChange.versionOf(giver.identifier)();
     return giver?.image?.url ?? '';

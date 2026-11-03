@@ -13,6 +13,7 @@ import { ViewportService } from '@axe/application/ui/viewport.service';
 import { Network } from '@axe/core/network/network';
 import { IPeerContext } from '@axe/core/network/peer-context';
 import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
+import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card, CardState } from '@axe/domain/card/card';
 import { handHolderForCharacter } from '@axe/domain/card/character-hands';
@@ -257,6 +258,56 @@ describe('HandRailComponent', () => {
     fixture.detectChanges();
     expect(PeerCursor.myCursor.handPublic).toBe(false);
     expect(root.querySelector('[data-testid="hand-public-confirm"]')).toBeNull();
+  });
+
+  it("shows a character's hand on its own switch, leaving yours as it was", async () => {
+    const blaze = GameCharacter.create('ブレイズ', 1, '');
+    blaze.owner = 'me';
+    blaze.setLocation('table');
+    makeCard(handLocationOf(handHolderForCharacter(blaze)));
+    TestBed.inject(HandRailService).open();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelectorAll<HTMLButtonElement>('[role="tab"]')[1].click();
+    fixture.detectChanges();
+    const status = () => root.querySelector<HTMLButtonElement>('[data-testid="hand-public-status"]')!;
+
+    expect(status().disabled).toBe(false);
+    status().click();
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('[data-testid="hand-public-confirm"]')!.click();
+    fixture.detectChanges();
+
+    expect(Config.instance.publicCharacterHands).toEqual([blaze.identifier]);
+    expect(PeerCursor.myCursor.handPublic).toBe(false);
+    expect(status().getAttribute('aria-pressed')).toBe('true');
+
+    status().click();
+    fixture.detectChanges();
+    expect(Config.instance.publicCharacterHands).toEqual([]);
+    blaze.destroy();
+  });
+
+  it('shows the picture of the character that gave a card', () => {
+    ImageStorage.instance.add({
+      identifier: 'blaze-picture',
+      name: 'blaze.png',
+      type: 'image/png',
+      blob: null,
+      url: 'blob:blaze-picture',
+      thumbnail: { type: '', blob: null, url: '' },
+    });
+    const blaze = GameCharacter.create('ブレイズ', 1, 'blaze-picture');
+    blaze.setLocation('table');
+    const card = makeCard(handLocationOf('me'));
+    card.lastHandGiverUserId = handHolderForCharacter(blaze);
+    try {
+      expect(component['giverImageUrl'](card)).toBe('blob:blaze-picture');
+    } finally {
+      blaze.destroy();
+      ImageStorage.instance.delete('blaze-picture');
+    }
   });
 
   it('keeps automatic sorting local and returns to manual order when rearranged', () => {

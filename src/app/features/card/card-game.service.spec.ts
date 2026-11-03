@@ -715,6 +715,7 @@ describe('CardGameService', () => {
 
     afterEach(() => {
       Config.instance.characterHands = [];
+      Config.instance.publicCharacterHands = [];
     });
 
     it('offers only the characters given a hand, not every piece on the table', () => {
@@ -832,17 +833,45 @@ describe('CardGameService', () => {
       ]);
     });
 
-    it("shows a character's hand as its owner chose for their own, and keeps one nobody owns hidden", () => {
+    it("shows a character's hand by a switch of its own, which its owner and the game master work", () => {
       const other = peer('other', 'あいて');
+      const mine = character('ブレイズ', 'me');
       const theirs = character('ローゼ', 'other');
       const npc = character('ゴブリン');
 
-      expect(service.handPublicOf(handHolderForCharacter(theirs))).toBe(false);
       other.handPublic = true;
-      expect(service.handPublicOf(handHolderForCharacter(theirs))).toBe(true);
+      expect(service.handPublicOf(handHolderForCharacter(theirs))).toBe(false);
+
+      expect(service.setHandPublic(handHolderForCharacter(mine), true)).toBe(true);
+      expect(service.handPublicOf(handHolderForCharacter(mine))).toBe(true);
+      expect(PeerCursor.myCursor.handPublic).toBe(false);
+      expect(service.setHandPublic(handHolderForCharacter(npc), true)).toBe(false);
       expect(service.handPublicOf(handHolderForCharacter(npc))).toBe(false);
-      Config.instance.handVisibilityMode = 'public';
+
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      expect(service.setHandPublic(handHolderForCharacter(npc), true)).toBe(true);
       expect(service.handPublicOf(handHolderForCharacter(npc))).toBe(true);
+      expect(service.setHandPublic(handHolderForCharacter(mine), false)).toBe(true);
+      expect(service.handPublicOf(handHolderForCharacter(mine))).toBe(false);
+
+      Config.instance.handVisibilityMode = 'private';
+      expect(service.handPublicOf(handHolderForCharacter(npc))).toBe(false);
+      expect(service.setHandPublic(handHolderForCharacter(mine), true)).toBe(false);
+    });
+
+    it('marks a card a character gave with the character, and one you gave with you', () => {
+      const other = peer('other', 'あいて');
+      const blaze = character('ブレイズ', 'me');
+      const fromCharacter = trumpCard('s01');
+      fromCharacter.toHand(handHolderForCharacter(blaze));
+      const fromMe = trumpCard('s02');
+      fromMe.toHand('me');
+
+      expect(service.giveFromHand(fromCharacter, other.userId, handHolderForCharacter(blaze))).toBe(true);
+      expect(service.giveFromHand(fromMe, other.userId)).toBe(true);
+
+      expect(fromCharacter.lastHandGiverUserId).toBe(handHolderForCharacter(blaze));
+      expect(fromMe.lastHandGiverUserId).toBe('me');
     });
 
     it("keeps a character's hand held while it stands on the table, and lets the game master hand it over once it is gone", () => {
