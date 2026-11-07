@@ -1,4 +1,4 @@
-import { ChildProcess, spawn } from 'node:child_process';
+import { ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -106,9 +106,18 @@ async function waitUntilAnswering(url: string, headers: Record<string, string>, 
   throw new Error(`${url} did not answer within ${timeoutMs} ms`);
 }
 
+/**
+ * Stops a process started detached, and everything it started. Windows has no process groups to
+ * signal, and wrangler leaves workerd running under it, so there the whole tree is taken down by id.
+ */
 function stopGroup(child: ChildProcess): void {
+  if (!child.pid) return;
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    return;
+  }
   try {
-    if (child.pid) process.kill(-child.pid, 'SIGTERM');
+    process.kill(-child.pid, 'SIGTERM');
   } catch {
     // already gone
   }
@@ -142,7 +151,8 @@ async function startRoomServer(index: number): Promise<{ server: RoomServer; sto
   const logPath = join(dir, 'wrangler.log');
   const log = openSync(logPath, 'w');
   const worker = spawn(
-    'npx',
+    // npx is a script on Windows, which only a shell runs.
+    process.platform === 'win32' ? 'npx.cmd' : 'npx',
     [
       'wrangler',
       'dev',
@@ -177,6 +187,7 @@ async function startRoomServer(index: number): Promise<{ server: RoomServer; sto
       detached: true,
       stdio: ['ignore', log, log],
       env: { ...process.env, WRANGLER_SEND_METRICS: 'false' },
+      shell: process.platform === 'win32',
     }
   );
   const app = spawn(process.execPath, [resolve(__dirname, '../serve-dist.mjs')], {
@@ -191,7 +202,8 @@ async function startRoomServer(index: number): Promise<{ server: RoomServer; sto
   const stop = () => {
     stopGroup(worker);
     stopGroup(app);
-    rmSync(dir, { recursive: true, force: true });
+    // The worker's files can stay held for a moment after it goes.
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   };
   try {
     await waitUntilAnswering(`${apiUrl}/v1/auth/config`, { Origin: appUrl }, 120_000);
