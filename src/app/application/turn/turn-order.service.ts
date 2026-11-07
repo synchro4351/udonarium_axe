@@ -1,4 +1,4 @@
-import { computed, DestroyRef, inject, Injectable } from '@angular/core';
+import { computed, DestroyRef, effect, inject, Injectable, untracked } from '@angular/core';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { GameObjectInventoryService } from '@axe/application/inventory/game-object-inventory.service';
@@ -16,8 +16,19 @@ import { BuffTiming, BuffTurnActor } from '@axe/domain/character/buff-timing';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { Party } from '@axe/domain/party/party';
 import { Config } from '@axe/domain/peer/config';
+import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import { canRoleEdit } from '@axe/domain/peer/peer-role';
 import { TriggerMoment } from '@axe/domain/tabletop/trigger-event';
-import { changedBuffs, parseTurnHistory, stringifyTurnHistory, TurnStep } from '@axe/domain/tabletop/turn-history';
+import {
+  changedBuffs,
+  noteRanOut,
+  parseTurnHistory,
+  readTurnOpening,
+  stringifyTurnHistory,
+  TurnOpening,
+  TurnStep,
+  writeTurnOpening,
+} from '@axe/domain/tabletop/turn-history';
 import {
   roundAdvance,
   roundCloseInPassing,
@@ -83,7 +94,20 @@ export class TurnOrderService {
   private readonly hooks = inject(TurnHooksService);
   private readonly t = inject(TRANSLATE_FN);
 
+  /** What the turn opened in this press counted down, written down as it goes for a wait to give back. */
+  private opening: TurnOpening | null = null;
+  /**
+   * What the step under way has seen run out of the buffs that leave their status moved, by piece
+   * and then by name, with how far their last count moved it; none outside a step.
+   */
+  private ranOut: Map<string, Map<string, number>> | null = null;
+
   constructor() {
+    effect(() => {
+      this.objectChange.collectionOf(PeerCursor.aliasName)();
+      const mine = PeerCursor.myCursor;
+      if (mine && mine.turnProtocol !== '1') untracked(() => (mine.turnProtocol = '1'));
+    });
     this.objectChange.onObjectChangedForIdentifier(
       'TurnState',
       () => {
@@ -324,7 +348,21 @@ export class TurnOrderService {
         return piece ? sideOfPiece(piece, sideOrder) : null;
       },
       now: Date.now(),
+      givesBackOnHold: this.givesBackOnHold(),
     };
+  }
+
+  /**
+   * Whether a wait gives back what its turn's opening counted down: only where every seat that may
+   * take turns runs a version that counts it down again when the turn comes back.
+   */
+  private givesBackOnHold(): boolean {
+    const mine = PeerCursor.myCursor;
+    if (mine && mine.turnProtocol !== '1') mine.turnProtocol = '1';
+    return this.objectStore
+      .getObjects<PeerCursor>(PeerCursor)
+      .filter((cursor) => cursor.peerId.length > 0 && canRoleEdit(cursor.role))
+      .every((cursor) => cursor.turnProtocol === '1');
   }
 
   /** Where the round stands, as the state machine reads it. */
@@ -338,6 +376,7 @@ export class TurnOrderService {
       acted: turnState.actedIdentifiers,
       holding: this.holding,
       turnStart: turnState.turnStart,
+      opening: readTurnOpening(turnState.turnOpening)?.identifier ?? '',
     };
   }
 
@@ -491,6 +530,7 @@ export class TurnOrderService {
 
   /** Carries a press of the round out from where it stands, as one step of the record. */
   private press(work: (state: TurnSnapshot, table: TurnTable, live: TurnLive) => TurnOutcome | null): void {
+    this.opening = null;
     this.step(() => work(this.snapshot(), this.turnTable(), this.live) !== null);
   }
 
@@ -512,9 +552,17 @@ export class TurnOrderService {
       buffs: [],
     };
     const buffsBefore = this.captureBuffs();
+    const ranOut = new Map<string, Map<string, number>>();
+    this.ranOut = ranOut;
+    let worked: boolean;
+    try {
+      worked = work();
+    } finally {
+      this.ranOut = null;
+    }
+    if (!worked) return;
 
-    if (!work()) return;
-
+    for (const [identifier, moved] of ranOut) noteRanOut(buffsBefore.get(identifier) ?? [], moved);
     before.buffs = changedBuffs(buffsBefore, this.captureBuffs());
     const steps = parseTurnHistory(this.turnState.history);
     steps.push(before);
@@ -549,6 +597,9 @@ export class TurnOrderService {
         case 'buffs':
           this.expireBuffs(effect.timing, this.actorOf(effect.identifier));
           break;
+        case 'giveBack':
+          this.giveBack(effect.identifier);
+          break;
         case 'ground':
           this.springGround(effect.identifier, effect.moment);
           break;
@@ -571,6 +622,17 @@ export class TurnOrderService {
     if (fields.acted !== undefined) turnState.actedIdentifiers = [...fields.acted];
     if (fields.holding !== undefined) turnState.holding = writeTurnHolding(fields.holding);
     if (fields.turnStart !== undefined) turnState.turnStart = fields.turnStart;
+    if (fields.opening !== undefined) this.writeOpening(fields.opening);
+  }
+
+  /**
+   * Starts writing down what the opening of a piece's turn counts down, or, for none, lets go of what
+   * was written; only the countdown of the press that opened the turn is written into it.
+   */
+  private writeOpening(identifier: string): void {
+    this.opening = identifier.length > 0 ? { identifier, buffs: [] } : null;
+    const written = writeTurnOpening(this.opening);
+    if (this.turnState.turnOpening !== written) this.turnState.turnOpening = written;
   }
 
   private captureBuffs(): Map<string, BuffSnapshotEntry[]> {
@@ -631,11 +693,21 @@ export class TurnOrderService {
   private expireBuffs(timing: BuffTiming, acting: BuffTurnActor): void {
     if (!this.turnState.buffDecay) return;
 
+    const opening = timing === 'turnStart' ? this.opening : null;
     const entries: ExpiredBuffEntry[] = [];
     for (const character of this.buffCarriers()) {
-      const buffNames = character.buffs.expireAt(timing, acting);
+      const due = opening ? character.buffs.dueAt(timing, acting) : [];
+      if (opening && due.length > 0) opening.buffs.push({ identifier: character.identifier, buffs: due });
+      const ranOut = new Map<string, number>();
+      const buffNames = character.buffs.expireAt(timing, acting, ranOut);
+      if (ranOut.size > 0) {
+        noteRanOut(due, ranOut);
+        const step = this.ranOut;
+        if (step) step.set(character.identifier, new Map([...(step.get(character.identifier) ?? []), ...ranOut]));
+      }
       if (buffNames.length > 0) entries.push({ characterName: character.name, buffNames });
     }
+    if (opening) this.turnState.turnOpening = writeTurnOpening(opening);
 
     const detail = formatExpiredBuffs(entries);
     if (detail !== '') {
@@ -644,10 +716,25 @@ export class TurnOrderService {
   }
 
   /**
+   * Gives back what the opening of the piece's turn counted down, as it begins to wait: every buff
+   * counted gets its round back, and one that ran out comes back, the last counted put back first.
+   * Only the peer that pressed runs this, as with the countdown itself.
+   */
+  private giveBack(identifier: string): void {
+    const opening = readTurnOpening(this.turnState.turnOpening);
+    this.turnState.turnOpening = '';
+    if (!opening || opening.identifier !== identifier || opening.buffs.length < 1) return;
+    for (const entry of [...opening.buffs].reverse()) {
+      this.objectStore.get<GameCharacter>(entry.identifier)?.buffs.putBack(entry.buffs);
+    }
+    this.announceCharacter(identifier, 'buffsGivenBack');
+  }
+
+  /**
    * Says in chat whose turn it is. A piece the players cannot see goes unnamed, since everyone
    * reads the line and a name would give away what is standing in the dark.
    */
-  private announceCharacter(identifier: string, announcement: TurnAnnouncement): void {
+  private announceCharacter(identifier: string, announcement: TurnAnnouncement | 'buffsGivenBack'): void {
     const character = this.objectStore.get<GameCharacter>(identifier);
     if (!character) return;
     this.chat.sendSystemNotice(

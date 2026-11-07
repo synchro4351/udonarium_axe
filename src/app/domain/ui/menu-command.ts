@@ -39,6 +39,7 @@ export const MENU_TOGGLES = [
   'widgetPlToolbar',
   'widgetGmToolbar',
   'widgetClock',
+  'widgetGameClock',
   'widgetCompass',
   'widgetRecording',
   'widgetConnectionQuality',
@@ -49,7 +50,15 @@ export const MENU_TOGGLES = [
 export type MenuToggleName = (typeof MENU_TOGGLES)[number];
 
 /** The settings that move on to their next choice when pressed, rather than having an off. */
-export const MENU_CYCLES = ['viewMode', 'theme', 'motion', 'renderLite', 'language', 'buffView'] as const;
+export const MENU_CYCLES = [
+  'viewMode',
+  'theme',
+  'motion',
+  'renderLite',
+  'language',
+  'buffView',
+  'buffIconSize',
+] as const;
 
 export type MenuCycleName = (typeof MENU_CYCLES)[number];
 
@@ -195,6 +204,7 @@ export const MENU_COMMANDS: readonly MenuCommand[] = [
   panel('chat', 'speaker_notes', 'chatWindow', 'app.fab.chat'),
   panel('roomSettings', 'room_preferences', 'roomSettings', 'app.fab.roomSettings'),
   panel('tableSetting', 'layers', 'tableSetting', 'app.fab.tableSetting'),
+  panel('scene', 'theaters', 'boardScene', 'feature.scene.title', { audience: 'gameMaster' }),
   panel('mapEditor', 'architecture', 'mapEditor', 'feature.mapEditor.title', { audience: 'gameMaster' }),
   panel('dungeonGenerator', 'map', 'dungeonGenerator', 'feature.tabletop.dungeonGenerator.title', {
     audience: 'gameMaster',
@@ -211,6 +221,7 @@ export const MENU_COMMANDS: readonly MenuCommand[] = [
   panel('stampPacks', 'collections', 'stampPacks', 'app.fab.stampPacks'),
   panel('effectLibrary', 'auto_awesome', 'effectLibrary', 'feature.effect.title', { audience: 'playing' }),
   panel('battleCutIn', 'sports_martial_arts', 'battleCutIn', 'feature.battleCutIn.title'),
+  panel('scenarioText', 'menu_book', 'scenarioText', 'feature.scenarioText.title', { audience: 'gameMaster' }),
   panel('skin', 'palette', 'skin', 'app.fab.skin', { testId: 'seat-skin' }),
   panel('soundSettings', 'volume_up', 'soundSettings', 'app.fab.soundSettings', { testId: 'seat-sound-settings' }),
   panel('objectList', 'category', 'objectList', 'app.fab.objectList', { audience: 'gameMaster' }),
@@ -241,6 +252,7 @@ export const MENU_COMMANDS: readonly MenuCommand[] = [
     testId: 'seat-widget-gmToolbar',
   }),
   widget('widgetClock', 'schedule', 'app.fab.clock', { testId: 'seat-widget-clock' }),
+  widget('widgetGameClock', 'wb_twilight', 'app.fab.gameClock', { testId: 'seat-widget-gameClock' }),
   widget('widgetCompass', 'explore', 'app.fab.compass', { testId: 'seat-widget-compass' }),
   widget('widgetRecording', 'radio_button_checked', 'app.fab.recording', {
     testId: 'seat-widget-recording',
@@ -259,6 +271,10 @@ export const MENU_COMMANDS: readonly MenuCommand[] = [
   cycle('buffView', 'auto_fix_high', 'feature.plTools.buffView', {
     audience: 'playing',
     testId: 'buff-view-cycle',
+  }),
+  cycle('buffIconSize', 'photo_size_select_large', 'feature.plTools.buffIconSize', {
+    audience: 'playing',
+    testId: 'buff-icon-size-cycle',
   }),
 
   act('save', 'save', 'app.fab.save', { testId: 'save-load-save' }),

@@ -117,6 +117,7 @@ import { isOffTheFloor } from '@axe/domain/tabletop/tabletop-object';
 import { Terrain } from '@axe/domain/tabletop/terrain';
 import { terrainBoxOf } from '@axe/domain/tabletop/terrain-box';
 import { PieceWaterLook, pieceWaterLook } from '@axe/domain/tabletop/water/submersion';
+import { BuffBadgeComponent } from '@axe/features/character/buff-badge/buff-badge.component';
 import {
   GameCharacterMenuHost,
   GameCharacterMenuService,
@@ -238,6 +239,7 @@ const WATER_RIPPLE_LIFT_PX = 0.5;
   templateUrl: './game-character.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    BuffBadgeComponent,
     BillboardDirective,
     SeeThroughDirective,
     MovableDirective,
@@ -543,7 +545,7 @@ export class GameCharacterComponent {
         RIDING_CARD_ENTRY_PX +
         (label.name ? RIDING_NAME_HEIGHT_PX : 0) +
         label.gauges.length * GAUGE_ROW_HEIGHT_PX +
-        Math.ceil(label.badges.length / BUFF_BADGES_PER_ROW) * BUFF_BADGE_ROW_HEIGHT_PX,
+        Math.ceil(label.badges.length / BUFF_BADGES_PER_ROW) * BUFF_BADGE_ROW_HEIGHT_PX * this.buffIconScale(),
       0
     )
   );
@@ -773,6 +775,8 @@ export class GameCharacterComponent {
   }
 
   protected readonly buffViewMode = linkedSignal<BuffViewMode>(() => this.buffViewPreference.mode());
+  /** How large this reader has the buff icons drawn, as a share of their usual size. */
+  protected readonly buffIconScale = computed(() => this.buffViewPreference.iconScale() / 100);
   protected readonly foldingBuff = computed(() => this.buffViewMode() !== 'detail');
   protected readonly buffViewLabelKey = computed(() => BUFF_VIEW_LABEL_KEYS[this.buffViewMode()]);
 
@@ -1165,6 +1169,7 @@ export class GameCharacterComponent {
     () => {
       const buffEl = this.gameCharacter()?.buffDataElement ?? null;
       if (this.followedTree(buffEl) === null || !buffEl) return [];
+      this.objectChange.fileVersion();
       return toBuffBadges(buffEl);
     },
     { equal: sameEntries }
@@ -1290,7 +1295,12 @@ export class GameCharacterComponent {
     const name = this.multiAngleCurvedNameLayout();
     const gauge = this.multiAngleResourceGaugeLayout();
     const innerExtent = Math.max(name.radius + name.fontSize / 2 + name.strokeWidth / 2, gauge.outerExtent);
-    return makeMultiAngleBuffOrbit(this.buffBadges().length, this.size() * this.gridSize, innerExtent);
+    return makeMultiAngleBuffOrbit(
+      this.buffBadges().length,
+      this.size() * this.gridSize,
+      innerExtent,
+      this.buffIconScale()
+    );
   });
 
   readonly multiAngleOrbitVisible = computed(
@@ -1387,7 +1397,7 @@ export class GameCharacterComponent {
     if (this.multiAngleResourceBuffOrbitEnabled() || this.hideBuff() || this.buffNum() < 1) return 0;
     if (this.buffViewMode() === 'detail') return this.buffChildren().length * BUFF_DETAIL_ROW_HEIGHT_PX;
     if (this.buffViewMode() === 'count') return BUFF_BADGE_ROW_HEIGHT_PX;
-    return Math.ceil(this.buffBadges().length / BUFF_BADGES_PER_ROW) * BUFF_BADGE_ROW_HEIGHT_PX;
+    return Math.ceil(this.buffBadges().length / BUFF_BADGES_PER_ROW) * BUFF_BADGE_ROW_HEIGHT_PX * this.buffIconScale();
   });
 
   protected multiAngleBuffOrbitTransform(angle: number, radius: number): string {

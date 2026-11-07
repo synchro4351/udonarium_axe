@@ -22,9 +22,11 @@ import { AssetHttpStore } from '@axe/core/storage/asset-http-store';
 import { ASSET_RETRY_DELAY_MS } from '@axe/core/storage/asset-retries';
 import { AudioSharingSystem } from '@axe/core/storage/audio-sharing-system';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
+import { hasChosenIconByHand, noteIconChosenByHand } from '@axe/core/storage/icon-chosen-by-hand';
 import { clearIdentity, loadIdentity, saveIdentity } from '@axe/core/storage/identity-storage';
 import { ImageSharingSystem } from '@axe/core/storage/image-sharing-system';
 import { ImageStorage } from '@axe/core/storage/image-storage';
+import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { handLocationOf } from '@axe/domain/card/hand-location';
@@ -34,6 +36,7 @@ import { isTableWithheld, markLoadedWithheld, markSeatWithheld } from '@axe/doma
 import { IdleSeatService } from '@axe/features/lobby/idle-seat.service';
 import { NetworkEventHandlerService } from '@axe/features/lobby/network-event-handler.service';
 import { NetworkReachService } from '@axe/features/lobby/network-reach.service';
+import { ServerWatchService } from '@axe/features/lobby/server-watch.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
 /**
@@ -758,19 +761,88 @@ describe('NetworkEventHandlerService', () => {
       expect(PeerCursor.myCursor.name).toBe('ゴブリン使い');
     });
 
-    it('takes back on logout the name and avatar it lent, but not ones chosen since', () => {
+    describe('the account’s avatar', () => {
+      const AVATAR = 'https://cdn.discordapp.com/avatars/1/a.png';
+
+      beforeEach(() => {
+        localStorage.removeItem(STORAGE_KEYS.iconChosenByHand);
+        vi.spyOn(Network, 'peerContext', 'get').mockReturnValue({ isRoom: false, userId: 'tab-1' } as never);
+        vi.spyOn(Network, 'openStandby').mockImplementation(() => {});
+        PeerCursor.myCursor.imageIdentifier = DEFAULT_CURSOR_IMAGE_IDENTIFIER;
+      });
+
+      afterEach(() => localStorage.removeItem(STORAGE_KEYS.iconChosenByHand));
+
+      it('puts it on a cursor that still has the default icon at login, and takes it back on logout', () => {
+        account.set({ ...ACCOUNT, avatarUrl: AVATAR });
+        TestBed.tick();
+        expect(PeerCursor.myCursor.imageIdentifier).toBe(AVATAR);
+
+        account.set(null);
+        TestBed.tick();
+        expect(PeerCursor.myCursor.imageIdentifier).toBe(DEFAULT_CURSOR_IMAGE_IDENTIFIER);
+      });
+
+      it('leaves an icon chosen by hand, and keeps off it once a reload has taken the icon back to the default', () => {
+        PeerCursor.myCursor.imageIdentifier = 'chosen-icon';
+        account.set({ ...ACCOUNT, avatarUrl: AVATAR });
+        TestBed.tick();
+        expect(PeerCursor.myCursor.imageIdentifier).toBe('chosen-icon');
+
+        account.set(null);
+        TestBed.tick();
+        PeerCursor.myCursor.imageIdentifier = DEFAULT_CURSOR_IMAGE_IDENTIFIER;
+        account.set({ ...ACCOUNT, avatarUrl: AVATAR });
+        TestBed.tick();
+
+        expect(PeerCursor.myCursor.imageIdentifier).toBe(DEFAULT_CURSOR_IMAGE_IDENTIFIER);
+      });
+
+      it('puts the new account’s look in place of the one lent, where the login moves straight on to it', () => {
+        const other = 'https://cdn.discordapp.com/avatars/2/b.png';
+        PeerCursor.myCursor.name = DEFAULT_CURSOR_NAME;
+        account.set({ ...ACCOUNT, avatarUrl: AVATAR });
+        TestBed.tick();
+
+        account.set({ userId: 'acct_2', name: 'Mio', avatarUrl: other });
+        TestBed.tick();
+
+        expect(PeerCursor.myCursor.imageIdentifier).toBe(other);
+        expect(PeerCursor.myCursor.name).toBe('Mio');
+      });
+
+      it('takes the account’s own avatar, chosen as the icon, for one lent rather than one chosen by hand', () => {
+        PeerCursor.myCursor.imageIdentifier = AVATAR;
+        account.set({ ...ACCOUNT, avatarUrl: AVATAR });
+        TestBed.tick();
+
+        expect(hasChosenIconByHand(ACCOUNT.userId)).toBe(false);
+        account.set(null);
+        TestBed.tick();
+        expect(PeerCursor.myCursor.imageIdentifier).toBe(DEFAULT_CURSOR_IMAGE_IDENTIFIER);
+      });
+
+      it('keeps off the icon of an account that chose its icon by hand in this browser before', () => {
+        noteIconChosenByHand(ACCOUNT.userId);
+
+        account.set({ ...ACCOUNT, avatarUrl: AVATAR });
+        TestBed.tick();
+
+        expect(PeerCursor.myCursor.imageIdentifier).toBe(DEFAULT_CURSOR_IMAGE_IDENTIFIER);
+      });
+    });
+
+    it('takes back on logout the name it lent, but not one chosen since', () => {
       vi.spyOn(Network, 'peerContext', 'get').mockReturnValue({ isRoom: false, userId: 'tab-1' } as never);
       vi.spyOn(Network, 'openStandby').mockImplementation(() => {});
       PeerCursor.myCursor.name = DEFAULT_CURSOR_NAME;
-      PeerCursor.myCursor.imageIdentifier = DEFAULT_CURSOR_IMAGE_IDENTIFIER;
-      account.set({ ...ACCOUNT, avatarUrl: 'https://cdn.example/a.png' });
+      account.set(ACCOUNT);
       TestBed.tick();
-      expect(PeerCursor.myCursor.imageIdentifier).not.toBe(DEFAULT_CURSOR_IMAGE_IDENTIFIER);
+      expect(PeerCursor.myCursor.name).toBe('Kai');
 
       account.set(null);
       TestBed.tick();
       expect(PeerCursor.myCursor.name).toBe(DEFAULT_CURSOR_NAME);
-      expect(PeerCursor.myCursor.imageIdentifier).toBe(DEFAULT_CURSOR_IMAGE_IDENTIFIER);
 
       account.set(ACCOUNT);
       TestBed.tick();
@@ -1063,6 +1135,20 @@ describe('NetworkEventHandlerService', () => {
       expect(PeerCursor.myCursor.role).toBe('pl');
     });
 
+    it('lets the choice of watching follow each role the server tells of, only the seat’s own', () => {
+      vi.spyOn(ImageStorage.instance, 'synchronize').mockImplementation(() => {});
+      vi.spyOn(AudioStorage.instance, 'synchronize').mockImplementation(() => {});
+      vi.spyOn(Network, 'serverRole', 'get').mockReturnValue('guest');
+      vi.spyOn(Network, 'peerContext', 'get').mockReturnValue({ peerId: 'p', userId: 'u', isRoom: true } as never);
+      const noted = vi.spyOn(TestBed.inject(ServerWatchService), 'noteRoleTold');
+
+      localDispatch('SERVER_ROLE_CHANGED', { role: 'guest' }, 'someone-else');
+      expect(noted).not.toHaveBeenCalled();
+      localDispatch('SERVER_ROLE_CHANGED', { role: 'guest' });
+
+      expect(noted).toHaveBeenCalledTimes(1);
+    });
+
     it('holds the table as withheld while a role other than the GM, and whole once the GM', () => {
       vi.spyOn(ImageStorage.instance, 'uploadAllToAssetStore').mockImplementation(() => {});
       vi.spyOn(AudioStorage.instance, 'uploadAllToAssetStore').mockImplementation(() => {});
@@ -1120,6 +1206,16 @@ describe('NetworkEventHandlerService', () => {
 
       expect(sent()).toHaveLength(1);
       expect(sent()[0]).toContain('feature.lobby.roleRejected.notLoggedIn');
+    });
+
+    it('says the seat could not switch its own role, without the code the server gives as why', () => {
+      vi.spyOn(Network, 'peerId', 'get').mockReturnValue('me');
+
+      localDispatch('ROLE_REJECTED', { peerId: 'me', role: 'guest', reason: 'not-game-master' }, '@authority');
+
+      expect(sent()).toHaveLength(1);
+      expect(sent()[0]).toContain('feature.lobby.roleRejected.own');
+      expect(sent()[0]).not.toContain('not-game-master');
     });
   });
 });

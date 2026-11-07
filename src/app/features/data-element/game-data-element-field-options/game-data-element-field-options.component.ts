@@ -4,7 +4,13 @@ import { ResourceSliderService } from '@axe/application/character/resource-slide
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
-import { isGaugeShownOnPiece, toggledGaugeSetting } from '@axe/domain/character/piece-gauge';
+import {
+  fixedGaugeColor,
+  gaugeColor,
+  gaugeFixedColorOf,
+  isGaugeShownOnPiece,
+  toggledGaugeSetting,
+} from '@axe/domain/character/piece-gauge';
 import {
   playsEffectOnChange,
   playsSoundOnChange,
@@ -244,6 +250,28 @@ export class GameDataElementFieldOptionsComponent {
   /** Turns reading the resource as one that grows worse as it rises on or off. */
   toggleGaugeInverted(): void {
     if (this.canShowPieceGauge()) this.toggleFlag(DataElementAttribute.GAUGE_INVERTED);
+  }
+
+  /** The colour set for the resource's bar, or empty while it follows how full the bar stands. */
+  gaugeFixedColor(): string {
+    const element = this.element();
+    this.objectChange.versionOf(element.identifier)();
+    return gaugeFixedColorOf(element);
+  }
+
+  /** What the colour box shows: the colour set, else the colour of a full bar. */
+  gaugeColorShown(): string {
+    return this.gaugeFixedColor() || gaugeColor(1, this.isGaugeInverted());
+  }
+
+  /** Sets the colour the resource's bar stands in, or lets it follow how full it stands again for empty. */
+  setGaugeColor(value: string): void {
+    if (!this.canShowPieceGauge()) return;
+    const element = this.element();
+    const color = fixedGaugeColor(value);
+    if (color) element.setAttribute(DataElementAttribute.GAUGE_COLOR, color);
+    else element.removeAttribute(DataElementAttribute.GAUGE_COLOR);
+    this.objectChange.notifyChanged(element.identifier);
   }
 
   /** Whether the resource's current value may go over its maximum. */

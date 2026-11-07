@@ -10,10 +10,13 @@ import {
   chatFontsIn,
   DecoratedRun,
   decoratedRunsOf,
+  leaningPiecesKeepingNotation as leaningPiecesKeepingStamps,
   leaningPiecesOf,
 } from '@axe/domain/chat/chat-decoration';
 import { rubyRunsOf } from '@axe/domain/chat/chat-ruby-notation';
+import { inlineStampSites } from '@axe/domain/chat/inline-stamp';
 import { replaceRubyNotation, rubyNotationRuns } from '@axe/domain/chat/ruby-notation';
+import { stampOf } from '@axe/domain/chat/stamp-catalog';
 
 const HTML_ESCAPE_MAP: Readonly<Record<string, string>> = {
   '&': '&amp;',
@@ -69,6 +72,8 @@ export interface RubyPart {
   readonly reading: string;
   /** The chat's decorations on the run, null for a plain one. */
   readonly decoration: ChatDecoration | null;
+  /** The stamp the run stands for, where it is a stamp put inside the line; its text is the stamp's name. */
+  readonly stamp?: string;
 }
 
 /**
@@ -86,6 +91,22 @@ export function splitRubyNotation(text: string): RubyPart[] {
 }
 
 function rubyPartsOf(text: string, decoration: ChatDecoration | null): RubyPart[] {
+  const sites = inlineStampSites(text);
+  if (sites.length > 0) {
+    const parts: RubyPart[] = [];
+    let at = 0;
+    for (const site of sites) {
+      parts.push(...rubyPartsOf(text.slice(at, site.from), decoration));
+      const words = `［${site.label}］`;
+      parts.push(
+        stampOf(site.id)
+          ? { text: words, reading: '', decoration, stamp: site.id }
+          : { text: words, reading: '', decoration }
+      );
+      at = site.to;
+    }
+    return [...parts, ...rubyPartsOf(text.slice(at), decoration)];
+  }
   const parts: RubyPart[] = [];
   const plain = (raw: string) => {
     if (raw.length < 1) return;
@@ -154,36 +175,48 @@ export function decorateQuoteLines(html: string): string {
   return parts.join('\n');
 }
 
+/** Draws a stamp put inside a line, by its identifier and the name it was sent with; null to write its name. */
+export type InlineStampMarkup = (stampId: string, label: string) => string | null;
+
 /**
  * Applies the chat's decorations (`**bold**`, `[明朝]…[/]`), escaping html and applying the ruby
  * notation (`|word《reading》` or `|word<reading>`) in each piece they leave, then quoted lines (`> ...`).
  * The ruby is read from each piece as it was typed, before anything is escaped, as
- * {@link escapeHtmlWithRuby} reads it, so the angle-bracket form is not lost to the escaping.
+ * {@link escapeHtmlWithRuby} reads it, so the angle-bracket form is not lost to the escaping. A stamp
+ * put inside the line is drawn by the markup given, or else written as its name in brackets.
  */
-export function decorateChatStyleText(text: string): string {
+export function decorateChatStyleText(text: string, stamps?: InlineStampMarkup): string {
   const runs = decoratedRunsOf(text);
   askForFonts(runs);
   return decorateQuoteLines(
-    chatDecorationMarkup(runs, (piece) => escapeHtmlWithRuby(piece), leaningPiecesKeepingNotation)
+    chatDecorationMarkup(runs, (piece) => markupOfPiece(piece, stamps), leaningPiecesKeepingNotation)
   );
 }
 
-const ESCAPED_SPACE_TOKEN = /\\s/g;
+/** A piece of a line escaped, with its ruby set over its words and each stamp in it drawn. */
+function markupOfPiece(piece: string, stamps?: InlineStampMarkup): string {
+  const sites = inlineStampSites(piece);
+  if (sites.length < 1) return escapeHtmlWithRuby(piece);
+  let html = '';
+  let at = 0;
+  for (const site of sites) {
+    html += escapeHtmlWithRuby(piece.slice(at, site.from));
+    html += stamps?.(site.id, site.label) ?? escapeHtml(`［${site.label}］`);
+    at = site.to;
+  }
+  return html + escapeHtmlWithRuby(piece.slice(at));
+}
 
-/** The pieces a leaning run breaks between, with a word and its reading, and a `\s`, each kept whole. */
+/**
+ * The pieces a leaning run breaks between: a word and its reading kept whole, the tyoitashi
+ * `|word<reading>` form among them, and within the rest what the chat keeps whole as well (a stamp,
+ * a `\s`).
+ */
 function leaningPiecesKeepingNotation(text: string): string[] {
   const pieces: string[] = [];
   for (const run of rubyNotationRuns(text)) {
-    if (run.reading !== '') {
-      pieces.push(run.raw);
-      continue;
-    }
-    let at = 0;
-    for (const match of run.raw.matchAll(ESCAPED_SPACE_TOKEN)) {
-      pieces.push(...leaningPiecesOf(run.raw.slice(at, match.index)), match[0]);
-      at = match.index + match[0].length;
-    }
-    pieces.push(...leaningPiecesOf(run.raw.slice(at)));
+    if (run.reading !== '') pieces.push(run.raw);
+    else pieces.push(...leaningPiecesKeepingStamps(run.raw));
   }
   return pieces;
 }

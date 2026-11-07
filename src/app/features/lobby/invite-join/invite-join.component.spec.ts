@@ -8,6 +8,7 @@ import { ViewportService } from '@axe/application/ui/viewport.service';
 import { Network } from '@axe/core/index';
 import { PeerContext } from '@axe/core/network/peer-context';
 import { IRoomInfo, RoomInfo } from '@axe/core/network/room-info';
+import type { Account } from '@axe/core/network/server/server-protocol';
 import { ServerRoomApiError } from '@axe/core/network/server/server-room-api';
 import { clearIdentity, saveIdentity } from '@axe/core/storage/identity-storage';
 import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
@@ -16,6 +17,7 @@ import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { markLoadedWithheld, markSeatWithheld } from '@axe/domain/peer/withheld-table';
 import { InviteJoinComponent } from '@axe/features/lobby/invite-join/invite-join.component';
+import { LobbyComponent } from '@axe/features/lobby/lobby/lobby.component';
 import { NetworkReachService } from '@axe/features/lobby/network-reach.service';
 import { RoomJoinService } from '@axe/features/lobby/room-join.service';
 import { RoomRestoreOfferService } from '@axe/features/room-archive/room-restore-banner/room-restore-offer.service';
@@ -41,7 +43,14 @@ describe('InviteJoinComponent', () => {
   let isCompact: WritableSignal<boolean>;
   let restoreOffered: WritableSignal<boolean>;
   let originalMyCursor: PeerCursor;
-  let auth: unknown = null;
+  let auth: {
+    isConfigured: boolean;
+    account: WritableSignal<Account | null>;
+    offersLogin: WritableSignal<boolean | null>;
+    isLoggingIn: WritableSignal<boolean>;
+    startLogin: ReturnType<typeof vi.fn>;
+    refreshProviders: ReturnType<typeof vi.fn>;
+  };
 
   async function setup(hash: string): Promise<void> {
     location.hash = hash;
@@ -55,10 +64,16 @@ describe('InviteJoinComponent', () => {
         },
         { provide: ViewportService, useValue: { isCompact } },
         { provide: RoomRestoreOfferService, useValue: { visible: restoreOffered } },
+        { provide: ServerAuthService, useValue: auth },
       ],
     }).compileComponents();
-    TestBed.overrideProvider(ModalService, { useValue: { open: modalOpen } });
-    if (auth) TestBed.overrideProvider(ServerAuthService, { useValue: auth });
+    TestBed.overrideProvider(ModalService, {
+      useValue: {
+        open: modalOpen,
+        openLazy: async (load: () => Promise<unknown>, option?: unknown) =>
+          (modalOpen as (...args: unknown[]) => unknown)(await load(), option),
+      },
+    });
     fixture = TestBed.createComponent(InviteJoinComponent);
     fixture.detectChanges();
   }
@@ -97,13 +112,21 @@ describe('InviteJoinComponent', () => {
     isCompact = signal(false);
     restoreOffered = signal(false);
     originalMyCursor = PeerCursor.myCursor;
+    auth = {
+      isConfigured: false,
+      account: signal(null),
+      offersLogin: signal(null),
+      isLoggingIn: signal(false),
+      startLogin: vi.fn().mockResolvedValue(undefined),
+      refreshProviders: vi.fn().mockResolvedValue(undefined),
+    };
     PeerCursor.myCursor = { reConnectPass: '', role: PeerRole.Player, update: vi.fn() } as unknown as PeerCursor;
     vi.spyOn(Network, 'isOpen', 'get').mockReturnValue(true);
   });
 
   afterEach(() => {
-    auth = null;
     location.hash = '';
+    sessionStorage.clear();
     PeerCursor.myCursor = originalMyCursor;
     vi.restoreAllMocks();
     TestBed.resetTestingModule();
@@ -171,6 +194,21 @@ describe('InviteJoinComponent', () => {
     expect(join).not.toHaveBeenCalled();
     expect(bannerText().trim()).toBe('');
     expect(location.hash).toBe('');
+  });
+
+  it('fetches the lobby and opens it once asked, after the banner said it could not join', async () => {
+    findRoom.mockResolvedValue(null);
+    await setup('#join?r=a1b&n=room');
+    await eventually(() => expect(bannerText()).toContain('見つかりませんでした'));
+    const openLobby = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('ロビー')
+    )!;
+
+    openLobby.click();
+
+    await eventually(() => expect(modalOpen).toHaveBeenCalledOnce());
+    expect(modalOpen.mock.calls[0][0]).toBe(LobbyComponent);
+    expect(modalOpen.mock.calls[0][1]).toMatchObject({ width: 700, height: 400 });
   });
 
   it('takes the invitation off the address once another room opens, after the banner said it could not join', async () => {
@@ -413,56 +451,6 @@ describe('InviteJoinComponent', () => {
       expect(modalOpen.mock.calls[0][1]).toMatchObject({ checkedByServer: true });
     });
 
-    describe('for somebody who came in without logging in', () => {
-      const stubAuth = (loggedIn: boolean) => {
-        const startLogin = vi.fn().mockResolvedValue(undefined);
-        auth = {
-          isLoggedIn: signal(loggedIn),
-          offersLogin: signal(true),
-          refreshProviders: vi.fn().mockResolvedValue(undefined),
-          startLogin,
-        };
-        return startLogin;
-      };
-
-      it('says they are watching and offers the login that lets them play', async () => {
-        PeerCursor.myCursor.role = PeerRole.Guest;
-        const startLogin = stubAuth(false);
-        const ask = vi.spyOn(ConfirmService.prototype, 'ask').mockResolvedValue(true);
-        findServerRoom.mockResolvedValue(serverRoom(false));
-        await setup(link(''));
-
-        await eventually(() => expect(ask).toHaveBeenCalledOnce());
-        expect(ask.mock.calls[0][0]).toMatchObject({ title: 'いまは見学者です' });
-        await eventually(() => expect(startLogin).toHaveBeenCalledOnce());
-      });
-
-      it('asks nothing of somebody who came in as a player', async () => {
-        stubAuth(false);
-        const ask = vi.spyOn(ConfirmService.prototype, 'ask').mockResolvedValue(true);
-        findServerRoom.mockResolvedValue(serverRoom(false));
-        PeerCursor.myCursor.role = PeerRole.Player;
-        await setup(link(''));
-
-        await eventually(() => expect(joinServerRoom).toHaveBeenCalled());
-        await flush();
-        expect(ask).not.toHaveBeenCalled();
-      });
-
-      it('asks nothing of a guest who is logged in already', async () => {
-        const startLogin = stubAuth(true);
-        const ask = vi.spyOn(ConfirmService.prototype, 'ask').mockResolvedValue(true);
-        findServerRoom.mockResolvedValue(serverRoom(false));
-        PeerCursor.myCursor.role = PeerRole.Guest;
-        await setup(link(''));
-
-        await eventually(() => expect(joinServerRoom).toHaveBeenCalled());
-        await flush();
-        expect(ask).not.toHaveBeenCalled();
-        expect(startLogin).not.toHaveBeenCalled();
-      });
-    });
-
     it('hands the server the invitation the link carries before joining', async () => {
       findServerRoom.mockResolvedValue(serverRoom(false));
       const setServerInvite = vi.spyOn(Network, 'setServerInvite').mockImplementation(() => {});
@@ -523,6 +511,136 @@ describe('InviteJoinComponent', () => {
       await setup(link(''));
 
       await eventually(() => expect(contactLink()).toBe('https://example.com/contact'));
+    });
+
+    describe('for a reader who has not logged in', () => {
+      function press(testId: string): void {
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(`[data-testid="${testId}"]`)!.click();
+        fixture.detectChanges();
+      }
+
+      beforeEach(() => {
+        auth.isConfigured = true;
+        auth.offersLogin.set(true);
+        findServerRoom.mockResolvedValue(serverRoom(false));
+      });
+
+      it('asks them to log in, or to go in to watch, before going in', async () => {
+        await setup(link(''));
+
+        await eventually(() => expect(bannerText()).toContain('PL・GMとして入るには'));
+        expect(joinServerRoom).not.toHaveBeenCalled();
+
+        press('invite-join-watch');
+
+        await eventually(() => expect(joinServerRoom).toHaveBeenCalledOnce());
+      });
+
+      it('goes in once the login it opened is done', async () => {
+        await setup(link(''));
+        await eventually(() => expect(bannerText()).toContain('PL・GMとして入るには'));
+
+        press('invite-join-login');
+        expect(auth.startLogin).toHaveBeenCalledOnce();
+        await flush();
+        expect(joinServerRoom).not.toHaveBeenCalled();
+
+        auth.account.set({ userId: 'acct_1', name: 'Kai', avatarUrl: null });
+
+        await eventually(() => expect(joinServerRoom).toHaveBeenCalledOnce());
+      });
+
+      it('does not ask again in a tab that chose to watch the room', async () => {
+        await setup(link(''));
+        await eventually(() => expect(bannerText()).toContain('PL・GMとして入るには'));
+        press('invite-join-watch');
+        await eventually(() => expect(joinServerRoom).toHaveBeenCalledOnce());
+        fixture.destroy();
+        TestBed.resetTestingModule();
+        joinServerRoom.mockClear();
+
+        await setup(link(''));
+
+        await eventually(() => expect(joinServerRoom).toHaveBeenCalledOnce());
+        expect(bannerText()).not.toContain('PL・GMとして入るには');
+      });
+
+      it('takes the question away, going into nothing, once the reader goes into another room instead', async () => {
+        await setup(link(''));
+        await eventually(() => expect(bannerText()).toContain('PL・GMとして入るには'));
+
+        vi.spyOn(Network, 'requestedRoomId', 'get').mockReturnValue('made-room');
+        (
+          TestBed.inject(ObjectChangeService) as unknown as { _networkOpen$: { emit(event: object): void } }
+        )._networkOpen$.emit({ peerId: 'made-room-peer' });
+
+        await eventually(() => expect(bannerText()).not.toContain('PL・GMとして入るには'));
+        expect(joinServerRoom).not.toHaveBeenCalled();
+      });
+
+      it('asks again for another room the server keeps no key for, after watching one', async () => {
+        const keyless = (id: string, name: string): IRoomInfo => ({
+          ...serverRoom(false),
+          id,
+          name,
+          roomKey: undefined,
+        });
+        const linkTo = (id: string, name: string) =>
+          buildInviteLink('', { roomId: id, roomName: name, roomKey: '', password: '', role: null, overlay: false });
+        findServerRoom.mockResolvedValue(keyless('a1b', 'room'));
+        await setup(linkTo('a1b', 'room'));
+        await eventually(() => expect(bannerText()).toContain('PL・GMとして入るには'));
+        press('invite-join-watch');
+        await eventually(() => expect(joinServerRoom).toHaveBeenCalledOnce());
+        fixture.destroy();
+        TestBed.resetTestingModule();
+        joinServerRoom.mockClear();
+
+        findServerRoom.mockResolvedValue(keyless('z9z', 'other'));
+        await setup(linkTo('z9z', 'other'));
+
+        await eventually(() => expect(bannerText()).toContain('PL・GMとして入るには'));
+        expect(joinServerRoom).not.toHaveBeenCalled();
+      });
+
+      it('asks the server whether it offers a login before asking the reader, and asks nothing where none is known', async () => {
+        auth.offersLogin.set(null);
+        await setup(link(''));
+        await eventually(() => expect(joinServerRoom).toHaveBeenCalledOnce());
+        expect(auth.refreshProviders).toHaveBeenCalled();
+        fixture.destroy();
+        TestBed.resetTestingModule();
+        joinServerRoom.mockClear();
+
+        auth.refreshProviders.mockImplementation(async () => auth.offersLogin.set(true));
+        await setup(link(''));
+
+        await eventually(() => expect(bannerText()).toContain('PL・GMとして入るには'));
+        expect(joinServerRoom).not.toHaveBeenCalled();
+      });
+
+      it('asks nothing where the server offers no login, or on a screen for streaming', async () => {
+        auth.offersLogin.set(false);
+        await setup(link(''));
+        await eventually(() => expect(joinServerRoom).toHaveBeenCalledOnce());
+        fixture.destroy();
+        TestBed.resetTestingModule();
+        joinServerRoom.mockClear();
+
+        auth.offersLogin.set(true);
+        await setup(
+          buildInviteLink('', {
+            roomId: 'a1b',
+            roomName: 'room',
+            roomKey: KEY,
+            password: '',
+            role: null,
+            overlay: true,
+          })
+        );
+
+        await eventually(() => expect(joinServerRoom).toHaveBeenCalledOnce());
+      });
     });
 
     it('says the room is gone when the server does not list it', async () => {

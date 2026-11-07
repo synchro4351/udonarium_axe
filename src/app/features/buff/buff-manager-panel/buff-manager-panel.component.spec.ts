@@ -287,6 +287,69 @@ describe('BuffManagerPanelComponent', () => {
       expect(component.builderPreview()).toBe('');
     });
 
+    it('writes how far the status moves again at every count, where it is asked for', () => {
+      component.builderName.set('変身');
+      component.builderStatus.set('器用度');
+      component.builderOperator.set('+');
+      component.builderAmount.set('5');
+      component.builderStep.set('-1');
+      component.builderRounds.set('5');
+
+      expect(component.builderCommand()).toBe('&!変身/器用度/+/5~-1/5');
+      expect(component.builderPreview()).toBe('器用度+5~-1');
+
+      component.builderOperator.set('=');
+      expect(component.builderCommand()).toBe('&!変身/器用度/=/5/5');
+    });
+
+    it('marks a status to stay moved once the buff goes with a colon, a row apiece', () => {
+      component.builderName.set('毒');
+      component.builderStatus.set('HP');
+      component.builderOperator.set('+');
+      component.builderAmount.set('0');
+      component.builderStep.set('-3');
+      component.builderRounds.set('3');
+      component.builderKeeps.set(true);
+
+      expect(component.builderCommand()).toBe('&!毒/:HP/+/0~-3/3');
+      expect(component.builderPreview()).toBe(':HP+0~-3');
+
+      component.builderKeeps.set(false);
+      component.builderStatus.set('回避');
+      component.builderOperator.set('-');
+      component.builderAmount.set('2');
+      component.builderStep.set('');
+      component.addBuilderStatus();
+      component.updateBuilderStatus(0, { status: 'HP', operator: '+', amount: '0', step: '-3', keeps: true });
+
+      expect(component.builderCommand()).toBe('&!毒/回避-2,:HP+0~-3/3');
+    });
+
+    it('writes several statuses together once more than one is asked for', () => {
+      component.builderName.set('全力攻撃');
+      component.builderStatus.set('追D');
+      component.builderOperator.set('+');
+      component.builderAmount.set('4');
+      component.builderRounds.set('1');
+      component.addBuilderStatus();
+      component.updateBuilderStatus(0, { status: '回避', operator: '-', amount: '2' });
+
+      expect(component.builderCommand()).toBe('&!全力攻撃/追D+4,回避-2/1');
+      expect(component.builderPreview()).toBe('追D+4,回避-2');
+
+      component.removeBuilderStatus(0);
+      expect(component.builderCommand()).toBe('&!全力攻撃/追D/+/4/1');
+    });
+
+    it('lays a buff holding any of its statuses at a value anew, rather than stacking it', () => {
+      component.builderStacks.set(true);
+      component.addBuilderStatus();
+      component.updateBuilderStatus(0, { status: '防護点', operator: '=', amount: '10', step: '1' });
+
+      expect(component.builderCanStack()).toBe(false);
+      expect(component.builderCommand()).toMatch(/^&!.*防護点=10\//);
+    });
+
     it('marks the command for a second helping when one is asked for', () => {
       component.builderName.set('猛攻撃');
       component.builderStatus.set('命中');

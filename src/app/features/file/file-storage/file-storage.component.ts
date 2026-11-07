@@ -27,6 +27,7 @@ import { FileArchiver, ImageDropPlace, MAX_LOADED_IMAGE_BYTES } from '@axe/core/
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { canBrowseImage, ImageTag, SYSTEM_RESERVED_TAG } from '@axe/domain/media/image-tag';
+import { isAccountAvatar } from '@axe/domain/peer/account-avatar';
 import {
   ClipboardImageResult,
   imageFromPaste,
@@ -192,7 +193,12 @@ export class FileStorageComponent implements DroppedImageHolder {
   /** The master's own view of what is being kept. Everyone else never sees them at all. */
   readonly showSecret = signal(true);
 
+  /**
+   * Whether a picture is listed for this seat: one it may browse, and no account's avatar, which is
+   * no picture of the room's.
+   */
   private mayShow(imageFile: ImageFile): boolean {
+    if (isAccountAvatar(imageFile.context.identifier)) return false;
     const tag = ImageTag.get(imageFile.context.identifier) ?? null;
     return canBrowseImage(tag, this.canKeepSecret, this.showSecret(), this.tagLock.hides);
   }
@@ -221,7 +227,7 @@ export class FileStorageComponent implements DroppedImageHolder {
         if (tag == this.selectTag() && this.mayShow(imageFile)) {
           imageFileList.push(imageFile);
         }
-      } else if (this.selectTag() == '') {
+      } else if (this.selectTag() == '' && this.mayShow(imageFile)) {
         imageFileList.push(imageFile);
       }
     }

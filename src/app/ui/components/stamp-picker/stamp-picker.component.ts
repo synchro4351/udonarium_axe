@@ -24,22 +24,13 @@ import { TranslocoModule } from '@jsverse/transloco';
 
 const RECENT_LIMIT = 16;
 
-type StampTab = 'recent' | 'emoji' | 'syntax' | StampFamily | `pack:${string}`;
+type StampTab = 'recent' | 'emoji' | StampFamily | `pack:${string}`;
 
 /** A room's own set of stamps, as the picker offers it. */
 export interface StampPickerPack {
   readonly identifier: string;
   readonly name: string;
   readonly stamps: readonly { readonly stampId: string }[];
-}
-
-/** One of the chat's own ways of writing, offered on a tab of its own to put into the line being written. */
-export interface StampPickerSyntax {
-  readonly id: string;
-  readonly name: string;
-  readonly hint: string;
-  /** How it reads written out whole. */
-  readonly example: string;
 }
 
 /** Whether a tab holds pictures: one of the character's families, or one of the room's sets. */
@@ -93,16 +84,8 @@ export class StampPickerComponent {
   /** Whether a stamp may be offered; one that may not is left out, and a tab left empty with it. */
   readonly allows = input<(stampId: string) => boolean>(() => true);
 
-  /**
-   * The chat's ways of writing, offered on a tab at the end of the first row where given: for a
-   * line being written, never for an answer to one.
-   */
-  readonly syntax = input<readonly StampPickerSyntax[]>([]);
-
   /** The stamp that was picked, by its identifier. */
   readonly picked = output<string>();
-  /** The way of writing that was picked, by its identifier. */
-  readonly syntaxPicked = output<string>();
   /** Asked for the room's sets to be managed. */
   readonly manage = output<void>();
 
@@ -118,7 +101,6 @@ export class StampPickerComponent {
       ] as StampTab[]
     ).filter((tab) => this.offeredIn(tab).length > 0);
     const first: StampTab[] = tabs.filter((tab) => !isPictureTab(tab));
-    if (this.syntax().length > 0) first.push('syntax');
     return [first, tabs.filter(isPictureTab)].filter((row) => row.length > 0);
   });
 
@@ -164,7 +146,6 @@ export class StampPickerComponent {
       return pack ? pack.stamps.map((stamp) => stamp.stampId) : [];
     }
     if (tab === 'emoji') return DEFAULT_REACTION_EMOJIS.map(emojiStampId);
-    if (tab === 'syntax') return [];
     return stampsOfFamily(tab as StampFamily).map((each) => each.id);
   }
 

@@ -205,10 +205,11 @@ test.describe('what shows above a piece', () => {
     const before = await movable.evaluate((element) => (element as HTMLElement).style.transform);
 
     await selectBuffView(page, '詳細');
-    await expect(badges).toHaveCount(0, { timeout: 5000 });
+    await expect(piece.locator('[data-testid="buff-badge-grid"]')).toHaveCount(0, { timeout: 5000 });
     await expect(buffRows(piece).first()).toBeVisible({
       timeout: 5000,
     });
+    await expect(buffRows(piece).first().locator('[data-testid="buff-badge"]')).toBeVisible();
 
     await selectBuffView(page, '個数');
     await expect(piece.getByText(/バフ2個/)).toBeVisible({ timeout: 5000 });
@@ -417,6 +418,28 @@ test.describe('what shows above a piece', () => {
     await expect(change).toHaveText('-50');
     await expect(change).toHaveAttribute('data-kind', 'heal');
     await expect(piece.locator('[data-testid="heal-aura"]')).toBeAttached();
+  });
+
+  test('picks a colour for a resource’s bar from a box wide enough to press, and draws the bar in it', async ({
+    page,
+  }) => {
+    const piece = newCharacterPiece(page);
+    const sheet = await openSheet(page);
+    await sheet.locator('button[title="編集"]').first().dispatchEvent('click');
+    const row = resourceRows(sheet, page).first();
+    await row.locator('button[title="詳細設定"]').first().dispatchEvent('click');
+
+    const colour = row.locator('input[name="data-gauge-color"]');
+    const rect = await box(colour);
+    expect(rect.width).toBeGreaterThanOrEqual(32);
+    expect(rect.height).toBeGreaterThanOrEqual(20);
+
+    await colour.fill('#3949ab');
+    await colour.dispatchEvent('change');
+
+    const fill = piece.locator('[data-testid="piece-gauge"]').first().locator('span[style*="width"]');
+    await expect(fill).toHaveCSS('background-color', 'rgb(57, 73, 171)');
+    await expect(row.getByTestId('data-gauge-color-auto')).toBeVisible();
   });
 
   test('pops out a green number when a resource goes up', async ({ page }) => {

@@ -10,7 +10,9 @@ export const STORAGE_KEYS = {
   audioAnalyses: 'audio-analyses',
   battleCutIn: 'axe.battle.cutIn',
   battleCutInRemote: 'axe.battle.remote',
+  battleCutInWindow: 'axe.battle.window',
   beatLightOff: 'beat-light-off',
+  buffIconScale: 'ui-buff-icon-scale',
   buffView: 'ui-buff-view',
   chatAutoFollow: 'chat-auto-follow-scroll',
   chatLogOmitDeleted: 'chat-log-omit-deleted',
@@ -21,8 +23,10 @@ export const STORAGE_KEYS = {
   djDeckOpen: 'mini-jukebox-dj-deck',
   effectAutoPlay: 'axe.effect.autoPlay',
   firstPersonPiece: 'ui-first-person-piece',
+  foregroundSeeThrough: 'axe.foreground.seeThrough',
   hotbar: 'ui-hotbar',
   hotbarOwner: 'ui-hotbar-owner',
+  iconChosenByHand: 'axe.icon.chosenByHand',
   imageEditFirst: 'ui-image-edit-first',
   imageShrinkLarge: 'ui-image-shrink-large',
   inventoryCompact: 'ui-inventory-compact',
@@ -36,6 +40,7 @@ export const STORAGE_KEYS = {
   mobileLayout: 'ui-mobile-layout',
   motion: 'ui-motion',
   myDice: 'my-dice',
+  overviewMemo: 'ui-overview-memo',
   ownerKey: 'udonarium-axe.owner-key',
   panelTransparency: 'ui-panel-transparency',
   personalVolumes: 'audio-personal-volumes',
@@ -71,6 +76,7 @@ export const STORAGE_KEYS = {
 export const STORAGE_KEY_PREFIXES = {
   menuLayout: 'axe.menu',
   personalFolders: 'axe.inventory.personal-folders',
+  scenarioTextSent: 'axe.scenario-text.sent',
 } as const;
 
 /** The key a setting kept per room, menu or the like is kept under, the prefix alone for an empty part. */

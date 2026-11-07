@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import {
+  chatInput,
   openPanel,
   openTableContextMenu,
   openVnSpeakerList,
@@ -273,9 +274,9 @@ test.describe('visual novel mode', () => {
 
     // The novel's input box speaks only as a character, so the small talk is sent from the usual chat.
     await openPanel(page, 'チャット');
-    const chatInput = page.locator('chat-window textarea').first();
-    await chatInput.fill('ちょっと待ってください');
-    await chatInput.press('Enter');
+    const chatBox = chatInput(page.locator('chat-window')).first();
+    await chatBox.fill('ちょっと待ってください');
+    await chatBox.press('Enter');
     await expect(page.locator('chat-message').last()).toContainText('ちょっと待ってください', { timeout: 15000 });
 
     await expect(page.locator('visual-novel-overlay')).toContainText('舞台の台詞');
@@ -478,13 +479,13 @@ test.describe('visual novel mode', () => {
     await input.press('Enter');
     await expect(page.locator('visual-novel-overlay')).toContainText('舞台の台詞', { timeout: 15000 });
 
-    await page.locator('visual-novel-overlay button[title="発言の流れ"]').click();
+    await page.locator('visual-novel-overlay button[title="ストリームチャット"]').click();
 
     const stream = page.locator('chat-stream');
     await expect(stream).toBeVisible();
     await expect(stream).toContainText('舞台の台詞');
 
-    await page.locator('visual-novel-overlay button[title="発言の流れ"]').click();
+    await page.locator('visual-novel-overlay button[title="ストリームチャット"]').click();
     await expect(stream).toHaveCount(0);
   });
 

@@ -42,6 +42,19 @@ test.describe('the battle cut-in', () => {
     await expect(stage).toHaveCount(0);
   });
 
+  test('turns a piece to face across where its picture faces the side it stands on', async ({ page }) => {
+    const panel = await setUpLineup(page);
+    await panel.getByTestId('battle-effect-piece').selectOption({ label: 'キャラクターA' });
+    await panel.getByTestId('battle-facing').selectOption({ label: '左向き' });
+
+    await panel.getByTestId('battle-cut-in-play-here').dispatchEvent('click');
+
+    const stage = page.getByTestId('battle-cut-in');
+    await expect(stage).toBeVisible({ timeout: 10000 });
+    await expect(stage.locator('img[alt="キャラクターA"]')).toHaveClass(/-scale-x-100/);
+    await expect(stage.locator('img[alt="モンスターA"]')).not.toHaveClass(/-scale-x-100/);
+  });
+
   test('closes by itself once the exchange has played', async ({ page }) => {
     const panel = await setUpLineup(page);
 
@@ -50,6 +63,33 @@ test.describe('the battle cut-in', () => {
     const stage = page.getByTestId('battle-cut-in');
     await expect(stage).toBeVisible({ timeout: 10000 });
     await expect(stage).toHaveCount(0, { timeout: 15000 });
+  });
+
+  test('plays in a small window that leaves the rest of the screen to the table, until its button closes it', async ({
+    page,
+  }) => {
+    const panel = await setUpLineup(page);
+    await panel.getByTestId('battle-cut-in-size-choice').selectOption({ label: '小さな窓' });
+
+    await panel.getByTestId('battle-cut-in-play-here').dispatchEvent('click');
+
+    const stage = page.getByTestId('battle-cut-in');
+    await expect(stage).toBeVisible({ timeout: 10000 });
+    await expect(stage).toHaveAttribute('data-stage-size', 'small');
+    const box = (await stage.boundingBox())!;
+    const screen = page.viewportSize()!;
+    expect(box.width).toBeLessThan(screen.width / 2);
+    // The middle of the screen lies outside the window, and a press there reaches the table.
+    const reached = await page.evaluate(
+      ([x, y]) => !document.elementFromPoint(x, y)?.closest('[data-testid="battle-cut-in"]'),
+      [screen.width / 2, screen.height / 2]
+    );
+    expect(reached).toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect(stage).toBeVisible();
+    await stage.getByTestId('battle-cut-in-close').click();
+    await expect(stage).toHaveCount(0);
   });
 
   test('stays off a screen whose reader turned it off', async ({ page }) => {

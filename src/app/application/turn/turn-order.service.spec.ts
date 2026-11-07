@@ -49,6 +49,7 @@ describe('TurnOrderService', () => {
     turnState.actedIdentifiers = [];
     turnState.history = '[]';
     turnState.holding = '';
+    turnState.turnOpening = '';
 
     chars = [new GameCharacter(), new GameCharacter(), new GameCharacter()];
     chars.forEach((c) => c.initialize());
@@ -367,6 +368,29 @@ describe('TurnOrderService', () => {
       expect(buffsOf(buffed[1]).map((buff: DataElement) => buff.name)).toEqual(['猛攻撃']);
     });
 
+    it('gives back what a poison that ran out in the step it undoes took, and no more', () => {
+      const [first] = buffed;
+      first.detailDataElement!.appendChild(DataElement.create('体力', 10, {}));
+      first.buffs.addRound('毒', ':体力+0~-3', 1);
+      first.buffs.applyModifier(first.buffs.find('毒')!, {
+        target: '体力',
+        slot: 'now',
+        operator: 'add',
+        amount: 0,
+        step: -3,
+        lasting: true,
+      });
+      const hp = () => first.detailDataElement!.getFirstElementByName('体力')!.value;
+
+      advanceToRoundEnd();
+      expect(hp()).toBe(7);
+
+      service.prev();
+
+      expect(buffsOf(first).map((buff: DataElement) => buff.name)).toContain('毒');
+      expect(hp()).toBe(10);
+    });
+
     it("counts a buff down as its trigger's turn opens, and leaves the rest alone", () => {
       // A Sword World enhancement runs out as the caster comes round again, not with the round.
       const [caster, target] = buffed;
@@ -380,6 +404,116 @@ describe('TurnOrderService', () => {
 
       expect(buffsOf(target).map((buff: DataElement) => buff.name)).not.toContain('練技');
       expect(buffsOf(target).map((buff: DataElement) => buff.name)).toContain('猛攻撃');
+    });
+
+    describe('a piece that waits once its turn has begun', () => {
+      const namesOf = (character: GameCharacter) => buffsOf(character).map((buff: DataElement) => buff.name);
+      const roundsOf = (character: GameCharacter, name: string) =>
+        buffsOf(character).find((buff: DataElement) => buff.name === name)?.value;
+
+      it('has its opening countdown given back, and counted down again as its turn comes back', () => {
+        const [first] = buffed;
+        first.buffs.addRound('加護', '', 2, { timing: 'turnStart' });
+
+        service.next(); // round 1 begins
+        service.next(); // the first piece's turn opens
+        expect(roundsOf(first, '加護')).toBe(1);
+
+        sendSpy.mockClear();
+        service.hold(first.identifier);
+        expect(roundsOf(first, '加護')).toBe(2);
+        const said = sendSpy.mock.calls.map((call: unknown[]) => String(call[1]));
+        expect(said.some((text: string) => text.includes('feature.turnOrder.buffsGivenBack'))).toBe(true);
+
+        service.next(); // the second piece is done, and the first comes back
+        expect(turnState.currentIdentifier).toBe(first.identifier);
+        expect(roundsOf(first, '加護')).toBe(1);
+      });
+
+      it('has a buff that ran out at the opening brought back, with what it moved on the sheet', () => {
+        const [first] = buffed;
+        first.detailDataElement!.appendChild(DataElement.create('命中', 5, {}));
+        first.buffs.addRound('集中', '命中+2', 1, { timing: 'turnStart' });
+        first.buffs.applyModifier(first.buffs.find('集中')!, {
+          target: '命中',
+          slot: 'now',
+          operator: 'add',
+          amount: 2,
+        });
+        const hit = () => first.detailDataElement!.getFirstElementByName('命中')!.value;
+        expect(hit()).toBe(7);
+
+        service.next(); // round 1 begins
+        service.next(); // the first piece's turn opens, and 集中 runs out
+        expect(namesOf(first)).not.toContain('集中');
+        expect(hit()).toBe(5);
+
+        service.hold(first.identifier);
+        expect(namesOf(first)).toContain('集中');
+        expect(roundsOf(first, '集中')).toBe(1);
+        expect(hit()).toBe(7);
+      });
+
+      it('gives back exactly what a poison that ran out at the opening took, and takes it again as its turn comes back', () => {
+        const [first] = buffed;
+        first.detailDataElement!.appendChild(DataElement.create('体力', 10, {}));
+        first.buffs.addRound('毒', ':体力+0~-3', 1, { timing: 'turnStart' });
+        first.buffs.applyModifier(first.buffs.find('毒')!, {
+          target: '体力',
+          slot: 'now',
+          operator: 'add',
+          amount: 0,
+          step: -3,
+          lasting: true,
+        });
+        const hp = () => first.detailDataElement!.getFirstElementByName('体力')!.value;
+
+        service.next(); // round 1 begins
+        service.next(); // the first piece's turn opens, and the poison bites as it runs out
+        expect(namesOf(first)).not.toContain('毒');
+        expect(hp()).toBe(7);
+
+        service.hold(first.identifier);
+        expect(roundsOf(first, '毒')).toBe(1);
+        expect(hp()).toBe(10);
+
+        service.next(); // the second piece is done, and the first comes back
+        expect(hp()).toBe(7);
+      });
+
+      it('leaves the countdown be while a seat at the table runs a version that would not count it again', () => {
+        const [first] = buffed;
+        first.buffs.addRound('加護', '', 2, { timing: 'turnStart' });
+        const older = new PeerCursor('older-cursor');
+        older.initialize();
+        older.peerId = 'older-peer';
+        older.role = 'pl';
+
+        try {
+          service.next(); // round 1 begins
+          service.next(); // the first piece's turn opens
+          service.hold(first.identifier);
+
+          expect(roundsOf(first, '加護')).toBe(1);
+          service.next(); // the first comes back, and its opening is not counted a second time
+          expect(roundsOf(first, '加護')).toBe(1);
+        } finally {
+          older.destroy();
+        }
+      });
+
+      it('goes back to before it waited in one step back', () => {
+        const [first] = buffed;
+        first.buffs.addRound('加護', '', 2, { timing: 'turnStart' });
+
+        service.next(); // round 1 begins
+        service.next(); // the first piece's turn opens
+        service.hold(first.identifier);
+        service.prev();
+
+        expect(turnState.currentIdentifier).toBe(first.identifier);
+        expect(roundsOf(first, '加護')).toBe(1);
+      });
     });
 
     it('waits for the bearer where the buff names no trigger', () => {

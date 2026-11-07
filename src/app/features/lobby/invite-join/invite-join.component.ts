@@ -11,7 +11,6 @@ import {
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ServerAuthService } from '@axe/application/lobby/server-auth.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
-import { ConfirmService } from '@axe/application/ui/confirm.service';
 import { LocalModePreferenceService } from '@axe/application/ui/local-mode-preference.service';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { OverlayModeService } from '@axe/application/ui/overlay-mode.service';
@@ -23,7 +22,6 @@ import { InviteLinkParams, parseInviteLink } from '@axe/domain/peer/invite-link'
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { dropInvitationFromAddress } from '@axe/features/lobby/leave-room';
-import { LobbyComponent } from '@axe/features/lobby/lobby/lobby.component';
 import { NetworkReachService } from '@axe/features/lobby/network-reach.service';
 import { OperatorContactComponent } from '@axe/features/lobby/operator-contact/operator-contact.component';
 import {
@@ -35,7 +33,10 @@ import { WithheldEntryService } from '@axe/features/lobby/withheld-entry';
 import { RoomRestoreOfferService } from '@axe/features/room-archive/room-restore-banner/room-restore-offer.service';
 import { TranslocoModule } from '@jsverse/transloco';
 
-type InviteJoinState = 'idle' | 'joining' | 'offline' | 'notFound' | 'failed' | 'banned' | 'done';
+type InviteJoinState = 'idle' | 'joining' | 'askLogin' | 'offline' | 'notFound' | 'failed' | 'banned' | 'done';
+
+/** Where a tab keeps the rooms its reader chose to watch rather than log in for, so a reload does not ask again. */
+const WATCHED_WITHOUT_LOGIN_KEY = 'udonarium-axe.watched-without-login';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -56,14 +57,20 @@ export class InviteJoinComponent {
   private readonly reach = inject(NetworkReachService);
   private readonly withheldEntry = inject(WithheldEntryService);
   private readonly auth = inject(ServerAuthService);
-  private readonly confirm = inject(ConfirmService);
 
   private readonly state = signal<InviteJoinState>('idle');
   private readonly roomName = signal('');
   /** The operator's contact looking the room up was refused with; null for none. */
   private readonly refusalContact = signal<string | null>(null);
+  /** Lets the join go on once the reader asked to log in has done so or chosen to watch. */
+  private answerLogin: (() => void) | null = null;
+  /** The key of the room the reader is being asked about. */
+  private askedRoomKey = '';
 
   protected readonly isJoining = computed(() => this.state() === 'joining');
+  /** Whether the reader is being asked to log in before going in, or to go in to watch. */
+  protected readonly isAskingLogin = computed(() => this.state() === 'askLogin');
+  protected readonly isLoggingIn = this.auth.isLoggingIn;
   /** The operator's contact to show beside the word that the operator blocked this connection. */
   protected readonly bannedContact = computed(() => (this.state() === 'banned' ? this.refusalContact() : null));
   /** Whether this browser is set to play offline, where no room can be joined until it goes online. */
@@ -88,6 +95,8 @@ export class InviteJoinComponent {
         return this.roomJoin.waitingForPreviousConnection()
           ? this.t('feature.lobby.waitingForPreviousConnection')
           : this.t('feature.lobby.invite.joining', { roomName: this.roomName() });
+      case 'askLogin':
+        return this.t('feature.lobby.invite.askLogin', { roomName: this.roomName() });
       case 'offline':
         return this.t('feature.lobby.invite.offline', { roomName: this.roomName() });
       case 'notFound':
@@ -105,7 +114,9 @@ export class InviteJoinComponent {
     const params = parseInviteLink(location.hash);
     if (!params) return;
     this.objectChange.networkOpen$.subscribe(() => {
-      if (isInAnotherRoom(params.roomId)) dropInvitationFromAddress();
+      if (!isInAnotherRoom(params.roomId)) return;
+      dropInvitationFromAddress();
+      if (this.state() === 'askLogin') this.answerLogin?.();
     }, this.destroyRef);
 
     this.roomName.set(params.roomName);
@@ -116,6 +127,9 @@ export class InviteJoinComponent {
     this.state.set('joining');
     effect(() => {
       if (this.reach.unreachable() && untracked(this.state) === 'joining') this.state.set('failed');
+    });
+    effect(() => {
+      if (this.auth.account() && untracked(this.state) === 'askLogin') this.answerLogin?.();
     });
 
     if (Network.isOpen) {
@@ -128,19 +142,58 @@ export class InviteJoinComponent {
     }, this.destroyRef);
   }
 
+  /**
+   * Opens the lobby, to find the room another way. It is fetched only now, as a link that works
+   * never needs it.
+   */
   protected showLobby(): void {
     this.state.set('done');
-    this.modalService.open(LobbyComponent, {
-      title: this.t('feature.lobby.lobby.title'),
-      width: 700,
-      height: 400,
-      left: 0,
-      top: 400,
-    });
+    void this.modalService.openLazy(
+      () => import('@axe/features/lobby/lobby/lobby.component').then((loaded) => loaded.LobbyComponent),
+      { title: this.t('feature.lobby.lobby.title'), width: 700, height: 400, left: 0, top: 400 }
+    );
   }
 
   protected dismiss(): void {
     this.state.set('done');
+  }
+
+  /** Opens the login; once it is done the join goes on as the account. */
+  protected logIn(): void {
+    void this.auth.startLogin();
+  }
+
+  /** Goes in without logging in, to watch, which this tab then remembers for the room. */
+  protected watch(): void {
+    const roomKey = this.askedRoomKey;
+    try {
+      const watched = readWatchedWithoutLogin();
+      if (!watched.includes(roomKey))
+        sessionStorage.setItem(WATCHED_WITHOUT_LOGIN_KEY, JSON.stringify([...watched, roomKey]));
+    } catch {
+      // a tab that keeps nothing asks again on a reload
+    }
+    this.answerLogin?.();
+  }
+
+  /**
+   * Waits, where a room server offers a login the reader has not made, for them to log in or to
+   * choose to watch. A link opened as on any other table would otherwise take them in as a guest
+   * without a word, and the login is in the lobby, which a link never opens. A screen for streaming,
+   * which always watches, and a tab that chose to watch the room before are not asked; nor is a
+   * reader where the server is not known to offer a login, once it has been asked. The question
+   * goes as another room opens meanwhile, which the reader went to instead.
+   */
+  private async logInOrWatch(roomKey: string): Promise<void> {
+    if (!this.auth.isConfigured || this.auth.account()) return;
+    if (this.overlayMode.active() || readWatchedWithoutLogin().includes(roomKey)) return;
+    if (this.auth.offersLogin() === null) await this.auth.refreshProviders();
+    if (this.auth.offersLogin() !== true || this.auth.account()) return;
+    this.askedRoomKey = roomKey;
+    this.state.set('askLogin');
+    await new Promise<void>((resolve) => (this.answerLogin = resolve));
+    this.answerLogin = null;
+    this.state.set('joining');
   }
 
   /**
@@ -231,6 +284,8 @@ export class InviteJoinComponent {
       this.state.set('failed');
       return;
     }
+    await this.logInOrWatch(room.roomKey || `${room.id}/${room.name}`);
+    if (this.movedOn(params)) return;
     let password = params.password;
     if (room.hasPassword && password.length < 1) {
       const options: PasswordCheckOptions = { checkedByServer: true, title: `${room.name}/${room.id}` };
@@ -251,25 +306,6 @@ export class InviteJoinComponent {
     }
 
     this.state.set('done');
-    void this.offerLoginToGuest();
-  }
-
-  /**
-   * Tells somebody who came in by an invitation without logging in that they are watching, and offers
-   * the login that lets them play, where the room server has one. Logging in comes back into the room,
-   * the invitation kept for the account.
-   */
-  private async offerLoginToGuest(): Promise<void> {
-    if (PeerCursor.myCursor?.role !== PeerRole.Guest || this.auth.isLoggedIn()) return;
-    if (this.auth.offersLogin() === null) await this.auth.refreshProviders();
-    if (!this.auth.offersLogin() || this.auth.isLoggedIn()) return;
-    const login = await this.confirm.ask({
-      title: this.t('feature.lobby.invite.guestLoginTitle'),
-      message: this.t('feature.lobby.invite.guestLoginMessage'),
-      okLabel: this.t('feature.lobby.account.login'),
-      cancelLabel: this.t('feature.lobby.invite.guestLoginStay'),
-    });
-    if (login) await this.auth.startLogin();
   }
 
   private async resolvePassword(hasPassword: boolean, given: string, peerContext: PeerContext): Promise<string | null> {
@@ -286,5 +322,15 @@ export class InviteJoinComponent {
     if (!role) return;
     PeerCursor.myCursor.role = role;
     PeerCursor.myCursor.update();
+  }
+}
+
+/** The rooms this tab's reader chose to watch rather than log in for, by key. */
+function readWatchedWithoutLogin(): string[] {
+  try {
+    const read: unknown = JSON.parse(sessionStorage.getItem(WATCHED_WITHOUT_LOGIN_KEY) ?? '[]');
+    return Array.isArray(read) ? read.filter((key): key is string => typeof key === 'string') : [];
+  } catch {
+    return [];
   }
 }

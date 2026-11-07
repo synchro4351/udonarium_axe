@@ -4,7 +4,9 @@ import { existsSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { Browser, BrowserContext, expect, Page, test as base } from '@playwright/test';
+import { Browser, BrowserContext, expect, Locator, Page, test as base } from '@playwright/test';
+
+import { chatInput } from '../helpers';
 
 /**
  * The room server project runs the backend's Cloudflare Worker under `wrangler dev`, next to a
@@ -304,7 +306,7 @@ export async function openSeat(
   }
   const page = await context.newPage();
   await page.goto(url, { timeout: 45_000 });
-  await expect(page.locator('textarea.chat-input')).toBeVisible({ timeout: 30_000 });
+  await expect(chatInput(page)).toBeVisible({ timeout: 30_000 });
   return { context, page, name, login };
 }
 
@@ -359,17 +361,31 @@ export async function joinRoom(page: Page, name: string): Promise<void> {
  */
 export async function expectInRoom(page: Page, name: string): Promise<void> {
   await expect(page.locator('peer-menu')).toContainText(name, { timeout: 40_000 });
-  await expect(page.getByTestId('peer-menu-server-role')).toBeVisible({ timeout: 20_000 });
+  await expect(roleShown(page)).toBeVisible({ timeout: 20_000 });
+}
+
+/**
+ * Where the peer menu shows the seat's role: the badge of a seat with no choice of its own, or, for a
+ * seat logged in, whichever of its role and watching is pressed.
+ */
+export function roleShown(page: Page): Locator {
+  return page.locator(
+    [
+      '[data-testid="peer-menu-server-role"]',
+      '[data-testid="peer-menu-kept-role"][aria-pressed="true"]',
+      '[data-testid="peer-menu-watch"][aria-pressed="true"]',
+    ].join(', ')
+  );
 }
 
 /** The role the server gave the page's seat, as the peer menu shows it. */
 export async function serverRole(page: Page): Promise<string> {
-  return ((await page.getByTestId('peer-menu-server-role').textContent()) ?? '').trim();
+  return ((await roleShown(page).textContent()) ?? '').trim();
 }
 
 /** Says a line in the chat. */
 export async function say(page: Page, text: string): Promise<void> {
-  const input = page.locator('textarea.chat-input');
+  const input = chatInput(page);
   await input.click();
   await input.fill(text);
   await input.press('Enter');

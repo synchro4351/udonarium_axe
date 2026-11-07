@@ -29,36 +29,6 @@ describe('StampPickerComponent', () => {
   beforeEach(() => localStorage.removeItem(STORAGE_KEYS.recentStamps));
   afterEach(() => localStorage.removeItem(STORAGE_KEYS.recentStamps));
 
-  describe('the ways of writing', () => {
-    const ruby = { id: 'ruby', name: 'ルビ', hint: 'ふりがなを付ける', example: '|漢字<かんじ>' };
-
-    it('offers no tab for them unless given some, as for answering a line', () => {
-      const root = open();
-
-      expect(root.querySelector('[data-testid="stamp-picker-tab-syntax"]')).toBeNull();
-    });
-
-    it('puts them on a tab at the end of the first row, and says which was picked', () => {
-      const root = open();
-      fixture.componentRef.setInput('syntax', [ruby]);
-      fixture.detectChanges();
-      const picked: string[] = [];
-      fixture.componentInstance.syntaxPicked.subscribe((id) => picked.push(id));
-
-      const firstRow = root.querySelector<HTMLElement>('[data-testid="stamp-picker-tab-row-0"]')!;
-      const tabs = [...firstRow.querySelectorAll<HTMLElement>('[role="tab"]')];
-      expect(tabs.at(-1)!.dataset['testid']).toBe('stamp-picker-tab-syntax');
-
-      tabs.at(-1)!.click();
-      fixture.detectChanges();
-      const choice = root.querySelector<HTMLElement>('[data-testid="stamp-picker-syntax"][data-syntax="ruby"]')!;
-      expect(choice.textContent).toContain('|漢字<かんじ>');
-      choice.click();
-
-      expect(picked).toEqual(['ruby']);
-    });
-  });
-
   it('opens on the sound effects for somebody who has picked nothing yet, with a tab for each family', () => {
     const root = open();
 

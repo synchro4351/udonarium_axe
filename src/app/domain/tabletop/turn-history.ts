@@ -26,6 +26,29 @@ export interface TurnStep {
   buffs: CharacterBuffSnapshot[];
 }
 
+/** What the opening of a piece's turn counted down: every buff it counted, as it stood before. */
+export interface TurnOpening {
+  identifier: string;
+  buffs: CharacterBuffSnapshot[];
+}
+
+/** Reads what a turn's opening counted down; null for nothing written, or anything unreadable. */
+export function readTurnOpening(raw: unknown): TurnOpening | null {
+  if (typeof raw !== 'string' || raw === '') return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<TurnOpening> | null;
+    if (!parsed || typeof parsed.identifier !== 'string' || !Array.isArray(parsed.buffs)) return null;
+    return { identifier: parsed.identifier, buffs: parsed.buffs };
+  } catch {
+    return null;
+  }
+}
+
+/** Writes what a turn's opening counted down as the text `readTurnOpening` reads; empty for none. */
+export function writeTurnOpening(opening: TurnOpening | null): string {
+  return opening ? JSON.stringify(opening) : '';
+}
+
 /**
  * Reads the round's step history from its stored JSON. Anything unreadable gives an empty history.
  */
@@ -48,6 +71,18 @@ export function parseTurnHistory(json: string): TurnStep[] {
 /** Writes the step history as JSON, keeping only the latest TURN_HISTORY_LIMIT steps. */
 export function stringifyTurnHistory(steps: readonly TurnStep[]): string {
   return JSON.stringify(steps.slice(-TURN_HISTORY_LIMIT));
+}
+
+/**
+ * Writes on the buffs as they stood before a count how far the count moved the status of each that
+ * ran out in it while leaving its status moved, by name, so putting them back gives back exactly
+ * that much.
+ */
+export function noteRanOut(entries: readonly BuffSnapshotEntry[], ranOut: ReadonlyMap<string, number>): void {
+  for (const entry of entries) {
+    const moved = ranOut.get(entry.name);
+    if (moved !== undefined) entry.lastMoved = moved;
+  }
 }
 
 /**

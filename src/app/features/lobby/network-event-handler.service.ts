@@ -22,6 +22,7 @@ import { AssetHttpStore } from '@axe/core/storage/asset-http-store';
 import { AssetRetries } from '@axe/core/storage/asset-retries';
 import { AudioSharingSystem } from '@axe/core/storage/audio-sharing-system';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
+import { hasChosenIconByHand, noteIconChosenByHand } from '@axe/core/storage/icon-chosen-by-hand';
 import { guestUserIdAfter, guestUserIdOf, loadIdentity, saveIdentity } from '@axe/core/storage/identity-storage';
 import { ImageSharingSystem } from '@axe/core/storage/image-sharing-system';
 import { ImageStorage } from '@axe/core/storage/image-storage';
@@ -31,6 +32,7 @@ import { canRoleEdit, DEFAULT_PEER_ROLE } from '@axe/domain/peer/peer-role';
 import { markSeatWithheld } from '@axe/domain/peer/withheld-table';
 import { IdleSeatService } from '@axe/features/lobby/idle-seat.service';
 import { NetworkReachService } from '@axe/features/lobby/network-reach.service';
+import { ServerWatchService } from '@axe/features/lobby/server-watch.service';
 
 /** What to say for each reason the room server gives for keeping a role as it was. */
 const ROLE_REJECTED_KEYS: Readonly<Record<string, string>> = {
@@ -67,6 +69,7 @@ export class NetworkEventHandlerService {
   private readonly overlayMode = inject(OverlayModeService);
   private readonly t = inject(TRANSLATE_FN);
   private readonly idleSeat = inject(IdleSeatService);
+  private readonly serverWatch = inject(ServerWatchService);
   private readonly imageStorage = inject(ImageStorage);
   private readonly audioStorage = inject(AudioStorage);
   private readonly assetHttpStore = inject(AssetHttpStore);
@@ -141,6 +144,7 @@ export class NetworkEventHandlerService {
     // The room server gave this seat another role: a guest made a player brings its pictures up.
     networkMessage$.subscribe((message) => {
       if (message.eventName !== 'SERVER_ROLE_CHANGED' || !message.isSendFromSelf) return;
+      this.serverWatch.noteRoleTold();
       this.takeServerRole();
       this.bringAssetsIntoRoom();
     }, this.destroyRef);
@@ -178,7 +182,7 @@ export class NetworkEventHandlerService {
       // A room server's clock sets the chat's as the seat comes in, though nobody else may be there.
       if (peer.isRoom && Network.serverClockOffset !== null) this.chatClock.calibrate();
       const account = Network.transport === 'server' ? this.auth.account() : null;
-      if (account) this.lendAccountLook(account.name, account.avatarUrl);
+      if (account) this.lendAccountLook(account);
     }, this.destroyRef);
     this.objectChange.networkError$.subscribe((event) => {
       if (this.localMode) return;
@@ -443,8 +447,15 @@ export class NetworkEventHandlerService {
     });
   }
 
-  /** Says why the room server would not change somebody's role. */
+  /**
+   * Says why the room server would not change somebody's role. A request of the seat's own, to watch
+   * or to come back, is told apart, as the reasons are written for changing somebody else's.
+   */
   private tellRoleRejected(data: { peerId?: unknown; reason?: unknown } | null): void {
+    if (data?.peerId === Network.peerId) {
+      this.chatMessageService.sendSystemNotice('room', encodeI18nMessage('feature.lobby.roleRejected.own'));
+      return;
+    }
     const reason = typeof data?.reason === 'string' ? data.reason : '';
     const key = ROLE_REJECTED_KEYS[reason] ?? 'feature.lobby.roleRejected.other';
     const name = typeof data?.peerId === 'string' ? this.resolvePeerName(data.peerId) : '';
@@ -539,7 +550,8 @@ export class NetworkEventHandlerService {
    * Follows a login or logout, in this tab or another, on a room server. In a room, the seat goes in
    * again as whoever is logged in now; outside one, it waits as them, taking what the old id held
    * along. A login also lends the cursor the account's name and avatar while it has the defaults,
-   * and a logout takes back what is still as lent, so the guest seat does not go on as the account.
+   * the avatar only where the account never chose its icon by hand, and a logout takes back what is
+   * still as lent, so the guest seat does not go on as the account.
    * A login gone in a room, as when the server no longer takes it, says the seat is a guest now.
    */
   private followAccount(userId: string | null): void {
@@ -548,7 +560,7 @@ export class NetworkEventHandlerService {
     if (userId) this.lastAccountUserId = userId;
     if (this.localMode || Network.transport !== 'server') return;
     const account = this.auth.account();
-    if (account) this.lendAccountLook(account.name, account.avatarUrl);
+    if (account) this.lendAccountLook(account);
     else this.takeBackAccountLook();
     if (previous === undefined || previous === userId || !Network.isOpen) return;
 
@@ -575,18 +587,40 @@ export class NetworkEventHandlerService {
     return peer.userId.startsWith(ACCOUNT_USER_ID_PREFIX) || peer.userId === this.lastAccountUserId;
   }
 
-  /** Puts the account's name and avatar on the cursor where it still has the defaults. */
-  private lendAccountLook(name: string, avatarUrl: string | null): void {
+  /**
+   * Puts the account's name on the cursor where it still has the default, and its avatar where the
+   * icon is still the default and the account has never chosen one by hand in this browser. What is
+   * still as lent before, as when the login moves straight on to another account or to a new
+   * avatar, counts as the default, and the account's own avatar, chosen again, as lent. An icon found chosen already, as one picked before the login,
+   * counts as chosen by hand from then on, so the avatar does not come over it once a reload has
+   * taken it back to the default.
+   */
+  private lendAccountLook(account: { userId: string; name: string; avatarUrl: string | null }): void {
     const cursor = PeerCursor.myCursor;
     if (!cursor) return;
-    if (cursor.name === DEFAULT_CURSOR_NAME && name) {
-      cursor.name = name;
-      this.lentLook.name = name;
+    const lent = this.lentLook;
+    const nameFree = cursor.name === DEFAULT_CURSOR_NAME || (lent.name !== '' && cursor.name === lent.name);
+    if (nameFree && account.name) {
+      cursor.name = account.name;
+      lent.name = account.name;
     }
-    if (cursor.imageIdentifier === DEFAULT_CURSOR_IMAGE_IDENTIFIER && avatarUrl) {
-      cursor.imageIdentifier = this.imageStorage.add(avatarUrl).identifier;
-      this.lentLook.imageIdentifier = cursor.imageIdentifier;
+    const icon = cursor.imageIdentifier;
+    if (account.avatarUrl && icon === account.avatarUrl) {
+      lent.imageIdentifier = icon;
+      return;
     }
+    const iconLent = lent.imageIdentifier !== '' && icon === lent.imageIdentifier;
+    if (icon !== DEFAULT_CURSOR_IMAGE_IDENTIFIER && !iconLent) {
+      noteIconChosenByHand(account.userId);
+      return;
+    }
+    if (!account.avatarUrl || hasChosenIconByHand(account.userId)) {
+      if (iconLent) cursor.imageIdentifier = DEFAULT_CURSOR_IMAGE_IDENTIFIER;
+      lent.imageIdentifier = '';
+      return;
+    }
+    cursor.imageIdentifier = this.imageStorage.add(account.avatarUrl).identifier;
+    lent.imageIdentifier = cursor.imageIdentifier;
   }
 
   /** Puts the defaults back on the cursor where it still has the account's name or avatar as lent. */

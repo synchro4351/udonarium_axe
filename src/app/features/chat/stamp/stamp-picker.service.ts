@@ -9,18 +9,12 @@ import { StampUse } from '@axe/domain/chat/stamp-rules';
 import { builtinStampPack } from '@axe/domain/media/builtin-stamps';
 import { StampPackPanelComponent } from '@axe/features/chat/stamp-pack-panel/stamp-pack-panel.component';
 import { placePopover } from '@axe/ui/anchored-popover';
-import { StampPickerComponent, StampPickerSyntax } from '@axe/ui/components/stamp-picker/stamp-picker.component';
+import { StampPickerComponent } from '@axe/ui/components/stamp-picker/stamp-picker.component';
 
 const PICKER_WIDTH = 360;
 const PICKER_MIN_HEIGHT = 200;
 const PACK_PANEL_WIDTH = 520;
 const PACK_PANEL_HEIGHT = 480;
-
-/** The chat's ways of writing to offer on a tab of their own, and what to do with the one picked. */
-export interface StampPickerSyntaxChoice {
-  readonly syntax: readonly StampPickerSyntax[];
-  readonly pick: (id: string) => void;
-}
 
 interface OpenPicker {
   readonly ref: ComponentRef<StampPickerComponent>;
@@ -54,21 +48,28 @@ export class StampPickerService {
     anchor: Element,
     use: StampUse,
     pick: (stampId: string) => void,
-    syntax: StampPickerSyntaxChoice | null = null
+    align: 'center' | 'end' = 'center',
+    prefer?: 'up'
   ): void {
     if (this.opened?.anchor === anchor) {
       this.close();
       return;
     }
-    this.open(anchor, use, pick, syntax);
+    this.open(anchor, use, pick, align, prefer);
   }
 
-  /** Opens the stamps the room lets be used `use`'s way under `anchor`, closing any already open. */
+  /**
+   * Opens the stamps the room lets be used `use`'s way by `anchor`, closing any already open:
+   * centred on it, or lined up with its right edge for a button at the right of a row. They open
+   * toward the larger room, or upward wherever they fit there, as asked for a button at the foot
+   * of the screen.
+   */
   open(
     anchor: Element,
     use: StampUse,
     pick: (stampId: string) => void,
-    syntax: StampPickerSyntaxChoice | null = null
+    align: 'center' | 'end' = 'center',
+    prefer?: 'up'
   ): void {
     this.close();
     const parent = this.overlays.layerFor(anchor.ownerDocument) ?? this.overlays.current() ?? this.overlays.main;
@@ -96,13 +97,6 @@ export class StampPickerService {
       this.close();
       pick(stampId);
     });
-    if (syntax) {
-      ref.setInput('syntax', syntax.syntax);
-      ref.instance.syntaxPicked.subscribe((id) => {
-        this.close();
-        syntax.pick(id);
-      });
-    }
     ref.instance.manage.subscribe(() => {
       this.close();
       this.openPackPanel();
@@ -112,7 +106,8 @@ export class StampPickerService {
     placePopover(element, anchor.getBoundingClientRect(), {
       width: PICKER_WIDTH,
       minHeight: PICKER_MIN_HEIGHT,
-      align: 'center',
+      align,
+      prefer,
     });
 
     const page = element.ownerDocument;

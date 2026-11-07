@@ -1,10 +1,15 @@
 import { ObjectNode } from '@axe/core/sync/object-node';
 import { BuffAppearance } from '@axe/domain/character/buff-appearance';
+import { buffGroupOf, isBuffGroupMember } from '@axe/domain/character/buff-group';
 import {
   BuffModifier,
   clearBuffModifier,
+  describeStandingModifier,
+  holdsRequestedStatus,
+  movesSameStatus,
   ParsedBuffModifierRequest,
   readBuffModifier,
+  speaksOnlyOfHeldStatus,
   writeBuffModifier,
 } from '@axe/domain/character/buff-modifier';
 import { stackBuffEffect } from '@axe/domain/character/buff-stack';
@@ -19,6 +24,12 @@ export interface BuffSnapshotEntry {
   info: string;
   appearance: BuffAppearance;
   modifier: BuffModifier | null;
+  /**
+   * For a buff that leaves its status moved and has run out since this was taken: how far the
+   * count it ran out at moved the status, which putting it back gives back. None where nothing says,
+   * which gives back nothing, as a buff gone some other way moved nothing as it went.
+   */
+  lastMoved?: number;
 }
 
 export class BuffManager {
@@ -61,15 +72,25 @@ export class BuffManager {
   }
 
   /**
-   * Takes away the first buff of that name, putting back whatever it moved on the sheet. False when
-   * there is no such buff or the piece has no buff container yet.
+   * Takes away the first buff of that name, putting back whatever it moved on the sheet, with the
+   * further rows of a buff that moves several statuses. False when there is no such buff or the piece
+   * has no buff container yet.
    */
   delete(name: string): boolean {
     this.gather();
     const data = this.find(name);
     if (!data) return false;
     this.remove(data);
+    this.removeGroupMembers(name);
     return true;
+  }
+
+  /**
+   * Takes away the further rows of a buff that moves several statuses, leaving its first row, so the
+   * buff can be laid again with however many it moves now.
+   */
+  removeGroupMembers(name: string): void {
+    this.removeWhere((data) => isBuffGroupMember(data) && buffGroupOf(data) === name);
   }
 
   /**
@@ -87,6 +108,16 @@ export class BuffManager {
       this.remove(data);
     }
     return removed;
+  }
+
+  /**
+   * Takes a buff away as the reader sees it: the first row of a buff that moves several statuses goes
+   * with every further row of it, putting back all they moved. Any other row goes on its own.
+   */
+  removeWhole(data: DataElement): void {
+    const heads = buffGroupOf(data) === data.name ? data.name : '';
+    this.remove(data);
+    if (heads.length > 0) this.removeGroupMembers(heads);
   }
 
   /** Takes the buff away, putting back whatever it moved on the sheet. */
@@ -110,19 +141,25 @@ export class BuffManager {
    * Moves a status again on top of what the standing buff already moved, and remembers the two
    * distances added together, so taking the buff away puts back everything it did in all.
    *
-   * A buff standing on some other status has nothing in common with this one, so what it moved
-   * goes back before the new one is laid, which leaves this the same as applying it fresh.
+   * A buff standing on some other status, or giving back what this one leaves moved or the other way
+   * about, has nothing in common with this one, so what it moved goes back before the new one is
+   * laid, which leaves this the same as applying it fresh. One
+   * holding the same status at a value keeps holding it there, and nothing is moved. Null where the
+   * sheet has no such status, as for a buff laid fresh.
    */
   stackModifier(data: DataElement, request: ParsedBuffModifierRequest): BuffModifier | null {
     const standing = readBuffModifier(data);
-    if (!standing || standing.target !== request.target || standing.slot !== request.slot) {
+    if (!standing || !movesSameStatus(standing, request)) {
       this.revertModifier(data);
       return this.applyModifier(data, request);
+    }
+    if (holdsRequestedStatus(standing, request)) {
+      return this.status()?.getValue(request.target, request.slot) == null ? null : standing;
     }
 
     const moved = this.moveStatus(request);
     if (moved == null) return null;
-    return this.writeModifier(data, request, standing.applied + moved);
+    return this.writeModifier(data, { ...request, step: request.step ?? standing.step }, standing.applied + moved);
   }
 
   /** Moves the status by what the request asks for and answers how far it actually went. */
@@ -144,20 +181,51 @@ export class BuffManager {
       slot: request.slot,
       operator: request.operator,
       applied,
+      ...(request.step ? { step: request.step } : {}),
+      ...(request.lasting ? { lasting: request.lasting } : {}),
     };
     writeBuffModifier(data, modifier);
     return modifier;
   }
 
+  /**
+   * Moves the status again by what the buff moves it at every count, as it is counted down, and
+   * writes down the distance it now stands moved, on the record and, for a buff that gives it back,
+   * on the badge.
+   *
+   * At the count it runs out at, a buff that gives back what it moved is left alone, since all of it
+   * is about to go back; one that leaves its status moved moves it then too, so poison laid for three
+   * rounds bites three times.
+   */
+  private stepModifier(data: DataElement, runsOut = false): number | null {
+    const modifier = readBuffModifier(data);
+    if (!modifier?.step || modifier.operator !== 'add') return null;
+    if (runsOut && !modifier.lasting) return null;
+    const moved = this.moveStatus({
+      target: modifier.target,
+      slot: modifier.slot,
+      operator: 'add',
+      amount: modifier.step,
+    });
+    if (moved == null) return null;
+    const standing = { ...modifier, applied: modifier.applied + moved };
+    writeBuffModifier(data, standing);
+    if (!modifier.lasting) data.currentValue = describeStandingModifier(standing);
+    return moved;
+  }
+
+  /** Lets go of what the buff moved, moving it back unless the buff leaves it moved. */
   private revertModifier(data: DataElement): void {
     const modifier = readBuffModifier(data);
     if (!modifier) return;
-    this.status()?.changeValue(modifier.target, modifier.slot, -modifier.applied);
+    if (!modifier.lasting) this.status()?.changeValue(modifier.target, modifier.slot, -modifier.applied);
     clearBuffModifier(data);
   }
 
   /**
-   * Counts every buff that expires down by one round, by hand and whatever its timing.
+   * Counts every buff that expires down by one round, by hand and whatever its timing, moving the
+   * status of one that moves at every count as the round's own countdown does, down to the count it
+   * runs out at and no further.
    *
    * Nothing is removed here, even at zero; `deleteZeroRound` does that. A buff held until cleared
    * is left alone.
@@ -170,6 +238,7 @@ export class BuffManager {
       if (!buffExpires(data)) continue;
       const sum = parseInt(String(data.value)) - 1;
       data.value = sum;
+      if (sum >= 0) this.stepModifier(data, sum === 0);
     }
   }
 
@@ -213,8 +282,11 @@ export class BuffManager {
    * Counts down the buffs whose moment this is, removes the ones that ran out and returns
    * their names. `acting` is whose turn it is, which a buff pinned to a trigger character
    * waits for; it is unused at the end of a round, where everything counts down.
+   *
+   * A buff that leaves its status moved and runs out here is written into `ranOut`, where given,
+   * with how far its last count moved the status, for a record of the count to give back exactly.
    */
-  expireAt(timing: BuffTiming, acting: BuffTurnActor): string[] {
+  expireAt(timing: BuffTiming, acting: BuffTurnActor, ranOut?: Map<string, number>): string[] {
     this.gather();
     const container = this.container;
     if (!container) return [];
@@ -226,11 +298,43 @@ export class BuffManager {
       const round = parseInt(String(data.value)) - 1;
       data.value = round;
       if (round <= 0) {
-        expired.push(data.name);
+        if (!isBuffGroupMember(data)) expired.push(data.name);
+        // Only the count that brings it to nought is its last; one already standing there has had it.
+        const moved = round === 0 ? this.stepModifier(data, true) : null;
+        if (moved != null) ranOut?.set(data.name, moved);
         this.remove(data);
+      } else {
+        this.stepModifier(data);
       }
     }
     return expired;
+  }
+
+  /**
+   * The buffs whose moment this is, as they stand before they are counted down, for a turn's opening
+   * to give them back should the piece wait.
+   */
+  dueAt(timing: BuffTiming, acting: BuffTurnActor): BuffSnapshotEntry[] {
+    const owner = this.owner();
+    return this.snapshotOf(this.list().filter((data) => isBuffDueAt(data, timing, owner, acting)));
+  }
+
+  /**
+   * Puts these buffs back as they stood, one by one, leaving every other buff as it is: one counted
+   * down gets its rounds back, one that ran out comes back, and what each moves on the sheet is moved
+   * again by the difference alone.
+   */
+  putBack(entries: readonly BuffSnapshotEntry[]): void {
+    this.gather();
+    for (const entry of entries) {
+      const found = this.find(entry.name);
+      const data = found ?? this.append(entry.name, entry.value, entry.info);
+      if (!data) continue;
+      data.value = entry.value;
+      data.currentValue = entry.info;
+      applyAppearance(data, entry.appearance);
+      this.restoreModifier(data, entry.modifier, found == null ? (entry.lastMoved ?? 0) : null);
+    }
   }
 
   /**
@@ -240,7 +344,11 @@ export class BuffManager {
    * with it, and a buff that only reads as a note has no number to find it by.
    */
   snapshot(): BuffSnapshotEntry[] {
-    return this.list().map((data) => ({
+    return this.snapshotOf(this.list());
+  }
+
+  private snapshotOf(rows: readonly DataElement[]): BuffSnapshotEntry[] {
+    return rows.map((data) => ({
       name: data.name,
       value: data.value,
       info: `${data.currentValue ?? ''}`,
@@ -268,12 +376,13 @@ export class BuffManager {
     }
     const restored: DataElement[] = [];
     for (const entry of entries) {
-      const data = this.find(entry.name) ?? this.append(entry.name, entry.value, entry.info);
+      const found = this.find(entry.name);
+      const data = found ?? this.append(entry.name, entry.value, entry.info);
       if (!data) continue;
       data.value = entry.value;
       data.currentValue = entry.info;
       applyAppearance(data, entry.appearance);
-      this.restoreModifier(data, entry.modifier);
+      this.restoreModifier(data, entry.modifier, found == null ? (entry.lastMoved ?? 0) : null);
       restored.push(data);
     }
     this.reorder(restored);
@@ -303,14 +412,21 @@ export class BuffManager {
     return created;
   }
 
-  /** Moves the sheet by what the buff has yet to move, which is nothing when it already stands. */
-  private restoreModifier(data: DataElement, wanted: BuffModifier | null): void {
+  /**
+   * Moves the sheet by what the buff has yet to move, which is nothing when it already stands.
+   *
+   * A buff that leaves its status moved left it moved when it went, so a record of it gone is taken
+   * to stand where it last moved it. One that comes back after going, `cameBackMoving` being how far
+   * the count it ran out at moved the status, has that given back as well.
+   */
+  private restoreModifier(data: DataElement, wanted: BuffModifier | null, cameBackMoving: number | null): void {
     const standing = readBuffModifier(data);
-    if (standing && (!wanted || standing.target !== wanted.target || standing.slot !== wanted.slot)) {
+    if (standing && (!wanted || !movesSameStatus(standing, wanted))) {
       this.revertModifier(data);
     }
     if (!wanted) return;
-    const applied = readBuffModifier(data)?.applied ?? 0;
+    const left = wanted.lasting ? wanted.applied + (cameBackMoving ?? 0) : 0;
+    const applied = readBuffModifier(data)?.applied ?? left;
     if (applied !== wanted.applied) {
       this.status()?.changeValue(wanted.target, wanted.slot, wanted.applied - applied);
     }
@@ -366,7 +482,9 @@ export class BuffManager {
    * `攻撃+2` laid twice reads `攻撃+4`. Where the two notes do not say the same thing about the
    * same number there is nothing to add up, and the new note is written as it stands. The rounds
    * become whichever count is longer, so a short second helping never cuts a long one short, and
-   * a buff held until cleared is left held. A name no buff goes by yet is simply granted.
+   * a buff held until cleared is left held. A name no buff goes by yet is simply granted. A buff
+   * holding a status at a value keeps the note that says so where the new note speaks of that status
+   * alone, since holding it there twice is still holding it there.
    */
   stackRound(name: string, info: string = '', round?: number, appearance: BuffAppearance = {}): void {
     this.pileOn(name, info, round, appearance, (standing, asked) => Math.max(standing, asked));
@@ -398,9 +516,11 @@ export class BuffManager {
       return;
     }
 
-    const stacked = stackBuffEffect(`${data.currentValue ?? ''}`, info);
-    if (stacked !== null) data.currentValue = stacked;
-    else if (info.length > 0) data.currentValue = info;
+    if (!speaksOnlyOfHeldStatus(readBuffModifier(data), info)) {
+      const stacked = stackBuffEffect(`${data.currentValue ?? ''}`, info);
+      if (stacked !== null) data.currentValue = stacked;
+      else if (info.length > 0) data.currentValue = info;
+    }
     applyAppearance(data, appearance);
 
     if (round === undefined || !buffExpires(data)) return;
@@ -415,11 +535,13 @@ function isBuffRow(node: ObjectNode): boolean {
 }
 
 function readAppearance(data: DataElement): BuffAppearance {
+  const group = buffGroupOf(data);
   return {
     timing: buffTimingOf(data),
     trigger: data.getAttribute(DataElementAttribute.BUFF_TRIGGER) ?? '',
     color: data.getAttribute(DataElementAttribute.BUFF_COLOR) ?? '',
     icon: data.getAttribute(DataElementAttribute.BUFF_ICON) ?? '',
+    ...(group.length > 0 ? { group } : {}),
   };
 }
 
@@ -438,5 +560,9 @@ function applyAppearance(data: DataElement, appearance: BuffAppearance): void {
   if (appearance.icon !== undefined) {
     if (appearance.icon.length > 0) data.setAttribute(DataElementAttribute.BUFF_ICON, appearance.icon);
     else data.removeAttribute(DataElementAttribute.BUFF_ICON);
+  }
+  if (appearance.group !== undefined) {
+    if (appearance.group.length > 0) data.setAttribute(DataElementAttribute.BUFF_GROUP, appearance.group);
+    else data.removeAttribute(DataElementAttribute.BUFF_GROUP);
   }
 }

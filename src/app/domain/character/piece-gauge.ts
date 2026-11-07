@@ -8,6 +8,7 @@ export interface PieceGauge {
   max: number;
   ratio: number;
   inverted: boolean;
+  /** The colour the bar stands in: the one set for it, else that of how full it stands. */
   color: string;
 }
 
@@ -51,6 +52,25 @@ export function gaugeColor(ratio: number, inverted = false): string {
   if (remaining <= LOW_THRESHOLD) return LOW_COLOR;
   if (remaining <= HALF_THRESHOLD) return HALF_COLOR;
   return FULL_COLOR;
+}
+
+/** A bar colour as a colour box writes one. */
+const BAR_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+/**
+ * A colour set for a bar to stand in however full it is, or empty for the colour of how full it
+ * stands. Anything but a colour, an empty value from a version that never wrote one included, is
+ * empty. It changes only the look: a resource that grows worse as it rises is still told by
+ * {@link isGaugeInverted}.
+ */
+export function fixedGaugeColor(value: unknown): string {
+  const held = `${value ?? ''}`.trim();
+  return BAR_COLOR.test(held) ? held.toLowerCase() : '';
+}
+
+/** The colour set for the resource's bar, or empty for none. */
+export function gaugeFixedColorOf(element: DataElement): string {
+  return fixedGaugeColor(element.getAttribute(DataElementAttribute.GAUGE_COLOR));
 }
 
 const NO_ROOM_GAUGES: ReadonlySet<string> = new Set();
@@ -111,7 +131,7 @@ export function selectPieceGauges(
         max: Number.isFinite(max) ? max : 0,
         ratio,
         inverted,
-        color: gaugeColor(ratio, inverted),
+        color: gaugeFixedColorOf(data) || gaugeColor(ratio, inverted),
       });
     }
   };

@@ -69,10 +69,10 @@ describe('remote-controller-helpers', () => {
     });
 
     it('holds a buff given no rounds until it is taken off, and says so in the chat line', () => {
-      for (const line of ['猛攻撃', '猛攻撃 攻撃+2', '猛攻撃 攻撃+2 赤']) {
+      for (const line of ['猛攻撃', '猛攻撃 攻撃+2', '猛攻撃/攻撃+2/']) {
         const parsed = parseBuffInput(line)!;
         expect(parsed.appearance.timing).toBe('none');
-        expect(parsed.bufftext).toMatch(/\/永続/);
+        expect(parsed.bufftext).toMatch(/\/消えない/);
         expect(parsed.bufftext).not.toMatch(/\dR/);
       }
     });
@@ -84,6 +84,15 @@ describe('remote-controller-helpers', () => {
     it('keeps the rounds of a standing buff piled on without a number', () => {
       const parsed = parseBuffInput('+猛攻撃 攻撃+2')!;
       expect(parsed.appearance.timing).toBeUndefined();
+    });
+
+    it('reads none as the timing that never runs out, after the rounds or in their place', () => {
+      expect(parseBuffInput('毒 継続2 3 none')!.appearance).toEqual({ timing: 'none' });
+      expect(parseBuffInput('毒 継続2 none')).toMatchObject({
+        round: 3,
+        appearance: { timing: 'none' },
+        bufftext: '毒/継続2/none',
+      });
     });
 
     it('reads nothing from an empty line', () => {

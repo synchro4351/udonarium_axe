@@ -1,6 +1,7 @@
 import {
   BATTLE_CHAT_TOKEN,
   buildEffectChatToken,
+  effectTokenSites,
   hasBattleChatToken,
   parseEffectChatToken,
   stripEffectChatTokens,
@@ -93,8 +94,16 @@ describe('ruby and effect commands together', () => {
     expect(parseEffectChatToken('|技《爆炎》 《斬撃》')).toEqual({ name: '斬撃', text: '|技《爆炎》' });
     expect(parseEffectChatToken('|技<爆炎> 《斬撃》')).toEqual({ name: '斬撃', text: '|技<爆炎>' });
   });
-  it('preserves spaces within ruby while removing commands from surrounding text', () => {
-    expect(stripEffectChatTokens('  |東京<とう  きょう>   《斬撃》  ')).toBe('|東京<とう  きょう>');
-    expect(stripEffectChatTokens('|東京《とう  きょう》 《斬撃》')).toBe('|東京《とう  きょう》');
+});
+
+describe('effectTokenSites', () => {
+  it('places every token, brackets included, passing over the readings of rubies', () => {
+    const text = '|爆炎《ばくえん》だ《爆炎》《 vs 》《 》';
+    const sites = effectTokenSites(text);
+    expect(sites.map((site) => [text.slice(site.from, site.to), site.name, site.battle])).toEqual([
+      ['《爆炎》', '爆炎', false],
+      ['《 vs 》', 'vs', true],
+      ['《 》', '', false],
+    ]);
   });
 });

@@ -1,11 +1,30 @@
 import { toHalfWidth } from '@axe/core/util/string-util';
 import { parseBuffAppearance } from '@axe/domain/character/buff-appearance';
-import { describeBuffModifier, parseBuffModifierRequest } from '@axe/domain/character/buff-modifier';
+import {
+  buffCommandKind,
+  readBuffStacking,
+  readCalculatedBuff,
+  readCalculatedBuffLook,
+  removedBuffName,
+  splitBuffRounds,
+} from '@axe/domain/character/buff-command';
+import {
+  describeBuffModifier,
+  describeBuffModifierTarget,
+  holdsRequestedStatus,
+  parseBuffModifierRequest,
+  ParsedBuffModifierRequest,
+  readBuffModifier,
+} from '@axe/domain/character/buff-modifier';
 import { BuffPileOn } from '@axe/domain/character/buff-stack';
-import { resolveBuffTiming } from '@axe/domain/character/buff-timing';
+import { buffExpires } from '@axe/domain/character/buff-timing';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { findStatusAilment, type StatusAilment } from '@axe/domain/character/status-ailment';
+import { StatusAilmentCatalog } from '@axe/domain/character/status-ailment-catalog';
+import { plantStatusAilment, statusAilmentAsCommanded } from '@axe/domain/character/status-ailment-plant';
 import { DataElement } from '@axe/domain/data/data-element';
 import { findEmbeddedRolls, replaceEmbeddedRolls } from '@axe/domain/data/embedded-roll';
+import { resourceCommandParts } from '@axe/domain/data/resource-command-words';
 import { readNamedResourceSlot, type ResourceSlot, resourceSlotLabel } from '@axe/domain/data/resource-slot';
 
 export interface ResourceEditOption {
@@ -148,18 +167,16 @@ export function convertCommandToResourceEdit(
   oneResourceEdit.object = object;
   oneResourceEdit.targeted = targeted;
 
-  const replaceText = ` ${text.replace('：', ':').replace('＋', '+').replace('－', '-').replace('＝', '=').replace('＞', '>')}`;
-  const resourceEditRegExp = /[:]([^-+=>]+)([-+=>])(.*)/;
-  const resourceEditResult = replaceText.match(resourceEditRegExp);
-  if (!resourceEditResult) return false;
-  if (resourceEditResult[2] !== '>' && resourceEditResult[3] === '') return false;
+  const parts = resourceCommandParts(text);
+  if (!parts) return false;
+  if (parts.operator !== '>' && parts.amount === '') return false;
 
-  const named = readNamedResourceSlot(resourceEditResult[1]);
+  const named = readNamedResourceSlot(parts.name);
   const reg1 = named.name;
   const reg1HalfWidth = toHalfWidth(reg1);
   oneResourceEdit.nowOrMax = named.slot;
 
-  oneResourceEdit.operator = resourceEditResult[2];
+  oneResourceEdit.operator = parts.operator;
 
   if (object.status.canChangeName(reg1)) {
     oneResourceEdit.target = reg1;
@@ -170,17 +187,17 @@ export function convertCommandToResourceEdit(
   }
 
   if (oneResourceEdit.operator === '>') {
-    oneResourceEdit.replace = resourceEditResult[3];
+    oneResourceEdit.replace = parts.amount;
     return true;
   }
 
-  const reg3 = splitOptionLetters(toHalfWidth(resourceEditResult[3])).amount;
+  const reg3 = splitOptionLetters(toHalfWidth(parts.amount)).amount;
   const commandPrefix = oneResourceEdit.operator === '-' ? '-' : '';
   oneResourceEdit.amount = reg3;
   const leading = commandPrefix === '-' ? wrapLeadingDivision(oneResourceEdit.amount) : oneResourceEdit.amount;
   oneResourceEdit.command = `${commandPrefix}${leading}+(1d1-1)`;
 
-  const optionCommand = parseResourceEditOption(resourceEditResult[3]);
+  const optionCommand = parseResourceEditOption(parts.amount);
   if (optionCommand.isErr) {
     return false;
   }
@@ -288,55 +305,73 @@ export function applyResourceEdit(edit: ResourceEdit, character: GameCharacter):
  * `&!name/status/op/amount/R/timing/trigger` - a buff that moves a status as it goes on and
  * moves it back as it runs out, so the table stops doing the arithmetic by hand.
  *
+ * `&!name/status+amount,status-amount/R/timing/trigger` moves several at once, written together in
+ * the second field; it is told from the first by its third field, which is no operator. Each status
+ * gets a row of its own, the first under the buff's name and the rest under the name and their
+ * status, all of them marked as the one buff, so that a version that knows no such buff shows them
+ * as buffs of their own that each put back what they moved.
+ *
  * `&+!` stacks: a second helping moves the status again and the buff remembers both, rather than
  * putting the first one back, and `&++!` lengthens the buff by the rounds asked for as well.
  * Holding a status at a value (`=`) is the one thing that cannot stack, since holding it there
- * twice is still holding it there, so that starts over as always.
+ * twice is still holding it there, so that starts over as always. For the same reason a helping
+ * stacked on a buff that holds its status leaves the status held, adding only to the rounds.
  */
 function applyCalculatedBuff(command: string, character: GameCharacter, piles: BuffPileOn): string {
-  const parts = command.replace(/^[tTｔＴ]?&[!！]/i, '').split('/');
-  const name = (parts[0] ?? '').trim();
+  const { name, requests, rest } = readCalculatedBuff(command);
   if (name.length < 1) return '';
-
-  const request = parseBuffModifierRequest(parts[1] ?? '', parts[2] ?? '', parts[3] ?? '');
-  if (!request) return `バフの書式が読めません ${name}    `;
-
-  const roundText = (parts[4] ?? '').trim();
-  const round = roundText.length > 0 && Number.isFinite(Number(roundText)) ? Number(roundText) : 3;
-  const timing = resolveBuffTiming(parts[5] ?? '') ?? undefined;
-  const trigger = (parts[6] ?? '').trim();
-
-  const stacking = piles !== 'none' && request.operator === 'add' && character.buffs.find(name) != null;
-  const effect = describeBuffModifier(request);
-  const appearance = { timing, trigger: trigger.length > 0 ? trigger : undefined };
-  if (!stacking) character.buffs.addRound(name, effect, round, appearance);
-  else if (piles === 'extend') character.buffs.extendRound(name, effect, round, appearance);
-  else character.buffs.stackRound(name, effect, round, appearance);
-
-  const data = character.buffs.find(name);
-  if (!data) return '';
-  const applied = stacking
-    ? character.buffs.stackModifier(data, request)
-    : character.buffs.applyModifier(data, request);
-  const verb = stacking ? '加算' : '付与';
-  const standing = stacking ? `${data.currentValue ?? effect}` : effect;
-  if (!applied) return `${name}を${verb} ${standing}/${data.value}R (${request.target}が見つかりません)    `;
-
-  return `${name}を${verb} ${standing}/${data.value}R    `;
+  if (!requests) return `バフの書式が読めません ${name}    `;
+  return grantCalculatedBuff(character, name, requests, rest, piles);
 }
 
 /**
- * What second helping the command asks for, and the command with that mark taken off.
- *
- * `&+猛攻撃/攻撃+2/3` adds its `+2` to whatever the standing 猛攻撃 already carries instead of
- * writing over it, and `&++猛攻撃/攻撃+2/3` adds the three rounds to the ones left as well. The
- * mark sits right after the ampersand so that everything downstream reads the command it always
- * read, `&+!` included.
+ * Lays a buff of one row a status, or stacks it, and says in the chat what it did. A single status
+ * stacked on a buff of several leaves the buff marked as several; laid anew, it is one again.
  */
-function readBuffStacking(command: string): { piles: BuffPileOn; command: string } {
-  const marked = command.match(/^([tTｔＴ]?&)([+＋]{1,2})(?=[^+＋])/);
-  if (!marked) return { piles: 'none', command };
-  return { piles: marked[2].length > 1 ? 'extend' : 'stack', command: marked[1] + command.slice(marked[0].length) };
+function grantCalculatedBuff(
+  character: GameCharacter,
+  name: string,
+  requests: readonly ParsedBuffModifierRequest[],
+  rest: readonly string[],
+  piles: BuffPileOn
+): string {
+  const { rounds, look } = splitBuffRounds(rest);
+  const roundText = (rounds ?? '').trim();
+  const round = roundText.length > 0 && Number.isFinite(Number(roundText)) ? Number(roundText) : 3;
+  const stacking =
+    piles !== 'none' && requests.every((request) => request.operator === 'add') && character.buffs.find(name) != null;
+  if (!stacking) character.buffs.removeGroupMembers(name);
+  const grouped = requests.length > 1;
+  const group = grouped ? name : stacking ? undefined : '';
+  const appearance = { ...readCalculatedBuffLook(look), group };
+
+  const missing: string[] = [];
+  const effects: string[] = [];
+  requests.forEach((request, index) => {
+    const rowName = index === 0 ? name : `${name}（${describeBuffModifierTarget(request)}）`;
+    const effect = describeBuffModifier(request);
+    const standing = stacking ? character.buffs.find(rowName) : null;
+    const rowStacking = standing != null;
+    const note = standing && holdsRequestedStatus(readBuffModifier(standing), request) ? '' : effect;
+    if (!rowStacking) character.buffs.addRound(rowName, effect, round, appearance);
+    else if (piles === 'extend') character.buffs.extendRound(rowName, note, round, appearance);
+    else character.buffs.stackRound(rowName, note, round, appearance);
+
+    const data = character.buffs.find(rowName);
+    if (!data) return;
+    const applied = rowStacking
+      ? character.buffs.stackModifier(data, request)
+      : character.buffs.applyModifier(data, request);
+    if (!applied) missing.push(request.target);
+    effects.push(rowStacking ? `${data.currentValue ?? effect}` : effect);
+  });
+
+  const data = character.buffs.find(name);
+  if (!data) return '';
+  const verb = stacking ? '加算' : '付与';
+  const lack = missing.length > 0 ? ` (${missing.join('・')}が見つかりません)` : '';
+  const left = buffExpires(data) ? `/${data.value}R` : '';
+  return `${name}を${verb} ${effects.join(',')}${left}${lack}    `;
 }
 
 /**
@@ -344,9 +379,10 @@ function readBuffStacking(command: string): { piles: BuffPileOn; command: string
  *
  * `&R-` and `&R+` move every buff's remaining rounds, `&D` clears buffs at zero rounds or fewer, `&name-`
  * removes one buff, `&!` adds a buff that changes a status, and anything else adds a plain
- * `name/effect/rounds/appearance` buff. A `+` right after the ampersand stacks onto a buff of the
- * same name rather than starting it over, and `++` lengthens it by the rounds asked for as well.
- * A targeted command's text starts with the character's name.
+ * `name/effect/rounds/appearance` buff; one named after a state the room keeps puts that state on,
+ * what the command leaves out read from the room's list of states. A `+` right after the ampersand
+ * stacks onto a buff of the same name rather than starting it over, and `++` lengthens it by the
+ * rounds asked for as well. A targeted command's text starts with the character's name.
  */
 export function applyBuffEdit(buff: BuffEdit, character: GameCharacter): string {
   const { piles, command } = readBuffStacking(buff.command);
@@ -355,25 +391,29 @@ export function applyBuffEdit(buff: BuffEdit, character: GameCharacter): string 
     text += `[${character.name}] `;
   }
 
-  if (command.match(/^[tTｔＴ]?&[RＲrｒ]-$/i)) {
+  const kind = buffCommandKind(command);
+  if (kind === 'roundsDown') {
     character.buffs.decreaseRound();
     text += 'バフRを減少    ';
-  } else if (command.match(/^[tTｔＴ]?&[RＲrｒ][+]$/i)) {
+  } else if (kind === 'roundsUp') {
     character.buffs.increaseRound();
     text += 'バフRを増加    ';
-  } else if (command.match(/^[tTｔＴ]?&[DＤdｄ]$/i)) {
+  } else if (kind === 'clearZero') {
     character.buffs.deleteZeroRound();
     text += '0R以下のバフを消去    ';
-  } else if (command.match(/^[tTｔＴ]?&.+-$/i)) {
-    const match = command.match(/^[tTｔＴ]?&(.+)-$/i);
-    const reg1 = match![1];
+  } else if (kind === 'remove') {
+    const reg1 = removedBuffName(command);
     if (character.buffs.delete(reg1)) {
       text += `${reg1}を消去    `;
     }
-  } else if (command.match(/^[tTｔＴ]?&[!！]/i)) {
+  } else if (kind === 'calculated') {
     text += applyCalculatedBuff(command, character, piles);
   } else {
     const splittext = readModifierLayout(command.replace(/^[tTｔＴ]?&/i, '').split('/'));
+    const state = findStatusAilment(StatusAilmentCatalog.instance.ailments, splittext[0]);
+    if (state && (piles === 'none' || !character.buffs.find(state.name))) {
+      return text + plantCommandedState(state, splittext, character);
+    }
     let round: number | undefined = undefined;
     let sub = '';
     const buffname = splittext[0];
@@ -383,35 +423,67 @@ export function applyBuffEdit(buff: BuffEdit, character: GameCharacter): string 
       sub = splittext[1];
       bufftext = `${bufftext}/${splittext[1]}`;
     }
-    if (splittext.length > 2 && splittext[2]) {
-      const written = parseInt(splittext[2]);
-      if (!Number.isNaN(written)) round = written;
+    const { rounds, look } = splitBuffRounds(splittext.slice(2));
+    if (rounds !== undefined && (rounds.trim() || piles !== 'none')) {
+      if (rounds) {
+        round = parseInt(rounds);
+        if (Number.isNaN(round)) {
+          round = 3;
+        }
+      } else {
+        round = 3;
+      }
     }
 
-    const appearance = parseBuffAppearance(splittext.slice(3));
-    // A buff put on without a number of rounds stays until it is taken off, unless a timing word
-    // says otherwise; one piled on a standing buff without a number keeps that buff's rounds.
-    if (round === undefined && piles === 'none' && !appearance.timing) {
-      appearance.timing = 'none';
-      bufftext = `${bufftext}/永続`;
-    } else if (round !== undefined) {
-      bufftext = `${bufftext}/${round}R`;
-    }
-    for (const token of splittext.slice(3)) {
-      if (token) bufftext = `${bufftext}/${token}`;
-    }
+    const appearance = parseBuffAppearance(look);
+    // A buff put on without a number of rounds stays until it is taken off (tyoitashi), unless a
+    // timing word says otherwise; one piled on a standing buff without a number keeps its rounds.
+    const lasting = !rounds?.trim() && piles === 'none' && !appearance.timing;
+    if (lasting) appearance.timing = 'none';
+    const lookText =
+      (lasting ? '/消えない' : '') +
+      look
+        .filter((token) => token)
+        .map((token) => `/${token}`)
+        .join('');
+    const told = () => {
+      const laid = character.buffs.find(buffname);
+      const roundText = round !== undefined && (!laid || buffExpires(laid)) ? `/${round}R` : '';
+      return `${bufftext}${roundText}${lookText}`;
+    };
 
     if (piles !== 'none' && character.buffs.find(buffname)) {
       if (piles === 'extend') character.buffs.extendRound(buffname, sub, round, appearance);
       else character.buffs.stackRound(buffname, sub, round, appearance);
-      text += `バフを加算 ${describeStandingBuff(character, buffname, bufftext)}    `;
+      text += `バフを加算 ${describeStandingBuff(character, buffname, told())}    `;
     } else {
       character.buffs.addRound(buffname, sub, round, appearance);
-      text += `バフを付与 ${bufftext}    `;
+      text += `バフを付与 ${told()}    `;
     }
   }
 
   return text;
+}
+
+/**
+ * A plain buff naming a state the room keeps, put on as the room describes the state: the note,
+ * the rounds and the look the command writes stand in for the state's own, and the rest, the
+ * status the state moves among it, is the state's. Laid on top of one already worn, the buff
+ * piles on as any plain one does instead.
+ */
+function plantCommandedState(state: StatusAilment, parts: string[], character: GameCharacter): string {
+  const written = splitBuffRounds(parts.slice(2));
+  const rounds = written.rounds !== undefined ? Number.parseInt(written.rounds, 10) : Number.NaN;
+  const look = parseBuffAppearance(written.look);
+  const ailment = statusAilmentAsCommanded(state, {
+    note: parts[1] ?? '',
+    rounds: Number.isNaN(rounds) ? null : rounds,
+    look,
+  });
+  plantStatusAilment(character, ailment, look.trigger ? { trigger: look.trigger } : {});
+  const counted = ailment.rounds > 0 && ailment.timing !== 'none';
+  const told = [ailment.name, ailment.effect, counted ? `${ailment.rounds}R` : '', ...written.look];
+  return `バフを付与 ${told.filter((part) => part.length > 0).join('/')}    `;
 }
 
 /**
@@ -422,17 +494,20 @@ export function applyBuffEdit(buff: BuffEdit, character: GameCharacter): string 
  *
  * Without the mark the status is left where it is; the note says what the buff would move.
  */
-function readModifierLayout(parts: string[]): string[] {
+export function readModifierLayout(parts: string[]): string[] {
   if (parts.length < 4) return parts;
   const request = parseBuffModifierRequest(parts[1], parts[2], parts[3]);
   if (!request) return parts;
   return [parts[0], describeBuffModifier(request), ...parts.slice(4)];
 }
 
-/** How a stacked buff reads once it stands, so the chat line names the total rather than the helping. */
+/**
+ * How a stacked buff reads once it stands, so the chat line names the total rather than the helping,
+ * and the rounds left only for a buff that runs out.
+ */
 function describeStandingBuff(character: GameCharacter, name: string, fallback: string): string {
   const data = character.buffs.find(name);
   if (!data) return fallback;
   const note = `${data.currentValue ?? ''}`;
-  return `${name}${note.length > 0 ? `/${note}` : ''}/${data.value}R`;
+  return `${name}${note.length > 0 ? `/${note}` : ''}${buffExpires(data) ? `/${data.value}R` : ''}`;
 }

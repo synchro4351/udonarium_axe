@@ -11,10 +11,12 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
+import { BattleCutInPreferenceService } from '@axe/application/battle/battle-cut-in-preference.service';
 import { EffectLibraryService } from '@axe/application/effect/effect-library.service';
 import { DisclosureService } from '@axe/application/permission/disclosure.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { MotionService } from '@axe/application/ui/motion.service';
+import { ViewportService } from '@axe/application/ui/viewport.service';
 import { VolumeType } from '@axe/core/storage/audio-output';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
@@ -22,6 +24,12 @@ import { observeSize } from '@axe/core/util/observe-size';
 import { BattleSide, oppositeBattleSide } from '@axe/domain/battle/battle-lineup';
 import { battleChangeLabel, BattleFighter, battleGaugeChanges } from '@axe/domain/battle/battle-scene';
 import { DEFAULT_BATTLE_THEME } from '@axe/domain/battle/battle-settings';
+import {
+  BATTLE_STAGE_CANVAS,
+  BATTLE_STAGE_SIZE_LABEL_KEYS,
+  battleStageWindowBox,
+  battleStageWindowPlace,
+} from '@axe/domain/battle/battle-stage-window';
 import {
   attackerStep,
   BATTLE_STILL_MS,
@@ -68,6 +76,7 @@ import {
   standingTransform,
 } from '@axe/features/battle-cut-in/battle-stage-layout';
 import { BATTLE_PICTURE_LOOK, BattleBandLook, battleThemeLook } from '@axe/features/battle-cut-in/battle-themes';
+import { MirroredPictureService } from '@axe/features/battle-cut-in/mirrored-picture.service';
 import { EffectCanvasComponent } from '@axe/features/effect/effect-canvas/effect-canvas.component';
 import {
   EFFECT_CAMERA_LIFT_PX,
@@ -150,6 +159,11 @@ interface FighterView {
   striking: boolean;
   point: Point3;
   imageUrl: string;
+  /**
+   * Whether its picture is turned left for right: a picture facing the side it stands on faces
+   * away from the one across.
+   */
+  mirrored: boolean;
   /** Whether the reader may read its numbers, as for the bars over the piece. */
   readable: boolean;
   /** How its body answers going down, as a piece on the table does. */
@@ -159,6 +173,8 @@ interface FighterView {
 export interface FigureFrame {
   key: string;
   imageUrl: string;
+  /** Whether the picture is turned left for right. */
+  mirrored: boolean;
   name: string;
   transform: string;
   shadowTransform: string;
@@ -201,27 +217,50 @@ export interface PlateFrame {
  * the scene is ever sent. The sounds of the effects play here, on this screen alone. Pressing
  * anywhere or Escape moves on. With motion turned off the stage shows one still of how the
  * exchange ended, and the sounds still play.
+ *
+ * A reader may have it drawn in a window instead, in a corner they drag it to: the stage is drawn
+ * at a fixed size and shrunk to the window whole, and only its close button moves on, so that the
+ * rest of the screen can be worked in, and its Escapes spent elsewhere, while the exchange plays.
  */
 @Component({
   selector: 'battle-cut-in-overlay',
   templateUrl: './battle-cut-in-overlay.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgStyle, NgTemplateOutlet, SafePipe, EffectCanvasComponent, TranslocoModule],
-  host: { class: 'contents', '(document:keydown.escape)': 'skip()' },
+  host: { class: 'contents', '(document:keydown.escape)': 'pressEscape()', '(window:resize)': 'measureScreen()' },
 })
 export class BattleCutInOverlayComponent {
   private readonly state = inject(BattleCutInStateService);
   private readonly motion = inject(MotionService);
   private readonly library = inject(EffectLibraryService);
   private readonly images = inject(ImageStorage);
+  private readonly mirrors = inject(MirroredPictureService);
   private readonly objectStore = inject(ObjectStore);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly disclosure = inject(DisclosureService);
+  private readonly preference = inject(BattleCutInPreferenceService);
+  private readonly layout = inject(ViewportService);
 
   protected readonly zIndex = Z_BATTLE_CUT_IN;
   protected readonly looks = LOOKS;
   private readonly root = viewChild<ElementRef<HTMLElement>>('root');
   private readonly viewport = signal({ width: 0, height: 0 });
+  private readonly screen = signal(readScreen());
+  private readonly dragPlace = signal<{ x: number; y: number } | null>(null);
+  private dragFrom: { pointerX: number; pointerY: number; left: number; top: number } | null = null;
+
+  protected readonly canvas = BATTLE_STAGE_CANVAS;
+  /** How large this reader has the stage drawn. */
+  readonly stageSize = computed(() => this.preference.stageWindow().size);
+  protected readonly sizeLabelKey = computed(() => BATTLE_STAGE_SIZE_LABEL_KEYS[this.stageSize()]);
+  /** Whether the screen is too narrow for a window to be moved about, which keeps it along the top. */
+  protected readonly narrow = computed(() => this.layout.isCompact());
+  /** The window the stage plays in, following the pointer while it is dragged; null on the full screen. */
+  readonly windowBox = computed(() => {
+    const place = this.preference.stageWindow();
+    const dragged = this.dragPlace();
+    return battleStageWindowBox(dragged ? { ...place, ...dragged } : place, this.screen(), this.narrow());
+  });
 
   readonly scene = computed(() => this.state.current()?.scene ?? null);
   private readonly serial = computed(() => this.state.current()?.serial ?? 0);
@@ -275,7 +314,9 @@ export class BattleCutInOverlayComponent {
     return timeline ? stageOpenness(this.elapsed(), timeline) : 0;
   });
 
-  readonly bandHeight = computed(() => bandHeight(this.viewport().height));
+  readonly bandHeight = computed(() =>
+    this.windowBox() ? BATTLE_STAGE_CANVAS.height : bandHeight(this.viewport().height)
+  );
 
   readonly boardTransform = computed(() => {
     const scale = stageScale(this.viewport().width, this.bandHeight(), this.scene()?.defenders.length ?? 1);
@@ -330,6 +371,7 @@ export class BattleCutInOverlayComponent {
       return {
         key: view.key,
         imageUrl: view.imageUrl,
+        mirrored: view.mirrored,
         name: view.fighter.name,
         transform: standingTransform(view.point, shift, 0),
         shadowTransform: lyingTransform(view.point, shift),
@@ -393,7 +435,7 @@ export class BattleCutInOverlayComponent {
           return {
             name: gauge.name,
             percent: ratio * 100,
-            color: gaugeColor(ratio, gauge.inverted),
+            color: gauge.color || gaugeColor(ratio, gauge.inverted),
             numbers: readable ? `${Math.round(reading)}/${gauge.max}` : HIDDEN_GAUGE_NUMBERS,
           };
         }),
@@ -429,7 +471,11 @@ export class BattleCutInOverlayComponent {
       baseSize: BATTLE_CELL_PX,
       viewRotation: BATTLE_VIEW,
       resolvePosition: (identifier) => views.find((view) => view.fighter.identifier === identifier)?.point ?? null,
-      resolveImage: (identifier) => views.find((view) => view.fighter.identifier === identifier)?.imageUrl ?? '',
+      resolveImage: (identifier) => {
+        const view = views.find((held) => held.fighter.identifier === identifier);
+        if (!view) return '';
+        return view.mirrored ? this.mirrors.of(view.imageUrl) || view.imageUrl : view.imageUrl;
+      },
     };
   });
 
@@ -571,6 +617,53 @@ export class BattleCutInOverlayComponent {
     if (this.state.active()) this.state.next();
   }
 
+  /** A press on the stage moves on over the full screen; a window is only closed by its button. */
+  pressStage(): void {
+    if (!this.windowBox()) this.skip();
+  }
+
+  /** Escape moves on over the full screen, and is left to whatever else wants it beside a window. */
+  pressEscape(): void {
+    if (!this.windowBox()) this.skip();
+  }
+
+  /** Moves the stage on to its next size, from the full screen down to the smallest window and round. */
+  cycleSize(): void {
+    this.preference.cycleStageSize();
+  }
+
+  /** Takes in the size of the screen again, for a window to keep to its corner. */
+  measureScreen(): void {
+    this.screen.set(readScreen());
+  }
+
+  /** Takes hold of the window by its top edge, where the screen is wide enough to move it about. */
+  startDrag(event: PointerEvent): void {
+    const box = this.windowBox();
+    if (!box || this.narrow() || event.button !== 0) return;
+    (event.currentTarget as Element | null)?.setPointerCapture?.(event.pointerId);
+    this.dragFrom = { pointerX: event.clientX, pointerY: event.clientY, left: box.left, top: box.top };
+  }
+
+  /** Follows the pointer with the window held. */
+  moveDrag(event: PointerEvent): void {
+    const from = this.dragFrom;
+    const box = this.windowBox();
+    if (!from || !box) return;
+    const left = from.left + event.clientX - from.pointerX;
+    const top = from.top + event.clientY - from.pointerY;
+    this.dragPlace.set(battleStageWindowPlace(left, top, box, this.screen()));
+  }
+
+  /** Lets go of the window, and keeps it where it was put. */
+  endDrag(): void {
+    if (!this.dragFrom) return;
+    this.dragFrom = null;
+    const place = this.dragPlace();
+    this.dragPlace.set(null);
+    if (place) this.preference.placeStageWindow(place.x, place.y);
+  }
+
   /**
    * How solid a fighter's body stands as it goes down. Crumbling and cleaving take it away
    * themselves as the pieces of the picture take over; a fighter that only bleeds fades most of the
@@ -629,13 +722,17 @@ export class BattleCutInOverlayComponent {
     reaction: DefeatReaction
   ): FighterView {
     const image = fighter.image.length > 0 ? this.images.get(fighter.image) : null;
+    const imageUrl = image?.url ?? '';
+    const mirrored = fighter.facing === side;
+    if (mirrored && imageUrl.length > 0) this.mirrors.of(imageUrl);
     return {
       key: `${striking ? 'a' : 'd'}-${fighter.identifier}`,
       fighter,
       side,
       striking,
       point,
-      imageUrl: image?.url ?? '',
+      imageUrl,
+      mirrored,
       readable: this.readable(fighter.identifier),
       reaction,
     };
@@ -653,6 +750,12 @@ export class BattleCutInOverlayComponent {
   private presetOf(identifier: string): EffectPreset | null {
     return identifier.length > 0 ? this.library.get(identifier) : null;
   }
+}
+
+/** The size of the screen the stage is drawn on, nothing where there is no window to measure. */
+function readScreen(): { width: number; height: number } {
+  if (typeof window === 'undefined') return { width: 0, height: 0 };
+  return { width: window.innerWidth, height: window.innerHeight };
 }
 
 /**

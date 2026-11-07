@@ -7,7 +7,9 @@ describe('the keys the app keeps settings under in the browser', () => {
       audioAnalyses: 'audio-analyses',
       battleCutIn: 'axe.battle.cutIn',
       battleCutInRemote: 'axe.battle.remote',
+      battleCutInWindow: 'axe.battle.window',
       beatLightOff: 'beat-light-off',
+      buffIconScale: 'ui-buff-icon-scale',
       buffView: 'ui-buff-view',
       chatAutoFollow: 'chat-auto-follow-scroll',
       chatLogOmitDeleted: 'chat-log-omit-deleted',
@@ -18,8 +20,10 @@ describe('the keys the app keeps settings under in the browser', () => {
       djDeckOpen: 'mini-jukebox-dj-deck',
       effectAutoPlay: 'axe.effect.autoPlay',
       firstPersonPiece: 'ui-first-person-piece',
+      foregroundSeeThrough: 'axe.foreground.seeThrough',
       hotbar: 'ui-hotbar',
       hotbarOwner: 'ui-hotbar-owner',
+      iconChosenByHand: 'axe.icon.chosenByHand',
       imageEditFirst: 'ui-image-edit-first',
       imageShrinkLarge: 'ui-image-shrink-large',
       inventoryCompact: 'ui-inventory-compact',
@@ -33,6 +37,7 @@ describe('the keys the app keeps settings under in the browser', () => {
       mobileLayout: 'ui-mobile-layout',
       motion: 'ui-motion',
       myDice: 'my-dice',
+      overviewMemo: 'ui-overview-memo',
       ownerKey: 'udonarium-axe.owner-key',
       panelTransparency: 'ui-panel-transparency',
       personalVolumes: 'audio-personal-volumes',
@@ -63,6 +68,7 @@ describe('the keys the app keeps settings under in the browser', () => {
     expect(STORAGE_KEY_PREFIXES).toEqual({
       menuLayout: 'axe.menu',
       personalFolders: 'axe.inventory.personal-folders',
+      scenarioTextSent: 'axe.scenario-text.sent',
     });
   });
 

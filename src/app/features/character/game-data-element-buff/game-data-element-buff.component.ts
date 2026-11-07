@@ -7,12 +7,19 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { VisionService } from '@axe/application/tabletop/vision.service';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { BUFF_COLORS, DEFAULT_BUFF_COLOR } from '@axe/domain/character/buff-appearance';
-import { buffColorOf, buffIconOf, buffIconUrlOf, parseBuffStrength } from '@axe/domain/character/buff-badge';
-import { BUFF_TIMINGS, BuffTiming, buffTimingOf, buffTriggerOf } from '@axe/domain/character/buff-timing';
+import {
+  buffBadgeOf,
+  buffColorOf,
+  buffIconOf,
+  buffIconUrlOf,
+  parseBuffStrength,
+} from '@axe/domain/character/buff-badge';
+import { BUFF_TIMINGS, buffExpires, BuffTiming, buffTimingOf, buffTriggerOf } from '@axe/domain/character/buff-timing';
 import { buffTriggerOptions, selectedTriggerValue } from '@axe/domain/character/buff-trigger-options';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DataElement, DataElementAttribute, DataElementType } from '@axe/domain/data/data-element';
-import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
+import { BuffBadgeComponent } from '@axe/features/character/buff-badge/buff-badge.component';
+import { loadFileSelecter } from '@axe/ui/components/file-selecter/file-selecter-loader';
 import { CloseOutsideDirective } from '@axe/ui/directives/close-outside.directive';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
@@ -21,7 +28,7 @@ import { TranslocoModule } from '@jsverse/transloco';
   selector: 'game-data-element-buff, [game-data-element-buff]',
   templateUrl: './game-data-element-buff.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, SafePipe, TranslocoModule, CloseOutsideDirective],
+  imports: [BuffBadgeComponent, FormsModule, SafePipe, TranslocoModule, CloseOutsideDirective],
   host: { '[attr.inert]': "isReadOnly() ? '' : null" },
 })
 export class GameDataElementBuffComponent {
@@ -95,8 +102,11 @@ export class GameDataElementBuffComponent {
     return buffIconOf(element);
   });
 
-  /** Where the picture is, for a buff whose mark is one that was brought in. */
-  readonly iconUrl = computed(() => buffIconUrlOf(this.icon()));
+  /** Where the picture is, for a buff whose mark is one that was brought in, once it has arrived. */
+  readonly iconUrl = computed(() => {
+    this.objectChange.fileVersion();
+    return buffIconUrlOf(this.icon());
+  });
 
   readonly colorChoices = BUFF_COLORS;
   readonly defaultColor = DEFAULT_BUFF_COLOR;
@@ -115,6 +125,24 @@ export class GameDataElementBuffComponent {
     const element = this.gameDataElement();
     this.objectChange.versionOf(element.identifier)();
     return buffTimingOf(element);
+  });
+
+  /** The buff as the badge it is shown as over the piece, for the row of its details on the piece. */
+  readonly badge = computed(() => {
+    const element = this.gameDataElement();
+    this.objectChange.versionOf(element.identifier)();
+    this.objectChange.fileVersion();
+    return buffBadgeOf(element);
+  });
+
+  /**
+   * Whether time takes the buff away. A buff that never runs out is shown with ∞ for its rounds left,
+   * since the count it holds never goes down.
+   */
+  readonly expires = computed(() => {
+    const element = this.gameDataElement();
+    this.objectChange.versionOf(element.identifier)();
+    return buffExpires(element);
   });
 
   readonly trigger = computed(() => {
@@ -151,11 +179,6 @@ export class GameDataElementBuffComponent {
     this.objectChange.notifyChanged(element.identifier);
   }
 
-  /** Applies the timing picked in the row's timing dropdown. */
-  onSelectTiming(event: Event): void {
-    this.selectTiming((event.target as HTMLSelectElement).value as BuffTiming);
-  }
-
   /**
    * Names the character whose turn start or end the buff counts down on.
    *
@@ -169,11 +192,6 @@ export class GameDataElementBuffComponent {
     this.objectChange.notifyChanged(element.identifier);
   }
 
-  /** Applies the character picked in the row's trigger dropdown. */
-  onSetTrigger(event: Event): void {
-    this.setTrigger((event.target as HTMLSelectElement).value);
-  }
-
   /** Gives the buff one of the offered marks; picking the mark it already has goes back to the default. */
   selectIcon(icon: string): void {
     const element = this.gameDataElement();
@@ -183,14 +201,13 @@ export class GameDataElementBuffComponent {
   }
 
   /** Puts a picture from the room's images in place of the mark. */
-  chooseIconImage(): void {
-    this.modalService.open<string>(FileSelecterComponent, { isAllowedEmpty: true }).then((identifier) => {
-      if (identifier == null) return;
-      const element = this.gameDataElement();
-      if (identifier.length > 0) element.setAttribute(DataElementAttribute.BUFF_ICON, identifier);
-      else element.removeAttribute(DataElementAttribute.BUFF_ICON);
-      this.objectChange.notifyChanged(element.identifier);
-    });
+  async chooseIconImage(): Promise<void> {
+    const identifier = await this.modalService.openLazy<string>(loadFileSelecter, { isAllowedEmpty: true });
+    if (identifier == null) return;
+    const element = this.gameDataElement();
+    if (identifier.length > 0) element.setAttribute(DataElementAttribute.BUFF_ICON, identifier);
+    else element.removeAttribute(DataElementAttribute.BUFF_ICON);
+    this.objectChange.notifyChanged(element.identifier);
   }
 
   /** Gives the buff a badge colour; an empty colour, or the one it already has, goes back to the default. */
@@ -279,7 +296,7 @@ export class GameDataElementBuffComponent {
   deletBuff(data: DataElement) {
     // Through the owner, so a buff that moved a status puts it back on the way out.
     const owner = ownerCharacterOf(data);
-    if (owner) owner.buffs.remove(data);
+    if (owner) owner.buffs.removeWhole(data);
     else data.destroy();
   }
 }

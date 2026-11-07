@@ -1,4 +1,5 @@
 import {
+  afterEveryRender,
   afterNextRender,
   ChangeDetectionStrategy,
   Component,
@@ -15,10 +16,13 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CharacterMacroService } from '@axe/application/chat/character-macro.service';
+import { ChatLintService } from '@axe/application/chat/chat-lint.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { ChatPaletteRegistryService } from '@axe/application/chat/chat-palette-registry.service';
+import { ChatPreferencesService } from '@axe/application/chat/chat-preferences.service';
 import { DiceBotCatalogService } from '@axe/application/dice/dice-bot-catalog.service';
 import { HotbarFillService } from '@axe/application/hotbar/hotbar-fill.service';
+import { LanguageService } from '@axe/application/i18n/language.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
@@ -33,21 +37,38 @@ import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatOutgoing } from '@axe/domain/chat/chat-outgoing';
 import { ChatPalette, PaletteIndex } from '@axe/domain/chat/chat-palette';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
+import { tabBeside } from '@axe/domain/chat/chat-tab-cycle';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { canRoleSpeakTab, canRoleViewTab } from '@axe/domain/chat/chat-tab-permission';
-import { PaletteRow, paletteRowsOf } from '@axe/domain/chat/palette-rows';
+import { PaletteRow, paletteRowsOf, paletteTabsOf } from '@axe/domain/chat/palette-rows';
 import { DataElement } from '@axe/domain/data/data-element';
 import { emptyHotbarSlotDraft } from '@axe/domain/hotbar/hotbar-draft';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { ChatComposeService } from '@axe/features/chat/chat-compose.service';
+import type { ChatEditorField, ChatEditorHost } from '@axe/features/chat/chat-editor/chat-editor';
+import {
+  CHAT_EDITOR_LOADER,
+  CHAT_HIGHLIGHT_LIMIT,
+  type ChatEditorModule,
+} from '@axe/features/chat/chat-editor/chat-editor-loader';
 import { ChatInputComponent } from '@axe/features/chat/chat-input/chat-input.component';
 import { editsTextInPlace } from '@axe/features/chat/chat-input/chat-input-helpers';
+import { ChatSyntaxSourceService } from '@axe/features/chat/chat-input/chat-syntax-source.service';
 import { PaletteSearchResult, searchPaletteRows } from '@axe/features/chat/chat-palette/chat-palette-search';
+import { ChatPaletteTabService } from '@axe/features/chat/chat-palette/chat-palette-tab.service';
 import { ChatTabStripComponent } from '@axe/features/chat/chat-tab-strip/chat-tab-strip.component';
 import { ChatTickerSelectionService } from '@axe/features/chat/chat-ticker-selection.service';
 import { GameDataElementComponent } from '@axe/features/data-element/game-data-element/game-data-element.component';
+import { ComposingMarkDirective, whenNotComposing } from '@axe/ui/directives/composing-mark.directive';
 import { TextTooltipDirective } from '@axe/ui/directives/text-tooltip.directive';
+import { followPlainBox, type PlainBoxStand } from '@axe/ui/plain-box-handover';
 import { TranslocoModule } from '@jsverse/transloco';
+
+/**
+ * The attribute the editor a palette is written in is found by, apart from the chat input's: the
+ * keys that switch tabs from the input move the caret in here, as they do in any other text.
+ */
+const PALETTE_TEXT_ATTR = 'data-chat-palette-text';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,6 +81,7 @@ import { TranslocoModule } from '@jsverse/transloco';
     '(keydown.control.arrowright)': 'switchTabByKey($event, 1)',
   },
   imports: [
+    ComposingMarkDirective,
     TextTooltipDirective,
     FormsModule,
     ChatInputComponent,
@@ -83,16 +105,101 @@ export class ChatPaletteComponent {
   private readonly chatTickerSelection = inject(ChatTickerSelectionService);
   private readonly uiSignalService = inject(UiSignalService);
   private readonly objectChange = inject(ObjectChangeService);
+  private readonly language = inject(LanguageService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
   private readonly chatPaletteRegistry = inject(ChatPaletteRegistryService);
   private readonly t = inject(TRANSLATE_FN);
+  private readonly tabMemory = inject(ChatPaletteTabService);
 
   readonly rootElementRef = viewChild.required<ElementRef<HTMLElement>>('root');
   readonly chatInputComponent = viewChild.required<ChatInputComponent>('chatInput');
   readonly paletteListRef = viewChild<ElementRef<HTMLDivElement>>('paletteList');
   readonly completeSelectRef = viewChild<ElementRef<HTMLSelectElement>>('completeSelect');
   readonly editTextRef = viewChild<ElementRef<HTMLTextAreaElement>>('editText');
+
+  private readonly chatPreferences = inject(ChatPreferencesService);
+  private readonly editorLoader = inject(CHAT_EDITOR_LOADER);
+  private readonly syntaxSource = inject(ChatSyntaxSourceService);
+  private readonly paletteEditorHost = viewChild<ElementRef<HTMLElement>>('paletteEditorHost');
+  private readonly editorModule = signal<ChatEditorModule | null>(null);
+  private paletteEditor: ChatEditorField | null = null;
+  /** How far down the list was as editing opened, as a share of it, for the edit area to be scrolled to once drawn. */
+  private editScrollShare: number | null = null;
+  /** Where the reader stands in the text area the editor arrived to take the place of, read as it is put in. */
+  private plainStand: (() => PlainBoxStand) | null = null;
+
+  /**
+   * Whether the palette is written in the editor that colours each line's syntax and marks what
+   * will not work, for a reader who has it on and once it has arrived.
+   */
+  protected readonly editsInEditor = computed(
+    () => this.isEdit() && this.chatPreferences.richInput() && this.editorModule() !== null
+  );
+
+  /** What is written in the palette, checked line by line as it will be sent from it. */
+  private readonly paletteLint = inject(ChatLintService).watch({
+    text: computed(() => this.editPalette()),
+    sendFrom: computed(() => this.character()?.identifier ?? ''),
+    gameType: computed(() => this.rolledGameType()),
+    path: 'palette',
+    mode: 'palette',
+    tabIdentifier: computed(() => this.chatTabidentifier()),
+  });
+
+  private readonly paletteEditorApi: ChatEditorHost = {
+    mode: 'palette',
+    marker: PALETTE_TEXT_ATTR,
+    placeholder: () => this.t('feature.chat.palette.editPlaceholder'),
+    changed: (text) => this.editPalette.set(text),
+    session: () => this.paletteLint,
+    completionWords: () => this.syntaxSource.completionWordsFor(this.character()?.identifier ?? ''),
+    language: () => this.syntaxSource.tagLanguage(),
+    cutInNames: () => this.syntaxSource.chatCutInNames(),
+    portraitImage: (raw) => this.syntaxSource.portraitImage(this.character()?.identifier ?? '', raw),
+    translate: (key, params) => this.t(key, params),
+    stampHtml: (stampId, key) => this.syntaxSource.stampHtml(stampId, key),
+  };
+
+  /** Puts the editor into the edit area while the palette is being written, and takes it down after. */
+  private followPaletteEditor(): void {
+    const host = this.paletteEditorHost()?.nativeElement ?? null;
+    const module = this.editorModule();
+    untracked(() => {
+      if (this.paletteEditor && this.paletteEditor.parent !== host) {
+        this.paletteEditor.destroy();
+        this.paletteEditor = null;
+      }
+      if (!host || !module || this.paletteEditor) return;
+      const text = this.editPalette();
+      const start = this.plainStand?.() ?? { selection: { from: 0, to: 0 }, focused: false };
+      this.plainStand = null;
+      this.paletteEditor = module.mountChatEditor(host, { text, ...start }, this.paletteEditorApi);
+      this.paletteEditor.refresh(false);
+      this.scrollEditToList();
+      this.editScrollShare = null;
+    });
+  }
+
+  /**
+   * Follows the text area as the editor arrives to take its place, for where the reader stands in it
+   * to be read as the editor is put in: the caret, and whether it has the keys. How far down it is
+   * scrolled is kept as the editor arrives, as a text area taken off the page is scrolled no more.
+   * Let go as editing ends.
+   */
+  private handOverFromTextArea(): void {
+    const area = this.editTextRef()?.nativeElement;
+    if (!area || !this.isEdit() || !this.chatPreferences.richInput()) return;
+    this.plainStand = followPlainBox(area);
+    this.editScrollShare = area.scrollTop / Math.max(1, area.scrollHeight);
+  }
+
+  /** Scrolls the edit area, the editor or the text area, to about where the list was as editing opened. */
+  private scrollEditToList(): void {
+    const share = this.editScrollShare;
+    const scroller = this.editTextRef()?.nativeElement ?? this.paletteEditorHost()?.nativeElement;
+    if (share !== null && scroller) scroller.scrollTop = share * scroller.scrollHeight;
+  }
   readonly character = signal<GameCharacter | null>(null);
 
   readonly selectedLine = signal<number>(-1);
@@ -112,7 +219,28 @@ export class ChatPaletteComponent {
    * followed in the window the app started in, so over there it lands somewhere the reader
    * cannot see. A plain list needs nowhere to be put.
    */
-  readonly paletteHeadings = computed((): PaletteRow[] => this.paletteRows().filter((row) => row.kind === 'heading'));
+  readonly paletteHeadings = computed((): PaletteRow[] => this.shownRows().filter((row) => row.kind === 'heading'));
+
+  /** The tabs the palette is parted into by its `◆◆name` lines; none for a palette with no such line. */
+  readonly paletteTabs = computed(() => paletteTabsOf(this.paletteRows()));
+
+  /** The tab open, kept for each character while the page is; -1 for a palette with no tabs. */
+  readonly activeTab = computed(() => {
+    const tabs = this.paletteTabs();
+    if (tabs.length < 1) return -1;
+    return Math.min(this.tabMemory.tabOf(this.character()?.identifier ?? ''), tabs.length - 1);
+  });
+
+  /** The rows drawn: those of the tab open, or the whole palette where it has no tabs. */
+  readonly shownRows = computed((): PaletteRow[] => {
+    const at = this.activeTab();
+    return at < 0 ? this.paletteRows() : this.paletteTabs()[at].rows;
+  });
+
+  /** Opens a tab of the palette, and keeps it open for this character while the page is. */
+  chooseTab(index: number): void {
+    this.tabMemory.choose(this.character()?.identifier ?? '', index);
+  }
 
   readonly searchResultsRef = viewChild<ElementRef<HTMLElement>>('searchResultsList');
 
@@ -156,6 +284,9 @@ export class ChatPaletteComponent {
   get gameType(): string {
     return this._gameType();
   }
+
+  /** The game system the palette's lines are rolled with, as its input sends them, taken from the input itself. */
+  private readonly rolledGameType = computed(() => this.chatInputComponent().rolledGameType());
   set gameType(gameType: string) {
     this._gameType.set(gameType);
     const char = this.character();
@@ -266,12 +397,47 @@ export class ChatPaletteComponent {
     effect(() => {
       const req = this.uiSignalService.jumpIndexRequest();
       if (!req || this._timeId != req.targetId) return;
-      this.japmIndex(req.lineNo);
+      untracked(() => this.japmIndex(req.lineNo));
     });
     this.destroyRef.onDestroy(() => {
       this.chatPaletteRegistry.unregister(this);
       if (this.isEdit()) this.toggleEditMode();
+      this.paletteEditor?.destroy();
     });
+    effect(() => {
+      if (!this.isEdit() || !this.chatPreferences.richInput() || this.editorModule()) return;
+      untracked(
+        () =>
+          void this.editorLoader().then((module) =>
+            whenNotComposing(this.editTextRef()?.nativeElement, () => {
+              if (!module) return;
+              this.handOverFromTextArea();
+              this.editorModule.set(module);
+            })
+          )
+      );
+    });
+    effect(() => this.followPaletteEditor());
+    let refreshedText: string | null = null;
+    effect(() => {
+      if (!this.editsInEditor()) {
+        refreshedText = null;
+        return;
+      }
+      const text = this.editPalette();
+      if (text.length <= CHAT_HIGHLIGHT_LIMIT) this.paletteLint.annotations();
+      this.objectChange.fileVersion();
+      untracked(() => {
+        if (text === refreshedText) this.paletteEditor?.refreshSoon();
+        else this.paletteEditor?.refresh(true);
+      });
+      refreshedText = text;
+    });
+    effect(() => {
+      this.language.currentLang();
+      untracked(() => this.paletteEditor?.reconfigure());
+    });
+    afterEveryRender(() => this.paletteEditor?.followRoot());
   }
 
   /**
@@ -322,21 +488,8 @@ export class ChatPaletteComponent {
    * Does nothing when the current tab is no longer in the list.
    */
   chatTabSwitchRelative(direction: number) {
-    const chatTabs = this.visibleChatTabs();
-    const index = chatTabs.findIndex((elm) => elm.identifier == this.chatTabidentifier());
-    if (index < 0) {
-      return;
-    }
-
-    let nextIndex: number;
-    if (index == chatTabs.length - 1 && direction == 1) {
-      nextIndex = 0;
-    } else if (index == 0 && direction == -1) {
-      nextIndex = chatTabs.length - 1;
-    } else {
-      nextIndex = index + direction;
-    }
-    this.chatTabidentifier.set(chatTabs[nextIndex].identifier);
+    const next = tabBeside(this.visibleChatTabs(), this.chatTabidentifier(), direction);
+    if (next) this.chatTabidentifier.set(next.identifier);
   }
 
   /**
@@ -503,7 +656,7 @@ export class ChatPaletteComponent {
       event.preventDefault();
       this.selectPalette(result.row.text);
       this.japmIndex(result.row.lineIndex);
-      this.chatInputComponent().textAreaElementRef()?.nativeElement.focus();
+      this.chatInputComponent().focusInput();
     } else if (event.key === 'Escape') {
       if (this.searchQuery() === '') return;
       event.preventDefault();
@@ -574,7 +727,8 @@ export class ChatPaletteComponent {
    * Opens the palette text for editing, or writes the edited text back to the palette when editing
    * ends.
    *
-   * On opening, the text area is scrolled to about where the list was. It also runs when the panel
+   * On opening, the edit area is scrolled to about where the list was: the text area once it is
+   * drawn, and the editor once it is put in, which may come later. It also runs when the panel
    * closes mid-edit, so an edit is never lost by closing. A seat that may not rewrite the palette
    * opens nothing, and writes nothing back.
    */
@@ -585,19 +739,11 @@ export class ChatPaletteComponent {
     if (this.isEdit()) {
       const listEl = this.paletteListRef()?.nativeElement;
       this.editPalette.set(this.palette.value + '');
-      const listTop = listEl?.scrollTop ?? 0;
-      const listHeight = listEl?.scrollHeight ?? 1;
-      afterNextRender(
-        () => {
-          const textEl = this.editTextRef()?.nativeElement;
-          if (textEl) {
-            textEl.scrollTop = (listTop * textEl.scrollHeight) / listHeight;
-          }
-        },
-        { injector: this.injector }
-      );
-    } else if (this.mayEdit()) {
-      this.palette.setPalette(this.editPalette());
+      this.editScrollShare = (listEl?.scrollTop ?? 0) / Math.max(1, listEl?.scrollHeight ?? 1);
+      afterNextRender(() => this.scrollEditToList(), { injector: this.injector });
+    } else {
+      this.plainStand = null;
+      if (this.mayEdit()) this.palette.setPalette(this.editPalette());
     }
   }
 
@@ -613,10 +759,21 @@ export class ChatPaletteComponent {
 
   /**
    * Highlights a palette line and scrolls it into view; a heading picked from the headings menu or
-   * list lands here.
+   * list lands here, and so does a search result, which may stand in a tab other than the one open:
+   * that tab is opened first, and the line scrolled to once it is drawn.
    */
   japmIndex(lineNo: number) {
     this.selectedLine.set(lineNo);
+    const tab = this.paletteTabs().findIndex((candidate) => candidate.rows.some((row) => row.lineIndex === lineNo));
+    if (tab >= 0 && tab !== this.activeTab()) {
+      this.chooseTab(tab);
+      afterNextRender(() => this.scrollToLine(lineNo), { injector: this.injector });
+      return;
+    }
+    this.scrollToLine(lineNo);
+  }
+
+  private scrollToLine(lineNo: number): void {
     const el = this.paletteListRef()?.nativeElement;
     if (!el) return;
     const row = el.querySelector<HTMLElement>(`[data-line="${lineNo}"]`);
@@ -653,7 +810,7 @@ export class ChatPaletteComponent {
     position.x = panelBox.left - 8;
     position.y = panelBox.top - 8;
 
-    this._paletteIndex = this.palette.paletteIndex;
+    this._paletteIndex = this.paletteHeadings().map((row) => ({ name: row.headingName ?? '', line: row.lineIndex }));
 
     const index = [];
     for (const list of this._paletteIndex) {

@@ -25,6 +25,7 @@ import { ViewportService } from '@axe/application/ui/viewport.service';
 import { VisualNovelModeService } from '@axe/application/ui/visual-novel-mode.service';
 import { WidgetVisibilityService } from '@axe/application/ui/widget-visibility.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { BUFF_ICON_SCALE_LABEL_KEYS } from '@axe/domain/character/buff-icon-scale';
 import { BUFF_VIEW_LABEL_KEYS, type BuffViewMode } from '@axe/domain/character/buff-view-mode';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
@@ -222,6 +223,7 @@ export class MenuCommandService {
   private prefixKeyOf(command: MenuCommand): string | null {
     const action = command.action;
     if (action.kind === 'cycle' && action.cycle === 'buffView') return 'feature.plTools.buffView';
+    if (action.kind === 'cycle' && action.cycle === 'buffIconSize') return 'feature.plTools.buffIconSize';
     return null;
   }
 
@@ -264,6 +266,7 @@ export class MenuCommandService {
           return RENDER_LITE_ICONS[this.renderLite.setting()];
         case 'buffView':
           return BUFF_VIEW_ICONS[this.buffView.mode()];
+        case 'buffIconSize':
         case 'language':
           return command.icon;
       }
@@ -302,6 +305,8 @@ export class MenuCommandService {
           return `common.renderLite.${this.renderLite.setting()}`;
         case 'buffView':
           return BUFF_VIEW_LABEL_KEYS[this.buffView.mode()];
+        case 'buffIconSize':
+          return BUFF_ICON_SCALE_LABEL_KEYS[this.buffView.iconScale()];
         case 'language':
           return command.labelKey;
       }
@@ -330,10 +335,8 @@ export class MenuCommandService {
 
   /** The name written out, for the places that show text rather than a translation key. */
   labelOf(command: MenuCommand): string {
-    const action = command.action;
-    if (action.kind === 'cycle' && action.cycle === 'buffView') {
-      return `${this.t('feature.plTools.buffView')}: ${this.t(this.labelKeyOf(command))}`;
-    }
+    const prefix = this.prefixKeyOf(command);
+    if (prefix) return `${this.t(prefix)}: ${this.t(this.labelKeyOf(command))}`;
     return this.t(this.labelKeyOf(command));
   }
 
@@ -374,6 +377,8 @@ export class MenuCommandService {
         return this.widgets.gmToolbar();
       case 'widgetClock':
         return this.widgets.clock();
+      case 'widgetGameClock':
+        return this.widgets.gameClock();
       case 'widgetCompass':
         return this.widgets.compass();
       case 'widgetRecording':
@@ -508,6 +513,9 @@ export class MenuCommandService {
       case 'widgetClock':
         this.widgets.toggleClock();
         return;
+      case 'widgetGameClock':
+        this.widgets.toggleGameClock();
+        return;
       case 'widgetCompass':
         this.widgets.toggleCompass();
         return;
@@ -545,6 +553,9 @@ export class MenuCommandService {
         return;
       case 'buffView':
         this.buffView.cycle();
+        return;
+      case 'buffIconSize':
+        this.buffView.cycleIconScale();
         return;
     }
   }
