@@ -1,6 +1,6 @@
 import { expect, Locator, Page, test } from '@playwright/test';
 
-import { openPanel, selectVnSpeaker, vnMessageInput, waitAppReady } from './helpers';
+import { chatInput, openPanel, selectVnSpeaker, vnMessageInput, waitAppReady } from './helpers';
 import { settle } from './see-through-helpers';
 
 /** Opens the piece's menu and walks into 表示と扱い › 画像効果, then presses `entry`. */
@@ -65,7 +65,7 @@ test('keeps a silhouette on the icon of what the piece says, so the chat gives n
     page.locator('.ng-dropdown-panel').getByRole('option', { name: 'キャラクターB', exact: true })
   ).toBeVisible();
   await search.press('Enter');
-  const textarea = page.locator('textarea.chat-input');
+  const textarea = chatInput(page);
   await textarea.fill('……誰だと思う？');
   await textarea.press('Enter');
 

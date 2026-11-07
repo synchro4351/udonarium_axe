@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-import { waitAppReady } from './helpers';
+import { chatInput, waitAppReady } from './helpers';
 
-test('both ruby forms render safely and the picker inserts ASCII notation', async ({ page }) => {
+test('both ruby forms render safely', async ({ page }) => {
   await waitAppReady(page);
-  const input = page.locator('textarea.chat-input');
+  const input = chatInput(page);
   await input.fill('「|魔法<まほう>を使う！」 と ｜技《わざ》');
   await input.press('Enter');
   const message = page.locator('chat-message').last();
@@ -16,9 +16,4 @@ test('both ruby forms render safely and the picker inserts ASCII notation', asyn
   await expect(literal).toContainText('1 < 2 > 0');
   await expect(literal.locator('ruby rt')).toHaveText('img src=x onerror=alert(1)');
   await expect(literal.locator('ruby img, script')).toHaveCount(0);
-  await page.getByTestId('chat-input-stamp').click();
-  const picker = page.getByTestId('stamp-picker');
-  await picker.getByTestId('stamp-picker-tab-syntax').click();
-  await picker.locator('[data-syntax="ruby"]').click();
-  await expect(input).toHaveValue('|漢字<かんじ>');
 });

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createCharacter, waitAppReady } from './helpers';
+import { chatInput, createCharacter, waitAppReady } from './helpers';
 
 for (const chatFocused of [false, true]) {
   test(`the first character drag works with chat focus ${chatFocused}`, async ({ page }) => {
@@ -9,7 +9,7 @@ for (const chatFocused of [false, true]) {
 
     const piece = page.locator('game-character').filter({ hasText: '新しいキャラクター' }).first();
     const grab = piece.locator('[data-testid="multi-angle-piece-motion-source"]');
-    const input = page.locator('textarea[name="chat-input-text"]');
+    const input = chatInput(page);
     if (chatFocused) {
       await input.focus();
       await expect(input).toBeFocused();
