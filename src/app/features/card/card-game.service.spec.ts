@@ -818,6 +818,26 @@ describe('CardGameService', () => {
       expect(fromOther.location.name).toBe(handLocationOf(handHolderForCharacter(blaze)));
     });
 
+    it('deals a stack out to the hands picked, a character’s among them, and to nobody else', () => {
+      const other = peer('other', 'あいて');
+      const blaze = character('ブレイズ', 'me');
+      const stack = CardStack.create('山札');
+      created.push(stack);
+      for (const code of ['s01', 's02', 's03', 's04']) stack.putOnBottom(trumpCard(code));
+
+      expect(service.dealSeats().map((seat) => seat.userId)).toEqual([
+        'me',
+        other.userId,
+        handHolderForCharacter(blaze),
+      ]);
+      const result = service.dealAll(stack, 1, ['me', handHolderForCharacter(blaze)]);
+
+      expect(result).toEqual({ dealt: 4, participants: 2 });
+      expect(service.handCardsOf('me')).toHaveLength(2);
+      expect(service.handCardsOf(handHolderForCharacter(blaze))).toHaveLength(2);
+      expect(service.handCardsOf(other.userId)).toHaveLength(0);
+    });
+
     it('lists your own hand first, then the characters with a hand you own, and for the game master every character with one', () => {
       const blaze = character('ブレイズ', 'me');
       const npc = character('ゴブリン', '', false);

@@ -171,7 +171,7 @@ describe('buildCardStackContextMenu', () => {
         vi.fn(),
         t
       );
-      const dealIndex = actions.findIndex((action) => action.name === '全員に配り切る');
+      const dealIndex = actions.findIndex((action) => action.name === '配り切る');
 
       expect(dealIndex).toBeGreaterThanOrEqual(0);
       expect(actions[dealIndex + 1].name).toBe('山札を人数分に分割する');

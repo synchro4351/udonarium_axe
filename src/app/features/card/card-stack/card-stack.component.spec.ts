@@ -4,6 +4,7 @@ import { RolePermissionService } from '@axe/application/permission/role-permissi
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { ConfirmService } from '@axe/application/ui/confirm.service';
+import { ModalService } from '@axe/application/ui/modal.service';
 import { Network } from '@axe/core/network/network';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
@@ -88,6 +89,7 @@ describe('CardStackComponent', () => {
     it('deals without asking when every face is here', async () => {
       const ask = vi.spyOn(TestBed.inject(ConfirmService), 'ask');
       const deal = vi.spyOn(TestBed.inject(CardGameService), 'dealAll').mockReturnValue({ dealt: 1, participants: 1 });
+      vi.spyOn(TestBed.inject(ModalService), 'open').mockResolvedValue(['me']);
       const deck = CardStack.create('山札');
       deck.putOnBottom(Card.create('A', 'front.png', 'back.png'));
 

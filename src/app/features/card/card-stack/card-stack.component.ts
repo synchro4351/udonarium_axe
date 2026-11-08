@@ -37,6 +37,10 @@ import { surfaceOf } from '@axe/domain/tabletop/tabletop-object';
 import { CardDrawCountDialogComponent } from '@axe/features/card/card-draw-count-dialog/card-draw-count-dialog.component';
 import { CardGameService } from '@axe/features/card/card-game.service';
 import { buildCardStackContextMenu } from '@axe/features/card/card-stack/card-stack-context-menu';
+import {
+  DealChoiceDialogComponent,
+  DealChoiceSeat,
+} from '@axe/features/card/deal-choice-dialog/deal-choice-dialog.component';
 import { handTransferActions } from '@axe/features/card/hand-rail/hand-transfer-context-menu';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { CardFaceTextComponent } from '@axe/ui/components/card-face-text/card-face-text.component';
@@ -520,7 +524,18 @@ export class CardStackComponent {
       const askGm = gameMasterHoldsThem ? this.translateFn('feature.cardStack.message.dealWithheldAskGm') : '';
       if (!(await this.confirm.ask(this.translateFn('feature.cardStack.message.dealWithheld', { askGm })))) return;
     }
-    this.cardGameService.dealAll(stack);
+    // Which hands take the cards, participants' and characters' alike, every one ticked to begin with.
+    const seats: DealChoiceSeat[] = this.cardGameService
+      .dealSeats()
+      .map((seat) => ({ userId: seat.userId, name: seat.name, character: seat.characterIdentifier !== undefined }));
+    const holders = await this.modalService
+      .open<string[] | null>(DealChoiceDialogComponent, {
+        title: this.translateFn('feature.cardStack.dealChoice.title'),
+        seats,
+      })
+      .catch(() => null);
+    if (!holders || holders.length < 1) return;
+    this.cardGameService.dealAll(stack, 1, holders);
   }
 
   private breakStack() {

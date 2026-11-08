@@ -181,15 +181,20 @@ export class CardGameService {
     return PeerCursor.findByUserId(holder)?.name ?? '';
   }
 
+  /** The hands a stack can be dealt out to: every participant who holds cards, then each character with a hand. */
+  dealSeats(): CardSeat[] {
+    return [...this.participants(), ...this.characterSeats()];
+  }
+
   /**
-   * Shuffles a stack and deals all of it evenly into every participant's hand, announcing the deal
-   * in chat.
+   * Shuffles a stack and deals all of it evenly into the hands given, every participant's when none
+   * are, announcing the deal in chat.
    *
    * Jokers beyond `keepJokerCount` are put back on the bottom of the stack rather than dealt. With
    * nobody to deal to, a system message says so and nothing moves.
    */
-  dealAll(cardStack: CardStack, keepJokerCount = 1): DealResult {
-    const seats = this.participants();
+  dealAll(cardStack: CardStack, keepJokerCount = 1, holders?: readonly string[]): DealResult {
+    const seats = holders ? this.dealSeats().filter((seat) => holders.includes(seat.userId)) : this.participants();
     if (seats.length < 1) {
       this.chatMessageService.sendSystemNotice('card', this.t('feature.cardStack.message.noSeats'));
       return { dealt: 0, participants: 0 };
@@ -208,6 +213,7 @@ export class CardGameService {
       plan.indexes[seatIndex].forEach((cardIndex, order) => {
         cards[cardIndex].toHand(seat.userId, baseOrder + order);
       });
+      this.noteHand(seat.userId);
     });
 
     SoundEffect.play(PresetSound.cardDraw);
