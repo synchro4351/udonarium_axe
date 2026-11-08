@@ -15,10 +15,12 @@ async function openHandRail(page: Page) {
 
 async function dealAll(page: Page) {
   const menu = await openCardStackMenu(page);
-  const item = menu.getByText('全員に配り切る');
+  const item = menu.locator('li', { hasText: /^\s*配り切る\s*$/ });
   await item.scrollIntoViewIfNeeded();
   await item.click();
   await expect(page.locator('context-menu')).toHaveCount(0, { timeout: 5000 });
+  // Every hand is ticked to begin with.
+  await page.getByTestId('deal-choice-confirm').click();
 }
 
 async function openCardStackMenu(page: Page) {
@@ -62,7 +64,7 @@ test.describe('card handling for old maid', () => {
 
     const panel = page.locator('hand-overview-panel');
     await expect(panel).toBeVisible({ timeout: 5000 });
-    await expect(panel.locator('[data-testid="hand-overview-draw-hint"]')).toContainText('自分の欄へドラッグ');
+    await expect(panel.locator('[data-testid="hand-overview-draw-rule"]')).toContainText('手札を引く：ON');
     await expect(panel.locator('[data-hand-draw-card]')).toHaveCount(0);
   });
 });

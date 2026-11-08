@@ -1169,7 +1169,7 @@
         "privateStatus": "Hand private",
         "publicStatus": "Hand public",
         "confirmPublic": "Show to everyone",
-        "viewPublicHands": "Everyone's hands (view, draw, give)",
+        "viewPublicHands": "Everyone's hands",
         "tabs": "Hands you hold",
         "ownTab": "Yours",
         "chooseFaceAfterDrop": "Play at this position (cancel to keep in hand)",
@@ -1268,11 +1268,8 @@
         }
       },
       "handOverview": {
-        "hint": "Only public hands show their fronts.",
-        "giveHint": "Drag a card from your hand onto a participant to give it to them.",
-        "giveForbidden": "This room does not allow giving cards.",
-        "drawHint": "Drag a card from someone else's hand onto your own to draw it.",
-        "drawForbidden": "This room does not allow drawing from other hands.",
+        "giveRule": "Give cards: {{state}}",
+        "drawRule": "Draw cards: {{state}}",
         "you": "(you)",
         "character": "Character",
         "public": "Public",
@@ -1364,7 +1361,7 @@
         "splitByPeers": "Split deck by peer count",
         "breakStack": "Break stack",
         "deleteStack": "Delete stack",
-        "dealAll": "Deal to everyone",
+        "dealAll": "Deal out",
         "copySchema": "Copy the top card fields to every card",
         "giveTopCard": "Give the top card"
       },
@@ -1373,6 +1370,10 @@
         "noSeats": "Nobody can be dealt cards",
         "dealWithheld": "Some cards are face down to you, so jokers cannot be told apart, and every joker will be dealt too. {{askGm}}Deal anyway?",
         "dealWithheldAskGm": "You can ask the GM to deal instead. "
+      },
+      "dealChoice": {
+        "title": "Deal to",
+        "deal": "Deal"
       }
     },
     "coin": {

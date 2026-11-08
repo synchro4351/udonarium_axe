@@ -145,11 +145,11 @@ describe('HandOverviewPanelComponent', () => {
     fixture.detectChanges();
 
     expect(sectionOf('other').getAttribute('data-hand-drop-user-id')).toBe('other');
-    expect(sectionOf('me').hasAttribute('data-hand-drop-user-id')).toBe(false);
     expect(sectionOf('other').querySelector('[data-testid="hand-overview-drop-hint"]')).toBeNull();
 
     TestBed.inject(HandDragService).begin(mine);
     fixture.detectChanges();
+    expect(sectionOf('me').hasAttribute('data-hand-drop-user-id')).toBe(false);
     expect(sectionOf('other').querySelector('[data-testid="hand-overview-drop-hint"]')).toBeTruthy();
     expect(sectionOf('me').querySelector('[data-testid="hand-overview-drop-hint"]')).toBeNull();
   });
@@ -164,8 +164,8 @@ describe('HandOverviewPanelComponent', () => {
     expect(sectionOf('other').hasAttribute('data-hand-drop-user-id')).toBe(false);
     expect(sectionOf('other').querySelector('[data-testid="hand-overview-drop-hint"]')).toBeNull();
     expect(
-      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="hand-overview-hint"]')?.textContent
-    ).toContain('この部屋ではカードを渡せません');
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="hand-overview-give-rule"]')?.textContent
+    ).toContain('手札を渡す：OFF');
 
     Config.instance.allowsHandGive = true;
     TestBed.inject(ObjectChangeService).notifyChanged('Config');
@@ -307,9 +307,36 @@ describe('HandOverviewPanelComponent', () => {
       fixture.detectChanges();
 
       expect(cardElementOf('me').hasAttribute('data-hand-draw-card')).toBe(false);
-      expect(cardElementOf('me').classList.contains('touch-none')).toBe(false);
       pickUp(cardElementOf('me'));
       expect(TestBed.inject(HandDragService).drawCard()).toBeNull();
+      expect(mine.location.name).toBe(handLocationOf('me'));
+    });
+
+    it("gives a card from your own hand, or a character's you hold for, by dragging it onto another section", () => {
+      peer('other', 'あいて');
+      const mine = card('h01', 'me');
+      fixture.detectChanges();
+
+      expect(cardElementOf('me').hasAttribute('data-hand-give-card')).toBe(true);
+      expect(cardElementOf('other', 0)?.hasAttribute('data-hand-give-card') ?? false).toBe(false);
+      pickUp(cardElementOf('me'));
+      expect(sectionOf('me').hasAttribute('data-hand-drop-user-id')).toBe(false);
+      under = [sectionOf('other')];
+      pointer(cardElementOf('me'), 'pointerup', 40, 40);
+
+      expect(mine.location.name).toBe(handLocationOf('other'));
+    });
+
+    it('gives nothing from your own hand while the room forbids giving', () => {
+      peer('other', 'あいて');
+      const mine = card('h01', 'me');
+      Config.instance.allowsHandGive = false;
+      fixture.detectChanges();
+
+      expect(cardElementOf('me').hasAttribute('data-hand-give-card')).toBe(false);
+      pickUp(cardElementOf('me'));
+      under = [sectionOf('other')];
+      pointer(cardElementOf('me'), 'pointerup', 40, 40);
       expect(mine.location.name).toBe(handLocationOf('me'));
     });
 
@@ -319,9 +346,9 @@ describe('HandOverviewPanelComponent', () => {
       Config.instance.allowsHandDraw = false;
       fixture.detectChanges();
       const hint = () =>
-        (fixture.nativeElement as HTMLElement).querySelector('[data-testid="hand-overview-draw-hint"]')?.textContent;
+        (fixture.nativeElement as HTMLElement).querySelector('[data-testid="hand-overview-draw-rule"]')?.textContent;
 
-      expect(hint()).toContain('この部屋では他の人の手札から引けません');
+      expect(hint()).toContain('手札を引く：OFF');
       expect(sectionOf('me').hasAttribute('data-hand-draw-target')).toBe(false);
       expect(cardElementOf('other').hasAttribute('data-hand-draw-card')).toBe(false);
       pickUp(cardElementOf('other'));
@@ -333,7 +360,7 @@ describe('HandOverviewPanelComponent', () => {
       Config.instance.allowsHandDraw = true;
       TestBed.inject(ObjectChangeService).notifyChanged('Config');
       fixture.detectChanges();
-      expect(hint()).toContain('自分の欄へドラッグ');
+      expect(hint()).toContain('手札を引く：ON');
       expect(sectionOf('me').getAttribute('data-hand-draw-target')).toBe('me');
       expect(cardElementOf('other').hasAttribute('data-hand-draw-card')).toBe(true);
     });

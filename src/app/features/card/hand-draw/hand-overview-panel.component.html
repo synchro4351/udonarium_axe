@@ -1,22 +1,29 @@
-<p class="text-ui-dim m-0 mb-2 text-xs" data-testid="hand-overview-hint">
-  <span class="block">{{ 'feature.card.handOverview.hint' | transloco }}</span>
-  <span class="block">{{
-    (allowsGive() ? 'feature.card.handOverview.giveHint' : 'feature.card.handOverview.giveForbidden') | transloco
-  }}</span>
-  <span class="block" data-testid="hand-overview-draw-hint">{{
-    (allowsDraw() ? 'feature.card.handOverview.drawHint' : 'feature.card.handOverview.drawForbidden') | transloco
-  }}</span>
+<p class="m-0 mb-2 flex flex-wrap gap-1.5 text-xs" data-testid="hand-overview-rules">
+  <span
+    class="rounded-ui-sm bg-ui-elevated px-1.5 py-0.5"
+    data-testid="hand-overview-give-rule"
+    [class.text-ui-dim]="!allowsGive()"
+    >{{ 'feature.card.handOverview.giveRule' | transloco: { state: allowsGive() ? 'ON' : 'OFF' } }}</span
+  >
+  <span
+    class="rounded-ui-sm bg-ui-elevated px-1.5 py-0.5"
+    data-testid="hand-overview-draw-rule"
+    [class.text-ui-dim]="!allowsDraw()"
+    >{{ 'feature.card.handOverview.drawRule' | transloco: { state: allowsDraw() ? 'ON' : 'OFF' } }}</span
+  >
 </p>
 @for (section of sections(); track section.userId) {
-  @let source = dropping() && section.userId === draggedFrom();
+  @let carrying = dropping() || giving() || tableDropping();
+  @let source = carrying && section.userId === giveSource();
   @let drawInto = drawing() && section.heldByMe && section.userId !== drawFromUserId();
-  @let target = (dropping() && !source) || drawInto;
-  @let active = dropping() ? drag.dropUserId() === section.userId : drawInto && drawTarget() === section.userId;
+  @let target = (carrying && !source) || drawInto;
+  @let active = carrying ? drag.dropUserId() === section.userId : drawInto && drawTarget() === section.userId;
   @let drawable = !section.heldByMe && canDraw();
+  @let givable = section.heldByMe && allowsGive();
   <section
     class="rounded-ui mb-2 border-2 border-solid p-2 transition-colors"
     data-testid="hand-overview-section"
-    [attr.data-hand-drop-user-id]="(dropping() ? source : section.isSelf) || !allowsGive() ? null : section.userId"
+    [attr.data-hand-drop-user-id]="allowsGive() && section.userId !== giveSource() ? section.userId : null"
     [attr.data-hand-draw-target]="section.heldByMe && canDraw() ? section.userId : null"
     [class.border-ui-border-panel]="!target"
     [class.border-dashed]="target && !active"
@@ -53,7 +60,7 @@
         {{ 'feature.card.handOverview.cardCount' | transloco: { count: section.cards.length } }}
       </span>
     </header>
-    @if (dropping() && !source) {
+    @if (carrying && !source) {
       <p class="text-ui-accent m-0 mb-1 text-[11px] font-bold" data-testid="hand-overview-drop-hint">
         {{ 'feature.card.handOverview.dropHere' | transloco: { name: section.name } }}
       </p>
@@ -68,9 +75,10 @@
         <div
           class="rounded-ui-sm border-ui-border-panel h-14 w-10 shrink-0 overflow-hidden border border-solid"
           data-testid="hand-overview-card"
-          [class]="drawable ? 'hover:border-ui-accent cursor-grab touch-none' : ''"
+          [class]="drawable || givable ? 'hover:border-ui-accent cursor-grab touch-none' : ''"
           [class.opacity-40]="drag.drawCard() === card"
           [attr.data-hand-draw-card]="drawable ? '' : null"
+          [attr.data-hand-give-card]="givable ? '' : null"
           [attr.title]="section.handPublic ? card.name : null"
           (pointerdown)="onCardPointerDown($event, section, card)"
           (pointermove)="onCardPointerMove($event)"

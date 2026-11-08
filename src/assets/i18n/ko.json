@@ -1169,7 +1169,7 @@
         "privateStatus": "패 비공개",
         "publicStatus": "패 공개 중",
         "confirmPublic": "모두에게 공개",
-        "viewPublicHands": "모두의 패(보기·뽑기·건네기)",
+        "viewPublicHands": "모두의 손패",
         "tabs": "가진 손패",
         "ownTab": "나",
         "chooseFaceAfterDrop": "이 위치에 카드 내기(취소하면 패에 유지)",
@@ -1268,11 +1268,8 @@
         }
       },
       "handOverview": {
-        "hint": "공개된 패만 앞면이 보입니다.",
-        "giveHint": "내 패의 카드를 참가자 칸으로 끌어다 놓으면 그 사람에게 건넬 수 있습니다.",
-        "giveForbidden": "이 방에서는 카드를 건넬 수 없습니다.",
-        "drawHint": "다른 사람의 칸에서 카드를 내 칸으로 끌어다 놓으면 1장 뽑을 수 있습니다.",
-        "drawForbidden": "이 방에서는 다른 사람의 패에서 뽑을 수 없습니다.",
+        "giveRule": "손패 주기: {{state}}",
+        "drawRule": "손패 뽑기: {{state}}",
         "you": "(나)",
         "character": "캐릭터",
         "public": "공개 중",
@@ -1364,7 +1361,7 @@
         "splitByPeers": "덱을 인원수만큼 나누기",
         "breakStack": "덱 풀기",
         "deleteStack": "덱 삭제하기",
-        "dealAll": "전원에게 모두 나눠주기",
+        "dealAll": "모두 나눠 주기",
         "copySchema": "맨 위 카드의 항목을 모든 카드에 복사",
         "giveTopCard": "맨 위 카드 건네기"
       },
@@ -1373,6 +1370,10 @@
         "noSeats": "나눠줄 참가자가 없습니다",
         "dealWithheld": "앞면이 보이지 않는 카드가 있어 조커를 구별할 수 없습니다. 조커도 모두 나눠줍니다. {{askGm}}그래도 나눠주시겠습니까?",
         "dealWithheldAskGm": "GM에게 나눠 달라고 할 수도 있습니다. "
+      },
+      "dealChoice": {
+        "title": "나눠 줄 상대",
+        "deal": "나눠 주기"
       }
     },
     "coin": {

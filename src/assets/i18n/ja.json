@@ -1169,7 +1169,7 @@
         "privateStatus": "手札は非公開",
         "publicStatus": "手札を公開中",
         "confirmPublic": "全員に公開する",
-        "viewPublicHands": "全員の手札（見る・引く・渡す）",
+        "viewPublicHands": "全員の手札",
         "tabs": "持っている手札",
         "ownTab": "自分",
         "chooseFaceAfterDrop": "この位置にカードを出す（取消は手札に戻す）",
@@ -1268,11 +1268,8 @@
         }
       },
       "handOverview": {
-        "hint": "表が見えるのは公開中の手札だけです。",
-        "giveHint": "手札のカードを参加者の欄へドラッグすると、その人に渡せます。",
-        "giveForbidden": "この部屋ではカードを渡せません。",
-        "drawHint": "ほかの人の欄からカードを自分の欄へドラッグすると、1 枚引けます。",
-        "drawForbidden": "この部屋では他の人の手札から引けません。",
+        "giveRule": "手札を渡す：{{state}}",
+        "drawRule": "手札を引く：{{state}}",
         "you": "（自分）",
         "character": "キャラクター",
         "public": "公開中",
@@ -1364,7 +1361,7 @@
         "splitByPeers": "山札を人数分に分割する",
         "breakStack": "山札を崩す",
         "deleteStack": "山札を削除する",
-        "dealAll": "全員に配り切る",
+        "dealAll": "配り切る",
         "copySchema": "一番上のカードの項目を全カードにコピー",
         "giveTopCard": "一番上のカードを渡す"
       },
@@ -1373,6 +1370,10 @@
         "noSeats": "配れる参加者がいません",
         "dealWithheld": "表の見えないカードがあるため、ジョーカーを見分けられません。ジョーカーも全部配られます。{{askGm}}このまま配りますか？",
         "dealWithheldAskGm": "GMに配ってもらうこともできます。"
+      },
+      "dealChoice": {
+        "title": "配る相手",
+        "deal": "配る"
       }
     },
     "coin": {
