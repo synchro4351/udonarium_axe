@@ -6,7 +6,7 @@
   [movable.disable]="isLock"
   [appSelectable]="card()"
   (movable.ondragstart)="onMove()"
-  (movable.ondragend)="onMoved()"
+  (movable.ondragend)="onMoved($event)"
 >
   <div
     class="pointer-events-auto box-border size-full backface-hidden transform-3d"

@@ -34,6 +34,7 @@ import { CardFlipCutInService } from '@axe/features/card/card-flip-cut-in.servic
 import { CardGameService } from '@axe/features/card/card-game.service';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
 import { HandDragService } from '@axe/features/card/hand-rail/hand-drag.service';
+import { HAND_DROP_USER_ATTRIBUTE } from '@axe/features/card/hand-rail/hand-drop-target';
 import { handTransferActions } from '@axe/features/card/hand-rail/hand-transfer-context-menu';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { CardFaceTextComponent } from '@axe/ui/components/card-face-text/card-face-text.component';
@@ -503,15 +504,34 @@ export class CardComponent {
   /**
    * Finishes a drag or rotation of the card.
    *
-   * Let go of over the hand rail, the card returns to where it lay and goes into this user's hand.
+   * Let go of over the hand rail, the card returns to where it lay and goes into this user's hand;
+   * over a hand in the window of everyone's hands, it goes to that hand, given as from the table.
    * Anywhere else it stays where it landed and the other pieces under it are told, so a stack can
    * take it in.
    */
-  onMoved() {
+  onMoved(event?: PointerEvent) {
     this.handDrag.disarmTableDrag();
     const origin = this.positionBeforeDrag;
     this.positionBeforeDrag = null;
-    if (origin && this.isDroppedOnHandRail()) {
+    // Where the card was let go of, read off the release itself: the pointer the device service last
+    // saw can lag behind a drag, whose moves the table keeps to itself.
+    const at = this.releasePoint(event);
+    const recipient = origin ? this.handSectionAt(at) : '';
+    if (origin && recipient && recipient !== (PeerCursor.myCursor?.userId ?? '')) {
+      const card = this.card();
+      const from = { x: card.location.x, y: card.location.y };
+      card.location.x = origin.x;
+      card.location.y = origin.y;
+      if (this.cardGame.giveFromTable(card, recipient)) {
+        card.update();
+        this.objectChange.notifyChanged(card.identifier);
+        return;
+      }
+      card.location.x = from.x;
+      card.location.y = from.y;
+    }
+    const ownSection = recipient.length > 0 && recipient === (PeerCursor.myCursor?.userId ?? '');
+    if (origin && (this.isDroppedOnHandRail(at) || ownSection)) {
       const card = this.card();
       card.location.x = origin.x;
       card.location.y = origin.y;
@@ -525,9 +545,32 @@ export class CardComponent {
     this.dispatchCardDropEvent();
   }
 
-  private isDroppedOnHandRail(): boolean {
+  /** The point in the viewport a drag ended at: the release's own, or the last pointer seen without one. */
+  private releasePoint(event?: PointerEvent): { x: number; y: number } {
+    if (event && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+      return { x: event.clientX, y: event.clientY };
+    }
     const pointer = this.pointerDeviceService.pointers[0];
-    return elementsAt(pointer.x, pointer.y).some((element) => element.closest('.hand-rail') != null);
+    return { x: pointer.x - window.scrollX, y: pointer.y - window.scrollY };
+  }
+
+  /**
+   * The hand of a section of everyone's hands the card is let go over, or empty. Found by where the
+   * sections stand rather than by asking what lies under the pointer: windows let the pointer through
+   * while anything is dragged, so a section is never what the pointer is over.
+   */
+  private handSectionAt(at: { x: number; y: number }): string {
+    for (const section of document.querySelectorAll<HTMLElement>(`[${HAND_DROP_USER_ATTRIBUTE}]`)) {
+      const box = section.getBoundingClientRect();
+      if (at.x >= box.left && at.x <= box.right && at.y >= box.top && at.y <= box.bottom) {
+        return section.getAttribute(HAND_DROP_USER_ATTRIBUTE) ?? '';
+      }
+    }
+    return '';
+  }
+
+  private isDroppedOnHandRail(at: { x: number; y: number }): boolean {
+    return elementsAt(at.x, at.y).some((element) => element.closest('.hand-rail') != null);
   }
 
   private createStack() {
