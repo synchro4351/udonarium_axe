@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ModalService } from '@axe/application/ui/modal.service';
+import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
 import { TranslocoModule } from '@jsverse/transloco';
 
 /** One hand the cards can be dealt into: a participant's, or a character's. */
@@ -14,9 +15,27 @@ export interface DealChoiceDialogOption {
   seats: readonly DealChoiceSeat[];
 }
 
+/** The hands picked the last time a stack was dealt out in this browser, or null for none yet. */
+function rememberedPick(): string[] | null {
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(STORAGE_KEYS.dealChoice) ?? 'null');
+    return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberPick(picked: readonly string[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.dealChoice, JSON.stringify(picked));
+  } catch {
+    // A browser that keeps nothing asks afresh each time.
+  }
+}
+
 /**
- * Asks which hands a stack is dealt out to, every one ticked to begin with. Closes with the hands
- * ticked, or null when cancelled.
+ * Asks which hands a stack is dealt out to: the ones picked last time in this browser, or every
+ * participant at first. Closes with the hands ticked, or null when cancelled.
  */
 @Component({
   selector: 'deal-choice-dialog',
@@ -30,10 +49,17 @@ export class DealChoiceDialogComponent {
 
   protected readonly seats: readonly DealChoiceSeat[] =
     (this.modalService.option as Partial<DealChoiceDialogOption> | undefined)?.seats ?? [];
-  private readonly picked = signal<ReadonlySet<string>>(new Set(this.seats.map((seat) => seat.userId)));
+  private readonly picked = signal<ReadonlySet<string>>(this.startingPick());
 
   /** Whether any hand is ticked, which dealing needs. */
   protected readonly anyPicked = computed(() => this.picked().size > 0);
+
+  private startingPick(): ReadonlySet<string> {
+    const remembered = rememberedPick();
+    const here = new Set(this.seats.map((seat) => seat.userId));
+    if (remembered && remembered.some((id) => here.has(id))) return new Set(remembered.filter((id) => here.has(id)));
+    return new Set(this.seats.filter((seat) => !seat.character).map((seat) => seat.userId));
+  }
 
   protected isPicked(userId: string): boolean {
     return this.picked().has(userId);
@@ -50,7 +76,9 @@ export class DealChoiceDialogComponent {
   /** Closes with the hands ticked, in the order they are listed. */
   protected confirm(): void {
     if (!this.anyPicked()) return;
-    this.modalService.resolve(this.seats.filter((seat) => this.picked().has(seat.userId)).map((seat) => seat.userId));
+    const picked = this.seats.filter((seat) => this.picked().has(seat.userId)).map((seat) => seat.userId);
+    rememberPick(picked);
+    this.modalService.resolve(picked);
   }
 
   /** Closes with null, so nothing is dealt. */

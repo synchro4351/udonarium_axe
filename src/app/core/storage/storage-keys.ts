@@ -20,6 +20,7 @@ export const STORAGE_KEYS = {
   chatPersonalBookmarks: 'chat-personal-bookmarks',
   chatPreferences: 'chat-preferences',
   compassFace: 'axe.compass.face',
+  dealChoice: 'axe.card.dealChoice',
   djDeckOpen: 'mini-jukebox-dj-deck',
   effectAutoPlay: 'axe.effect.autoPlay',
   firstPersonPiece: 'ui-first-person-piece',
