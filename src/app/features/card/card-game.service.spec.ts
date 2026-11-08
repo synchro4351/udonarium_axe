@@ -794,6 +794,23 @@ describe('CardGameService', () => {
       expect(service.canHoldFor(handHolderForCharacter(npc))).toBe(true);
     });
 
+    it('gives from your own hand and the characters you own alone, the game master too', () => {
+      const other = peer('other', 'あいて');
+      const mine = character('ブレイズ', 'me');
+      const npc = character('ゴブリン');
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      const fromNpc = trumpCard('s01');
+      fromNpc.toHand(handHolderForCharacter(npc));
+      const fromMine = trumpCard('s02');
+      fromMine.toHand(handHolderForCharacter(mine));
+
+      expect(service.canGiveFrom('me')).toBe(true);
+      expect(service.canGiveFrom(handHolderForCharacter(mine))).toBe(true);
+      expect(service.canGiveFrom(handHolderForCharacter(npc))).toBe(false);
+      expect(service.giveFromHand(fromNpc, other.userId, handHolderForCharacter(npc))).toBe(false);
+      expect(service.giveFromHand(fromMine, other.userId, handHolderForCharacter(mine))).toBe(true);
+    });
+
     it('will not give from a character you do not hold for', () => {
       const theirs = character('ローゼ', 'other');
       const card = trumpCard('s01');

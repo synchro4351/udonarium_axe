@@ -442,7 +442,7 @@ export class HandRailComponent {
   }
 
   private giveActionsFor(card: Card): ContextMenuAction[] {
-    if (!this.cardGame.canGiveCards()) return [];
+    if (!this.cardGame.canGiveCards() || !this.cardGame.canGiveFrom(this.holder())) return [];
     return this.giveRecipients().map((recipient) => ({
       name: recipient.name || this.t('feature.card.hand.unnamed'),
       action: () => this.cardGame.giveFromHand(card, recipient.userId, this.holder()),

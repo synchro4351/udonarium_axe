@@ -19,7 +19,7 @@
   @let target = (carrying && !source) || drawInto;
   @let active = carrying ? drag.dropUserId() === section.userId : drawInto && drawTarget() === section.userId;
   @let drawable = !section.heldByMe && canDraw();
-  @let givable = section.heldByMe && allowsGive();
+  @let givable = section.givesFrom && allowsGive();
   <section
     class="rounded-ui mb-2 border-2 border-solid p-2 transition-colors"
     data-testid="hand-overview-section"

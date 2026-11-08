@@ -288,6 +288,18 @@ export class CardGameService {
     return !(card.hasOwner && !card.isMine) && card.isVisible;
   }
 
+  /**
+   * Whether you may give cards from this hand: your own, or a character's you own. The game master
+   * holds every character's hand but gives only from the ones they own, as anyone else does.
+   */
+  canGiveFrom(holder: string): boolean {
+    const myUserId = this.myUserId();
+    if (myUserId.length < 1 || !canRoleEdit(PeerCursor.myRole)) return false;
+    if (holder === myUserId) return true;
+    const character = this.characterOf(holder);
+    return character !== null && character.isVisibleOnTable && character.owner === myUserId;
+  }
+
   /** Whether this user may send cards to other hands at all: they can hold cards and the room allows giving. */
   canGiveCards(): boolean {
     return this.myUserId().length > 0 && canRoleEdit(PeerCursor.myRole) && this.allowsHandGive();
@@ -329,7 +341,7 @@ export class CardGameService {
    * hidden there. False while the room forbids it.
    */
   giveFromHand(card: Card, recipientUserId: string, fromHolder: string = this.myUserId()): boolean {
-    if (!this.canHoldFor(fromHolder)) return false;
+    if (!this.canGiveFrom(fromHolder)) return false;
     const recipient = this.recipientForGive(recipientUserId, fromHolder);
     if (!recipient || !this.handCardsOf(fromHolder).includes(card)) return false;
 

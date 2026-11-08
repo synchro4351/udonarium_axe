@@ -23,6 +23,8 @@ export interface HandOverviewSection {
   isSelf: boolean;
   /** A hand you hold for: your own, or a character's whose cards you see. */
   heldByMe: boolean;
+  /** A hand you may give from: your own, or a character's you own. */
+  givesFrom: boolean;
   /** The character the hand belongs to; absent for a participant's. */
   characterIdentifier?: string;
   handPublic: boolean;
@@ -108,6 +110,7 @@ export class HandOverviewPanelComponent {
       name: seat.name,
       isSelf: seat.userId === myUserId,
       heldByMe: this.cardGame.canHoldFor(seat.userId),
+      givesFrom: this.cardGame.canGiveFrom(seat.userId),
       characterIdentifier: seat.characterIdentifier,
       handPublic: this.cardGame.handPublicOf(seat.userId),
       cards: this.cardGame.handCardsOf(seat.userId),
@@ -174,10 +177,10 @@ export class HandOverviewPanelComponent {
   }
 
   protected onCardPointerDown(event: PointerEvent, section: HandOverviewSection, card: Card): void {
-    // A card in a hand you hold for (yours, or a character's you own) is given; one in any other
-    // hand is drawn.
-    const mode = section.heldByMe ? 'give' : 'draw';
-    if (mode === 'draw' ? !this.canDraw() : !this.allowsGive()) return;
+    // A card in a hand you give from (yours, or a character's you own) is given; one in a hand you
+    // do not hold is drawn; one in a hand you only hold for, as the game master an NPC's, stays.
+    const mode = section.givesFrom ? 'give' : section.heldByMe ? null : 'draw';
+    if (mode === null || (mode === 'draw' ? !this.canDraw() : !this.allowsGive())) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     event.preventDefault();
     this.drawPending = {
