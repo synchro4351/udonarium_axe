@@ -164,10 +164,21 @@ function importedFrom(roots, imports) {
   return reached;
 }
 
+/**
+ * Windows takes a command line of at most 32,767 characters; past it the run cannot even start. A
+ * list of specs that long is most of the suite, so the whole suite is run instead.
+ */
+const MAX_WINDOWS_COMMAND_CHARS = 30_000;
+
 function run(args) {
-  const result = spawnSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', ...args], {
+  const files = args.filter((arg) => !arg.startsWith('-'));
+  const tooLong = process.platform === 'win32' && args.join(' ').length > MAX_WINDOWS_COMMAND_CHARS;
+  if (tooLong) console.log(`[vitest-related] ${files.length} spec(s) make too long a command here; running them all`);
+  const runArgs = tooLong ? args.filter((arg) => arg.startsWith('-')) : args;
+  const result = spawnSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', ...runArgs], {
     stdio: 'inherit',
   });
+  if (result.error) console.error(`[vitest-related] ${result.error.message}`);
   process.exit(result.status ?? 1);
 }
 
