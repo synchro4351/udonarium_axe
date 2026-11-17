@@ -28,7 +28,7 @@ describe('RoomGeneralSettingsComponent', () => {
 
   afterEach(() => {
     for (const object of ObjectStore.instance.getObjects()) ObjectStore.instance.remove(object);
-    (Config as unknown as { _instance: Config | undefined })._instance = undefined;
+    Config.forget();
   });
 
   it('leaves the room’s dice to the master', () => {
@@ -158,6 +158,20 @@ describe('RoomGeneralSettingsComponent', () => {
 
       expect(component.isSharedReadOnly()).toBe(true);
       expect(Config.instance.controllerResources).toBeNull();
+    });
+
+    it('holds the section out of a player’s reach, and in the master’s', async () => {
+      const section = () =>
+        (fixture.nativeElement as HTMLElement).querySelector('[data-testid="room-settings-controller-resources"]')!;
+      PeerCursor.myCursor.role = PeerRole.Player;
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(section().closest('[inert]')).not.toBeNull();
+
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(section().closest('[inert]')).toBeNull();
     });
   });
 

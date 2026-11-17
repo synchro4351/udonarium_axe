@@ -82,6 +82,11 @@ export class PeerCursor extends GameObject {
    */
   @SyncVar() zoneProtocol = '';
   /**
+   * `1` once this peer's version draws the raised ground of a table and stands what is on it there.
+   * Empty on a cursor from a version that knows nothing of the ground, to which the table is flat.
+   */
+  @SyncVar() groundProtocol = '';
+  /**
    * `1` once this peer's version counts a turn down again when it comes back to a piece that had the
    * countdown of its opening given back as it waited. Empty on a cursor from a version before that.
    */
@@ -241,6 +246,18 @@ export class PeerCursor extends GameObject {
   private static peerIdMap: Map<PeerId, ObjectIdentifier> = new Map();
   /** The user each cursor that left the store stood for, by its identifier, the latest last. */
   private static goneUserIds: Map<ObjectIdentifier, UserId> = new Map();
+
+  /**
+   * Forgets my own cursor and which cursor stands for which user and peer, so the next test starts
+   * with nobody known. Only a test between two of its own has any reason to say this.
+   */
+  static forget(): void {
+    PeerCursor.myCursor = null!;
+    PeerCursor.userIdMap = new Map();
+    PeerCursor.peerIdMap = new Map();
+    PeerCursor.goneUserIds = new Map();
+  }
+
   chatColorCode: string[] = [...DEFAULT_CHAT_COLOR_CODES];
   /** The bubble each colour is shown on, per theme. An empty entry is worked out instead. */
   chatBubbleLight: string[] = [...DEFAULT_CHAT_BUBBLE_CODES];
@@ -475,7 +492,7 @@ export class PeerCursor extends GameObject {
     const voteId = this.voteId;
     super.apply(context);
 
-    if (voteId != this.voteId) {
+    if (voteId !== this.voteId) {
       this.vote?.chkFinishVote();
     }
   }

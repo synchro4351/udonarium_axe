@@ -1,24 +1,37 @@
 import { computed, DestroyRef, inject, Injectable, type Signal, signal } from '@angular/core';
+import { PieceNameService } from '@axe/application/character/piece-name.service';
 import { StampRulesService } from '@axe/application/chat/stamp-rules.service';
 import { GameSystemPrefetchService } from '@axe/application/dice/game-system-prefetch.service';
 import { EffectLibraryService } from '@axe/application/effect/effect-library.service';
+import { GameObjectInventoryService } from '@axe/application/inventory/game-object-inventory.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { TurnChatCommandService } from '@axe/application/turn/turn-chat-command.service';
+import { TurnOrderService } from '@axe/application/turn/turn-order.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { BoundedMap } from '@axe/core/util/bounded-map';
+import { sameList } from '@axe/core/util/same-list';
+import { sameSet } from '@axe/core/util/same-set';
 import { portraitNameOf } from '@axe/domain/character/character-portrait';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { saidNameOf } from '@axe/domain/character/hidden-name';
 import { StatusAilmentCatalog } from '@axe/domain/character/status-ailment-catalog';
+import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { evaluateReferences, type PaletteVariable } from '@axe/domain/chat/chat-palette';
 import type { ImageNameEntry } from '@axe/domain/chat/chat-portrait-command';
 import type { ReferenceSite } from '@axe/domain/chat/chat-reference';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import {
   fillTargetNumber,
-  findTargetNumber,
+  findTargetNumberSource,
   holdsTargetNumber,
   isTargetNumberReference,
+  type TargetNumberChoice,
+  targetNumberChoiceOf,
+  targetNumberChoices,
+  type TargetNumberSource,
 } from '@axe/domain/chat/target-number';
 import { type ChatDiagnostic, type ChatLintContext, lintChatSyntax } from '@axe/domain/chat-syntax/chat-lint';
 import {
@@ -32,7 +45,9 @@ import { DiceBot } from '@axe/domain/dice/dice-bot';
 import { checkRollLine, isSecretRollLine, rollableText, type RollCheck } from '@axe/domain/dice/dice-roll-line';
 import { DiceTable } from '@axe/domain/dice/dice-table';
 import { CutIn } from '@axe/domain/media/cut-in';
+import { Party } from '@axe/domain/party/party';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import type { TurnChatCommand, TurnChatRefusal } from '@axe/domain/tabletop/turn-chat-command';
 
 /** How a text is sent: typed into chat, or from a palette. */
 export type ChatLintPath = ChatLintContext['path'];
@@ -50,7 +65,28 @@ export interface ChatLintSource {
   readonly mode?: ChatSyntaxMode;
   /** The tab it is said in, whose rolls fill in a `{目標値}` in it; none where that is not told. */
   readonly tabIdentifier?: Signal<string>;
+  /**
+   * The answer the reader picked to fill a `{目標値}` in it with, in place of the one found; empty,
+   * or one no longer there to pick, leaves the one found.
+   */
+  readonly chosenTargetNumber?: Signal<string>;
 }
+
+/**
+ * What a `{目標値}` left in a text, after the speaker's own data has answered what it can, is filled
+ * in with as the text is sent, and the answers the reader may pick instead.
+ */
+export interface ChatLintTargetNumber {
+  /** The number found among the tab's rolls and where; null where nothing has been rolled to beat. */
+  readonly found: TargetNumberSource | null;
+  /** The answer the reader picked, filling it in instead of the one found; null where none is. */
+  readonly chosen: TargetNumberChoice | null;
+  /** The newest answers that may be picked, newest first, the one picked among them wherever it stands. */
+  readonly choices: readonly TargetNumberChoice[];
+}
+
+/** How many of a tab's newest answers are offered to pick a `{目標値}` from. */
+const TARGET_NUMBER_CHOICES = 8;
 
 /** Something shown beside a syntax: what a reference is filled in with, a roll's result, a cut-in it starts. */
 export interface ChatLintAnnotation extends TextRange {
@@ -72,6 +108,15 @@ export interface ChatLintSession {
   readonly rolls: Signal<ChatLintAnnotation[]>;
 }
 
+/** A text being checked as it is written to be sent, with what its `{目標値}` comes to. */
+export interface ChatLintWatch extends ChatLintSession {
+  /**
+   * What a `{目標値}` the speaker's data leaves in the text is filled in with, and what may be picked
+   * instead; null where the text holds none, or tells no tab.
+   */
+  readonly targetNumber: Signal<ChatLintTargetNumber | null>;
+}
+
 /**
  * How many roll checks are kept, so that a text checked again as it is drawn is not rolled again:
  * enough for every roll line of a long palette, each checked again at every key.
@@ -91,11 +136,15 @@ const ROLL_CHECKS_KEPT = 1024;
 export class ChatLintService {
   private readonly objectStore = inject(ObjectStore);
   private readonly objectChange = inject(ObjectChangeService);
+  private readonly names = inject(PieceNameService);
   private readonly uiSignal = inject(UiSignalService);
   private readonly effectLibrary = inject(EffectLibraryService);
   private readonly imageStorage = inject(ImageStorage);
   private readonly stampRules = inject(StampRulesService);
   private readonly selection = inject(SelectionSignalService);
+  private readonly turnOrder = inject(TurnOrderService);
+  private readonly turnCommands = inject(TurnChatCommandService);
+  private readonly inventory = inject(GameObjectInventoryService);
 
   private readonly systems = inject(GameSystemPrefetchService);
 
@@ -124,15 +173,16 @@ export class ChatLintService {
     return PeerCursor.isMyselfKeptOffTable;
   });
   /**
-   * The names the pieces in the room go by, for the dice tokens put onto them: read again as any
-   * piece changes, but a change that leaves every name as it was checks no text again.
+   * The names the pieces in the room go by, for the dice tokens put onto them, leaving out a name
+   * kept from the reader, which a token's finding would give away: read again as any piece changes,
+   * but a change that leaves every name as it was checks no text again.
    */
   private readonly pieceNames = computed(
     () => {
-      const pieces = this.trackedPieces();
+      const pieces = this.trackedPieces().filter((piece) => !this.names.isKept(piece));
       return new Set(pieces.map((piece) => piece.name.trim()));
     },
-    { equal: (a, b) => a.size === b.size && [...a].every((name) => b.has(name)) }
+    { equal: sameSet }
   );
 
   /**
@@ -148,31 +198,49 @@ export class ChatLintService {
       const selectedPiece = selected ? this.objectStore.get(selected.identifier) : null;
       return selectedPiece instanceof GameCharacter && selectedPiece.isVisibleOnTable ? [selectedPiece] : [];
     },
-    { equal: (a, b) => a.length === b.length && a.every((piece, index) => piece === b[index]) }
+    { equal: sameList }
   );
-  private readonly rollChecks = new Map<string, RollCheck>();
+  private readonly rollChecks = new BoundedMap<string, RollCheck>(ROLL_CHECKS_KEPT);
 
   /** Starts checking a text, for as long as its signals are read. */
-  watch(source: ChatLintSource): ChatLintSession {
+  watch(source: ChatLintSource): ChatLintWatch {
     const mode = source.mode ?? 'chat';
     const scan = computed(() => scanChatSyntax(source.text(), mode));
     const variables = computed(() => (mode === 'palette' ? this.variablesWritten(scan()) : null), {
       equal: sameVariables,
     });
-    const holdsTargetNumberNow = computed(() => holdsTargetNumber(source.text()));
-    const toBeat = computed(() => (holdsTargetNumberNow() ? this.targetNumberOf(source) : null));
+    // A `{目標値}` may come in through a reference, as a palette's variable `//抵抗=2d6>={目標値}` brings it.
+    const holdsTargetNumberNow = computed(() => {
+      const text = source.text();
+      if (holdsTargetNumber(text)) return true;
+      return /[{｛]/.test(text) && this.leavesTargetNumber(source, variables());
+    });
+    const lookup = computed(() => (holdsTargetNumberNow() ? this.targetNumberOf(source) : null));
+    const toBeat = computed(() => {
+      const found = lookup();
+      return (found?.chosen ?? found?.found)?.total ?? null;
+    });
     const context = computed(() => this.contextOf(source, scan, variables(), toBeat));
     const diagnostics = computed(() => lintChatSyntax(scan(), context()));
     const annotations = computed(() => this.annotationsOf(scan(), context()));
     const rolls = computed(() => this.rollsOf(scan(), context()));
-    return { scan, diagnostics, annotations, rolls };
+    const targetNumber = computed(() => {
+      const found = lookup();
+      this.objectChange.versionOf(source.sendFrom())();
+      if (!found || !this.leavesTargetNumber(source, variables())) return null;
+      const choices = targetNumberChoices(found.tab, TARGET_NUMBER_CHOICES);
+      const chosen = found.chosen;
+      const listed = chosen && !choices.some((choice) => choice.answer === chosen.answer);
+      return { found: found.found, chosen, choices: listed ? [...choices, chosen] : choices };
+    });
+    return { scan, diagnostics, annotations, rolls, targetNumber };
   }
 
   /**
    * What a text is checked against, which follows the room, not the text: the text itself is read
    * only as a reference or a roll in it is checked, and a palette's variables only where they change.
    * The room's pictures, which portraits are found among, and its states, which a buff may name,
-   * are followed too.
+   * are followed too, and the round where the text holds a command of it.
    * Whether the seat is kept off the table turns on the room server too, which no signal tells, so
    * it is read as each text is checked. A palette's line is rolled as it goes out, each `\n` written
    * in it broken into a line of its own.
@@ -226,6 +294,7 @@ export class ChatLintService {
       hasEffectTarget: candidates.length > 0,
       hasBattleDefender: candidates.some((piece) => piece !== speaker),
       isGameMaster,
+      piecesOnTable: () => pieces.filter((piece) => piece.location.name === 'table'),
       get keptOffTable() {
         return PeerCursor.isMyselfKeptOffTable;
       },
@@ -249,6 +318,7 @@ export class ChatLintService {
         return presets.some((preset) => preset.name.trim() === needle && (!preset.gmOnly || isGameMaster));
       },
       hasPieceNamed: (name: string) => pieceNames.has(name.trim()),
+      nameOf: (piece: GameCharacter) => this.names.shown(piece),
       rollCheck: (message: TextRange) => {
         const line = sent(message);
         if (tableCommands.has(rollableText(line).trim().split(/\s/)[0])) return null;
@@ -260,7 +330,21 @@ export class ChatLintService {
         const line = fill(sent(message), targets[0]);
         return system != null && isSecretRollLine(system, DiceBot.isUnreachable(system), line);
       },
+      turnCommandRefusal: (command: TurnChatCommand) => this.turnCommandRefusal(command, sendFrom),
     };
+  }
+
+  /**
+   * Why a round command said now as the speaker would move nothing, as saying it would find. Read
+   * only for a text that holds one, which is then checked again as the round, how the room takes
+   * its turns, its parties and the pieces on the table change.
+   */
+  private turnCommandRefusal(command: TurnChatCommand, sendFrom: string): TurnChatRefusal | null {
+    this.turnOrder.progress();
+    this.objectChange.versionOf('Config')();
+    this.objectChange.collectionOf(Party.aliasName)();
+    this.inventory.inventoryVersion();
+    return this.turnCommands.refusalOf(command, sendFrom);
   }
 
   /** The pieces in the room, each followed, so that what reads them is read again as any of them changes. */
@@ -302,18 +386,41 @@ export class ChatLintService {
   }
 
   /**
-   * The number a `{目標値}` in the text would be filled in with as it is sent, from the rolls in its
-   * tab, looked for again as each line comes in. Asked only while the text holds one, so that typing
-   * leaves the log unread.
+   * Where a `{目標値}` in the text would be filled in from as it is sent: the answer the reader
+   * picked, where it is still there to pick, and the number found among the rolls in its tab, looked
+   * for again as each line comes in and as the tab's own number to beat is set. Asked only while the
+   * text holds one, so that typing leaves the log unread.
    */
-  private targetNumberOf(source: ChatLintSource): number | null {
+  private targetNumberOf(
+    source: ChatLintSource
+  ): { tab: ChatTab; found: TargetNumberSource | null; chosen: TargetNumberChoice | null } | null {
     if (!source.tabIdentifier) return null;
     this.linesHeard();
     const tab = this.objectStore.get(source.tabIdentifier());
     if (!(tab instanceof ChatTab)) return null;
+    this.objectChange.versionOf(tab.identifier)();
     const sendFrom = source.sendFrom();
     const speaker = this.objectStore.get(sendFrom);
-    return findTargetNumber(tab, { identifier: sendFrom, name: speaker instanceof GameCharacter ? speaker.name : '' });
+    const name = speaker instanceof GameCharacter ? saidNameOf(speaker) : '';
+    const ownName = speaker instanceof GameCharacter ? speaker.name : '';
+    const found = findTargetNumberSource(tab, { identifier: sendFrom, name, ownName });
+    const picked = this.objectStore.get(source.chosenTargetNumber?.() ?? '');
+    const chosen = picked instanceof ChatMessage && picked.parent === tab ? targetNumberChoiceOf(picked) : null;
+    return { tab, found, chosen };
+  }
+
+  /**
+   * Whether a `{目標値}` is left in the text once the speaker's data, and the variables of a palette
+   * being written, have answered what they can: one a sheet item of that name answers is no number
+   * to beat.
+   */
+  private leavesTargetNumber(source: ChatLintSource, variables: readonly PaletteVariable[] | null): boolean {
+    const text = source.text();
+    const speaker = this.objectStore.get(source.sendFrom());
+    if (!(speaker instanceof GameCharacter) && !variables) return holdsTargetNumber(text);
+    return holdsTargetNumber(
+      this.filled(text, speaker instanceof GameCharacter ? speaker : null, undefined, variables, true)
+    );
   }
 
   /** The variables a palette being written sets, read from what is written rather than what was kept. */
@@ -356,7 +463,6 @@ export class ChatLintService {
     }
     const check = checkRollLine(system, unreachable, text);
     this.rollChecks.set(key, check);
-    if (this.rollChecks.size > ROLL_CHECKS_KEPT) this.rollChecks.delete(this.rollChecks.keys().next().value!);
     return check;
   }
 

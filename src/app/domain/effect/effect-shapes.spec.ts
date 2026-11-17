@@ -1,127 +1,113 @@
 import { PERF_SVG_BUILD, perfCounters } from '@axe/core/util/perf-counters';
+import { DEFAULT_EFFECT_PRESET_SEEDS } from '@axe/domain/effect/builtin-effect-presets';
+import { EFFECT_KINDS, PROJECTILE_STYLES } from '@axe/domain/effect/effect-kind';
 import {
-  arrowSvg,
-  boltSvg,
-  bulletSvg,
-  cloudSvg,
-  crackSvg,
-  crescentSvg,
-  impactStarSvg,
+  glyphLookOf,
+  type GlyphSource,
   kindGlyphSvg,
-  magicCircleSvg,
   paintableColor,
-  ringSvg,
+  presetGlyphSvg,
   ShapeColors,
-  snowflakeSvg,
-  speedLinesSvg,
-  spikeSvg,
-  spiralSvg,
 } from '@axe/domain/effect/effect-shapes';
 
-describe('the shapes of the effects', () => {
+describe('the marks of the kinds of effect', () => {
   const colors: ShapeColors = { core: '#ffffff', edge: '#3f9bff' };
 
-  const builders: [string, () => string][] = [
-    ['三日月', () => crescentSvg(colors)],
-    ['輪', () => ringSvg(colors)],
-    ['魔法陣', () => magicCircleSvg(colors)],
-    ['結晶', () => snowflakeSvg(colors)],
-    ['螺旋', () => spiralSvg(colors)],
-    ['地割れ', () => crackSvg(colors, 8, [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])],
-    ['霧', () => cloudSvg(colors)],
-    ['氷柱', () => spikeSvg(colors)],
-    ['矢', () => arrowSvg(colors)],
-    ['銃弾', () => bulletSvg(colors)],
-    ['衝撃の星', () => impactStarSvg(colors)],
-    ['集中線', () => speedLinesSvg(colors)],
-  ];
-
-  it('returns a drawing with its own box for every shape', () => {
-    for (const [, build] of builders) {
-      const markup = build();
+  it('draws a mark in its own square box for every kind, and something for a kind it does not know', () => {
+    for (const kind of [...EFFECT_KINDS, 'unknown']) {
+      const markup = kindGlyphSvg(kind, colors);
       expect(markup.startsWith('<svg ')).toBe(true);
       expect(markup).toContain('viewBox="0 0 100 100"');
       expect(markup.endsWith('</svg>')).toBe(true);
     }
   });
 
-  it('returns the same text for the same arguments', () => {
-    for (const [, build] of builders) {
-      expect(build()).toBe(build());
+  it('gives every kind a mark of its own, none the plain disc an unknown kind is drawn as', () => {
+    const unknown = kindGlyphSvg('unknown', colors);
+    const marks = EFFECT_KINDS.map((kind) => kindGlyphSvg(kind, colors));
+
+    expect(EFFECT_KINDS).toHaveLength(37);
+    expect(marks.filter((mark) => mark === unknown)).toEqual([]);
+    expect(new Set(marks).size).toBe(EFFECT_KINDS.length);
+  });
+
+  describe('the mark of a shot', () => {
+    function shot(more: Partial<GlyphSource> = {}): GlyphSource {
+      return { effectKind: 'projectile', projectileLook: 'bolt', impactKind: '', shotCount: 1, ...more };
     }
-  });
 
-  it('puts the colour in', () => {
-    expect(ringSvg(colors)).toContain(colors.edge);
-    expect(magicCircleSvg(colors)).toContain(colors.core);
-  });
-
-  it('changes the identifiers of its definitions with the colour', () => {
-    const other: ShapeColors = { core: '#ffe9a8', edge: '#ff9d3d' };
-    const idOf = (markup: string) => markup.match(/id="([^"]+)"/)?.[1];
-
-    for (const build of [crescentSvg, cloudSvg, spikeSvg]) {
-      // Two of an identifier would let one effect pick up the gradient of another fired at the same moment.
-      expect(idOf(build(colors))).not.toBe(idOf(build(other)));
-      expect(idOf(build(colors))).toBe(idOf(build(colors)));
+    function markOf(source: GlyphSource): string {
+      return kindGlyphSvg(source.effectKind, colors, glyphLookOf(source));
     }
+
+    it('is told by what flies: each look a shot may have is drawn differently', () => {
+      const marks = PROJECTILE_STYLES.map((projectileLook) => markOf(shot({ projectileLook })));
+
+      expect(new Set(marks).size).toBe(PROJECTILE_STYLES.length);
+    });
+
+    it('tells a magical bolt by what it lands as, and draws one that lands as anything else as the glowing ball', () => {
+      const landings = ['', 'frost', 'bolt', 'rubble', 'vortex', 'miasma', 'smite', 'impact'];
+      const marks = landings.map((impactKind) => markOf(shot({ impactKind })));
+
+      expect(new Set(marks).size).toBe(landings.length);
+      expect(markOf(shot({ impactKind: 'burst' }))).toBe(markOf(shot({ impactKind: 'flame' })));
+    });
+
+    it('leaves what an arrow or a bullet lands as out of its mark', () => {
+      expect(markOf(shot({ projectileLook: 'arrow', impactKind: 'frost' }))).toBe(
+        markOf(shot({ projectileLook: 'arrow', impactKind: 'impact' }))
+      );
+    });
+
+    it('draws a second shot behind one fired several at a time', () => {
+      const single = markOf(shot({ projectileLook: 'bullet' }));
+      const volley = markOf(shot({ projectileLook: 'bullet', shotCount: 3 }));
+
+      expect(volley).not.toBe(single);
+      expect(volley.split('<g ').length - 1).toBe(2);
+    });
+
+    it('names no look for any other kind, whatever shot values the preset carries', () => {
+      expect(glyphLookOf(shot({ effectKind: 'slash', projectileLook: 'arrow', shotCount: 4 }))).toBe('');
+    });
+
+    it('tells the shots that come with the tool apart: no mark is shared by more than four of that family', () => {
+      const shots = DEFAULT_EFFECT_PRESET_SEEDS.filter((seed) => seed.tagName === '射撃');
+      const shared = new Map<string, string[]>();
+      for (const seed of shots) {
+        const source: GlyphSource = {
+          effectKind: seed.kind,
+          projectileLook: seed.projectileStyle ?? 'bolt',
+          impactKind: seed.impactKind ?? '',
+          shotCount: seed.shots ?? 1,
+        };
+        const mark = kindGlyphSvg(source.effectKind, colors, glyphLookOf(source));
+        shared.set(mark, [...(shared.get(mark) ?? []), seed.name]);
+      }
+
+      expect(shots.length).toBeGreaterThan(20);
+      expect(Math.max(...[...shared.values()].map((names) => names.length))).toBeLessThanOrEqual(4);
+      expect(shared.size).toBeGreaterThanOrEqual(Math.ceil(shots.length / 2));
+    });
+
+    it('draws a preset’s mark in the preset’s own colours', () => {
+      const preset = shot({ projectileLook: 'missile', shotCount: 2 });
+      const painted = { ...preset, colorPrimary: '#102030', colorSecondary: '#a0b0c0' };
+
+      expect(presetGlyphSvg(painted)).toBe(
+        kindGlyphSvg('projectile', { core: '#102030', edge: '#a0b0c0' }, glyphLookOf(preset))
+      );
+      expect(presetGlyphSvg(painted)).toContain('#102030');
+    });
   });
 
-  it('draws a ring as a line rather than a fill', () => {
-    const markup = ringSvg(colors, 4);
-
-    expect(markup).toContain('fill="none"');
-    expect(markup).toContain('stroke-width');
+  it('draws it in the preset’s own colours', () => {
+    expect(kindGlyphSvg('slash', colors)).toContain(colors.core);
+    expect(kindGlyphSvg('slash', colors)).toContain(colors.edge);
   });
 
-  it('breaks it where it is asked to', () => {
-    expect(ringSvg(colors, 4, true)).toContain('stroke-dasharray');
-    expect(ringSvg(colors, 4, false)).not.toContain('stroke-dasharray');
-  });
-
-  it('draws an arrow pointing right', () => {
-    const markup = arrowSvg(colors);
-
-    // Its head sits at the right edge, and whoever uses it turns it where it should point.
-    expect(markup).toContain('99,50');
-    expect(markup).toContain('<rect');
-  });
-
-  it('gives a bullet a tail behind it', () => {
-    expect(bulletSvg(colors)).toContain('linearGradient');
-  });
-
-  it('gives the star of an impact a jagged outline', () => {
-    const markup = impactStarSvg(colors, 12);
-    const points = markup.match(/points="([^"]+)"/)?.[1].split(' ') ?? [];
-
-    // It alternates between the outer and the inner radius, so there are twice as many points as spikes.
-    expect(points).toHaveLength(24);
-  });
-
-  it('draws as many speed lines as it is asked for', () => {
-    expect(speedLinesSvg(colors, 10).match(/<line /g)).toHaveLength(10);
-  });
-
-  it('gathers the bolt and its branches into one path', () => {
-    const jitter = [0.5, 0.2, 0.8, 0.3, 0.7, 0.4, 0.6, 0.5, 0.35, 0.65];
-    const markup = boltSvg(80, 400, 30, 6, jitter, [0.4, 0.6, 0.3, 0.7, 0.5, 0.5], colors);
-
-    expect(markup.match(/M[\d.]+ [\d.]+/g)?.length).toBeGreaterThan(1);
-    expect(markup.match(/<path/g)).toHaveLength(3);
-    expect(markup).toContain('stroke-linejoin="round"');
-  });
-
-  it('runs the bolt from the top edge to the bottom', () => {
-    const jitter = [0.5, 0.5, 0.5, 0.5, 0.5];
-    const markup = boltSvg(60, 300, 20, 5, jitter, [], colors);
-    const points = [...markup.matchAll(/[ML]([\d.]+) ([\d.]+)/g)].map((match) => Number(match[2]));
-
-    expect(Math.min(...points)).toBe(0);
-    expect(Math.max(...points)).toBe(300);
-  });
-
-  describe('the colours a drawing is given', () => {
+  describe('the colours a mark is given', () => {
     it('keeps a colour written by hex, by name or by the rgb and hsl functions', () => {
       for (const color of [
         '#fff',
@@ -142,20 +128,10 @@ describe('the shapes of the effects', () => {
       }
     });
 
-    it('writes no other markup into any drawing, whatever colours it is asked with', () => {
+    it('writes no other markup into any mark, whatever colours it is asked with', () => {
       const odd: ShapeColors = { core: '#fff" data-x="1', edge: '<b>bold</b>' };
-      const drawings = [
-        crescentSvg(odd),
-        ringSvg(odd),
-        magicCircleSvg(odd),
-        snowflakeSvg(odd),
-        spikeSvg(odd),
-        impactStarSvg(odd),
-        kindGlyphSvg('slash', odd),
-        kindGlyphSvg('burst', odd),
-      ];
 
-      for (const markup of drawings) {
+      for (const markup of [kindGlyphSvg('slash', odd), kindGlyphSvg('burst', odd)]) {
         const host = document.createElement('div');
         host.innerHTML = markup;
         expect(markup).not.toContain('data-x');
@@ -166,24 +142,21 @@ describe('the shapes of the effects', () => {
   });
 
   describe('remembering', () => {
-    it('hands the same drawing back for the same colours and shape', () => {
-      const colors = { core: '#123456', edge: '#abcdef' };
-      const first = ringSvg(colors, 5, true);
-      const again = ringSvg({ ...colors }, 5, true);
-      const other = ringSvg(colors, 6, true);
+    it('hands the same mark back for the same colours and kind', () => {
+      const own = { core: '#123456', edge: '#abcdef' };
 
-      expect(again).toBe(first);
-      expect(other).not.toBe(first);
+      expect(kindGlyphSvg('frost', { ...own })).toBe(kindGlyphSvg('frost', own));
+      expect(kindGlyphSvg('flame', own)).not.toBe(kindGlyphSvg('frost', own));
     });
 
-    it('builds a drawing once', () => {
+    it('draws a mark once', () => {
       perfCounters.enabled = true;
       perfCounters.clear();
-      const colors = { core: '#0f0f0f', edge: '#f0f0f0' };
+      const own = { core: '#0f0f0f', edge: '#f0f0f0' };
 
-      crescentSvg(colors, 30);
-      crescentSvg(colors, 30);
-      crescentSvg(colors, 30);
+      kindGlyphSvg('heal', own);
+      kindGlyphSvg('heal', own);
+      kindGlyphSvg('heal', own);
 
       expect(perfCounters.drain().get(PERF_SVG_BUILD)).toBe(1);
       perfCounters.enabled = false;

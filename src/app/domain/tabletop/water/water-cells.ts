@@ -1,4 +1,11 @@
-import { type CellGrid, forEachCellInBox } from '@axe/domain/tabletop/fog/cell-grid';
+import {
+  cellCenterOf,
+  cellColRow,
+  type CellGrid,
+  forEachCellInBox,
+  forEachNeighbourCell,
+} from '@axe/domain/tabletop/fog/cell-grid';
+import { isHexGrid } from '@axe/domain/tabletop/hex-geometry';
 
 /** A body of water laid on the table, in table pixels. */
 export interface WaterArea {
@@ -23,6 +30,8 @@ export interface WaterArea {
   /** How fast it flows, from 0 for still to 1, and which way, in degrees clockwise from the top. */
   readonly flowSpeed: number;
   readonly flowDirection: number;
+  /** How much of its surface is frozen, from 0 for open water to 1 for ice. */
+  readonly ice: number;
 }
 
 /** One cell under water. */
@@ -44,6 +53,7 @@ export interface WaterCell {
   readonly leaves: number;
   readonly flowSpeed: number;
   readonly flowDirection: number;
+  readonly ice: number;
   /** The area it belongs to. */
   readonly area: string;
 }
@@ -71,6 +81,8 @@ const LEVEL_PX = 0.5;
  * slope running down from the shore, the water there is only as deep as the surface stands over
  * it, and where the ground rises to the surface or above, the cell is dry land. `groundOf` gives
  * how high the ground stands in a cell, and is left out where the water lies on its own floor.
+ * Where the raised ground of the table has been dug below the board and below the water's floor,
+ * as a river bed or a pond, the water reaches down to the ground.
  */
 export function waterCellsOf(
   grid: CellGrid,
@@ -89,6 +101,7 @@ export function waterCellsOf(
       (index, cx, cy) => {
         const ground = groundOf(index);
         const risen = ground > area.floorPx + LEVEL_PX;
+        const dug = ground < Math.min(0, area.floorPx) - LEVEL_PX;
         if (risen && ground >= surfacePx - LEVEL_PX) return;
         const held = cells.get(index);
         if (held && held.surfacePx >= surfacePx) return;
@@ -96,9 +109,9 @@ export function waterCellsOf(
           index,
           cx,
           cy,
-          floorPx: risen ? ground : area.floorPx,
+          floorPx: risen || dug ? ground : area.floorPx,
           surfacePx,
-          flat: !risen,
+          flat: !risen && !dug,
           areaFloorPx: area.floorPx,
           color: area.color,
           density: area.density,
@@ -107,27 +120,46 @@ export function waterCellsOf(
           leaves: area.leaves,
           flowSpeed: area.flowSpeed,
           flowDirection: area.flowDirection,
+          ice: area.ice,
           area: area.identifier,
         });
       }
     );
   }
+  spillIntoDugGround(grid, cells, groundOf);
   return cells;
 }
 
-/** What the floor under a cell of water looks like; floors that look alike are drawn as one piece. */
-export function waterFloorLookOf(cell: WaterCell): string {
-  return `${round(cell.floorPx)}|${waterSurfaceLookOf(cell)}`;
-}
-
 /**
- * What the surface over a cell of water looks like; surfaces that look alike are drawn as one
- * piece however deep the water under them, the depth being painted onto the piece cell by cell.
+ * Lets the water run out of its areas into the ground dug below its surface that it touches, cell by
+ * cell along their sides, as far as the dug ground runs on: a ditch or a pit dug from a pond fills
+ * from it, whether the pond stands on the ground or is sunk into it. The water stands there at the
+ * surface of the water it ran from, which the dug ground takes none away from, and is drawn as that
+ * water is. Ground not dug, or not below that surface, stays dry, as does a pit the water does not
+ * reach. Water an area is laid over stays that area's, its ice and its look with it, though a higher
+ * water runs up to it. Corners are not run through on a grid of squares; the sides of a hex are all
+ * sides.
  */
-export function waterSurfaceLookOf(cell: WaterCell): string {
-  return `${round(cell.surfacePx)}|${cell.color}|${round(cell.density)}|${round(cell.turbidity)}|${round(cell.dirt)}|${round(cell.leaves)}|${round(cell.flowSpeed)}|${round(cell.flowDirection)}`;
-}
-
-function round(value: number): number {
-  return Math.round(value * 1000) / 1000;
+function spillIntoDugGround(grid: CellGrid, cells: Map<number, WaterCell>, groundOf: (index: number) => number): void {
+  const running = [...cells.values()];
+  const laid = new Set(cells.keys());
+  const hex = isHexGrid(grid.type);
+  for (let at = 0; at < running.length; at++) {
+    const from = running[at];
+    const here = cellColRow(grid, from.index);
+    forEachNeighbourCell(grid, from.index, (index) => {
+      if (!hex) {
+        const there = cellColRow(grid, index);
+        if (there.col !== here.col && there.row !== here.row) return;
+      }
+      const ground = groundOf(index);
+      if (ground >= Math.min(0, from.surfacePx) - LEVEL_PX) return;
+      const held = cells.get(index);
+      if (held && (laid.has(index) || held.surfacePx >= from.surfacePx)) return;
+      const centre = cellCenterOf(grid, index);
+      const spilt: WaterCell = { ...from, index, cx: centre.x, cy: centre.y, floorPx: ground, flat: false };
+      cells.set(index, spilt);
+      running.push(spilt);
+    });
+  }
 }

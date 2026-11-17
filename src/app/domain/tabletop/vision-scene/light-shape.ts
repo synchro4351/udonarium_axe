@@ -1,3 +1,4 @@
+import { clamp } from '@axe/core/util/clamp';
 import { surfaceFrame } from '@axe/domain/tabletop/surface-space';
 import { LightBeam, LightGlow, SceneLight } from '@axe/domain/tabletop/vision-scene/scene-model';
 import { VisionType } from '@axe/domain/tabletop/vision-types';
@@ -19,7 +20,7 @@ export function distance(ax: number, ay: number, bx: number, by: number): number
  * The unit vector a light points along, from its direction across the table and its pitch up or
  * down.
  */
-export function lightAxis(light: SceneLight): { x: number; y: number; z: number } {
+export function lightAxis(light: Pick<SceneLight, 'direction' | 'pitch'>): { x: number; y: number; z: number } {
   const dir = (light.direction * Math.PI) / 180;
   const pit = (light.pitch * Math.PI) / 180;
   const cp = Math.cos(pit);
@@ -146,7 +147,7 @@ export function computeLightBeam(light: SceneLight): LightBeam | null {
  */
 export function computeLightGlow(light: SceneLight, gridSize: number): LightGlow | null {
   if (light.angle < 360 || light.dimPx < 1 || light.brightPx > GLOW_MAX_RADIUS_PX) return null;
-  const r = Math.min(gridSize, Math.max(0.4 * gridSize, light.brightPx * 0.3));
+  const r = clamp(light.brightPx * 0.3, 0.4 * gridSize, gridSize);
   const size = 2 * r;
   if (light.surface === 'floor') {
     return { x: light.x, y: light.y, z: light.z, size, color: light.color, transform: null };

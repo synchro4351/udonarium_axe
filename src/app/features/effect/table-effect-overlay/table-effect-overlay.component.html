@@ -1,18 +1,7 @@
-@for (sprite of sprites(); track sprite.key) {
-  <div class="backface-visible" [ngStyle]="spriteStyle(sprite)">
-    @if (hasPaintLayer(sprite)) {
-      <div class="size-full" [ngStyle]="paintStyle(sprite)" [innerHTML]="sprite.svg | safe: 'html'"></div>
-    }
-    @if (sprite.text) {
-      <div
-        class="flex size-full items-center justify-center leading-none whitespace-nowrap select-none"
-        [ngStyle]="textStyle(sprite)"
-      >
-        {{ sprite.text }}
-      </div>
+@for (placed of standingOnScreen(); track placed.sprite.key) {
+  <div data-effect-sprite [ngStyle]="placed.style">
+    @if (hasPaintLayer(placed.sprite)) {
+      <div class="size-full" [ngStyle]="paintStyle(placed.sprite)"></div>
     }
   </div>
-}
-@for (placement of canvases(); track placement.key) {
-  <effect-canvas class="backface-visible" [ngStyle]="canvasStyle(placement)" [layer]="placement.layer"></effect-canvas>
 }

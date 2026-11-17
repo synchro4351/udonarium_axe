@@ -5,6 +5,7 @@ import { RolePermissionService } from '@axe/application/permission/role-permissi
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { RideService } from '@axe/application/tabletop/ride.service';
 import { getMyPeerId } from '@axe/core/network/peer-context-source';
+import { clampOr } from '@axe/core/util/clamp';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DEFAULT_LABEL_PLACEMENT, LABEL_PLACEMENTS, labelPlacementOf } from '@axe/domain/character/label-placement';
 import {
@@ -37,8 +38,9 @@ import {
   SeatHeightUnit,
   writeSeatHeight,
 } from '@axe/domain/tabletop/ride/ride-rules';
-import { clampInRange, floatOr, roundOr } from '@axe/features/character/game-character-sheet/numeric-input-helpers';
+import { floatOr, roundOr } from '@axe/features/character/game-character-sheet/numeric-input-helpers';
 import { GameDataElementComponent } from '@axe/features/data-element/game-data-element/game-data-element.component';
+import { PieceModelFieldsComponent } from '@axe/ui/components/piece-model-fields/piece-model-fields.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -46,7 +48,7 @@ import { TranslocoModule } from '@jsverse/transloco';
   selector: 'game-character-settings-tab',
   templateUrl: './game-character-settings-tab.component.html',
   host: { class: 'block', '[attr.inert]': "isReadOnly() ? '' : null" },
-  imports: [FormsModule, GameDataElementComponent, SafePipe, TranslocoModule],
+  imports: [FormsModule, GameDataElementComponent, SafePipe, TranslocoModule, PieceModelFieldsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class GameCharacterSettingsTabComponent {
@@ -56,6 +58,8 @@ export class GameCharacterSettingsTabComponent {
   private readonly ride = inject(RideService);
 
   readonly isReadOnly = computed(() => !this.rolePermission.canEditTabletop());
+  /** Whether the reader may hide the piece's name, or show one hidden: a game master alone. */
+  protected readonly canHideName = computed(() => this.rolePermission.canSeeHidden());
 
   readonly character = input.required<GameCharacter>();
 
@@ -282,7 +286,7 @@ export class GameCharacterSettingsTabComponent {
    */
   onChkPopWidth(event: Event): void {
     const character = this.character();
-    character.overViewWidth = clampInRange(
+    character.overViewWidth = clampOr(
       (event.target as HTMLInputElement).valueAsNumber,
       270,
       800,
@@ -296,7 +300,7 @@ export class GameCharacterSettingsTabComponent {
    */
   onChkPopMaxHeight(event: Event): void {
     const character = this.character();
-    character.overViewMaxHeight = clampInRange(
+    character.overViewMaxHeight = clampOr(
       (event.target as HTMLInputElement).valueAsNumber,
       250,
       1000,

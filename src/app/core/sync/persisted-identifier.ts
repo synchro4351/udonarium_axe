@@ -68,7 +68,7 @@ export function applyPersistedIdentifier(
     !ObjectStore.instance.isDeleted(persisted) &&
     !(options.whenTaken === 'copy' && ObjectStore.instance.get(persisted))
   ) {
-    (gameObject as unknown as { context: { identifier: string } }).context.identifier = persisted;
+    gameObject.takeIdentifier(persisted);
     if (!ObjectStore.instance.get(persisted)) ObjectStore.instance.announceComingBack([persisted]);
   }
 }

@@ -1,43 +1,198 @@
-import { type EffectPreset } from '@axe/domain/effect/effect-preset';
-import { ringSvg } from '@axe/domain/effect/effect-shapes';
-import {
-  blank,
-  clamp01,
-  colorsOf,
-  easeOutCubic,
-  type EffectSprite,
-  fadeInOut,
-  type Point3,
-  round2,
-  takeRandoms,
-} from '@axe/domain/effect/timeline/shared';
+import { blank, clamp01, type EffectSprite, type Point3, takeRandoms } from '@axe/domain/effect/timeline/shared';
 
-/**
- * What happens to the piece itself.
+/*
+ * The crumbling of a piece's own picture, laid over the table where the piece is drawn. As the piece
+ * itself fades from the table its picture takes its place, whole, cut into shards along jagged lines.
+ * Cracks open between the shards, each pushed out a little from the middle and shrunk about its own,
+ * wider as its turn to go nears; the picture jolts outward as it lets go, and the shards peel away one
+ * by one from its windward edge, its head and the side the wind comes from first and its feet last;
+ * each is kicked out from the middle as it breaks off, caught by the wind and carried off to the right
+ * and up as the eye sees it, turning about its own middle, shrinking and fading as it goes.
  *
- * Crumbling away and spurting blood. They cut the picture and move it, which no other effect does.
+ * What is drawn about it in the table's scene, the light rimming each shard and the motes it breaks
+ * into, is laid out from the same shards, which `dissolveShards` throws from the same seed.
  */
 
-const DEFEAT_SHARD_COUNT = 9;
-const DISSOLVE_COLUMNS = 4;
-const DISSOLVE_ROWS = 6;
-/** The size of one fragment. The picture of a piece fits one cell. */
-const DISSOLVE_PIECE_SCALE = 0.34;
-/** How tall the picture that crumbles is drawn, against the size the effect is drawn at. */
-export const DISSOLVE_PICTURE_HEIGHT = DISSOLVE_PIECE_SCALE * DISSOLVE_ROWS;
-const GORE_DROP_COUNT = 14;
-const GORE_DRIP_COUNT = 5;
-const GORE_STAIN_COUNT = 9;
-const GORE_PULSE_COUNT = 3;
-/** Which way it spurts, wavering a little with each beat. */
-const GORE_JET_ANGLES = [-88, -104, -72];
-/** Which way the drops fly, leaning towards the side the stroke passed and thin straight up and down. */
-const GORE_SPRAY_ANGLES = [-142, -118, -101, -84, -66, -49, -32, -14, 6, 26, -160, -75, -40, 44];
+const DISSOLVE_COLUMNS = 5;
+const DISSOLVE_ROWS = 7;
+/** How tall the picture that crumbles is drawn, against the size the effect is drawn at: as tall as a piece of one cell stands. */
+export const DISSOLVE_PICTURE_HEIGHT = 1.4;
+/** How wide it is drawn, against the same. */
+const DISSOLVE_PICTURE_WIDTH = (DISSOLVE_PICTURE_HEIGHT * DISSOLVE_COLUMNS) / DISSOLVE_ROWS;
+/** When the picture fades in over the piece as the piece itself fades from the table, in seconds, as its fall has it. */
+export const DISSOLVE_TAKES_OVER_S: readonly [number, number] = [0.17, 0.4];
 /**
- * The crumbling: the picture itself is cut into a grid and scattered as fragments.
- *
- * Particles of light alone only vanish; cutting the picture and moving it makes something
- * that stood there break. A piece with no picture makes do with shards of light.
+ * When the first shard peels away, in seconds, how long a shard is carried on the wind before it is
+ * gone, and over how much of the playback the rest follow, at the most in seconds; for a playback as
+ * long as the bundled one, all of it, and for a shorter one all but the first sooner.
+ */
+const PEELS_FROM_S = 0.55;
+const FLIES_S = 1.15;
+const PEELS_SHARE = 0.9;
+const PEELS_MOST_S = 1.9;
+/** How long a playback is crumbled at the pace above, and the least share of that pace a shorter one is crumbled at, in seconds. */
+const FULL_PACE_S = 4.4;
+const LEAST_PACE = 0.35;
+/** How far the corners where shards meet are thrown off a straight grid, as a share of a shard. */
+const JAGGED = 0.32;
+/**
+ * How the picture cracks before it lets go: how far its shards are pushed out from its middle and
+ * shrunk about their own, as shares, as the cracks open up to the moment it lets go, as each nears its
+ * own peeling, and in the jolt of the moment it lets go, which lasts as long as `JOLT_S` seconds.
+ */
+const CRACK_SPREAD = 0.05;
+const CRACK_SHRINK = 0.08;
+const NEAR_SPREAD = 0.04;
+const NEAR_SHRINK = 0.06;
+const NEARS_S = 0.5;
+const JOLT_SPREAD = 0.08;
+const JOLT_S = 0.3;
+/** How far out from the middle of the picture a shard is kicked as it peels away, as a share of how far out it sat. */
+const KICKED = 0.4;
+
+/** One shard of the picture: its outline, where it sits in the picture, and how it is peeled away and carried off. */
+export interface DissolveShard {
+  readonly index: number;
+  /** Its corners, as shares of the picture across from its left and down from its top. */
+  readonly outline: readonly (readonly [number, number])[];
+  /** Where its middle sits, as shares of the picture across and down. */
+  readonly middle: readonly [number, number];
+  /** When it peels away, and how long it flies, in seconds. */
+  readonly peelsAt: number;
+  /** When the picture lets go and the first shards peel away, in seconds. */
+  readonly letsGoAt: number;
+  readonly flies: number;
+  /** How far the wind carries it, to the right and up as the eye sees it, as shares of the size the effect is drawn at. */
+  readonly drift: readonly [number, number];
+  /** How far it turns as it flies, in degrees. */
+  readonly spin: number;
+}
+
+/**
+ * The shards a picture crumbles into for a playback of `lastsS` seconds, thrown from `random`: the
+ * same seed throws the same shards for the picture and for what is drawn about it in the scene.
+ */
+export function dissolveShards(lastsS: number, random: () => number): DissolveShard[] {
+  const corners = takeRandoms(random, (DISSOLVE_COLUMNS + 1) * (DISSOLVE_ROWS + 1) * 2);
+  const corner = (column: number, row: number): [number, number] => {
+    const at = (row * (DISSOLVE_COLUMNS + 1) + column) * 2;
+    const inside = column > 0 && column < DISSOLVE_COLUMNS && row > 0 && row < DISSOLVE_ROWS;
+    const jag = inside ? JAGGED : 0;
+    return [
+      (column + (corners[at] - 0.5) * jag) / DISSOLVE_COLUMNS,
+      (row + (corners[at + 1] - 0.5) * jag) / DISSOLVE_ROWS,
+    ];
+  };
+  const pace = Math.min(1, Math.max(LEAST_PACE, lastsS / FULL_PACE_S));
+  const peelsFrom = DISSOLVE_TAKES_OVER_S[1] + (PEELS_FROM_S - DISSOLVE_TAKES_OVER_S[1]) * pace;
+  const flying = FLIES_S * pace;
+  const peelsFor = Math.min(PEELS_MOST_S, Math.max(0, (lastsS - peelsFrom - flying * 1.2) * PEELS_SHARE));
+  const shards: DissolveShard[] = [];
+  for (let row = 0; row < DISSOLVE_ROWS; row++) {
+    for (let column = 0; column < DISSOLVE_COLUMNS; column++) {
+      const [order, flies, right, up, spin] = takeRandoms(random, 5);
+      const outline = [
+        corner(column, row),
+        corner(column + 1, row),
+        corner(column + 1, row + 1),
+        corner(column, row + 1),
+      ];
+      const windward = 0.55 * ((column + 0.5) / DISSOLVE_COLUMNS) + 0.45 * ((row + 0.5) / DISSOLVE_ROWS);
+      shards.push({
+        index: row * DISSOLVE_COLUMNS + column,
+        outline,
+        middle: [
+          outline.reduce((sum, [x]) => sum + x, 0) / outline.length,
+          outline.reduce((sum, [, y]) => sum + y, 0) / outline.length,
+        ],
+        peelsAt: peelsFrom + clamp01(windward + (order - 0.5) * 0.14) * peelsFor,
+        letsGoAt: peelsFrom,
+        flies: flying * (0.8 + 0.4 * flies),
+        drift: [1.4 + 1.3 * right, 0.55 + 1.1 * up],
+        spin: (spin - 0.5) * 300,
+      });
+    }
+  }
+  return shards;
+}
+
+/** Where a shard is at a moment, against where it sits in the picture, and how it shows; null once it is gone. */
+export interface ShardPose {
+  /** Where its middle is, to the right and down from the middle of the picture as the eye sees it, in table pixels. */
+  readonly x: number;
+  readonly y: number;
+  readonly turned: number;
+  /** How large it is against its size in the picture, and how far it shows. */
+  readonly scale: number;
+  readonly opacity: number;
+  /** How far it is carried off, from 0 as it peels away to 1 gone; below nothing while it sits in the picture. */
+  readonly flown: number;
+}
+
+/** Where a shard is `seconds` into the crumbling of a picture drawn at `base`: see the head of this file. */
+export function shardPoseAt(shard: DissolveShard, seconds: number, base: number): ShardPose | null {
+  const [from, to] = DISSOLVE_TAKES_OVER_S;
+  const shown = clamp01((seconds - from) / (to - from));
+  if (shown <= 0) return null;
+  const sits = {
+    x: (shard.middle[0] - 0.5) * DISSOLVE_PICTURE_WIDTH * base,
+    y: (shard.middle[1] - 0.5) * DISSOLVE_PICTURE_HEIGHT * base,
+  };
+  const since = seconds - shard.peelsAt;
+  const { spread, shrink } = crackedAt(shard, Math.min(seconds, shard.peelsAt));
+  const at = { x: sits.x * spread, y: sits.y * spread };
+  if (since < 0) return { ...at, turned: 0, scale: 1 - shrink, opacity: shown, flown: -1 };
+  const flown = since / shard.flies;
+  if (flown >= 1) return null;
+  const carried = flown * flown * 0.6 + flown * 0.4;
+  const kicked = KICKED * (1 - Math.pow(1 - Math.min(1, flown * 3), 3));
+  return {
+    x: at.x + sits.x * kicked + shard.drift[0] * base * carried,
+    y: at.y + sits.y * kicked - shard.drift[1] * base * carried - base * 0.08 * Math.sin(flown * Math.PI),
+    turned: shard.spin * flown,
+    scale: (1 - shrink) * (1 - 0.7 * flown),
+    opacity: shown * Math.pow(1 - flown, 1.2),
+    flown,
+  };
+}
+
+/**
+ * How far the cracks about a shard have opened `seconds` into the crumbling: how far they have opened
+ * up to the moment the picture lets go, from 0 to 1; how far the shard is pushed out from the middle
+ * of the picture, as a share of where it sits; and how far it is shrunk about its own middle.
+ */
+export function crackedAt(
+  shard: DissolveShard,
+  seconds: number
+): { readonly opened: number; readonly spread: number; readonly shrink: number } {
+  const opensFrom = (DISSOLVE_TAKES_OVER_S[0] + DISSOLVE_TAKES_OVER_S[1]) / 2;
+  const cracked = clamp01((seconds - opensFrom) / Math.max(0.01, shard.letsGoAt - opensFrom));
+  const near = clamp01(1 + (seconds - shard.peelsAt) / NEARS_S);
+  const jolted = (seconds - shard.letsGoAt) / JOLT_S;
+  const jolt = jolted > 0 && jolted < 1 ? Math.sin(Math.PI * jolted) : 0;
+  return {
+    opened: cracked,
+    spread: 1 + CRACK_SPREAD * cracked + NEAR_SPREAD * near + JOLT_SPREAD * jolt,
+    shrink: CRACK_SHRINK * cracked + NEAR_SHRINK * near,
+  };
+}
+
+/** Where a spot of a picture drawn at `base` lies from its middle, given as shares across it and down it: in table pixels to the right and down. */
+export function pictureSpotOf(
+  spot: readonly [number, number],
+  base: number
+): { readonly x: number; readonly y: number } {
+  return { x: (spot[0] - 0.5) * DISSOLVE_PICTURE_WIDTH * base, y: (spot[1] - 0.5) * DISSOLVE_PICTURE_HEIGHT * base };
+}
+
+/** How high over its foot the middle of a crumbling picture drawn at `base` stands, in table pixels: on the floor. */
+export function dissolvePictureRise(base: number): number {
+  return (base * DISSOLVE_PICTURE_HEIGHT) / 2;
+}
+
+/**
+ * The crumbling of a piece's own picture `progress` of the way through a playback of `lastsS` seconds:
+ * see the head of this file. Nothing for a piece with no picture.
  */
 export function appendDissolve(
   sprites: EffectSprite[],
@@ -45,292 +200,46 @@ export function appendDissolve(
   center: Point3,
   base: number,
   progress: number,
-  preset: EffectPreset,
+  lastsS: number,
   random: () => number,
   image: string
 ): void {
-  const life = 1 - clamp01((progress - 0.55) / 0.45);
-  const jitters = takeRandoms(random, DISSOLVE_COLUMNS * DISSOLVE_ROWS * 3);
-  const piece = base * DISSOLVE_PIECE_SCALE;
-
-  if (image.length > 0) {
-    for (let row = 0; row < DISSOLVE_ROWS; row++) {
-      for (let column = 0; column < DISSOLVE_COLUMNS; column++) {
-        const index = row * DISSOLVE_COLUMNS + column;
-        const seed = jitters[index * 3];
-        const spin = jitters[index * 3 + 1] - 0.5;
-        const lift = jitters[index * 3 + 2];
-        // The lower rows go first; all at once it reads as an explosion.
-        // They go from the bottom up with a pause between; all at once it reads as an explosion.
-        const born = (1 - row / DISSOLVE_ROWS) * 0.42 + seed * 0.14;
-        const local = clamp01((progress - born) / 0.52);
-        if (local <= 0) continue;
-
-        const fly = easeOutCubic(local);
-        const away = (column / (DISSOLVE_COLUMNS - 1) - 0.5) * 2;
-        sprites.push({
-          ...blank(),
-          key: `${prefix}-dissolve-piece-${index}`,
-          x: center.x,
-          y: center.y,
-          z: center.z + base * 0.9,
-          // One cell of the grid is shown and flown as a piece.
-          offsetX: away * piece * (0.5 + fly * 2.2) + spin * piece * fly * 1.6,
-          offsetY: (row / (DISSOLVE_ROWS - 1) - 0.5) * piece * DISSOLVE_ROWS * 0.5 - piece * fly * (1.6 + lift * 2.4),
-          width: piece * DISSOLVE_COLUMNS,
-          height: piece * DISSOLVE_ROWS,
-          rotate: spin * 90 * fly,
-          opacity: life * (1 - local) ** 0.7,
-          background: `url(${image}) center/contain no-repeat`,
-          clipPath: cellClipPath(column, row),
-        });
-      }
-    }
-  }
-
-  // The light rising from the broken edges; the fragments alone merely scatter.
-  for (let shard = 0; shard < DEFEAT_SHARD_COUNT; shard++) {
-    const seed = jitters[shard % jitters.length];
-    const phase = (progress * 1.5 + seed) % 1;
-    const rise = easeOutCubic(phase);
-    const height = base * (0.4 + seed * 0.7);
+  if (image.length < 1) return;
+  const seconds = progress * lastsS;
+  const width = base * DISSOLVE_PICTURE_WIDTH;
+  const height = base * DISSOLVE_PICTURE_HEIGHT;
+  for (const shard of dissolveShards(lastsS, random)) {
+    const pose = shardPoseAt(shard, seconds, base);
+    if (!pose) continue;
+    const local = {
+      x: (shard.middle[0] - 0.5) * width * pose.scale,
+      y: (shard.middle[1] - 0.5) * height * pose.scale,
+    };
+    const turn = (pose.turned * Math.PI) / 180;
     sprites.push({
       ...blank(),
-      key: `${prefix}-dissolve-shard-${shard}`,
+      key: `${prefix}-dissolve-piece-${shard.index}`,
       x: center.x,
       y: center.y,
-      z: center.z + base * (0.2 + rise * 2.6),
-      offsetX: (seed - 0.5) * base * 1.6 * (1 - rise * 0.4),
-      offsetY: -height / 2,
-      width: base * 0.09,
-      height,
-      opacity: life * (1 - phase) * 0.75,
-      background: `linear-gradient(180deg, transparent, ${preset.colorPrimary} 55%, #ffffff)`,
-      borderRadius: '50%',
-    });
-  }
-
-  const ring = base * (1.5 + easeOutCubic(progress) * 1.2);
-  sprites.push({
-    ...blank(),
-    key: `${prefix}-dissolve-ring`,
-    x: center.x,
-    y: center.y,
-    z: center.z + 1,
-    width: ring,
-    height: ring,
-    opacity: life * 0.6,
-    svg: ringSvg(colorsOf(preset), 6),
-    animation: 'effectSpinSlow 3s linear infinite',
-    flat: true,
-  });
-}
-
-/** The clip that shows one cell of the grid. */
-function cellClipPath(column: number, row: number): string {
-  const left = (column / DISSOLVE_COLUMNS) * 100;
-  const right = 100 - ((column + 1) / DISSOLVE_COLUMNS) * 100;
-  const top = (row / DISSOLVE_ROWS) * 100;
-  const bottom = 100 - ((row + 1) / DISSOLVE_ROWS) * 100;
-  return `inset(${round2(top)}% ${round2(right)}% ${round2(bottom)}% ${round2(left)}%)`;
-}
-
-/**
- * The blood.
- *
- * Straight lines from a centre make a star of light. Real blood shows as a mass at the
- * wound, flying drops, a trickle and a stain on the ground, so it is laid out in layers.
- * The stain is not a circle but a main pool with spatter of different sizes about it.
- */
-export function appendGore(
-  sprites: EffectSprite[],
-  prefix: string,
-  center: Point3,
-  base: number,
-  progress: number,
-  preset: EffectPreset,
-  random: () => number
-): void {
-  const life = fadeInOut(progress, 0.06);
-  const jitters = takeRandoms(random, GORE_DROP_COUNT * 3 + GORE_DRIP_COUNT * 2);
-  const burst = Math.min(1, progress / 0.18);
-  const wound = { x: center.x, y: center.y, z: center.z + base * 0.95 };
-
-  // The mass at the wound, which shows where it comes from.
-  const core = base * (0.5 + easeOutCubic(burst) * 0.45);
-  sprites.push({
-    ...blank(),
-    key: `${prefix}-gore-core`,
-    x: wound.x,
-    y: wound.y,
-    z: wound.z,
-    width: core * 1.3,
-    height: core,
-    rotate: -18,
-    opacity: life * (1 - progress * 0.5),
-    background: `radial-gradient(circle, ${preset.colorPrimary} 0%, ${preset.colorSecondary} 55%, transparent 78%)`,
-    borderRadius: '50%',
-  });
-
-  // The flying drops, mixed in size and drawn out along their flight; matched in size they read as made.
-  for (let drop = 0; drop < GORE_DROP_COUNT; drop++) {
-    const seed = jitters[drop * 3];
-    const spin = jitters[drop * 3 + 1];
-    const grade = jitters[drop * 3 + 2];
-    const angle = GORE_SPRAY_ANGLES[drop % GORE_SPRAY_ANGLES.length] + (spin - 0.5) * 26;
-    const radians = (angle * Math.PI) / 180;
-    const flight = Math.min(1, burst * (0.6 + seed * 0.8));
-    const reach = base * (0.6 + seed * 2.2) * easeOutCubic(flight);
-    const size = base * (0.07 + grade * grade * 0.16);
-    sprites.push({
-      ...blank(),
-      key: `${prefix}-gore-drop-${drop}`,
-      x: wound.x,
-      y: wound.y,
-      z: wound.z,
-      offsetX: Math.cos(radians) * reach,
-      offsetY: Math.sin(radians) * reach + base * flight * flight * 0.9,
-      width: size * (1.4 + flight * 1.6),
-      height: size,
-      rotate: angle,
-      opacity: life * (1 - flight * 0.35),
-      background: `linear-gradient(90deg, transparent, ${preset.colorSecondary} 45%, ${preset.colorPrimary})`,
-      borderRadius: '50%',
-    });
-  }
-
-  // The blood trickling from the wound, which thins and breaks before it falls clear.
-  for (let drip = 0; drip < GORE_DRIP_COUNT; drip++) {
-    const seed = jitters[GORE_DROP_COUNT * 3 + drip * 2];
-    const spread = jitters[GORE_DROP_COUNT * 3 + drip * 2 + 1];
-    const fall = easeOutCubic(Math.min(1, progress * (0.8 + seed * 1.1)));
-    const length = base * (0.3 + seed * 0.8) * (1 - fall * 0.35);
-    sprites.push({
-      ...blank(),
-      key: `${prefix}-gore-drip-${drip}`,
-      x: wound.x,
-      y: wound.y,
-      z: wound.z - base * fall * 1.5,
-      offsetX: (spread - 0.5) * base * 1.1,
-      offsetY: -length / 2,
-      width: base * (0.05 + seed * 0.04),
-      height: length,
-      opacity: life * (1 - fall * 0.5),
-      background: `linear-gradient(180deg, ${preset.colorSecondary}, ${preset.colorPrimary} 70%, transparent)`,
-      borderRadius: '50%',
-    });
-  }
-
-  appendGoreJet(sprites, `${prefix}-gore`, wound, base, progress, preset, life);
-  appendGoreStain(sprites, `${prefix}-gore`, center, base, progress, preset, jitters, life);
-}
-
-/**
- * The spurt: a thick line reaching from the wound in pulses.
- *
- * Scattered drops alone only seep; three thrusts on the heartbeat make it spurt.
- */
-function appendGoreJet(
-  sprites: EffectSprite[],
-  prefix: string,
-  wound: Point3,
-  base: number,
-  progress: number,
-  preset: EffectPreset,
-  life: number
-): void {
-  for (let pulse = 0; pulse < GORE_PULSE_COUNT; pulse++) {
-    const born = pulse * 0.16;
-    const local = clamp01((progress - born) / 0.5);
-    if (local <= 0 || local >= 1) continue;
-
-    const angle = GORE_JET_ANGLES[pulse % GORE_JET_ANGLES.length];
-    const radians = (angle * Math.PI) / 180;
-    // It thrusts and then reaches its length; at an even speed it reads as a tap running.
-    const reach = base * (1.4 + pulse * 0.4) * easeOutCubic(Math.min(1, local * 1.8)) * 2.1;
-    const thickness = base * (0.34 - pulse * 0.05) * (1 - local * 0.45);
-    sprites.push({
-      ...blank(),
-      key: `${prefix}-jet-${pulse}`,
-      x: wound.x,
-      y: wound.y,
-      z: wound.z,
-      offsetX: Math.cos(radians) * reach * 0.5,
-      offsetY: Math.sin(radians) * reach * 0.5,
-      width: reach,
-      height: thickness,
-      rotate: angle,
-      opacity: life * (1 - local) * 0.95,
-      background: `linear-gradient(90deg, ${preset.colorSecondary} 10%, ${preset.colorPrimary} 45%, ${preset.colorSecondary} 78%, transparent)`,
-      borderRadius: '50%',
-    });
-
-    // The mass that breaks at the head of the spurt, which is where the noise of it lands.
-    const head = base * (0.3 + local * 0.5);
-    sprites.push({
-      ...blank(),
-      key: `${prefix}-jet-head-${pulse}`,
-      x: wound.x,
-      y: wound.y,
-      z: wound.z,
-      offsetX: Math.cos(radians) * reach,
-      offsetY: Math.sin(radians) * reach,
-      width: head * 1.25,
-      height: head,
-      rotate: angle,
-      opacity: life * (1 - local) * 0.9,
-      background: `radial-gradient(circle, ${preset.colorPrimary} 0%, ${preset.colorSecondary} 60%, transparent 80%)`,
-      borderRadius: '54% 46% 42% 58% / 46% 52% 48% 54%',
+      z: center.z + dissolvePictureRise(base),
+      offsetX: pose.x - (local.x * Math.cos(turn) - local.y * Math.sin(turn)),
+      offsetY: pose.y - (local.x * Math.sin(turn) + local.y * Math.cos(turn)),
+      width: width * pose.scale,
+      height: height * pose.scale,
+      rotate: pose.turned,
+      opacity: pose.opacity,
+      background: `url(${image}) center bottom/contain no-repeat`,
+      clipPath: outlinePath(shard.outline),
     });
   }
 }
 
-/** The stain on the ground, parted into a main pool and its spatter rather than one round seep. */
-export function appendGoreStain(
-  sprites: EffectSprite[],
-  prefix: string,
-  center: Point3,
-  base: number,
-  progress: number,
-  preset: EffectPreset,
-  jitters: readonly number[],
-  life: number
-): void {
-  const spread = easeOutCubic(Math.min(1, progress * 1.4));
-  const pool = base * (0.5 + spread * 1.1);
-  sprites.push({
-    ...blank(),
-    key: `${prefix}-pool`,
-    x: center.x,
-    y: center.y,
-    z: center.z + 1,
-    width: pool * 1.25,
-    height: pool * 0.85,
-    rotate: -24,
-    opacity: life * 0.9,
-    background: `radial-gradient(circle, ${preset.colorSecondary} 0%, ${preset.colorSecondary} 62%, transparent 80%)`,
-    borderRadius: '46% 54% 60% 40% / 52% 44% 56% 48%',
-    flat: true,
-  });
+/** The clip that shows one shard of the picture. */
+function outlinePath(outline: readonly (readonly [number, number])[]): string {
+  return `polygon(${outline.map(([x, y]) => `${roundedPercent(x)} ${roundedPercent(y)}`).join(', ')})`;
+}
 
-  for (let stain = 0; stain < GORE_STAIN_COUNT; stain++) {
-    const seed = jitters[stain % jitters.length];
-    const angle = (stain / GORE_STAIN_COUNT) * Math.PI * 2 + seed * 1.7;
-    const distance = base * (0.7 + seed * 2.1) * spread;
-    const size = base * (0.08 + (1 - seed) * 0.2);
-    sprites.push({
-      ...blank(),
-      key: `${prefix}-stain-${stain}`,
-      x: center.x + Math.cos(angle) * distance,
-      y: center.y + Math.sin(angle) * distance,
-      z: center.z + 1,
-      width: size * (1 + seed),
-      height: size,
-      rotate: (angle * 180) / Math.PI,
-      opacity: life * (0.55 + seed * 0.35),
-      background: preset.colorSecondary,
-      borderRadius: '52% 48% 44% 56% / 48% 56% 44% 52%',
-      flat: true,
-    });
-  }
+/** A share of the picture as a percentage to two places, which keeps the clip written short. */
+function roundedPercent(value: number): string {
+  return `${Math.round(value * 10000) / 100}%`;
 }

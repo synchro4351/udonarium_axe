@@ -7,15 +7,18 @@ import {
   emitXmlLoaded,
   type FileTooLarge,
 } from '@axe/core/event/domain-events';
-import { Network } from '@axe/core/index';
 import { Logger } from '@axe/core/logging/logger';
+import { Network } from '@axe/core/network/network';
 import { isNetworkIsolated } from '@axe/core/network/network-isolation';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
 import * as FileReaderUtil from '@axe/core/storage/file-reader-util';
+import { gltfFactsOf, MAX_MODEL_TRIANGLES } from '@axe/core/storage/gltf-facts';
 import type { ImageFile } from '@axe/core/storage/image-file';
 import { imageTypeOf } from '@axe/core/storage/image-sniff';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import * as MimeType from '@axe/core/storage/mime-type';
+import { MODEL_TYPE } from '@axe/core/storage/model-file';
+import { ModelStorage } from '@axe/core/storage/model-storage';
 import { ccfoliaRoomFolderOf } from '@axe/core/storage/room-archive';
 import { createZipBlob, readZipEntries, ZipCodeUnavailableError } from '@axe/core/storage/zip-archive';
 import type { ZipEntry } from '@axe/core/storage/zip-archive-message';
@@ -44,6 +47,8 @@ export const MAX_LOADED_IMAGE_BYTES = 2 * MEGA_BYTE;
 export const MAX_IMAGE_FILE_SIZE = MAX_LOADED_IMAGE_BYTES;
 /** The largest sound a load takes in. */
 export const MAX_LOADED_AUDIO_BYTES = 10 * MEGA_BYTE;
+/** How large a 3D model may be, the same as a sound. */
+export const MAX_LOADED_MODEL_BYTES = 10 * MEGA_BYTE;
 const DROP_STACK_OFFSET = 20;
 const XML_MIME_TYPE = 'text/xml';
 /** The largest JSON file read from a drop; an arrangement of the menus is a few kilobytes. */
@@ -61,6 +66,8 @@ export interface LoadResult {
   readonly images: readonly string[];
   /** The identifiers of the sounds the load took in. */
   readonly audios: readonly string[];
+  /** The identifiers of the 3D models the load took in. */
+  readonly models: readonly string[];
 }
 
 /** What one load carries along from file to file. */
@@ -71,6 +78,7 @@ interface LoadRun {
   dataRead: boolean;
   readonly images: string[];
   readonly audios: string[];
+  readonly models: string[];
 }
 
 /** What {@link FileArchiver.loadImages} took in and what it had to leave out. */
@@ -89,6 +97,18 @@ export interface ImageDropPlace {
 
 /** Offers a single external file to a preview before storing it. */
 export type SingleFileDropHandler = (file: File, place: ImageDropPlace) => boolean;
+
+/**
+ * A file as the sound it is, or null for one that is no sound. A browser's word for a file is
+ * taken where it says a sound; otherwise the name decides, since browsers disagree about some
+ * sounds (Firefox calls an `.ogg` a video, and some systems give no type at all), and the file is
+ * then held under the type its name stands for.
+ */
+function asSound(file: File): File | null {
+  if (file.type.startsWith('audio/')) return file;
+  const byName = MimeType.type(file.name);
+  return byName.startsWith('audio/') ? new File([file], file.name, { type: byName }) : null;
+}
 
 /**
  * Whether a dropped file may be room or object XML: typed as plain text or XML, and not
@@ -113,9 +133,13 @@ export class FileArchiver {
     return FileArchiver._instance;
   }
 
-  networkService = Network;
+  networkService = Network.instance;
   singleFileDropHandler: SingleFileDropHandler | null = null;
-  /** Whether the current seat may load files dropped onto the page. */
+
+  /**
+   * Whether the reader may bring dropped files in, asked at each drop. A guest may not. Until the
+   * app puts in its own answer, every drop is taken.
+   */
   mayLoadDrops: () => boolean = () => true;
   /**
    * Told when a zip could not be packed or unpacked because the code for it could not be fetched,
@@ -239,10 +263,11 @@ export class FileArchiver {
       dataRead: false,
       images: [],
       audios: [],
+      models: [],
     };
     await this.loadFiles(files, dropPoint, true, run);
     if (run.tooLarge.length > 0) emitFilesTooLarge({ files: run.tooLarge });
-    return { dataRead: run.dataRead, images: run.images, audios: run.audios };
+    return { dataRead: run.dataRead, images: run.images, audios: run.audios, models: run.models };
   }
 
   private async loadFiles(
@@ -260,6 +285,7 @@ export class FileArchiver {
       const isImageDropped = await this.handleImage(file, imageDropPoint, run, placesDroppedImages);
       if (isImageDropped) droppedImageCount++;
       await this.handleAudio(file, run);
+      await this.handleModel(file, run);
       await this.handleText(file, dropPoint, run);
       await this.handleJson(file);
       await this.handleZip(file, dropPoint, run);
@@ -341,8 +367,9 @@ export class FileArchiver {
     return ImageStorage.instance.addAsync(file, { putBack: true });
   }
 
-  private async handleAudio(file: File, run: LoadRun) {
-    if (!file.type.startsWith('audio/')) return;
+  private async handleAudio(given: File, run: LoadRun) {
+    const file = asSound(given);
+    if (!file) return;
     if (file.size > MAX_LOADED_AUDIO_BYTES) {
       Logger.warn(`[FileArchiver] ファイルサイズ制限超過: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       run.tooLarge.push({ name: file.name, kind: 'audio', limitBytes: MAX_LOADED_AUDIO_BYTES });
@@ -350,6 +377,29 @@ export class FileArchiver {
     }
     const audio = await AudioStorage.instance.addAsync(file, { putBack: true });
     if (audio) run.audios.push(audio.identifier);
+  }
+
+  /**
+   * Takes in a binary glTF file as a 3D model: one named `.glb`, or sent as one, whose JSON can be
+   * read. Anything else under the name is left alone, and a model that draws more triangles than a
+   * model may is left out as one too large.
+   */
+  private async handleModel(file: File, run: LoadRun) {
+    if (file.type !== MODEL_TYPE && !file.name.toLowerCase().endsWith('.glb')) return;
+    if (file.size > MAX_LOADED_MODEL_BYTES) {
+      Logger.warn(`[FileArchiver] ファイルサイズ制限超過: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+      run.tooLarge.push({ name: file.name, kind: 'model', limitBytes: MAX_LOADED_MODEL_BYTES });
+      return;
+    }
+    const facts = gltfFactsOf(await FileReaderUtil.readAsArrayBufferAsync(file));
+    if (!facts) return;
+    if (facts.triangles > MAX_MODEL_TRIANGLES) {
+      Logger.warn(`[FileArchiver] 三角形数の上限超過: ${file.name} (${facts.triangles})`);
+      run.tooLarge.push({ name: file.name, kind: 'model', limitBytes: MAX_LOADED_MODEL_BYTES });
+      return;
+    }
+    const model = await ModelStorage.instance.addAsync(file, { putBack: true });
+    if (model) run.models.push(model.identifier);
   }
 
   private async handleText(file: File, dropPoint: { x: number; y: number } | undefined, run: LoadRun): Promise<void> {
@@ -363,6 +413,7 @@ export class FileArchiver {
       name === 'imagetag.xml' ||
       name === 'imagelink.xml' ||
       name === 'audiotag.xml' ||
+      name === 'modeltag.xml' ||
       name === 'playlist.xml' ||
       name === 'assetowner.xml' ||
       name === 'imagelock.xml' ||

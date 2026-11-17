@@ -58,6 +58,7 @@
       <button
         class="absolute -bottom-5.25 left-2 z-3 size-10.5 rounded-full p-1"
         data-testid="overview-white-board-zoom"
+        data-tooltip-control
         [title]="'feature.inventory.overview.enlarge' | transloco"
         [attr.aria-label]="'feature.inventory.overview.enlarge' | transloco"
         (click)="chanageImageView(true)"
@@ -93,6 +94,8 @@
         }
         <button
           class="absolute -bottom-5.25 left-2 z-3 size-10.5 rounded-full p-1"
+          data-testid="overview-card-zoom"
+          data-tooltip-control
           [title]="'feature.inventory.overview.enlarge' | transloco"
           [attr.aria-label]="'feature.inventory.overview.enlarge' | transloco"
           (click)="chanageImageView(true)"
@@ -208,7 +211,7 @@
       class="text-ui-text flex h-8 items-center gap-1 px-[1em] text-[1em]/8 [grid-area:3/2/4/3]"
       [ngClass]="pointerEventsStyle"
     >
-      <span class="min-w-0 flex-1 truncate">{{ character.name }}</span>
+      <span class="min-w-0 flex-1 truncate">{{ names.shown(character) }}</span>
       @if (hasMemo(character)) {
         <button
           type="button"
@@ -528,7 +531,8 @@
                   (blur)="stopRubyEditing(dataElm)"
                   class="text-ui-text hover:bg-ui-hover focus:bg-ui-input box-border size-full resize-none overflow-hidden rounded-xs border-none bg-transparent p-0 font-[inherit] leading-[inherit] wrap-anywhere [word-break:break-word] whitespace-pre-wrap outline-none"
                   name="data-value"
-                  [(ngModel)]="dataElm.value"
+                  [ngModel]="dataElm.value"
+                  (ngModelChange)="writeField(dataElm, 'value', $event)"
                   [readonly]="!canEdit"
                   spellcheck="false"
                   (focus)="textFocus(dataElm.myIdentifer)"
@@ -587,7 +591,7 @@
               size="1"
               name="data-current-value"
               [ngModel]="shownCurrentValue(dataElm)"
-              (ngModelChange)="dataElm.currentValue = $event"
+              (ngModelChange)="writeField(dataElm, 'currentValue', $event)"
               [readonly]="!canEdit"
             />
           </div>
@@ -657,7 +661,8 @@
               class="text-ui-text hover:bg-ui-hover focus:bg-ui-input box-border w-full min-w-12 rounded-xs border-none bg-transparent p-0 text-right font-[inherit] leading-[inherit] outline-none"
               size="1"
               name="data-value"
-              [(ngModel)]="dataElm.value"
+              [ngModel]="dataElm.value"
+              (ngModelChange)="writeField(dataElm, 'value', $event)"
               [readonly]="!canEdit"
             />
           }
@@ -671,6 +676,8 @@
 <ng-template #imageView>
   <div
     class="text-ui-text animate-fade-in absolute inset-0 z-9900 bg-[color-mix(in_srgb,var(--ui-panel-bg)_80%,transparent)]"
+    data-tooltip-control
+    data-testid="enlarged-view"
     (click)="chanageImageView(false)"
   >
     <div class="pointer-events-none absolute top-4 right-4"><i class="material-icons text-[36px]!">close</i></div>

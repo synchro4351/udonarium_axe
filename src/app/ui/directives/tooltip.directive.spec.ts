@@ -11,6 +11,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ObjectChangeService, ObjectDeleteEvent } from '@axe/application/sync/object-change.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { OverlayLayers } from '@axe/application/ui/overlay-layers';
+import { ReloadNoticeService } from '@axe/application/ui/reload-notice.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
 import { EventChannel } from '@axe/core/event/event-channel';
 import { GameCharacter } from '@axe/domain/character/game-character';
@@ -67,8 +68,12 @@ class StubTooltipPanelComponent implements TooltipPanelInstance {
   selector: 'tooltip-test-host',
   template: `
     <div data-testid="first-piece" [appTooltip]="first"><span data-testid="piece-body"></span></div>
-    <div data-testid="second-piece" [appTooltip]="second"></div>
-    <div data-testid="guarded-piece" [appTooltip]="first" [appTooltipDisabled]="guarded()"></div>
+    <div data-testid="second-piece" [appTooltip]="second" [appTooltipOff]="secondOff()"></div>
+    <div data-testid="body-piece" [appTooltip]="body">
+      <span data-testid="body-picture"></span>
+      <div data-testid="part-row" [appTooltip]="part()"></div>
+    </div>
+    <div data-testid="guarded-piece" [appTooltip]="first" [appTooltipOff]="guarded()"></div>
     <ng-container #panelHost></ng-container>
   `,
   imports: [TooltipDirective],
@@ -78,6 +83,9 @@ class TooltipHostComponent {
   first!: TabletopObject;
   second!: TabletopObject;
   readonly guarded = signal(false);
+  body!: TabletopObject;
+  readonly part = signal<TabletopObject | null>(null);
+  readonly secondOff = signal(false);
   readonly panelHost = viewChild.required('panelHost', { read: ViewContainerRef });
 }
 
@@ -132,6 +140,7 @@ describe('TooltipDirective', () => {
     host = fixture.componentInstance;
     host.first = makeCharacter('先手');
     host.second = makeCharacter('後手');
+    host.body = makeCharacter('ドラゴン');
     fixture.detectChanges();
     await fixture.whenStable();
     TestBed.inject(OverlayLayers).main = host.panelHost();
@@ -161,6 +170,19 @@ describe('TooltipDirective', () => {
     expect(fixture.nativeElement.querySelectorAll('[data-testid="stub-panel"]')).toHaveLength(4);
   });
 
+  it('opens no detail while it is asked to open none, as over a look on the ground locked in place', async () => {
+    host.secondOff.set(true);
+    fixture.detectChanges();
+    await hover('second-piece');
+    expect(panels()).toHaveLength(0);
+    await unhover('second-piece');
+
+    host.secondOff.set(false);
+    fixture.detectChanges();
+    await hover('second-piece');
+    expect(panels()).toHaveLength(4);
+  });
+
   it('fetches the detail the first time a piece asks for it, and shows it once it arrives', async () => {
     TestBed.inject(TooltipPanelSource).panel = null;
     let deliver!: (panel: typeof StubTooltipPanelComponent) => void;
@@ -188,6 +210,131 @@ describe('TooltipDirective', () => {
     fixture.detectChanges();
 
     expect(panels()).toHaveLength(0);
+  });
+
+  it('asks the reader to reload once when the detail cannot be fetched, and does not ask for it again', async () => {
+    const source = TestBed.inject(TooltipPanelSource);
+    source.panel = null;
+    const load = vi.fn(() => Promise.reject(new Error('chunk gone')));
+    source.load = load;
+    const tellReloadNeeded = vi
+      .spyOn(TestBed.inject(ReloadNoticeService), 'tellReloadNeeded')
+      .mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await hover('first-piece');
+    await fixture.whenStable();
+    await unhover('first-piece');
+    await hover('first-piece');
+    await fixture.whenStable();
+
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(tellReloadNeeded).toHaveBeenCalledTimes(1);
+    expect(source.failed).toBe(true);
+    expect(panels()).toHaveLength(0);
+    warn.mockRestore();
+    tellReloadNeeded.mockRestore();
+  });
+
+  describe('a row inside a piece that shows the detail of another, as a part listed on its body', () => {
+    const element = (testId: string) => fixture.nativeElement.querySelector(`[data-testid="${testId}"]`) as HTMLElement;
+    const shown = () => panels().map((panel) => panel.tabletopObject);
+
+    /** The pointer coming onto the row from outside the piece, which it enters on the way. */
+    async function hoverRow(): Promise<void> {
+      element('body-piece').dispatchEvent(new MouseEvent('mouseenter', { clientX: 0, clientY: 10 }));
+      element('part-row').dispatchEvent(new MouseEvent('mouseenter', { clientX: 0, clientY: 10 }));
+      await wait(OPEN_WAIT_MS);
+      fixture.detectChanges();
+    }
+
+    function tap(target: HTMLElement): void {
+      for (const [type, fingers] of [
+        ['touchstart', 1],
+        ['touchend', 0],
+      ] as const) {
+        const event = new Event(type, { bubbles: true });
+        const touch = { clientX: 5, clientY: 5 };
+        Object.defineProperty(event, 'changedTouches', { value: [touch] });
+        Object.defineProperty(event, 'touches', { value: fingers > 0 ? [touch] : [] });
+        target.dispatchEvent(event);
+      }
+    }
+
+    let head: GameCharacter;
+
+    beforeEach(() => {
+      table.hoverDetailPlacement = 'piece';
+      head = makeCharacter('頭');
+      host.part.set(head);
+      fixture.detectChanges();
+    });
+
+    it('shows the detail of the row alone while the pointer is on the row', async () => {
+      await hoverRow();
+
+      expect(shown()).toEqual([head]);
+    });
+
+    it('takes the place of the detail of the piece when the pointer comes onto the row from the piece', async () => {
+      await hover('body-piece');
+      expect(shown()).toEqual([host.body]);
+
+      await hover('part-row');
+
+      expect(shown()).toEqual([head]);
+    });
+
+    it('goes away once the pointer has left the row and the piece', async () => {
+      await hoverRow();
+
+      element('part-row').dispatchEvent(new MouseEvent('mouseleave'));
+      element('body-piece').dispatchEvent(new MouseEvent('mouseleave'));
+      await wait(CLOSE_WAIT_MS);
+
+      expect(shown()).toEqual([]);
+    });
+
+    it('gives way to the detail of the piece when the pointer leaves the row for the rest of the piece', async () => {
+      await hoverRow();
+
+      element('part-row').dispatchEvent(new MouseEvent('mouseleave', { relatedTarget: element('body-picture') }));
+      await wait(OPEN_WAIT_MS);
+
+      expect(shown()).toEqual([host.body]);
+    });
+
+    it('leaves the detail of the piece to show over a row with no detail of its own', async () => {
+      host.part.set(null);
+      fixture.detectChanges();
+
+      await hoverRow();
+
+      expect(shown()).toEqual([host.body]);
+    });
+
+    it('shows the detail of the row for a tap on it on a touch screen, and puts it away at the next', async () => {
+      vi.spyOn(TestBed.inject(ViewportService), 'isTouch').mockReturnValue(true);
+
+      tap(element('part-row'));
+      expect(shown()).toEqual([head]);
+
+      tap(element('part-row'));
+      expect(shown()).toEqual([]);
+
+      tap(element('body-picture'));
+      expect(shown()).toEqual([host.body]);
+    });
+
+    it('shows the detail of the piece for a tap on a row with no detail of its own', async () => {
+      vi.spyOn(TestBed.inject(ViewportService), 'isTouch').mockReturnValue(true);
+      host.part.set(null);
+      fixture.detectChanges();
+
+      tap(element('part-row'));
+
+      expect(shown()).toEqual([host.body]);
+    });
   });
 
   describe('a detail still on its way on a touch screen', () => {

@@ -1,6 +1,8 @@
 import { inject, Injectable, Injector, Type, ViewContainerRef } from '@angular/core';
+import { EFFECT_LIBRARY_MIN_SIZE, readEffectLibrarySize } from '@axe/application/effect/effect-library-size';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PanelOption, PanelService } from '@axe/application/ui/panel.service';
+import { browserLocalStorage } from '@axe/core/storage/local-preference';
 import { panelLabelKey, RoomPanelName, STATUS_AILMENT_PANEL } from '@axe/domain/ui/room-panel';
 import { PanelWindowService } from '@axe/features/panels/panel-window.service';
 
@@ -9,6 +11,21 @@ import { PanelWindowService } from '@axe/features/panels/panel-window.service';
  * top of the screen, which stand over panels and would hide the buttons at the right of a title bar.
  */
 const FIRST_PANEL_TOP = 64;
+
+/** How far in from the left of the screen the panels the room opens with stand, clear of the menu down that side. */
+export const START_PANEL_LEFT = 80;
+
+/** How far down from the top of the screen the connection panel opens, and the highest the chat window may stand. */
+export const START_PANEL_TOP = 10;
+
+/** How large the chat window opens, on a screen wide enough to open it with the room. */
+export const START_CHAT_SIZE = { width: 660, height: 460 } as const;
+
+/** How much is left free below the chat window the room opens with, on a screen tall enough to leave it. */
+export const START_CHAT_BOTTOM_GAP = 20;
+
+/** How wide the connection panel opens, the panel the room opens with in the top left corner. */
+export const PEER_MENU_WIDTH = 420;
 
 interface RoomPanel {
   load: () => Promise<Type<unknown>>;
@@ -136,7 +153,7 @@ export class RoomPanelService {
       case 'peerMenu':
         return {
           load: () => import('@axe/features/lobby/peer-menu/peer-menu.component').then((m) => m.PeerMenuComponent),
-          option: { width: 420, height: 300 },
+          option: { width: PEER_MENU_WIDTH, height: 300 },
         };
       case 'tableSetting':
         return {
@@ -183,6 +200,12 @@ export class RoomPanelService {
           load: () =>
             import('@axe/features/file/file-storage/file-storage.component').then((m) => m.FileStorageComponent),
           option: { width: 450, height: 600 },
+        };
+      case 'modelLibrary':
+        return {
+          load: () =>
+            import('@axe/features/media/model-library/model-library.component').then((m) => m.ModelLibraryComponent),
+          option: { width: 450, height: 640 },
         };
       case 'jukebox':
         return {
@@ -256,7 +279,11 @@ export class RoomPanelService {
             import('@axe/features/effect/effect-library-panel/effect-library-panel.component').then(
               (m) => m.EffectLibraryPanelComponent
             ),
-          option: { width: 360, height: 480 },
+          option: {
+            ...readEffectLibrarySize(browserLocalStorage()),
+            minWidth: EFFECT_LIBRARY_MIN_SIZE.width,
+            minHeight: EFFECT_LIBRARY_MIN_SIZE.height,
+          },
         };
       case 'boardScene':
         return {

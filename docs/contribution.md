@@ -109,8 +109,8 @@ E2Eは載せていない。PlaywrightはCIだと5ブラウザぶん走る設定�
 1回に何十分もかかる。手元で`npm run e2e`を回す。
 
 演出の見た目は`e2e/visual/`のスクリーンショット比較で守る。
-`npx playwright test --project=visual`が`e2e/visual/__screenshots__/`の基準画像と
-比べる。時計を止め、アニメーションを終端まで送ってから撮るので、同じ機械なら同じ絵になる。
+`npx playwright test --project=visual-webgl2`と`--project=visual-webgpu`が、卓をWebGL2とWebGPUで描いて
+`e2e/visual/__screenshots__/webgl2/`と`webgpu/`の基準画像と比べる。2つは順に1つずつ流す。時計を止め、アニメーションを終端まで送ってから撮るので、同じ機械なら同じ絵になる。
 基準画像は手元のChromiumで作ってコミットし、CIでは回さない。
 見た目を変えるつもりの変更で差分が出たら`--update-snapshots`で撮り直し、何がどう変わったかを
 コミット本文に書く。差分の理由が言えないなら、それは退行として直す。
@@ -135,8 +135,9 @@ E2Eは載せていない。PlaywrightはCIだと5ブラウザぶん走る設定�
 | 依頼に「チームの運用ルールとして」と添える         | `docs/`の規約のように、決まりを伝える文書で文末をそろえる |
 
 - 和文と英数字の間に半角空白を入れない。インラインコードの前後も詰める。
-  yomiyasuの書き方に合わせた決まりで、空けてある既存の文書は書き直すときにそろえる
-- リンター（`yomiyasu_lint.py`）と書き直し前後の差分の点検（`yomiyasu_diff.py`）はスキルが走らせる。
+  このリポジトリの決まりで、yomiyasuは空白を原文のまま残すので、書き手が詰める。
+  空けてある既存の文書は書き直すときにそろえる
+- リンター（`yomiyasu_lint.py`）と、書き直し前後の差分などをまとめて点検する`yomiyasu_check.py`はスキルが走らせる。
   Python 3の標準ライブラリだけで動くので、追加で入れるものはない
 - 指摘は疑いの提示であって修正指示ではないので、直すか残すかは文脈で決める。
   規約集のように箇条書きと太字が本体の文書では、「箇条書きの比率」「太字の頻度」の警告は残してよい
@@ -200,6 +201,9 @@ E2Eは載せていない。PlaywrightはCIだと5ブラウザぶん走る設定�
   生成される`src/app/domain/dice/bcdice/bcdice-importers.generated.ts`の一覧から読み込む。システムは継承の系統ごとに
   約300KBずつ`groups/`のチャンクにまとめ、翻訳はその手前の別チャンクに分ける（ビルドを1,000ファイル未満に保つため）。
   新しいシステムが一覧に無いと、そのシステムを選んでもDiceBotで振られる
+- **キャラクターシートの取り込み先のシステムを足したときと、取り込み元のサイトが入力欄を変えたときは**、スクリプトの先頭の一覧を直して
+  `node scripts/generate-charasheet-label-maps.mjs`（キャラクター保管所）か`node scripts/generate-appspot-label-maps.mjs`（キャラクターシート倉庫）を
+  リポジトリのルートで実行する。各サイトの入力ページを読んで`src/app/domain/character/import/`の`*-label-maps.generated.ts`を書き直すので、差分を確かめてコミットする
 
 ## 依存の脆弱性（`npm audit`）
 

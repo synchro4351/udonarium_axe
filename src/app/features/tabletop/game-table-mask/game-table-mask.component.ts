@@ -1,4 +1,4 @@
-import { NgStyle } from '@angular/common';
+import { NgStyle, NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -8,12 +8,15 @@ import {
   inject,
   input,
   signal,
+  viewChild,
 } from '@angular/core';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { CoordinateService } from '@axe/application/input/coordinate.service';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { GameObjectInventoryService } from '@axe/application/inventory/game-object-inventory.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { TablePickService } from '@axe/application/tabletop/table-pick.service';
+import { TablePiecesService } from '@axe/application/tabletop/table-pieces.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { ModalService } from '@axe/application/ui/modal.service';
@@ -21,11 +24,9 @@ import { PanelOption, PanelService } from '@axe/application/ui/panel.service';
 import { PieceContextMenuService } from '@axe/application/ui/piece-context-menu.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { sheetPanelBox, sheetPanelTitle } from '@axe/application/ui/sheet-panel';
-import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { ImageFile, imageFileEqual } from '@axe/core/storage/image-file';
 import { isInStore } from '@axe/core/sync/object-store';
 import { debounce } from '@axe/core/util/debounce';
-import { TextFormat } from '@axe/domain/data/text-format';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { GridType } from '@axe/domain/tabletop/game-table';
@@ -33,6 +34,7 @@ import { GameTableMask } from '@axe/domain/tabletop/game-table-mask';
 import { hexCircumradius, isFlatTopGrid, isHexGrid, pixelToHexCell } from '@axe/domain/tabletop/hex-geometry';
 import { computeHexMaskGeometry } from '@axe/domain/tabletop/hex-mask-geometry';
 import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
+import { surfaceKeyOf } from '@axe/domain/tabletop/tabletop-object';
 import { CreateObjectMenuService } from '@axe/features/tabletop/create-menu/create-object-menu.service';
 import { buildGameTableMaskContextMenu } from '@axe/features/tabletop/game-table-mask/game-table-mask-context-menu';
 import {
@@ -44,13 +46,15 @@ import {
   buildScratchingGridInfos,
   type ScratchGridInfo,
 } from '@axe/features/tabletop/game-table-mask/game-table-mask-helpers';
+import { AltitudeGuideComponent, altitudeGuideOf } from '@axe/ui/components/altitude-guide/altitude-guide.component';
 import { MovableOption } from '@axe/ui/directives/movable.directive';
 import { MovableDirective } from '@axe/ui/directives/movable.directive';
 import { SelectableDirective } from '@axe/ui/directives/selectable.directive';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
+import { HudPlaceDirective } from '@axe/ui/tabletop/hud-place.directive';
+import { pictureForCanvas } from '@axe/ui/tabletop/picture-for-canvas';
 import { setupInputHandler, setupMovableForPiece } from '@axe/ui/tabletop/setup-tabletop-piece';
-import { translateZCss, Z_OFFSET_MASK_PX } from '@axe/ui/tabletop/z-offset';
-import { decorateTextByFormat } from '@axe/ui/text-decoration/format-note-text';
+import { formatNoteText } from '@axe/ui/text-decoration/format-note-text';
 import { TranslocoModule } from '@jsverse/transloco';
 
 /** Words written across a mask, as they are drawn. */
@@ -61,13 +65,26 @@ interface MaskWriting {
   readonly outline: boolean;
 }
 
+const MASK_WRITING_OUTLINE =
+  '0 0 2px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000';
+
 @Component({
   selector: 'game-table-mask',
   templateUrl: './game-table-mask.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MovableDirective, SelectableDirective, NgStyle, SafePipe, TranslocoModule],
+  imports: [
+    AltitudeGuideComponent,
+    HudPlaceDirective,
+    MovableDirective,
+    SelectableDirective,
+    NgStyle,
+    NgTemplateOutlet,
+    SafePipe,
+    TranslocoModule,
+  ],
   host: {
     class: 'block',
+    '[attr.data-object-id]': 'gameTableMask()?.identifier ?? null',
     '(dragstart)': 'onDragstart($event)',
     '(pointerdown)': 'onInputStartPointer($event)',
     '(pointermove)': 'onInputMovePointer($event)',
@@ -86,18 +103,41 @@ export class GameTableMaskComponent {
   private readonly pointerDeviceService = inject(PointerDeviceService);
   private readonly modalService = inject(ModalService);
   private readonly coordinateService = inject(CoordinateService);
-  private readonly tableSelecter = inject(TableSelecter);
+  private readonly tablePick = inject(TablePickService);
+  private get tableSelecter(): TableSelecter {
+    return TableSelecter.instance;
+  }
   private readonly inventoryService = inject(GameObjectInventoryService);
-  private readonly uiSignalService = inject(UiSignalService);
+  private readonly pieces = inject(TablePiecesService);
   private readonly tabletopService = inject(TabletopService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly translateFn = inject(TRANSLATE_FN);
 
+  /**
+   * What the mask shows, laid out here for the table's canvas to draw the mask from a picture of it:
+   * left clear, still taking the presses where the canvas draws it. While it is scratched the
+   * picture shows what the scratch would open.
+   */
+  private readonly visual = viewChild<ElementRef<HTMLElement>>('visual');
+
   constructor() {
+    pictureForCanvas({
+      identifier: () => this.gameTableMask()?.identifier ?? '',
+      element: () => this.visual()?.nativeElement,
+      pictured: () => !!this.gameTableMask(),
+      follows: () => {
+        this.maskVersion();
+        this.imageFile();
+        this.scratchedImageFile();
+        this.writing();
+        this.masksCssValue();
+        this.scratchedLayerMaskValue();
+      },
+    });
     setupMovableForPiece(this, {
       target: this.gameTableMask,
       collideLayers: ['terrain'],
-      transformCssOffset: translateZCss(Z_OFFSET_MASK_PX),
+      footprint: () => ({ width: this.pixelWidth, height: this.pixelHeight }),
       snapOrigin: () => {
         const geo = computeHexMaskGeometry(this.width, this.height, this.gridSize, this.gridType());
         return geo ? { x: geo.offsetX, y: geo.offsetY } : undefined;
@@ -119,14 +159,10 @@ export class GameTableMaskComponent {
 
   readonly gameTableMask = input<GameTableMask | null>(null);
 
-  /** Whether a locked mask shows its lock mark; setting it writes straight to the mask. */
+  /** Whether a locked mask shows its lock mark. */
   get dispLockMark(): boolean {
     const mask = this.gameTableMask();
     return mask?.dispLockMark ?? false;
-  }
-  set dispLockMark(disp: boolean) {
-    const mask = this.gameTableMask();
-    if (mask) mask.dispLockMark = disp;
   }
 
   readonly name = computed(() => {
@@ -152,87 +188,26 @@ export class GameTableMaskComponent {
     const mask = this.gameTableMask();
     return Math.max(0, mask?.height ?? 0);
   }
-  /** The mask's own opacity, or 0 when there is no mask. */
-  get opacity(): number {
-    const mask = this.gameTableMask();
-    return mask?.opacity ?? 0;
-  }
   readonly imageFile = computed(
     () => {
       const mask = this.gameTableMask();
       this.objectChange.fileVersion();
-      if (!mask) throw new Error('gameTableMask is not set');
+      if (!mask) return ImageFile.Empty;
       this.objectChange.versionOf(mask.identifier)();
       return mask.imageFile;
     },
     { equal: imageFileEqual() }
   );
-  /** Whether the mask is locked in place; setting it writes straight to the mask. */
+  /** Whether the mask is locked in place. */
   get isLock(): boolean {
     const mask = this.gameTableMask();
     return mask?.isLock ?? false;
   }
-  set isLock(isLock: boolean) {
-    const mask = this.gameTableMask();
-    if (mask) mask.isLock = isLock;
-  }
 
-  /** The blend type for the mask picture, always 0, which draws it with hard-light blending. */
-  get blendType(): number {
-    return 0;
-  }
-
-  /**
-   * The mask's `color`, its colour element's `value`; setting it writes straight to the mask.
-   *
-   * Nothing in the app reads or writes it: the template fills a mask that has no picture with
-   * `bgcolor`.
-   */
-  get color(): string {
-    const mask = this.gameTableMask();
-    return mask?.color ?? '';
-  }
-  set color(color: string) {
-    const mask = this.gameTableMask();
-    if (mask) mask.color = color;
-  }
-  /**
-   * The background colour a mask without a picture is filled with; setting it writes straight to
-   * the mask.
-   */
+  /** The background colour a mask without a picture is filled with. */
   get bgcolor(): string {
     const mask = this.gameTableMask();
     return mask?.bgcolor ?? '';
-  }
-
-  get text(): string {
-    this.maskVersion();
-    return this.gameTableMask()?.text ?? '';
-  }
-  get fontSize(): number {
-    this.maskVersion();
-    return this.gameTableMask()?.fontSize ?? 18;
-  }
-  get textOutline(): boolean {
-    this.maskVersion();
-    return this.gameTableMask()?.textOutline ?? false;
-  }
-  get outlineColor(): string {
-    this.maskVersion();
-    return this.gameTableMask()?.outlineColor ?? '#ffffff';
-  }
-  get textFormat(): TextFormat {
-    this.maskVersion();
-    return this.gameTableMask()?.textFormat ?? 'normal';
-  }
-  readonly decoratedText = computed(() => decorateTextByFormat(this.text, this.textFormat));
-  get outlineShadowCss(): string {
-    const shadow = `0px 0px ${(this.fontSize + 9) * 0.075}px ${this.outlineColor}`;
-    return Array<string>(8).fill(shadow).join(', ');
-  }
-  set bgcolor(bgcolor: string) {
-    const mask = this.gameTableMask();
-    if (mask) mask.bgcolor = bgcolor;
   }
 
   /**
@@ -261,6 +236,21 @@ export class GameTableMaskComponent {
   get gameTableMaskAltitude(): number {
     return +this.altitude.toFixed(1);
   }
+
+  /**
+   * The guide from the height the mask floats at down to the face it lies on, or up to one sunk
+   * under it, from its middle. Nothing for a mask within half a cell of the face, or one set not to
+   * show it.
+   */
+  protected readonly altitudeGuide = computed(() => {
+    const mask = this.gameTableMask();
+    if (!mask) return null;
+    this.maskVersion();
+    if (!mask.isAltitudeIndicate) return null;
+    const foot = this.pieces.footOf(mask);
+    const middle = { ...foot, x: foot.x + this.pixelWidth / 2, y: foot.y + this.pixelHeight / 2 };
+    return altitudeGuideOf(middle, this.gameTableMaskAltitude, this.gridSize);
+  });
 
   /**
    * The cells scratched open, as a comma-separated list of `col:row`; setting it writes straight to
@@ -337,6 +327,17 @@ export class GameTableMaskComponent {
         (!!a && !!b && a.text === b.text && a.size === b.size && a.color === b.color && a.outline === b.outline),
     }
   );
+
+  /** The dark halo drawn round outlined words. */
+  protected readonly writingOutline = MASK_WRITING_OUTLINE;
+
+  /** The words drawn as a formatted note, where the mask is set to show them so (tyoitashi); null as typed. */
+  readonly formattedWriting = computed(() => {
+    const mask = this.gameTableMask();
+    if (!mask) return null;
+    this.objectChange.versionOf(mask.identifier)();
+    return mask.textFormat === 'formatted' && mask.text.trim().length > 0 ? formatNoteText(mask.text) : null;
+  });
 
   readonly scratchedColor = computed(() => {
     const mask = this.gameTableMask();
@@ -420,42 +421,13 @@ export class GameTableMaskComponent {
     const mask = this.gameTableMask();
     return mask?.altitude ?? 0;
   }
-  set altitude(altitude: number) {
-    const mask = this.gameTableMask();
-    if (mask) mask.altitude = altitude;
-  }
 
-  /**
-   * Whether the mask shows a line and label for its altitude; setting it writes straight to the
-   * mask.
-   */
-  get isAltitudeIndicate(): boolean {
-    const mask = this.gameTableMask();
-    return mask?.isAltitudeIndicate ?? false;
-  }
-  set isAltitudeIndicate(isAltitudeIndicate: boolean) {
-    const mask = this.gameTableMask();
-    if (mask) mask.isAltitudeIndicate = isAltitudeIndicate;
-  }
-
-  /**
-   * Whether the table is turned more than a quarter either way, so the scratcher's name is turned
-   * over to stay readable.
-   */
-  get isInverse(): boolean {
-    return Math.abs(this.viewRotateZ()) % 360 > 90 && Math.abs(this.viewRotateZ()) % 360 < 270;
-  }
   /** Whether someone is scratching the mask, which is whenever it has an owner. */
   get isScratching(): boolean {
     const mask = this.gameTableMask();
     return !!mask?.owner;
   }
 
-  /** Whether a peer has taken the mask to scratch it. */
-  get hasOwner(): boolean {
-    const mask = this.gameTableMask();
-    return mask?.hasOwner ?? false;
-  }
   /**
    * Whether the peer scratching the mask is still connected; the scratcher's banner only shows
    * while they are.
@@ -479,8 +451,6 @@ export class GameTableMaskComponent {
   get gridSize(): number {
     return this.tabletopService.gridSize();
   }
-  math = Math;
-  readonly viewRotateZ = this.uiSignalService.tableViewRotationZ;
 
   readonly gridType = computed(() => {
     const table = this.tableSelecter.viewTable;
@@ -647,33 +617,20 @@ export class GameTableMaskComponent {
    *
    * While dragging, a cell is toggled once as the pointer enters it; a fresh press may toggle the
    * same cell again. Picks are written to the mask after 250 ms without a new one, so a drag
-   * reaches other peers as one change. A point off the mask is ignored. When the table's grid is
-   * hidden, its grid clip is cleared.
+   * reaches other peers as one change. A point off the mask is ignored.
    */
   scratching(isStart: boolean, position: { offsetX: number; offsetY: number } | null = null) {
     const mask = this.gameTableMask();
     if (!mask || !mask.isMine) return;
-    const tableSelecter = this.tableSelecter;
-
-    if (!tableSelecter.viewTable?.gridShow) {
-      const viewTable = tableSelecter.viewTable;
-      if (viewTable)
-        viewTable.gridClipRect = {
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: 0,
-        };
-    }
     let offsetX;
     let offsetY;
     if (position) {
       offsetX = position.offsetX;
       offsetY = position.offsetY;
     } else {
-      const scratchingPosition = this.coordinateService.calcTabletopLocalCoordinate(
+      const scratchingPosition = this.coordinateService.convertToFace(
         this.pointerDeviceService.pointers[0],
-        this.elementRef.nativeElement
+        surfaceKeyOf(mask)
       );
       offsetX = scratchingPosition.x - mask.location.x;
       offsetY = scratchingPosition.y - mask.location.y;
@@ -758,7 +715,7 @@ export class GameTableMaskComponent {
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
     const menuPosition = this.pointerDeviceService.pointers[0];
     if (this.pieceContextMenu.openForSelection(mask, this.gridSize, menuPosition)) return;
-    const objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
+    const objectPosition = this.tablePick.landingAtPointer();
     const menuArray = buildGameTableMaskContextMenu({
       mask: mask,
       gridSize: this.gridSize,
@@ -766,7 +723,7 @@ export class GameTableMaskComponent {
       inventoryService: this.inventoryService,
       createMenu: this.createMenu,
       onStartScratch: () => {
-        if (mask.owner != '') {
+        if (mask.owner !== '') {
           this.isPreview = false;
           this.settleScratching.cancel();
           this._currentScratchingSet = null;

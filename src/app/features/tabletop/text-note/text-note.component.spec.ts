@@ -3,20 +3,27 @@ import { By } from '@angular/platform-browser';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { HudAnchor } from '@axe/application/tabletop/hud-frame.service';
+import { PiecePicturesService } from '@axe/application/tabletop/piece-pictures.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { PieceContextMenuService } from '@axe/application/ui/piece-context-menu.service';
-import { UiSignalService } from '@axe/application/ui/ui-signal.service';
+import { ObjectStore } from '@axe/core/sync/object-store';
+import { DataElement } from '@axe/domain/data/data-element';
 import { DisclosureMode } from '@axe/domain/disclosure/disclosure';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
+import { GameTable } from '@axe/domain/tabletop/game-table';
+import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
 import { TextNote } from '@axe/domain/tabletop/text-note';
 import { TextNoteComponent } from '@axe/features/tabletop/text-note/text-note.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 import { RotableDirective } from '@axe/ui/directives/rotable.directive';
+import { HudPlaceDirective } from '@axe/ui/tabletop/hud-place.directive';
 
 describe('TextNoteComponent', () => {
   let component: TextNoteComponent;
+  let given: TextNote;
   let fixture: ComponentFixture<TextNoteComponent>;
 
   beforeEach(async () => {
@@ -29,7 +36,13 @@ describe('TextNoteComponent', () => {
   beforeEach(() => {
     fixture = TestBed.createComponent(TextNoteComponent);
     component = fixture.componentInstance;
+    // Given its piece at once, as a template gives it, so that no drawing of the page made before a
+    // test gives its own reads the required input unset.
+    given = TextNote.create('メモ', '本文');
+    fixture.componentRef.setInput('textNote', given);
   });
+
+  afterEach(() => given.destroy());
 
   afterEach(() => {
     fixture.destroy();
@@ -60,6 +73,72 @@ describe('TextNoteComponent', () => {
     note.destroy();
   });
 
+  it('is pointed at by its panel laid on the note, and turned by the frame round its foot, not by handles on the panel', () => {
+    const note = TextNote.create('メモ', '本文');
+    fixture.componentRef.setInput('textNote', note);
+    fixture.detectChanges();
+    const placed = fixture.debugElement.queryAll(By.directive(HudPlaceDirective)).map((found) => ({
+      element: found.nativeElement as HTMLElement,
+      anchor: found.injector.get(HudPlaceDirective).anchor() as HudAnchor,
+    }));
+
+    const root = (fixture.nativeElement as HTMLElement).querySelector('[data-hud-box]')!;
+    expect(root.classList).toContain('pointer-events-none');
+    const panel = placed.find(({ element }) => element.matches('[data-part="panel"]'))!;
+    expect(panel.anchor).toEqual({ owner: note.identifier, part: 'panel', place: 'face' });
+    expect(panel.element.classList).toContain('pointer-events-auto');
+    expect(placed.some(({ element }) => element.matches('.rotate-grab'))).toBe(false);
+    expect((fixture.nativeElement as HTMLElement).querySelector('turn-frame')).toBeTruthy();
+    note.destroy();
+  });
+
+  it('hands the canvas the colour its panel is painted in, apart from how clear, for the back of the note', async () => {
+    const pictures = TestBed.inject(PiecePicturesService);
+    vi.spyOn(pictures, 'whileTaking').mockResolvedValue(new Blob(['png']) as never);
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:panel');
+    const show = vi.spyOn(pictures, 'show');
+    const painted = vi.spyOn(window, 'getComputedStyle');
+    painted.mockImplementation(
+      (element) =>
+        ({
+          backgroundColor: (element as HTMLElement).matches('[data-part="panel"]') ? 'rgba(22, 27, 34, 0.9)' : '',
+        }) as CSSStyleDeclaration
+    );
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    painted.mockRestore();
+
+    expect(show).toHaveBeenCalled();
+    expect(show.mock.calls.at(-1)![1].paper).toEqual({ colour: '#161b22', opacity: 0.9 });
+  });
+
+  it('starts editing on a release anywhere on the page after a press on the note, and on no release without one', () => {
+    PeerCursor.createMyCursor();
+    PeerCursor.myCursor.role = PeerRole.GameMaster;
+    vi.spyOn(TestBed.inject(PointerDeviceService), 'isAllowedToOpenContextMenu', 'get').mockReturnValue(true);
+    fixture.detectChanges();
+
+    document.dispatchEvent(new MouseEvent('mouseup', { button: 0 }));
+    expect(component.isEditing()).toBe(false);
+
+    component.onMouseDown(new MouseEvent('mousedown', { button: 0 }));
+    document.dispatchEvent(new MouseEvent('mouseup', { button: 0 }));
+    expect(component.isEditing()).toBe(true);
+  });
+
+  it('draws the text at the size the note is given, as the note changes', () => {
+    fixture.detectChanges();
+    const was = given.fontSize;
+    expect(component.fontSize()).toBe(was);
+
+    const size = ObjectStore.instance.get<DataElement>(`fontsize_${given.identifier}`)!;
+    size.value = was + 4;
+    TestBed.inject(ObjectChangeService).notifyChanged(size.identifier);
+
+    expect(component.fontSize()).toBe(was + 4);
+  });
+
   it('leaves a note being written as the room has it once the seat is made a guest, the draft unwritten', async () => {
     PeerCursor.createMyCursor();
     const note = TextNote.create('メモ', '本文');
@@ -78,15 +157,73 @@ describe('TextNoteComponent', () => {
     note.destroy();
   });
 
-  describe('viewRotateZ computed signal', () => {
-    it('starts at ten', () => {
-      expect(component.viewRotateZ()).toBe(10);
+  describe('the guide to how high it floats', () => {
+    let note: TextNote;
+
+    let table: GameTable;
+
+    beforeEach(() => {
+      table = new GameTable();
+      table.width = 20;
+      table.height = 20;
+      table.initialize();
+      TableSelecter.instance.viewTableIdentifier = table.identifier;
+      note = TextNote.create('浮くメモ', '本文', 5, 4, 3);
+      note.location = { name: 'table', x: 120, y: 80 };
+      note.posZ = 10;
+      note.isAltitudeIndicate = true;
+      fixture.componentRef.setInput('textNote', note);
     });
 
-    it('turns with the table view', () => {
-      const uiSignalService = TestBed.inject(UiSignalService);
-      uiSignalService.notifyTableViewRotation(50, 20, 60);
-      expect(component.viewRotateZ()).toBe(60);
+    afterEach(() => {
+      note.destroy();
+      table.destroy();
+    });
+
+    type Guide = {
+      lifted: { surface: string; x: number; y: number; height: number };
+      ground: { surface: string; x: number; y: number; height: number };
+      altitude: number;
+    } | null;
+    const guide = () => (component as unknown as { altitudeGuide(): Guide }).altitudeGuide();
+    const drawn = () => (fixture.nativeElement as HTMLElement).querySelector('[data-testid="altitude-guide"]');
+
+    it('runs from the point the note hangs from down to the face, and says how high', async () => {
+      note.altitude = 2;
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const grid = component.gridSize();
+      expect(guide()).toEqual({
+        lifted: { surface: 'floor', x: 120, y: 80, height: 10 + 2 * grid },
+        ground: { surface: 'floor', x: 120, y: 80, height: 10 },
+        altitude: 2,
+      });
+      expect(drawn()).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="altitude-guide-altitude"]').textContent.trim()).toBe(
+        '2'
+      );
+    });
+
+    it('runs down to the top of a standing note sunk under the face', () => {
+      note.isUpright = true;
+      note.altitude = -4;
+
+      expect(guide()?.lifted.height).toBe(10 - component.gridSize());
+      expect(guide()?.altitude).toBe(1);
+    });
+
+    it('is left out within half a cell of the face, or where the note is set not to show it', async () => {
+      note.altitude = 0.4;
+      expect(guide()).toBeNull();
+
+      note.altitude = 2;
+      note.isAltitudeIndicate = false;
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(guide()).toBeNull();
+      expect(drawn()).toBeNull();
     });
   });
 
@@ -150,7 +287,7 @@ describe('TextNoteComponent', () => {
     let note: TextNote;
 
     function body(): HTMLElement {
-      return fixture.nativeElement.querySelector('[data-v]:not(textarea)') as HTMLElement;
+      return fixture.nativeElement.querySelector('[data-part="body"]') as HTMLElement;
     }
 
     beforeEach(() => {
@@ -198,9 +335,9 @@ describe('TextNoteComponent', () => {
     let note: TextNote;
 
     function frame(): HTMLElement {
-      return (fixture.nativeElement.querySelector('[data-v]:not(textarea)') as HTMLElement).parentElement!;
+      return (fixture.nativeElement.querySelector('[data-part="body"]') as HTMLElement).parentElement!;
     }
-    const cap = () => `${component.height * component.gridSize}px`;
+    const cap = () => `${component.height() * component.gridSize()}px`;
 
     beforeEach(() => {
       note = TextNote.create('メモ', '一行目\n'.repeat(80));

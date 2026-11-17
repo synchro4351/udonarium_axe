@@ -3,14 +3,15 @@ import { BattleLaunchLoaderService } from '@axe/application/battle/battle-launch
 import { CharacterMacroService } from '@axe/application/chat/character-macro.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { ChatSpeakerService } from '@axe/application/chat/chat-speaker.service';
+import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { NamedCueService } from '@axe/application/media/named-cue.service';
 import { TableBgmService } from '@axe/application/media/table-bgm.service';
 import { BoardSceneLoader } from '@axe/application/tabletop/board-scene-loader';
 import { ConcealmentService } from '@axe/application/tabletop/concealment.service';
-import { blockFootprintOf } from '@axe/application/tabletop/functional-paint.service';
 import { TableTriggerService } from '@axe/application/tabletop/table-trigger.service';
 import { TriggerFireService } from '@axe/application/tabletop/trigger-fire.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
+import { copyPartsAlong } from '@axe/application/ui/tabletop-context-menu-actions';
 import { emitSelectGameTable } from '@axe/core/event/domain-events';
 import { Network } from '@axe/core/network/network';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
@@ -43,10 +44,12 @@ import { groundInSight } from '@axe/domain/tabletop/ground-in-sight';
 import { gatherSpotsAround } from '@axe/domain/tabletop/move/gather-cells';
 import { occupiedCells } from '@axe/domain/tabletop/move/occupied-cells';
 import { pieceCellOf } from '@axe/domain/tabletop/move/piece-on-grid';
+import { paintedBlockFootprintOf } from '@axe/domain/tabletop/painted-block-footprint';
 import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
 import { TableTrigger } from '@axe/domain/tabletop/table-trigger';
 import { Terrain } from '@axe/domain/tabletop/terrain';
 import { TurnState } from '@axe/domain/tabletop/turn-state';
+import { SwitchNoticeService } from '@axe/features/tabletop/board-switch/switch-notice.service';
 
 /** How long a switch stays down after a press, so a double click or an eager finger presses once. */
 export const SWITCH_COOLDOWN_MS = 1500;
@@ -101,7 +104,9 @@ export class SwitchPressService {
   private readonly speaker = inject(ChatSpeakerService);
   private readonly cues = inject(NamedCueService);
   private readonly vision = inject(VisionService);
-  private readonly tableSelecter = inject(TableSelecter);
+  private get tableSelecter(): TableSelecter {
+    return TableSelecter.instance;
+  }
   private readonly objectStore = inject(ObjectStore);
   private readonly triggers = inject(TableTriggerService);
   private readonly concealment = inject(ConcealmentService);
@@ -111,6 +116,8 @@ export class SwitchPressService {
   private readonly tableBgm = inject(TableBgmService);
   private readonly boardScenes = inject(BoardSceneLoader);
   private readonly battle = inject(BattleLaunchLoaderService);
+  private readonly notices = inject(SwitchNoticeService);
+  private readonly t = inject(TRANSLATE_FN);
 
   private readonly running = new Set<string>();
   private readonly pressedAt = new Map<string, number>();
@@ -120,7 +127,7 @@ export class SwitchPressService {
     const host: ObjectNode | null = target.parent;
     const grid = this.grid();
     if (host instanceof Terrain) {
-      const rect = grid ? (blockFootprintOf(host, host.width, host.depth, grid)?.rect ?? null) : null;
+      const rect = grid ? (paintedBlockFootprintOf(host, host.width, host.depth, grid)?.rect ?? null) : null;
       return { name: host.name, rect };
     }
     if (host instanceof TableTrigger) return { name: host.name, rect: host.rect };
@@ -199,6 +206,9 @@ export class SwitchPressService {
           await this.run(action, context);
         } catch {
           // One thing going wrong is no reason to leave the rest of the switch undone.
+          this.notices.showAtPointer(
+            this.t('feature.boardSwitch.actionFailed', { kind: this.t(`feature.boardSwitch.kind.${action.kind}`) })
+          );
         }
       }
       if (context.removesSelf && !context.trial) this.removeHost(target);
@@ -321,7 +331,8 @@ export class SwitchPressService {
     const line = text.trim();
     if (line.length < 1 || !context.tab) return;
     const { definition, character, tab } = context;
-    const options = { tab, gameType: definition.gameType || undefined };
+    // A switch's lines are the game master's words, whoever presses it: only a master makes switches.
+    const options = { tab, gameType: definition.gameType || undefined, mastersWords: true };
     switch (definition.speaker) {
       case 'presser':
         if (character) await this.macro.sendAsCharacter(character, line, options);
@@ -331,7 +342,7 @@ export class SwitchPressService {
         await this.macro.sendAsNamed(this.hostName(context), line, character, options);
         return;
       case 'system':
-        this.chat.sendSystemMessageToTab(tab, line);
+        this.chat.asMastersWords(() => this.chat.sendSystemMessageToTab(tab, line));
         return;
     }
   }
@@ -404,6 +415,7 @@ export class SwitchPressService {
     for (const spot of spots) {
       spot.character.location = { name: 'table', x: spot.x, y: spot.y };
       placed.add(spot.character);
+      copyPartsAlong(template, spot.character);
     }
     for (const copy of copies) if (!placed.has(copy)) copy.destroy();
   }

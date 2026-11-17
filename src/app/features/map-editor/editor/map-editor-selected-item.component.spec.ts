@@ -25,8 +25,21 @@ describe('MapEditorSelectedItemComponent', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('shows nothing while nothing is picked', async () => {
-    expect((await drawn()).querySelector('button')).toBeNull();
+  it('tells what the tool does and its keys while nothing is picked, with nothing to press', async () => {
+    const element = await drawn();
+
+    expect(element.querySelector('button')).toBeNull();
+    const guide = element.querySelector('[data-testid="map-editor-select-guide"]')!;
+    expect(guide.textContent).toContain('クリックで選び、ドラッグで動かします');
+    expect([...guide.querySelectorAll('dt')].map((key) => key.textContent?.trim())).toContain('Delete');
+  });
+
+  it('takes the guide away once something is picked', async () => {
+    state.stampId.set('door-single');
+    state.placeStamp(100, 100, 'スタンプ 1');
+    state.selection.set(state.hitTest(100, 100));
+
+    expect((await drawn()).querySelector('[data-testid="map-editor-select-guide"]')).toBeNull();
   });
 
   it('shows the size of a picked stamp, and deletes it', async () => {
@@ -37,10 +50,36 @@ describe('MapEditorSelectedItemComponent', () => {
 
     const element = await drawn();
     expect((element.querySelector('input[type="range"]') as HTMLInputElement).value).toBe('64');
+    expect(element.querySelector('input[type="range"] + span')?.textContent?.trim()).toBe('64px');
 
     (element.querySelector('button') as HTMLButtonElement).click();
 
     expect(state.selection()).toBeNull();
     expect((state.current.layers.find((layer) => layer.kind === 'stamp') as StampLayer).items).toHaveLength(0);
+  });
+
+  it('follows the picked stamp as it is changed, and as the change and the stamp are undone', async () => {
+    const element = fixture.nativeElement as HTMLElement;
+    const size = (): string | undefined =>
+      element.querySelector('input[type="range"] + span')?.textContent?.trim() ?? undefined;
+    state.stampId.set('door-single');
+    state.stampSize.set(64);
+    state.placeStamp(100, 100, 'スタンプ 1');
+    state.selection.set(state.hitTest(100, 100));
+    await fixture.whenStable();
+    expect(size()).toBe('64px');
+
+    state.updateSelectedStamp({ size: 128 });
+    await fixture.whenStable();
+    expect(size()).toBe('128px');
+
+    state.undo();
+    await fixture.whenStable();
+    expect(size()).toBe('64px');
+
+    state.undo();
+    await fixture.whenStable();
+    expect(size()).toBeUndefined();
+    expect(element.querySelector('[data-testid="map-editor-select-guide"]')).not.toBeNull();
   });
 });

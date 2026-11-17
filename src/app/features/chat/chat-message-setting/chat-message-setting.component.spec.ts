@@ -51,7 +51,7 @@ describe('ChatMessageSettingComponent', () => {
   });
 
   afterEach(() => {
-    (ChatTabList as unknown as { _instance: ChatTabList | undefined })._instance = undefined;
+    ChatTabList.forget();
     localStorage.removeItem('chat-preferences');
   });
 
@@ -81,6 +81,19 @@ describe('ChatMessageSettingComponent', () => {
     });
   });
 
+  it('opens the menu editor on the chat tools from its own section', () => {
+    const open = vi.spyOn(TestBed.inject(RoomPanelService), 'open').mockImplementation(() => undefined);
+    const surface = { set: vi.fn() };
+
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('[data-testid="chat-open-chat-tools"]')!
+      .click();
+
+    expect(open).toHaveBeenCalledWith('menuEditor', {}, expect.any(Function));
+    (open.mock.calls[0][2] as (panel: { surface: typeof surface }) => void)({ surface });
+    expect(surface.set).toHaveBeenCalledWith('chatTools');
+  });
+
   it('asks first whether a setting is one answer or one per tab', () => {
     expect([...scopeSelect('portraitScope').options].map((option) => option.value)).toEqual(['all', 'perTab']);
     expect(scopeSelect('portraitScope').value).toBe('all');
@@ -90,6 +103,43 @@ describe('ChatMessageSettingComponent', () => {
   it('shows one checkbox while the answer is for every tab', () => {
     expect(checkboxes('portraitDisplayFlag')).toHaveLength(1);
     expect(checkboxes('chatSimpleDispFlag')).toHaveLength(1);
+  });
+
+  it('offers the height of the portraits, and whether they are drawn inside the window or kept outside it', () => {
+    expect(root().querySelector<HTMLInputElement>('input[name="portraitHeight"]')?.type).toBe('number');
+    expect(root().querySelector('input[name="portraitInWindow"]')).not.toBeNull();
+    expect(root().querySelector('input[name="isKeepPortraitOutWindow"]')).not.toBeNull();
+  });
+
+  it('offers showing the time and the user ID in the simple view', () => {
+    expect(root().querySelector('input[name="simpleDispFlagTime"]')).not.toBeNull();
+    expect(root().querySelector('input[name="simpleDispFlagUserId"]')).not.toBeNull();
+  });
+
+  it('draws keeping portraits outside as closed from the first drawing while they are drawn inside', async () => {
+    ChatTabList.instance.isPortraitInWindow = true;
+    const late = TestBed.createComponent(ChatMessageSettingComponent);
+    late.detectChanges();
+    await late.whenStable();
+
+    const kept = (late.nativeElement as HTMLElement).querySelector<HTMLInputElement>(
+      'input[name="isKeepPortraitOutWindow"]'
+    )!;
+    expect(kept.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('sets the height of the portraits from its box, held to the smallest allowed', async () => {
+    await fixture.whenStable();
+    const height = root().querySelector<HTMLInputElement>('input[name="portraitHeight"]')!;
+
+    height.value = '300';
+    height.dispatchEvent(new Event('input'));
+    expect(ChatTabList.instance.portraitHeight).toBe(300);
+
+    height.value = '60';
+    height.dispatchEvent(new Event('input'));
+    height.dispatchEvent(new Event('change'));
+    expect(ChatTabList.instance.portraitHeight).toBe(ChatTabList.instance.minPortraitSize);
   });
 
   it('shows a checkbox for each tab once the answers differ per tab', () => {

@@ -1,7 +1,10 @@
-import { hexChannels } from '@axe/core/util/hex-color';
+import { clamp } from '@axe/core/util/clamp';
+import { hexChannels, withAlpha } from '@axe/core/util/hex-color';
 import { CellGrid, cellPolygonOf } from '@axe/domain/tabletop/fog/cell-grid';
 import { isHexGrid } from '@axe/domain/tabletop/hex-geometry';
 import { OverlayPlan, OverlayShape, OverlayVision, ShadowShape } from '@axe/domain/tabletop/vision-scene';
+import { animationIntensity } from '@axe/domain/tabletop/vision-scene/light-flicker';
+import { LONGEST_PICTURE_PX } from '@axe/infrastructure/table-3d/table-3d-port';
 import { fogPattern } from '@axe/infrastructure/tabletop/fog/fog-texture';
 
 const TWO_PI = Math.PI * 2;
@@ -17,28 +20,11 @@ interface ResolvedSurface extends OverlaySurface {
   heightPx: number;
 }
 
-/**
- * A CSS `rgba()` colour from a hex colour of three or six digits, with or without the `#`; anything
- * unreadable gives white at the same alpha.
- */
-export function hexToRgba(color: string, alpha: number): string {
-  const [r, g, b] = hexChannels(color) ?? [255, 255, 255];
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
+const WHITE = '#ffffff';
 
-/**
- * How brightly an animated light glows at a moment, as a multiplier: a pulse swells slowly between
- * about half and full, a flicker jitters between 0.6 and full, and anything else stays at 1.
- */
-export function animationIntensity(animation: string | undefined, timeMs: number): number {
-  switch (animation) {
-    case 'pulse':
-      return 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(timeMs / 350));
-    case 'flicker':
-      return 0.6 + 0.4 * Math.abs(Math.sin(timeMs * 0.013) * Math.sin(timeMs * 0.027 + 1.3));
-    default:
-      return 1;
-  }
+/** A CSS `rgba()` colour from a hex colour at an alpha; anything not written in hex gives white at the same alpha. */
+export function hexToRgba(color: string, alpha: number): string {
+  return withAlpha(hexChannels(color) ? color : WHITE, alpha);
 }
 
 function glowColor(shape: OverlayShape, alpha: number, timeMs: number): string {
@@ -57,9 +43,7 @@ function beginClips(ctx: CanvasRenderingContext2D, shape: OverlayShape): boolean
   ctx.save();
   if (hasPolygon && polygon) {
     ctx.beginPath();
-    ctx.moveTo(polygon[0].x, polygon[0].y);
-    for (let i = 1; i < polygon.length; i++) ctx.lineTo(polygon[i].x, polygon[i].y);
-    ctx.closePath();
+    tracePolygon(ctx, polygon);
     ctx.clip();
   }
   if (hasCone) {
@@ -101,12 +85,17 @@ function carveReveal(ctx: CanvasRenderingContext2D, shape: OverlayShape): void {
  */
 const polygonPaths = new WeakMap<object, Path2D>();
 
+/** Traces one polygon onto a path, from its first corner round to its last, and closes it. */
+function tracePolygon(sink: PathSink, polygon: readonly { x: number; y: number }[]): void {
+  sink.moveTo(polygon[0].x, polygon[0].y);
+  for (let i = 1; i < polygon.length; i++) sink.lineTo(polygon[i].x, polygon[i].y);
+  sink.closePath();
+}
+
 function tracePolygons(sink: PathSink, polygons: { x: number; y: number }[][]): void {
   for (const polygon of polygons) {
     if (polygon.length < 3) continue;
-    sink.moveTo(polygon[0].x, polygon[0].y);
-    for (let i = 1; i < polygon.length; i++) sink.lineTo(polygon[i].x, polygon[i].y);
-    sink.closePath();
+    tracePolygon(sink, polygon);
   }
 }
 
@@ -159,9 +148,7 @@ function clipToPolygon(ctx: CanvasRenderingContext2D, clip: { x: number; y: numb
   if (!clip || clip.length < 3) return false;
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(clip[0].x, clip[0].y);
-  for (let i = 1; i < clip.length; i++) ctx.lineTo(clip[i].x, clip[i].y);
-  ctx.closePath();
+  tracePolygon(ctx, clip);
   ctx.clip();
   return true;
 }
@@ -174,9 +161,7 @@ function drawShadow(ctx: CanvasRenderingContext2D, shadow: ShadowShape): void {
   gradient.addColorStop(1, hexToRgba(shadow.color, 0));
   ctx.fillStyle = gradient;
   ctx.beginPath();
-  ctx.moveTo(shadow.points[0].x, shadow.points[0].y);
-  for (let i = 1; i < shadow.points.length; i++) ctx.lineTo(shadow.points[i].x, shadow.points[i].y);
-  ctx.closePath();
+  tracePolygon(ctx, shadow.points);
   ctx.fill();
   if (clipped) ctx.restore();
 }
@@ -265,11 +250,6 @@ function drawShadowImage(ctx: CanvasRenderingContext2D, shadow: ShadowShape, img
   ctx.restore();
 }
 
-/** Whether a light is one of the ones that moves, and so has to be drawn again each pass. */
-function isAnimated(shape: OverlayShape): boolean {
-  return !!shape.animation && shape.animation !== 'none';
-}
-
 /**
  * How many pixels an overlay is allowed to hold, and how far its resolution may be let
  * down to stay inside that.
@@ -298,10 +278,19 @@ export const LIGHT_OVERLAY_PIXEL_BUDGET = 4_000_000;
 export const LIGHT_MIN_OVERLAY_SCALE = 0.35;
 
 /**
+ * The longest side an overlay past the budget is drawn at, in canvas pixels. A board of a hundred
+ * cells of 256 pixels drawn at the floor of half its size is an overlay of a hundred and eighty million
+ * pixels, which the table drawn on a canvas sends to the graphics card again at every change, as a
+ * piece is dragged, until the card gives up and draws nothing.
+ */
+export const OVERLAY_LONGEST_PX = 4096;
+
+/**
  * How many canvas pixels an overlay of this size is drawn with, to one pixel of the board.
  *
- * One while it fits inside the budget, and otherwise as much less as keeps it inside, but never
- * less than the floor.
+ * One while it fits inside the budget, though never longer than the graphics card takes a picture,
+ * and otherwise as much less as keeps it inside, but never less than the floor unless the floor
+ * would leave it longer than {@link OVERLAY_LONGEST_PX}.
  */
 export function overlayScale(
   width: number,
@@ -310,116 +299,9 @@ export function overlayScale(
   minScale = MIN_OVERLAY_SCALE
 ): number {
   const pixels = width * height;
-  if (!(pixels > budget)) return 1;
-  return Math.max(minScale, Math.sqrt(budget / pixels));
-}
-
-export interface DirtyRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-/**
- * The ground the lights that move cover, and nothing else, a patch for each group of them.
- *
- * A board is mostly still. Redrawn whole, one candle guttering in a corner would mean clearing
- * the whole board and laying the whole of it down again twenty times a second, which on a large
- * table is tens of millions of pixels a frame for the sake of a few hundred thousand. Kept to the
- * boxes the moving lights actually reach, the rest of the board is left where it is, and two
- * torches at opposite ends of a room redraw their own two corners rather than the room between.
- * Lights whose boxes meet are redrawn in one patch.
- */
-export function animatedGlowPatches(
-  plan: OverlayPlan,
-  widthPx: number,
-  heightPx: number,
-  margin = 0,
-  surface?: OverlaySurface
-): DirtyRect[] {
-  const resolved = resolvedSurfaceOf(widthPx, heightPx, surface);
-  const offsetX = margin - resolved.originX;
-  const offsetY = margin - resolved.originY;
-
-  const boxes: Box[] = [];
-  for (const shape of plan.glows) {
-    if (!isAnimated(shape) || shape.dimPx <= 0) continue;
-    boxes.push({
-      left: shape.x - shape.dimPx + offsetX,
-      top: shape.y - shape.dimPx + offsetY,
-      right: shape.x + shape.dimPx + offsetX,
-      bottom: shape.y + shape.dimPx + offsetY,
-    });
-  }
-
-  const width = widthPx + 2 * margin;
-  const height = heightPx + 2 * margin;
-  const patches: DirtyRect[] = [];
-  for (const box of mergeMeeting(boxes)) {
-    const x = Math.max(0, Math.floor(box.left));
-    const y = Math.max(0, Math.floor(box.top));
-    const w = Math.min(width, Math.ceil(box.right)) - x;
-    const h = Math.min(height, Math.ceil(box.bottom)) - y;
-    if (w > 0 && h > 0) patches.push({ x, y, width: w, height: h });
-  }
-  return patches;
-}
-
-interface Box {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
-
-/** The boxes with every two that meet taken together, until no two of what is left meet. */
-function mergeMeeting(boxes: readonly Box[]): Box[] {
-  const merged = boxes.map((box) => ({ ...box }));
-  let joined = true;
-  while (joined) {
-    joined = false;
-    for (let i = 0; i < merged.length && !joined; i++) {
-      for (let j = i + 1; j < merged.length; j++) {
-        const a = merged[i];
-        const b = merged[j];
-        if (a.left > b.right || b.left > a.right || a.top > b.bottom || b.top > a.bottom) continue;
-        merged[i] = {
-          left: Math.min(a.left, b.left),
-          top: Math.min(a.top, b.top),
-          right: Math.max(a.right, b.right),
-          bottom: Math.max(a.bottom, b.bottom),
-        };
-        merged.splice(j, 1);
-        joined = true;
-        break;
-      }
-    }
-  }
-  return merged;
-}
-
-/** Whether a light reaches into the patch a pass redraws, which every light does on a pass of the whole board. */
-function reachesPatch(shape: OverlayShape, patch: DirtyRect | null, offsetX: number, offsetY: number): boolean {
-  if (!patch) return true;
-  return (
-    shape.x + shape.dimPx + offsetX >= patch.x &&
-    shape.x - shape.dimPx + offsetX <= patch.x + patch.width &&
-    shape.y + shape.dimPx + offsetY >= patch.y &&
-    shape.y - shape.dimPx + offsetY <= patch.y + patch.height
-  );
-}
-
-/** The baked surfaces, holding what does not change over time. */
-export interface OverlayBake {
-  /** The darkness, with what can be seen cut out of it, and the lights that stay put. */
-  base: BakeCanvas;
-  /** The shadows, kept apart from the darkness because they go over the lights. */
-  shadows: BakeCanvas | null;
-  width: number;
-  height: number;
-  /** How many canvas pixels went to one overlay pixel when it was drawn. */
-  scale: number;
+  const side = Math.max(1, width, height);
+  if (!(pixels > budget)) return Math.min(1, LONGEST_PICTURE_PX / side);
+  return clamp(Math.sqrt(budget / pixels), minScale, OVERLAY_LONGEST_PX / side);
 }
 
 export interface BakeCanvas {
@@ -464,67 +346,6 @@ function reset(ctx: CanvasRenderingContext2D, scale: number): void {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 }
 
-/**
- * Bakes the part that does not change over time.
- *
- * A table with a flickering light redraws the same picture over and over, when only the
- * brightness changes. The darkness goes in, and so do the lights that stay put — a lamp
- * that is not guttering has no business being laid down again every pass, and on a board
- * with several of them that is most of the work.
- */
-export function bakeOverlayPlan(
-  plan: OverlayPlan,
-  widthPx: number,
-  heightPx: number,
-  images?: Map<string, HTMLImageElement>,
-  margin = 0,
-  surface?: OverlaySurface,
-  previous?: OverlayBake | null,
-  scale = 1,
-  scratch?: BakeCanvas | null
-): OverlayBake | null {
-  const width = widthPx + 2 * margin;
-  const height = heightPx + 2 * margin;
-  if (width < 1 || height < 1) return null;
-
-  const reuse =
-    previous && previous.width === width && previous.height === height && previous.scale === scale ? previous : null;
-  const base = bakeCanvas(width, height, scale, reuse?.base);
-  if (!base) return null;
-
-  const resolved = resolvedSurfaceOf(widthPx, heightPx, surface);
-  const offsetX = margin - resolved.originX;
-  const offsetY = margin - resolved.originY;
-
-  const bounds = { width, height, offsetX, offsetY, scale };
-  base.context.translate(offsetX, offsetY);
-  paintDarkness(base.context, plan, resolved, scratch ?? null, bounds);
-
-  const glow = (target: CanvasRenderingContext2D): void => {
-    target.globalCompositeOperation = 'lighter';
-    for (const shape of plan.glows) if (!isAnimated(shape)) drawGlow(target, shape, 0);
-    target.globalCompositeOperation = 'source-over';
-  };
-  if (plan.vision?.clipReveals) {
-    throughVision(base.context, plan.vision, scratch ?? null, bounds, 'lighter', glow);
-  } else {
-    glow(base.context);
-  }
-
-  let shadows: BakeCanvas | null = null;
-  if (plan.shadows.length > 0) {
-    shadows = bakeCanvas(width, height, scale, reuse?.shadows);
-    if (shadows) {
-      shadows.context.translate(offsetX, offsetY);
-      paintShadows(shadows.context, plan, images);
-      reset(shadows.context, scale);
-    }
-  }
-
-  reset(base.context, scale);
-  return { base, shadows, width, height, scale };
-}
-
 function resolvedSurfaceOf(widthPx: number, heightPx: number, surface?: OverlaySurface): ResolvedSurface {
   return {
     originX: surface?.originX ?? 0,
@@ -553,10 +374,7 @@ function traceCells(sink: PathSink, grid: CellGrid, keep: (index: number) => boo
   if (isHexGrid(grid.type)) {
     for (let index = 0; index < grid.cols * grid.rows; index++) {
       if (!keep(index)) continue;
-      const points = cellPolygonOf(grid, index);
-      sink.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) sink.lineTo(points[i].x, points[i].y);
-      sink.closePath();
+      tracePolygon(sink, cellPolygonOf(grid, index));
       any = true;
     }
     return any;
@@ -654,11 +472,7 @@ export function fillCells(
   keep: (index: number) => boolean,
   blurPx = 0
 ): void {
-  const previous = ctx.filter;
-  if (blurPx > 0) ctx.filter = `blur(${blurPx.toFixed(1)}px)`;
-  ctx.beginPath();
-  if (traceCells(ctx, grid, keep)) ctx.fill();
-  if (blurPx > 0) ctx.filter = previous;
+  fillMask(ctx, grid, { keep }, blurPx);
 }
 
 interface OverlayBounds {
@@ -667,59 +481,6 @@ interface OverlayBounds {
   offsetX: number;
   offsetY: number;
   scale: number;
-  patch?: DirtyRect | null;
-}
-
-/**
- * The seen cells with their edge softened, laid down once for the corner a moving light redraws.
- *
- * Softening the mask with a filter on every pass rasterises the blur twenty times a second, and
- * Firefox does that by hand. The corner is widened by the reach of the blur, so its edge comes
- * out as soft as it would from the whole mask. Only the corner is kept, not the board.
- */
-interface SoftMask {
-  key: string;
-  image: CanvasImageSource | null;
-  /** Where the kept corner starts, in canvas pixels. */
-  left: number;
-  top: number;
-}
-
-const softSeenMasks = new WeakMap<OverlayVision, Map<string, SoftMask>>();
-
-function softSeenMaskOf(vision: OverlayVision, mask: CellMask, bounds: OverlayBounds, patch: DirtyRect): SoftMask {
-  const scale = bounds.scale;
-  const reach = Math.ceil((vision.blurPx * 3) / Math.min(1, scale));
-  const left = Math.max(0, Math.floor((patch.x - reach) * scale));
-  const top = Math.max(0, Math.floor((patch.y - reach) * scale));
-  const right = Math.min(Math.ceil(bounds.width * scale), Math.ceil((patch.x + patch.width + reach) * scale));
-  const bottom = Math.min(Math.ceil(bounds.height * scale), Math.ceil((patch.y + patch.height + reach) * scale));
-  const key = [left, top, right, bottom, scale, bounds.offsetX, bounds.offsetY, vision.blurPx].join(',');
-
-  let byCorner = softSeenMasks.get(vision);
-  if (!byCorner) {
-    byCorner = new Map();
-    softSeenMasks.set(vision, byCorner);
-  }
-  const kept = byCorner.get(key);
-  if (kept) return kept;
-
-  // Even a corner that would not bake is remembered, or every pass would make a canvas and throw it away.
-  const soft: SoftMask = { key, image: null, left, top };
-  byCorner.set(key, soft);
-  if (!(right > left) || !(bottom > top) || typeof document === 'undefined') return soft;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = right - left;
-  canvas.height = bottom - top;
-  const context = canvas.getContext('2d');
-  if (!context || typeof context.drawImage !== 'function') return soft;
-  context.setTransform(scale, 0, 0, scale, -left, -top);
-  context.translate(bounds.offsetX, bounds.offsetY);
-  context.fillStyle = 'rgba(0, 0, 0, 1)';
-  fillMask(context, vision.grid, mask, vision.blurPx);
-  soft.image = canvas;
-  return soft;
 }
 
 /**
@@ -750,35 +511,23 @@ function throughVision(
     return;
   }
 
-  const patch = bounds.patch;
   const target = scratch.context;
   reset(target, bounds.scale);
   target.globalCompositeOperation = 'source-over';
   target.globalAlpha = 1;
-  if (patch) target.clearRect(patch.x, patch.y, patch.width, patch.height);
-  else target.clearRect(0, 0, bounds.width, bounds.height);
+  target.clearRect(0, 0, bounds.width, bounds.height);
   target.translate(bounds.offsetX, bounds.offsetY);
   draw(target);
   target.globalCompositeOperation = 'destination-in';
-  const soft = patch && vision.blurPx > 0 ? softSeenMaskOf(vision, mask, bounds, patch) : null;
-  if (patch && soft?.image) {
-    const x = patch.x * bounds.scale;
-    const y = patch.y * bounds.scale;
-    const width = patch.width * bounds.scale;
-    const height = patch.height * bounds.scale;
-    target.setTransform(1, 0, 0, 1, 0, 0);
-    target.drawImage(soft.image, x - soft.left, y - soft.top, width, height, x, y, width, height);
-  } else {
-    target.fillStyle = 'rgba(0, 0, 0, 1)';
-    fillMask(target, vision.grid, mask, vision.blurPx);
-  }
+  target.fillStyle = 'rgba(0, 0, 0, 1)';
+  fillMask(target, vision.grid, mask, vision.blurPx);
   target.globalCompositeOperation = 'source-over';
   reset(target, bounds.scale);
 
   const previous = ctx.globalCompositeOperation;
   ctx.setTransform(bounds.scale, 0, 0, bounds.scale, 0, 0);
   ctx.globalCompositeOperation = composite;
-  blit(ctx, scratch.image, patch ?? null, bounds.width, bounds.height, bounds.scale);
+  ctx.drawImage(scratch.image, 0, 0, bounds.width, bounds.height);
   ctx.globalCompositeOperation = previous;
   reset(ctx, bounds.scale);
   ctx.translate(bounds.offsetX, bounds.offsetY);
@@ -855,8 +604,8 @@ function paintFog(ctx: CanvasRenderingContext2D, plan: OverlayPlan): void {
     ctx.globalAlpha = vision.unexploredAlpha;
     fillMask(ctx, vision.grid, unwalkedMask(vision), vision.blurPx);
 
-    // The mottling that keeps the mist from reading as a sheet of paint. It rides in the
-    // surface baked when the scene changes, so it costs nothing on a frame of its own.
+    // The mottling that keeps the mist from reading as a sheet of paint. It is drawn only
+    // when the scene changes, so it costs nothing on a frame of its own.
     const pattern = fogPattern(ctx);
     if (pattern) {
       ctx.fillStyle = pattern;
@@ -886,67 +635,49 @@ function paintShadows(
   }
 }
 
-/**
- * Draws one frame of the lighting and vision overlay: the darkness, the glowing lights and the
- * shadows.
- *
- * A bake of the same size and scale supplies what does not change, so over it only the lights that
- * animate are drawn again, and given a dirty rectangle only that part of the canvas is redrawn.
- * Without a usable bake the whole plan is drawn. The margin widens the canvas around the table on
- * every side.
- */
+/** What an overlay is drawn with beyond its plan and size. */
+export interface OverlayDrawOptions {
+  /** The moment the lights flicker at, in milliseconds; the start of time unless given. */
+  readonly timeMs?: number;
+  /** The pictures the shadows are cast from, by url; a shadow whose picture is missing is cast as a shape. */
+  readonly images?: Map<string, HTMLImageElement>;
+  /** How far the canvas is widened around the table on every side, in board pixels. */
+  readonly margin?: number;
+  /** Where the surface lies and the cells it is made of; the whole canvas from its origin unless given. */
+  readonly surface?: OverlaySurface;
+  /** How many canvas pixels there are to a board pixel; one unless given. */
+  readonly scale?: number;
+  /** A surface to gather a pass on before it is cut back to what can be seen, where there is one. */
+  readonly scratch?: BakeCanvas | null;
+}
+
+/** Draws the lighting and vision overlay: the darkness, the glowing lights and the shadows. */
 export function drawOverlayPlan(
   ctx: CanvasRenderingContext2D,
   plan: OverlayPlan,
   widthPx: number,
   heightPx: number,
-  timeMs = 0,
-  images?: Map<string, HTMLImageElement>,
-  margin = 0,
-  surface?: OverlaySurface,
-  bake?: OverlayBake | null,
-  dirty?: DirtyRect | null,
-  scale = 1,
-  scratch?: BakeCanvas | null
+  options: OverlayDrawOptions = {}
 ): void {
+  const { timeMs = 0, images, margin = 0, surface, scale = 1, scratch } = options;
   const resolved = resolvedSurfaceOf(widthPx, heightPx, surface);
   const offsetX = margin - resolved.originX;
   const offsetY = margin - resolved.originY;
   const width = widthPx + 2 * margin;
   const height = heightPx + 2 * margin;
 
-  const usable = bake && bake.width === width && bake.height === height && bake.scale === scale ? bake : null;
-  // Only a pass that has the still part already laid down may keep to a corner of the board.
-  const patch = usable && dirty ? dirty : null;
-
   reset(ctx, scale);
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
-  if (patch) {
-    ctx.clearRect(patch.x, patch.y, patch.width, patch.height);
-    // A light reaching into the patch from beside it is drawn whole, and nothing past the edge was cleared for it.
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(patch.x, patch.y, patch.width, patch.height);
-    ctx.clip();
-  } else {
-    ctx.clearRect(0, 0, width, height);
-  }
+  ctx.clearRect(0, 0, width, height);
 
-  if (usable) blit(ctx, usable.base.image, patch, width, height, scale);
-
-  const bounds = { width, height, offsetX, offsetY, scale, patch };
+  const bounds = { width, height, offsetX, offsetY, scale };
   ctx.translate(offsetX, offsetY);
-  if (!usable) paintDarkness(ctx, plan, resolved, scratch ?? null, { ...bounds, patch: null });
+  paintDarkness(ctx, plan, resolved, scratch ?? null, bounds);
 
-  // A light that stays put is already in the baked surface, so drawing it again would
-  // only add it to itself.
   const glow = (target: CanvasRenderingContext2D): void => {
     target.globalCompositeOperation = 'lighter';
-    for (const shape of plan.glows) {
-      if ((!usable || isAnimated(shape)) && reachesPatch(shape, patch, offsetX, offsetY))
-        drawGlow(target, shape, timeMs);
-    }
+    for (const shape of plan.glows) drawGlow(target, shape, timeMs);
     target.globalCompositeOperation = 'source-over';
   };
   if (plan.vision?.clipReveals) {
@@ -956,48 +687,9 @@ export function drawOverlayPlan(
   }
 
   ctx.globalCompositeOperation = 'source-over';
-  if (usable) {
-    if (usable.shadows) {
-      reset(ctx, scale);
-      blit(ctx, usable.shadows.image, patch, width, height, scale);
-    }
-  } else {
-    paintShadows(ctx, plan, images);
-  }
+  paintShadows(ctx, plan, images);
 
-  if (patch) ctx.restore();
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
   reset(ctx, scale);
-}
-
-/**
- * Lays a baked surface down, either whole or only over the part being redrawn.
- *
- * The surface holds canvas pixels and is being laid onto overlay coordinates, so where it
- * is taken from is measured one way and where it lands the other.
- */
-function blit(
-  ctx: CanvasRenderingContext2D,
-  image: CanvasImageSource,
-  patch: DirtyRect | null,
-  width: number,
-  height: number,
-  scale: number
-): void {
-  if (!patch) {
-    ctx.drawImage(image, 0, 0, width, height);
-    return;
-  }
-  ctx.drawImage(
-    image,
-    patch.x * scale,
-    patch.y * scale,
-    patch.width * scale,
-    patch.height * scale,
-    patch.x,
-    patch.y,
-    patch.width,
-    patch.height
-  );
 }

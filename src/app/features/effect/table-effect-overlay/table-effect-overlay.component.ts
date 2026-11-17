@@ -1,34 +1,29 @@
 import { NgStyle } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { EffectFieldRenderable, EffectFieldService } from '@axe/application/effect/effect-field.service';
-import { EffectPlaybackService } from '@axe/application/effect/effect-playback.service';
+import { type EffectFieldRenderable, EffectFieldService } from '@axe/application/effect/effect-field.service';
+import { effectElapsedOf, EffectPlaybackService } from '@axe/application/effect/effect-playback.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { FirstPersonService } from '@axe/application/tabletop/first-person.service';
-import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
+import { PieceLinksService } from '@axe/application/tabletop/piece-links.service';
+import { PiecePartPicturesService } from '@axe/application/tabletop/piece-part-pictures.service';
+import { TABLE_SCREEN } from '@axe/application/tabletop/table-screen';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
-import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { PERF_EFFECT_RENDERABLES, perfCounters } from '@axe/core/util/perf-counters';
 import { GameCharacter } from '@axe/domain/character/game-character';
-import { hasPartRegion } from '@axe/domain/character/part-group';
-import { effectParticlePlacements } from '@axe/domain/effect/effect-particle-placements';
-import { EffectSprite, effectSprites } from '@axe/domain/effect/effect-timeline';
+import { cutPictureSprites, EffectSprite } from '@axe/domain/effect/effect-timeline';
 import { ViewRotation } from '@axe/domain/effect/effect-view';
+import { drawsOnlyPicturesOver } from '@axe/domain/effect/scene/scene-kinds';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
-import { EffectCanvasComponent } from '@axe/features/effect/effect-canvas/effect-canvas.component';
 import {
   EFFECT_CAMERA_LIFT_PX,
-  effectBillboardTransform,
-  EffectCanvasPlacement,
-  effectCanvasStyle,
   effectPaintStyle,
   effectSpriteStyle,
   EffectViewpoint,
   hasEffectPaintLayer,
 } from '@axe/features/effect/effect-sprite-style';
-import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 
 export interface EffectEye {
   rotation: ViewRotation;
@@ -36,32 +31,39 @@ export interface EffectEye {
   risePx: number;
 }
 
-const EYE_FLAT_RISE_PX = 1;
-
 const MAX_SPRITES = 400;
 const NOTHING_HIDDEN: ReadonlySet<string> = new Set<string>();
-const MAX_CANVASES = 24;
 
+/** One effect to draw over the table at a moment, a cast or a field, with the targets out of sight. */
+type Renderable = Pick<EffectFieldRenderable, 'key' | 'preset' | 'cast' | 'elapsed'> & { hidden: ReadonlySet<string> };
+
+/**
+ * Draws over the table what the effects that cut a piece's own picture do with it: the picture cut up
+ * and flown apart or parted, laid on the screen where the piece stands. All else an effect draws is
+ * drawn in the table's scene itself, among the pieces.
+ */
 @Component({
   selector: 'table-effect-overlay',
   templateUrl: './table-effect-overlay.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [NgStyle, SafePipe, EffectCanvasComponent],
+  imports: [NgStyle],
 })
 export class TableEffectOverlayComponent {
   private readonly playback = inject(EffectPlaybackService);
   private readonly fieldService = inject(EffectFieldService);
   private readonly tabletopService = inject(TabletopService);
-  private readonly multipartGroup = inject(MultipartGroupService);
   private readonly uiSignalService = inject(UiSignalService);
   private readonly visionService = inject(VisionService);
   private readonly objectStore = inject(ObjectStore);
   private readonly objectChange = inject(ObjectChangeService);
-  private readonly imageStorage = inject(ImageStorage);
   private readonly firstPerson = inject(FirstPersonService);
+  private readonly links = inject(PieceLinksService);
+  private readonly partPictures = inject(PiecePartPicturesService);
 
   readonly eye = input<EffectEye | null>(null);
+
+  private readonly camera = inject(TABLE_SCREEN);
 
   private readonly rotation = computed(() => this.eye()?.rotation ?? this.uiSignalService.tableViewRotation());
 
@@ -69,20 +71,16 @@ export class TableEffectOverlayComponent {
 
   private readonly risePx = computed(() => this.eye()?.risePx ?? 0);
 
-  private readonly flatRisePx = computed(() => (this.eye() ? EYE_FLAT_RISE_PX : 0));
-
   private readonly viewpoint = computed<EffectViewpoint>(() => ({
     rotation: this.rotation(),
     liftPx: this.liftPx(),
     risePx: this.risePx(),
-    flatRisePx: this.flatRisePx(),
+    flatRisePx: 0,
   }));
 
   /**
-   * Gathers the effects playing and the fields left standing into one thing to draw.
-   *
-   * Whether a target can be seen is settled once here; asking separately for the billboards
-   * and the particles would run that check twice a frame for every target.
+   * Which targets of each effect playing and each field left standing are out of sight, settled once
+   * a cast rather than once a frame for every target.
    */
   private readonly hiddenByKey = computed<ReadonlyMap<string, ReadonlySet<string>>>(() => {
     const hidden = new Map<string, ReadonlySet<string>>();
@@ -95,28 +93,32 @@ export class TableEffectOverlayComponent {
     return hidden;
   });
 
-  private readonly nothingToRender: (EffectFieldRenderable & { hidden: ReadonlySet<string> })[] = [];
+  private readonly nothingToRender: Renderable[] = [];
 
   /**
-   * Everything to draw this frame.
+   * The effects that cut a piece's own picture, whose picture is drawn over the table this frame; all
+   * else of them, and every other effect, is drawn in the table's scene itself.
    *
    * With no cast playing and no field standing it reads no clock and hands back the same empty
    * list, so the weather keeping the frame loop running does not rebuild the sprites every frame.
    */
-  private readonly renderables = computed<(EffectFieldRenderable & { hidden: ReadonlySet<string> })[]>(() => {
+  private readonly renderables = computed<Renderable[]>(() => {
     if (!this.eye() && this.firstPerson.showing()) return this.nothingToRender;
     if (this.playback.activeCasts().length < 1 && this.fieldService.fields().length < 1) return this.nothingToRender;
     perfCounters.bump(PERF_EFFECT_RENDERABLES);
     const now = this.playback.now();
     const hiddenByKey = this.hiddenByKey();
-    const all: EffectFieldRenderable[] = [
-      ...this.playback.activeCasts().map((active) => ({
-        key: String(active.key),
-        preset: active.preset,
-        cast: active.cast,
-        elapsed: now - active.startedAt,
-      })),
-      ...this.fieldService.renderables(now),
+    const all: Omit<Renderable, 'hidden'>[] = [
+      ...this.playback
+        .activeCasts()
+        .flatMap((active) => (drawsOnlyPicturesOver(active.preset) ? [active] : []))
+        .map((active) => ({
+          key: String(active.key),
+          preset: active.preset,
+          cast: active.cast,
+          elapsed: effectElapsedOf(active, now),
+        })),
+      ...this.fieldService.renderables(now).filter((field) => drawsOnlyPicturesOver(field.preset)),
     ];
     return all.map((active) => ({ ...active, hidden: hiddenByKey.get(active.key) ?? NOTHING_HIDDEN }));
   });
@@ -127,75 +129,37 @@ export class TableEffectOverlayComponent {
 
     for (const active of this.renderables()) {
       const hiddenIdentifiers = active.hidden;
-      const parts = effectSprites(active.preset, active.cast, active.elapsed, {
+      const parts = cutPictureSprites(active.preset, active.cast, active.elapsed, {
         baseSize: gridSize,
         hiddenIdentifiers,
-        viewRotation: this.rotation(),
         resolvePosition: (identifier) => this.centerOf(identifier, gridSize),
         resolveImage: (identifier) => this.imageUrlOf(identifier),
-        resolveImageFile: (identifier) => this.imageStorage.get(identifier)?.url ?? '',
+        resolveSize: (identifier) => this.sizeOf(identifier),
       });
       for (const part of parts) sprites.push({ ...part, key: `${active.key}-${part.key}` });
     }
     return sprites.length > MAX_SPRITES ? sprites.slice(0, MAX_SPRITES) : sprites;
   });
 
-  /** The glowing particles go onto one canvas per target, where the additive blending stays and does not flatten the depth. */
-  readonly canvases = computed<EffectCanvasPlacement[]>(() => {
-    const gridSize = this.tabletopService.gridSize();
+  /** The pieces of the pictures, each with the style that lays it on the screen where the point it stands at is drawn. */
+  protected readonly standingOnScreen = computed(() => {
+    const screen = this.camera.screenOf();
+    if (!screen) return [];
     const viewpoint = this.viewpoint();
-    const placements: EffectCanvasPlacement[] = [];
-
-    for (const active of this.renderables()) {
-      if (placements.length >= MAX_CANVASES) break;
-      const placed = effectParticlePlacements(
-        active.preset,
-        active.cast,
-        active.elapsed,
-        {
-          baseSize: gridSize,
-          hiddenIdentifiers: active.hidden,
-          resolvePosition: (identifier) => this.centerOf(identifier, gridSize),
-        },
-        MAX_CANVASES - placements.length
-      );
-      for (const placement of placed) {
-        placements.push({
-          key: `${active.key}-${placement.key}`,
-          layer: placement.layer,
-          width: placement.layer.width,
-          height: placement.layer.height,
-          transform: effectBillboardTransform(placement.center, placement.layer, viewpoint),
-        });
+    return this.sprites().map((sprite) => {
+      const at = screen(sprite.x, sprite.y, sprite.z + viewpoint.risePx, viewpoint.liftPx);
+      const parts = [`translate(${at.x}px, ${at.y}px)`, `scale(${at.scale})`];
+      if (sprite.offsetX !== 0 || sprite.offsetY !== 0) {
+        parts.push(`translate(${sprite.offsetX.toFixed(2)}px, ${sprite.offsetY.toFixed(2)}px)`);
       }
-    }
-    return placements.length > MAX_CANVASES ? placements.slice(0, MAX_CANVASES) : placements;
+      if (sprite.rotate !== 0) parts.push(`rotateZ(${sprite.rotate.toFixed(2)}deg)`);
+      parts.push('translate(-50%, -50%)');
+      return { sprite, style: { ...effectSpriteStyle(sprite, viewpoint), transform: parts.join(' ') } };
+    });
   });
-
-  protected canvasStyle(placement: EffectCanvasPlacement): Record<string, string> {
-    return effectCanvasStyle(placement);
-  }
 
   protected hasPaintLayer(sprite: EffectSprite): boolean {
     return hasEffectPaintLayer(sprite);
-  }
-
-  /** The outer layer, which only places it in space and fades it out. */
-  protected spriteStyle(sprite: EffectSprite): Record<string, string> {
-    return effectSpriteStyle(sprite, this.viewpoint());
-  }
-
-  /**
-   * The characters a reaction writes, sized to the sprite. A dark edge keeps a word readable
-   * over a bright map as well as a dark one.
-   */
-  protected textStyle(sprite: EffectSprite): Record<string, string> {
-    return {
-      'font-size': `${Math.max(1, sprite.height * 0.8).toFixed(1)}px`,
-      color: sprite.textColor || '#ffffff',
-      'text-shadow': '0 1px 3px rgba(0, 0, 0, 0.7)',
-      'font-weight': '700',
-    };
   }
 
   /** The inner layer, which carries the look and the animation. */
@@ -203,11 +167,22 @@ export class TableEffectOverlayComponent {
     return effectPaintStyle(sprite);
   }
 
-  /** Collapsing and cleaving cut the picture of the piece itself and move the parts. */
+  /**
+   * Collapsing and cleaving cut the picture of the piece itself, as it is drawn with any parts laid on
+   * it, and move the pieces of it.
+   */
   private imageUrlOf(identifier: string): string {
-    const object = this.objectStore.get<TabletopObject>(identifier);
+    const object = this.drawnAs(identifier);
     if (!(object instanceof TabletopObject)) return '';
+    if (object instanceof GameCharacter) return this.partPictures.pictureOf(object)?.url ?? object.imageFile.url;
     return object.imageFile?.url ?? '';
+  }
+
+  /** The piece a target is drawn as: the body a part is a part of, which is drawn for it; itself otherwise. */
+  private drawnAs(identifier: string): TabletopObject | null {
+    const object = this.objectStore.get<TabletopObject>(identifier);
+    if (!(object instanceof GameCharacter)) return object;
+    return this.links.bodyOf(object) ?? object;
   }
 
   private hiddenIdentifiersOf(identifiers: readonly string[]): ReadonlySet<string> {
@@ -221,30 +196,15 @@ export class TableEffectOverlayComponent {
     return hidden;
   }
 
+  /** How many cells across a piece is, as it stands now; one where it is not on the table. */
+  private sizeOf(identifier: string): number {
+    const size = (this.drawnAs(identifier) as { size?: unknown } | null)?.size;
+    return typeof size === 'number' && size > 0 ? size : 1;
+  }
+
   private centerOf(identifier: string, gridSize: number): { x: number; y: number; z: number } | null {
-    const object = this.objectStore.get<TabletopObject>(identifier);
+    const object = this.drawnAs(identifier);
     if (!(object instanceof TabletopObject) || !object.isVisibleOnTable) return null;
-    // A following effect re-resolves its target every frame and so overrides the position stored in
-    // the cast; a linked part has to land on its own region on this viewer's screen, not on the whole picture.
-    if (object instanceof GameCharacter && hasPartRegion(object)) {
-      const eye = this.eye();
-      return this.multipartGroup.anchorOf(
-        object,
-        gridSize,
-        eye
-          ? {
-              // The first-person view draws the part's transparent full-frame image as a vertical
-              // billboard. Its across axis follows camera yaw and its vertical axis follows world Z.
-              mode2d: false,
-              yawDeg: eye.rotation.z,
-              pitchDeg: 90,
-              tiltDeg: 0,
-              contain: false,
-              specifiedHeightPx: object.specifyKomaImageFlag ? object.komaImageHeight : undefined,
-            }
-          : undefined
-      );
-    }
     const size = (object as { size?: number }).size;
     const half = (gridSize * (typeof size === 'number' && size > 0 ? size : 1)) / 2;
     const raised = this.eye() ? object.altitude * gridSize : 0;

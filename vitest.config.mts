@@ -5,7 +5,7 @@ import { basename, isAbsolute, join, relative, resolve, sep } from 'path';
 import { defineConfig } from 'vitest/config';
 import { parseCLI } from 'vitest/node';
 
-import base from './vitest-base.config.mts';
+import base from './vitest-base.config.mjs';
 
 const ROOT = import.meta.dirname;
 const SPEC_TSCONFIG = resolve(ROOT, 'tsconfig.spec.json');
@@ -96,6 +96,8 @@ export default defineConfig({
     environment: 'happy-dom',
     // Use process isolation on Windows, matching the known-good local validation runs.
     pool: process.platform === 'win32' ? 'forks' : 'threads',
+    // Each fork starts with node's default heap, which the larger component specs outgrow on Windows.
+    execArgv: process.platform === 'win32' ? ['--max-old-space-size=6144'] : [],
     // A component compiled with its templateUrl is cached by its .ts alone, so with the module cache
     // on, a change to the template only ran the specs against the template as it was before.
     fsModuleCache: false,

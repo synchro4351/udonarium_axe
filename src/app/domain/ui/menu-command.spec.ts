@@ -1,6 +1,8 @@
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { HAND_CARDS_ICON } from '@axe/domain/ui/custom-icon';
 import {
+  CHAT_TOOLS,
+  chatToolOf,
   isMenuCommandOffered,
   MENU_COMMANDS,
   MENU_SURFACES,
@@ -43,9 +45,10 @@ describe('the table of what a menu can do', () => {
     expect(menuCommandOf('handRail')?.icon).toBe(HAND_CARDS_ICON);
   });
 
-  it('lets the stamp packs be put on every menu', () => {
+  it('lets the stamp packs be put on every menu a panel may go on', () => {
     const stamp = menuCommandOf('stampPacks')!;
-    for (const surface of MENU_SURFACES) expect(menuCommandFits(stamp, surface)).toBe(true);
+    const images = menuCommandOf('images')!;
+    for (const surface of MENU_SURFACES) expect(menuCommandFits(stamp, surface)).toBe(menuCommandFits(images, surface));
   });
 
   describe('menuCommandOf', () => {
@@ -139,6 +142,18 @@ describe('the table of what a menu can do', () => {
       expect(testIdOf('handRail')).toBe('fab-entry-hand');
       expect(testIdOf('theme')).toBe('seat-theme');
       expect(testIdOf('zipLoad')).toBe('save-load-load');
+    });
+
+    it('keeps the chat tools to the chat, and the rest off it', () => {
+      const onChat = menuCommandsFor('chatTools', PeerRole.Guest);
+      expect(onChat.map((command) => command.key)).toEqual(CHAT_TOOLS.map((tool) => `chat:${tool}`));
+      expect(onChat.map(chatToolOf)).toEqual([...CHAT_TOOLS]);
+      for (const surface of ['fab', 'gmToolbar', 'plToolbar'] as const) {
+        expect(menuCommandsFor(surface, PeerRole.GameMaster).some((command) => chatToolOf(command) !== null)).toBe(
+          false
+        );
+      }
+      expect(chatToolOf(menuCommandOf('chat')!)).toBeNull();
     });
 
     it('offers every menu something', () => {

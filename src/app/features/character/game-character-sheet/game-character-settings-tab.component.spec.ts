@@ -1,6 +1,7 @@
 import { ComponentRef } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
+import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import {
@@ -44,27 +45,14 @@ describe('GameCharacterSettingsTabComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  describe('label placement', () => {
-    const choose = (value: string) => component.onSetLabelPlacement({ target: { value } } as unknown as Event);
+  it('shows one who may not hide a name that it is hidden, and that the master alone may show it', () => {
+    vi.spyOn(TestBed.inject(RolePermissionService), 'canSeeHidden').mockReturnValue(false);
+    character.hideName = true;
+    fixture.detectChanges();
 
-    it('stores a chosen preset, keeps the default as an empty value and ignores unknown values', () => {
-      choose('bottomLeft');
-      expect(character.labelPlacement).toBe('bottomLeft');
-      expect(component.labelPlacement()).toBe('bottomLeft');
-      choose('above');
-      expect(character.labelPlacement).toBe('');
-      choose('center');
-      choose('sideways');
-      expect(character.labelPlacement).toBe('');
-    });
-
-    it('offers a compact select with every preset', () => {
-      fixture.detectChanges();
-      const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>(
-        '[data-testid="label-placement"]'
-      )!;
-      expect(select.options).toHaveLength(10);
-    });
+    const told = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="settings-hide-name-gm-only"]');
+    expect(told?.querySelector('input')?.disabled).toBe(true);
+    expect(told?.textContent).toContain('GMのみ');
   });
 
   describe("how high a mount's riders stand", () => {

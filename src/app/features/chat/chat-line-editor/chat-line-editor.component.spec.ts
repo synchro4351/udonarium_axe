@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import type { ChatLintSession } from '@axe/application/chat/chat-lint.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import type { ChatEditorHost, ChatEditorStart } from '@axe/features/chat/chat-editor/chat-editor';
 import { CHAT_EDITOR_LOADER, type ChatEditorModule } from '@axe/features/chat/chat-editor/chat-editor-loader';
 import { ChatLineEditorComponent } from '@axe/features/chat/chat-line-editor/chat-line-editor.component';
 import { StampPickerService } from '@axe/features/chat/stamp/stamp-picker.service';
@@ -60,14 +60,6 @@ describe('ChatLineEditorComponent', () => {
     expect(box().getAttribute('placeholder')).toBe('本文');
   });
 
-  it('says nothing of a decoration round a roll, as a line rewritten runs its commands no more', () => {
-    fixture.componentRef.setInput('draft', '**2d6 攻撃**');
-    fixture.detectChanges();
-    const session = (fixture.componentInstance as unknown as { session: ChatLintSession }).session;
-
-    expect(session.diagnostics().map((found) => found.code)).not.toContain('deco.hidesCommand');
-  });
-
   it('tells what is typed as the draft', () => {
     box().value = 'こんにちは';
     box().dispatchEvent(new Event('input'));
@@ -99,6 +91,50 @@ describe('ChatLineEditorComponent', () => {
 });
 
 describe('ChatLineEditorComponent handing its plain box over to the editor', () => {
+  it('says nothing of a decoration round a roll, as a line rewritten runs its commands no more', async () => {
+    let arrive!: (module: ChatEditorModule | null) => void;
+    const mounted = vi.fn((_parent: HTMLElement, _start: ChatEditorStart, _host: ChatEditorHost) => ({
+      parent: null,
+      text: () => '**2d6 攻撃**',
+      selection: () => ({ from: 0, to: 0 }),
+      refresh: vi.fn(),
+      refreshSoon: vi.fn(),
+      followRoot: vi.fn(),
+      destroy: vi.fn(),
+      focus: vi.fn(),
+      hasFocus: () => false,
+      activeMarks: () => null,
+      reconfigure: vi.fn(),
+    }));
+    TestBed.configureTestingModule({
+      imports: [ChatLineEditorComponent],
+      providers: [
+        ...TEST_PROVIDERS,
+        {
+          provide: CHAT_EDITOR_LOADER,
+          useValue: () =>
+            new Promise<ChatEditorModule | null>((resolve) => {
+              arrive = resolve;
+            }),
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(ChatLineEditorComponent);
+    fixture.componentRef.setInput('draft', '**2d6 攻撃**');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    arrive({ mountChatEditor: mounted } as unknown as ChatEditorModule);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    TestBed.tick();
+
+    const session = mounted.mock.calls[0][2].session();
+    expect(session).not.toBeNull();
+    expect(session!.scan().text).toBe('**2d6 攻撃**');
+    expect(session!.diagnostics().map((found) => found.code)).not.toContain('deco.hidesCommand');
+  });
+
   it('puts the editor in where the caret stood, as it arrives while the line is written', async () => {
     let arrive!: (module: ChatEditorModule | null) => void;
     const mounted = vi.fn(() => ({
@@ -312,5 +348,30 @@ describe('ChatLineEditorComponent handing its plain box over to the editor', () 
         other.remove();
       }
     });
+  });
+
+  it('marks no portrait that ends the line as doing nothing there, a line rewritten carrying none out', async () => {
+    TestBed.configureTestingModule({
+      imports: [ChatLineEditorComponent],
+      providers: [
+        ...TEST_PROVIDERS,
+        { provide: CHAT_EDITOR_LOADER, useValue: () => import('@axe/features/chat/chat-editor/chat-editor') },
+      ],
+    });
+    const fixture = TestBed.createComponent(ChatLineEditorComponent);
+    fixture.componentRef.setInput('draft', 'またね @アリス');
+    const element = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      TestBed.tick();
+      expect(element.querySelector('[data-chip="portrait"]')).not.toBeNull();
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    fixture.detectChanges();
+
+    expect(element.querySelector('.chat-chip-idle')).toBeNull();
+    fixture.destroy();
   });
 });

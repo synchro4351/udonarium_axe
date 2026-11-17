@@ -38,6 +38,26 @@ describe('ContextMenuComponent', () => {
     expect(root.querySelectorAll('[data-context-menu-item-gap]')).toHaveLength(0);
   });
 
+  it('lists an index by line and name, and goes to the line of the row pressed', () => {
+    const goTo = vi.fn();
+    component.contextMenuService.title = component.indexTitle;
+    component.contextMenuService.actions = [
+      { name: '攻撃', line: 3, action: () => goTo(3) },
+      { name: '防御', line: 9, action: () => goTo(9) },
+    ];
+    fixture.detectChanges();
+
+    const rows = Array.from(
+      component.rootElementRef().nativeElement.querySelectorAll<HTMLElement>('[data-context-menu-item]')
+    );
+    expect(rows.map((row) => row.textContent?.trim())).toEqual(['3:攻撃', '9:防御']);
+
+    rows[1].click();
+
+    expect(goTo).toHaveBeenCalledTimes(1);
+    expect(goTo).toHaveBeenCalledWith(9);
+  });
+
   it('draws an item that is not enabled dimmed, and does nothing when it is pressed', () => {
     const action = vi.fn();
     component.contextMenuService.actions = [
@@ -53,10 +73,21 @@ describe('ContextMenuComponent', () => {
     unavailable.click();
 
     expect(unavailable.getAttribute('aria-disabled')).toBe('true');
-    expect(unavailable.classList.contains('opacity-50')).toBe(true);
+    expect(unavailable.querySelector('span')?.classList.contains('opacity-50')).toBe(true);
+    expect(unavailable.classList.contains('hover:bg-ui-menu-hover')).toBe(false);
     expect(available.hasAttribute('aria-disabled')).toBe(false);
     expect(action).not.toHaveBeenCalled();
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it('draws the tick of an item that is not enabled as one that cannot be ticked', () => {
+    component.contextMenuService.actions = [{ name: '☑ 名前を隠す（GMのみ）', enabled: false }];
+    fixture.detectChanges();
+
+    const tick = component.rootElementRef().nativeElement.querySelector<HTMLInputElement>('input[type="checkbox"]');
+
+    expect(tick?.checked).toBe(true);
+    expect(tick?.disabled).toBe(true);
   });
 
   it('renders radial descendants as separate rounded rows with real transparent spacers', () => {

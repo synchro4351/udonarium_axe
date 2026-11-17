@@ -1,7 +1,4 @@
-import { FirstPersonPose } from '@axe/domain/tabletop/first-person/first-person-lattice';
-import { FirstPersonPlaneQuad, FirstPersonWallQuad } from '@axe/domain/tabletop/first-person/first-person-scene';
-import { FOG_VEIL_ALPHA } from '@axe/domain/tabletop/fog/fog-mode';
-
+import { clamp } from '@axe/core/util/clamp';
 export const FIRST_PERSON_UNIT_PX = 256;
 export const MAX_PIECE_TEXT_SCREEN_PX = 28;
 /** How far up from the bottom of the view a lifted piece's feet are held, as a share of half the view's height. */
@@ -12,15 +9,6 @@ const CHROME_BADGE_ROW_PX = 54;
 const CHROME_GAUGE_ROW_PX = 24;
 const CHROME_LABEL_ROW_PX = 46;
 const MAX_SHADE = 0.85;
-/** How blurred the farthest of what is drawn is, in screen pixels. */
-export const MAX_FAR_BLUR_PX = 3;
-const FAR_BLUR_STEP_PX = 0.5;
-/**
- * The colour a face darkens to with distance and the dark, as the red, green and blue of a CSS
- * colour: black in the air, the colour of the depths under water.
- */
-export const BLACK_VEIL = '0, 0, 0';
-const REMEMBERED_VEIL = `linear-gradient(rgba(0, 0, 0, ${FOG_VEIL_ALPHA}), rgba(0, 0, 0, ${FOG_VEIL_ALPHA}))`;
 /** Where each colour of the night sky stands down a level view, as a share of its height. */
 const NIGHT_SKY_STOPS: readonly (readonly [string, number])[] = [
   ['#04060b', 0],
@@ -52,7 +40,7 @@ export function nightSkyAt(liftPx: number, viewHeightPx: number): string {
  * the dark below alike, until water nothing can be seen through is its own colour all round.
  */
 export function waterSkyAt(deepColor: string, liftPx: number, viewHeightPx: number, murk = 0): string {
-  const clear = 1 - Math.min(Math.max(Number.isFinite(murk) ? murk : 0, 0), 1);
+  const clear = 1 - clamp(Number.isFinite(murk) ? murk : 0, 0, 1);
   const toward = (share: number) => `${round(100 - share * clear)}%`;
   const stops: (readonly [string, number])[] = [
     [`color-mix(in srgb, ${deepColor} ${toward(45)}, #b8e8ff)`, 0],
@@ -78,148 +66,21 @@ export function scaleOf(gridSize: number): number {
 }
 
 export function perspectivePx(widthPx: number, fovDeg: number): number {
-  const half = (Math.min(Math.max(fovDeg, 1), 179) * Math.PI) / 360;
+  const half = (clamp(fovDeg, 1, 179) * Math.PI) / 360;
   return Math.max(1, widthPx) / 2 / Math.tan(half);
 }
 
 /**
- * The transform that puts the camera at the eye, turned the way it faces and tipped up (positive) or
- * down as far as it looks.
+ * How far off, for a view drawn on a canvas that fades into the dark with distance, things have faded
+ * wholly away: the shade grows as it does for the CSS view, to its most at the farthest drawn.
  */
-export function cameraTransform(
-  pose: FirstPersonPose & { pitch?: number },
-  scale: number,
-  perspective: number
-): string {
-  return [
-    `translateZ(${px(perspective)})`,
-    ...(pose.pitch ? [`rotateX(${deg(pose.pitch)})`] : []),
-    'rotateX(90deg)',
-    `rotateZ(${deg(-pose.yaw)})`,
-    `translate3d(${px(-pose.x * scale)}, ${px(-pose.y * scale)}, ${px(-pose.z * scale)})`,
-  ].join(' ');
+export function fadeOutPx(depthPx: number): number {
+  return depthPx / MAX_SHADE;
 }
 
 export function shadeFor(depth: number, depthPx: number): number {
   if (depthPx <= 0) return 0;
-  return round(Math.min(Math.max(depth / depthPx, 0), 1) * MAX_SHADE);
-}
-
-/**
- * How blurred something is drawn for how far off it stands: not at all within the clear
- * distance, then more and more out to the farthest drawn, in half-pixel steps so faces at much
- * the same distance share one blur.
- */
-export function farBlurPx(depth: number, clearPx: number, depthPx: number): number {
-  if (depth <= clearPx || depthPx <= clearPx) return 0;
-  const share = Math.min((depth - clearPx) / (depthPx - clearPx), 1);
-  return Math.max(FAR_BLUR_STEP_PX, Math.round((share * MAX_FAR_BLUR_PX) / FAR_BLUR_STEP_PX) * FAR_BLUR_STEP_PX);
-}
-
-/** The CSS filter for a blur, or null for none. */
-export function blurFilter(blurPx: number): string | null {
-  return blurPx > 0 ? `blur(${round(blurPx)}px)` : null;
-}
-
-/**
- * The veil over a face once the light on it is counted as well as how far off it is: the same
- * darkening for distance, deepened as the light at the face falls from full to none.
- */
-export function litShade(depthShade: number, brightness: number): number {
-  const light = Math.min(Math.max(brightness, 0), 1);
-  return round(1 - (1 - depthShade) * light);
-}
-
-/**
- * The filter a piece's picture is drawn with: dimmed to the light on it, blurred for how far off it
- * stands, and glowing red while targeted.
- */
-export function pieceImageFilter(brightness: number, targeted: boolean, blurPx = 0): string | null {
-  const parts: string[] = [];
-  if (brightness < 1) parts.push(`brightness(${round(Math.max(brightness, 0))})`);
-  const blur = blurFilter(blurPx);
-  if (blur) parts.push(blur);
-  if (targeted) parts.push('drop-shadow(0 0 8px #ff3b30)');
-  return parts.length > 0 ? parts.join(' ') : null;
-}
-
-/**
- * Where a wall face is drawn and how its picture lies on it. A face a tipped camera cuts across is
- * drawn only as tall as what is kept, its outline cut to the slant, with its picture still laid over
- * the whole height of the wall so it keeps its place. A block that tiles its picture lays a cell of
- * it to a tile, from the start of the wall and its top, as the table does.
- */
-export function wallQuadStyle(
-  quad: FirstPersonWallQuad,
-  scale: number,
-  imageUrl: string,
-  shade: number,
-  remembered = false,
-  veil = BLACK_VEIL
-): QuadStyle {
-  const wallTop = quad.basePx + quad.heightPx;
-  const cut = quad.cut;
-  const top = cut ? cut.topPx : wallTop;
-  const height = cut ? cut.topPx - cut.basePx : quad.heightPx;
-  const style: QuadStyle = {
-    width: px(quad.length * scale),
-    height: px(height * scale),
-    transformOrigin: '0 0',
-    transform: `translate3d(${px(quad.x * scale)}, ${px(quad.y * scale)}, ${px(top * scale)}) rotateZ(${deg(quad.angle)}) rotateX(-90deg)`,
-    ...backgroundOf(
-      imageUrl,
-      shade,
-      quad.tilePx > 0
-        ? `${px(quad.tilePx * scale)} ${px(quad.tilePx * scale)}`
-        : cut
-          ? `${px(quad.fullLength * scale)} ${px(quad.heightPx * scale)}`
-          : `${px(quad.fullLength * scale)} 100%`,
-      cut ? `${px(-quad.uStart * scale)} ${px(-(wallTop - top) * scale)}` : `${px(-quad.uStart * scale)} 0`,
-      remembered,
-      veil,
-      quad.tilePx > 0
-    ),
-  };
-  if (cut?.outline) {
-    style['clipPath'] =
-      `polygon(${cut.outline.map((point) => `${px(point.u * scale)} ${px((top - point.z) * scale)}`).join(', ')})`;
-  }
-  return style;
-}
-
-/**
- * Where a floor, a ceiling or the top or underside of a block is drawn and how its picture lies on
- * it: over the whole of its frame however little of it is kept, or a cell of it to a tile from the
- * frame's corner where the block tiles its picture. An underside is seen from below, the far side of
- * its frame nearest the top of the view.
- */
-export function planeQuadStyle(
-  quad: FirstPersonPlaneQuad,
-  scale: number,
-  imageUrl: string,
-  shade: number,
-  remembered = false,
-  veil = BLACK_VEIL
-): QuadStyle {
-  const up = quad.facing === 'up';
-  const originY = up ? quad.minY : quad.minY + quad.height;
-  const local = quad.polygon.map((point) => ({
-    x: (point.x - quad.minX) * scale,
-    y: (up ? point.y - quad.minY : quad.minY + quad.height - point.y) * scale,
-  }));
-  const frame = quad.frame;
-  const tile = quad.tilePx > 0 ? `${px(quad.tilePx * scale)} ${px(quad.tilePx * scale)}` : null;
-  const size = tile ?? (frame ? `${px(frame.width * scale)} ${px(frame.height * scale)}` : '100% 100%');
-  const frameTop = frame ? (up ? frame.y - quad.minY : quad.minY + quad.height - frame.y - frame.height) : 0;
-  const position = frame ? `${px((frame.x - quad.minX) * scale)} ${px(frameTop * scale)}` : '0 0';
-  return {
-    width: px(quad.width * scale),
-    height: px(quad.height * scale),
-    transformOrigin: '0 0',
-    transform: `translate3d(${px(quad.minX * scale)}, ${px(originY * scale)}, ${px(quad.zPx * scale)})${up ? '' : ' rotateX(180deg)'}`,
-    clipPath: `polygon(${local.map((point) => `${px(point.x)} ${px(point.y)}`).join(', ')})`,
-    ...backgroundOf(imageUrl, shade, size, position, remembered, veil, tile !== null),
-  };
+  return round(clamp(depth / depthPx, 0, 1) * MAX_SHADE);
 }
 
 export function billboardStyle(
@@ -270,10 +131,6 @@ export function projectedScaleOf(depthPx: number, scale: number, perspective: nu
   return perspective / Math.max(depthPx * scale, 1);
 }
 
-export function projectedHeightPx(heightPx: number, depthPx: number, scale: number, perspective: number): number {
-  return heightPx * scale * projectedScaleOf(depthPx, scale, perspective);
-}
-
 /**
  * How far a piece standing close has to be raised, in table pixels, for its feet to come up into
  * the view rather than below its bottom edge; nothing for a piece far enough off to show whole.
@@ -314,6 +171,8 @@ export interface PieceChromeRows {
   readonly badges: boolean;
   readonly gauges: number;
   readonly label: boolean;
+  /** How many parts are listed under the piece, each by its name. */
+  readonly parts?: number;
 }
 
 /** How tall what is told about a piece stands, in the box's own pixels before it is scaled. */
@@ -322,7 +181,8 @@ export function pieceChromeHeightPx(rows: PieceChromeRows): number {
     CHROME_PAD_PX +
     (rows.badges ? CHROME_BADGE_ROW_PX : 0) +
     rows.gauges * CHROME_GAUGE_ROW_PX +
-    (rows.label ? CHROME_LABEL_ROW_PX : 0)
+    (rows.label ? CHROME_LABEL_ROW_PX : 0) +
+    (rows.parts ?? 0) * CHROME_LABEL_ROW_PX
   );
 }
 
@@ -351,44 +211,11 @@ export function pieceChromeBottomPercent(at: {
   const angle = ((at.pitchDeg ?? 0) * Math.PI) / 180 + Math.atan(roomPx / at.perspective);
   const highestZ = angle >= Math.PI / 2 ? Infinity : at.eyeZ + at.depthPx * Math.tan(angle);
   const percent = ((Math.min(topZ, highestZ) - at.baseZ) / at.heightPx) * 100;
-  return round(Math.min(Math.max(percent, 0), 100));
+  return round(clamp(percent, 0, 100));
 }
 
 export function billboardHudTransform(textScale: number): string | null {
   return textScale >= 1 ? null : `scale(${round(textScale)})`;
-}
-
-/**
- * The veils over a face and the picture under them, laid at the size and position given. A tiled
- * picture repeats where the face is drawn without repeating anything else.
- */
-function backgroundOf(
-  imageUrl: string,
-  shade: number,
-  size: string,
-  position: string,
-  remembered: boolean,
-  veil: string,
-  tiled = false
-): QuadStyle {
-  const veils = [`linear-gradient(rgba(${veil}, ${shade}), rgba(${veil}, ${shade}))`];
-  if (remembered) veils.unshift(REMEMBERED_VEIL);
-  const veilSizes = veils.map(() => '100% 100%');
-  const veilPositions = veils.map(() => '0 0');
-  if (!imageUrl) {
-    return {
-      backgroundImage: veils.join(', '),
-      backgroundSize: veilSizes.join(', '),
-      backgroundPosition: veilPositions.join(', '),
-    };
-  }
-  const style: QuadStyle = {
-    backgroundImage: `${veils.join(', ')}, url("${imageUrl.replace(/"/g, '%22')}")`,
-    backgroundSize: `${veilSizes.join(', ')}, ${size}`,
-    backgroundPosition: `${veilPositions.join(', ')}, ${position}`,
-  };
-  if (tiled) style['backgroundRepeat'] = `${veils.map(() => 'no-repeat').join(', ')}, repeat`;
-  return style;
 }
 
 function round(value: number): number {

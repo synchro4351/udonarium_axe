@@ -17,6 +17,7 @@ import { PieceLinksService } from '@axe/application/tabletop/piece-links.service
 import { PieceStepService } from '@axe/application/tabletop/piece-step.service';
 import { RideService } from '@axe/application/tabletop/ride.service';
 import { RoomRulesService } from '@axe/application/tabletop/room-rules.service';
+import { StandingGroundService } from '@axe/application/tabletop/standing-ground.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
@@ -65,6 +66,7 @@ interface FreeTerms {
   readonly start: MovePoint;
   readonly blocks: readonly MoveBlock[];
   readonly zones: ZoneMoveLimits | null;
+  readonly ground: LegLimits['ground'];
 }
 
 /**
@@ -78,7 +80,9 @@ interface FreeTerms {
  */
 @Injectable({ providedIn: 'root' })
 export class FreeMovePlanService {
-  private readonly tableSelecter = inject(TableSelecter);
+  private get tableSelecter(): TableSelecter {
+    return TableSelecter.instance;
+  }
   private readonly roomRules = inject(RoomRulesService);
   private readonly objectStore = inject(ObjectStore);
   private readonly pieceStep = inject(PieceStepService);
@@ -88,6 +92,7 @@ export class FreeMovePlanService {
   private readonly ride = inject(RideService);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly rolePermission = inject(RolePermissionService);
+  private readonly ground = inject(StandingGroundService);
 
   private readonly held = signal<FreePlan | null>(null);
   private readonly opened = signal(0);
@@ -342,6 +347,7 @@ export class FreeMovePlanService {
       shut: terms.zones?.shut ?? [],
       stops: terms.zones?.stops ?? [],
       escapes: terms.zones?.escapes ?? [],
+      ground: terms.ground,
     };
   }
 
@@ -357,11 +363,13 @@ export class FreeMovePlanService {
     if (budgetPx <= 0) return null;
     const zones = this.zones.moveLimitsFor(character, kind.name);
     if (zones?.noReach) return null;
+    const surface = this.ground.surface();
     return {
       budgetPx,
       start: zones?.startPoint ?? pieceCentreOf(character, table.gridSize),
       blocks: terrainMoveBlocks(table.terrains, table.gridSize, character.size),
       zones,
+      ground: surface.isFlat ? null : { surface, gridSize: table.gridSize },
     };
   }
 

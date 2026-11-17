@@ -52,6 +52,14 @@ export class ChatTab extends ObjectNode implements InnerXml {
    * for. See `toStageResetAt`.
    */
   @SyncVar() vnPortraitResetAt: number;
+  /**
+   * The answer of a roll somebody set as the number to beat for every `{目標値}` said in the tab, by
+   * identifier, until it is taken off or another is set: as the one roll of a spell cast at everyone
+   * it reaches, which each of them resists in turn. Empty for none. See `findTargetNumber`.
+   *
+   * Left without an initialiser, as `vnPortraitResetAt` is: only a tab given one writes it.
+   */
+  @SyncVar() pinnedTargetNumber: string;
 
   @SyncVar() count = 0;
   @SyncVar() imageIdentifierDummy = 'test';
@@ -151,7 +159,7 @@ export class ChatTab extends ObjectNode implements InnerXml {
   /** The portrait slot a speaker of that name stands in, or -1 when they stand in none. */
   portraitSlotOf(name: string) {
     for (let i = 0; i < this.imageCharacterName.length; i++) {
-      if (name == this.imageCharacterName[i]) {
+      if (name === this.imageCharacterName[i]) {
         return i;
       }
     }
@@ -355,7 +363,7 @@ export class ChatTab extends ObjectNode implements InnerXml {
     ObjectSerializer.parseAttributes(this.attributes, attributes);
     const persistedIdentifier = this.attributes['identifier'];
     if (typeof persistedIdentifier === 'string' && persistedIdentifier.length > 0) {
-      (this as unknown as { context: { identifier: string } }).context.identifier = persistedIdentifier;
+      this.takeIdentifier(persistedIdentifier);
       delete (this.attributes as Record<string, unknown>)['identifier'];
     }
   }

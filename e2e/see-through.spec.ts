@@ -1,15 +1,7 @@
 import { expect, Page, test } from '@playwright/test';
 
-import { waitAppReady } from './helpers';
+import { closePanels, holdsFor, waitAppReady } from './helpers';
 import { centreOf, pedestal, piece, placeOf, Point, pointsOnPicture, settle } from './see-through-helpers';
-
-async function closePanels(page: Page) {
-  const panels = page.locator('ui-panel');
-  for (let round = 0; round < 8 && (await panels.count()) > 0; round++) {
-    await panels.first().locator('.bg-ui-titlebar button', { hasText: 'close' }).dispatchEvent('click');
-  }
-  await expect(panels).toHaveCount(0);
-}
 
 async function drag(page: Page, from: Point, to: Point) {
   await page.mouse.move(from.x, from.y);
@@ -28,7 +20,7 @@ async function hoverOnto(page: Page, at: Point) {
 test.describe('the see-through parts of a piece’s picture', () => {
   test.beforeEach(async ({ page }) => {
     await waitAppReady(page);
-    await expect(piece(page, 'モンスターC').locator('img.image')).toBeVisible({ timeout: 10000 });
+    await expect(piece(page, 'モンスターC').locator('[data-part="picture"]')).toBeVisible({ timeout: 10000 });
     await closePanels(page);
     await settle(piece(page, 'モンスターC'));
   });
@@ -49,11 +41,16 @@ test.describe('the see-through parts of a piece’s picture', () => {
     const frontBefore = await placeOf(front);
 
     await hoverOnto(page, at);
+    // The table's line of sight passes the clear part of the picture and picks the piece behind.
+    const backId = await back.getAttribute('data-object-id');
     await expect
       .poll(() =>
         page.evaluate(
-          ([x, y]) => document.elementFromPoint(x, y)?.closest('game-character')?.textContent?.includes('モンスターB'),
-          [at.x, at.y]
+          ([x, y, id]) => {
+            const hooks = window.__axeTable;
+            return hooks?.pickAt(x as number, y as number) === id;
+          },
+          [at.x, at.y, backId] as const
         )
       )
       .toBe(true);
@@ -85,9 +82,8 @@ test.describe('the see-through parts of a piece’s picture', () => {
 
     await hoverOnto(page, at);
     await drag(page, at, { x: at.x + 100, y: at.y + 20 });
-    await page.waitForTimeout(500);
 
-    expect(await placeOf(front)).toBe(before);
+    await holdsFor(async () => expect(await placeOf(front)).toBe(before), 500);
   });
 });
 
@@ -115,7 +111,7 @@ test.describe('the see-through parts of a piece’s picture under a finger', () 
     await waitAppReady(page);
     const front = piece(page, 'モンスターC');
     const back = piece(page, 'モンスターB');
-    await expect(front.locator('img.image')).toBeVisible({ timeout: 10000 });
+    await expect(front.locator('[data-part="picture"]')).toBeVisible({ timeout: 10000 });
     await closePanels(page);
     await settle(front);
     const behind = await centreOf(pedestal(back));

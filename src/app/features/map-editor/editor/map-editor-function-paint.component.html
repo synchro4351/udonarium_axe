@@ -29,6 +29,18 @@
   </label>
 
   @if (state.functionRole() === 'terrain') {
+    @if (state.functionSpec().terrain.model) {
+      <div class="flex items-center justify-between gap-2" data-testid="terrain-model">
+        <span class="text-ui-muted text-[11px]">{{ 'feature.mapEditor.function.terrainModel' | transloco }}</span>
+        <button
+          type="button"
+          class="bg-ui-input hover:bg-ui-hover rounded-ui-sm px-2 py-0.5 text-[11px]"
+          (click)="setTerrainPaint({ model: '', modelScale: '', modelTurn: '' })"
+        >
+          {{ 'feature.mapEditor.function.terrainModelClear' | transloco }}
+        </button>
+      </div>
+    }
     <label class="flex items-center justify-between gap-2">
       <span class="text-ui-muted">{{ 'feature.mapEditor.function.terrainMode' | transloco }}</span>
       <select
@@ -153,69 +165,21 @@
       }
     </div>
 
-    <label class="flex cursor-pointer items-center gap-1.5 select-none">
-      <input
-        type="checkbox"
-        class="size-3.5 cursor-pointer [accent-color:var(--ui-accent)]"
-        [ngModel]="state.functionSpec().terrain.blocksSight"
-        (ngModelChange)="setTerrainPaint({ blocksSight: $event })"
-      />
-      {{ 'feature.mapEditor.function.terrainBlocksSight' | transloco }}
-    </label>
-    <label class="flex cursor-pointer items-center gap-1.5 select-none">
-      <input
-        type="checkbox"
-        class="size-3.5 cursor-pointer [accent-color:var(--ui-accent)]"
-        [ngModel]="state.functionSpec().terrain.blocksLight"
-        (ngModelChange)="setTerrainPaint({ blocksLight: $event })"
-      />
-      {{ 'feature.mapEditor.function.terrainBlocksLight' | transloco }}
-    </label>
-    <label class="flex cursor-pointer items-center gap-1.5 select-none">
-      <input
-        type="checkbox"
-        class="size-3.5 cursor-pointer [accent-color:var(--ui-accent)]"
-        [ngModel]="state.functionSpec().terrain.blocksClimb"
-        (ngModelChange)="setTerrainPaint({ blocksClimb: $event })"
-      />
-      {{ 'feature.mapEditor.function.terrainBlocksClimb' | transloco }}
-    </label>
-    <label class="flex cursor-pointer items-center gap-1.5 select-none">
-      <input
-        type="checkbox"
-        class="size-3.5 cursor-pointer [accent-color:var(--ui-accent)]"
-        [ngModel]="state.functionSpec().terrain.tiledTexture"
-        (ngModelChange)="setTerrainPaint({ tiledTexture: $event })"
-      />
-      {{ 'feature.mapEditor.function.terrainTiled' | transloco }}
-    </label>
-    <label class="flex cursor-pointer items-center gap-1.5 select-none">
-      <input
-        type="checkbox"
-        class="size-3.5 cursor-pointer [accent-color:var(--ui-accent)]"
-        [ngModel]="state.functionSpec().terrain.showsGrid"
-        (ngModelChange)="setTerrainPaint({ showsGrid: $event })"
-      />
-      {{ 'feature.mapEditor.function.terrainGrid' | transloco }}
-    </label>
-    <label class="flex cursor-pointer items-center gap-1.5 select-none">
-      <input
-        type="checkbox"
-        class="size-3.5 cursor-pointer [accent-color:var(--ui-accent)]"
-        [ngModel]="state.functionSpec().terrain.dropShadow"
-        (ngModelChange)="setTerrainPaint({ dropShadow: $event })"
-      />
-      {{ 'feature.mapEditor.function.terrainShadow' | transloco }}
-    </label>
-    <label class="flex cursor-pointer items-center gap-1.5 select-none">
-      <input
-        type="checkbox"
-        class="size-3.5 cursor-pointer [accent-color:var(--ui-accent)]"
-        [ngModel]="state.functionSpec().terrain.surfaceShading"
-        (ngModelChange)="setTerrainPaint({ surfaceShading: $event })"
-      />
-      {{ 'feature.mapEditor.function.terrainShading' | transloco }}
-    </label>
+    @for (flag of terrainFlags; track flag.key) {
+      <label class="flex cursor-pointer items-center gap-1.5 select-none">
+        <input
+          type="checkbox"
+          class="size-3.5 cursor-pointer [accent-color:var(--ui-accent)]"
+          [ngModel]="state.functionSpec().terrain[flag.key]"
+          (ngModelChange)="setTerrainFlag(flag.key, $event)"
+        />
+        {{ flag.labelKey | transloco }}
+      </label>
+    }
+  }
+
+  @if (state.functionRole() === 'object') {
+    <map-editor-object-paint />
   }
 
   @if (state.functionRole() === 'hazard') {
@@ -369,6 +333,22 @@
           }
         </select>
       </label>
+      <label class="flex items-center justify-between gap-2">
+        <span class="text-ui-muted">{{ 'feature.mapEditor.function.hazardIce' | transloco }}</span>
+        <span class="flex items-center gap-1">
+          <input
+            type="range"
+            min="0"
+            max="100"
+            class="w-24 cursor-pointer [accent-color:var(--ui-accent)]"
+            data-testid="hazard-ice"
+            [ngModel]="waterIcePercent()"
+            (ngModelChange)="setWaterIce($event)"
+            name="hazardIce"
+          />
+          <span class="text-ui-muted w-8 text-right">{{ waterIcePercent() }}%</span>
+        </span>
+      </label>
     }
     <label class="flex items-center justify-between gap-2">
       <span class="text-ui-muted">{{ 'feature.mapEditor.function.moveCostCharge' | transloco }}</span>
@@ -453,14 +433,20 @@
     </label>
     <label class="flex items-center justify-between gap-2">
       <span class="text-ui-muted">{{ 'feature.mapEditor.function.maskOpacity' | transloco }}</span>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
-        [ngModel]="state.functionSpec().mask.opacity"
-        (ngModelChange)="setMaskPaint({ opacity: $event })"
-      />
+      <span class="flex items-center gap-1">
+        <input
+          class="w-24"
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          [ngModel]="state.functionSpec().mask.opacity"
+          (ngModelChange)="setMaskPaint({ opacity: $event })"
+        />
+        <span class="text-ui-muted min-w-8 text-right whitespace-nowrap tabular-nums">{{
+          state.functionSpec().mask.opacity | percent
+        }}</span>
+      </span>
     </label>
   }
 
@@ -495,7 +481,7 @@
       <p class="text-ui-muted text-[10px] leading-snug">
         {{ 'feature.mapEditor.function.triggerPressHint' | transloco }}
       </p>
-      <app-switch-definition-fields
+      <switch-definition-fields
         data-testid="trigger-press-fields"
         [definition]="pressDefinition()"
         (changed)="setPressDefinition($event)"

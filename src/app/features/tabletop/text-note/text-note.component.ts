@@ -1,4 +1,4 @@
-import { NgStyle } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common';
 import {
   afterNextRender,
   ChangeDetectionStrategy,
@@ -10,8 +10,8 @@ import {
   inject,
   Injector,
   input,
+  linkedSignal,
   signal,
-  untracked,
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -21,21 +21,23 @@ import { GameObjectInventoryService } from '@axe/application/inventory/game-obje
 import { DisclosureService } from '@axe/application/permission/disclosure.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { TablePiecesService } from '@axe/application/tabletop/table-pieces.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
-import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { PieceContextMenuService } from '@axe/application/ui/piece-context-menu.service';
 import { sheetPanelTitle } from '@axe/application/ui/sheet-panel';
 import { buildSurfaceSwitchContextMenu } from '@axe/application/ui/surface-switch-context-menu';
-import { transientSignal } from '@axe/application/ui/transient-signal';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
+import { ObjectStore } from '@axe/core/sync/object-store';
 import { debounce } from '@axe/core/util/debounce';
+import { paintedColorOf } from '@axe/core/util/painted-color';
 import { DataElement } from '@axe/domain/data/data-element';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
-import { multiAngleFontScaleFactor } from '@axe/domain/tabletop/multi-angle-font-scale';
 import { TextNote } from '@axe/domain/tabletop/text-note';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { buildTextNoteContextMenuModel } from '@axe/features/tabletop/text-note/text-note-context-menu';
+import { clearToBlankTable, putAwayTutorial } from '@axe/features/tabletop/tutorial/put-away-tutorial';
+import { AltitudeGuideComponent, altitudeGuideOf } from '@axe/ui/components/altitude-guide/altitude-guide.component';
 import { MovableOption } from '@axe/ui/directives/movable.directive';
 import { MovableDirective } from '@axe/ui/directives/movable.directive';
 import { RotableOption } from '@axe/ui/directives/rotable.directive';
@@ -43,26 +45,49 @@ import { RotableDirective } from '@axe/ui/directives/rotable.directive';
 import { SelectableDirective } from '@axe/ui/directives/selectable.directive';
 import { LinkifyPipe } from '@axe/ui/pipes/linkify.pipe';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
+import { HudPlaceDirective } from '@axe/ui/tabletop/hud-place.directive';
+import { pictureForCanvas } from '@axe/ui/tabletop/picture-for-canvas';
 import { setupInputHandler, setupMovableRotableForPiece } from '@axe/ui/tabletop/setup-tabletop-piece';
-import { translateZCss, Z_OFFSET_TABLETOP_OBJECT_PX } from '@axe/ui/tabletop/z-offset';
+import { TurnFrameComponent, type TurnStand } from '@axe/ui/tabletop/turn-frame/turn-frame.component';
 import { decorateChatStyleText } from '@axe/ui/text-decoration/decorate-chat-text';
 import { formatNoteText } from '@axe/ui/text-decoration/format-note-text';
+
+/**
+ * How much of its face a note covers as it is moved: the one point it hangs from, the middle of its
+ * lower edge, so that it snaps and settles by that point alone.
+ */
+/** How many pixels larger than its font size setting a note's text is drawn. */
+const FONT_BASE_PX = 9;
+
+const NOTE_FOOTPRINT = { width: 1, height: 0 } as const;
 
 @Component({
   selector: 'text-note',
   templateUrl: './text-note.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MovableDirective, RotableDirective, SelectableDirective, NgStyle, FormsModule, LinkifyPipe, SafePipe],
+  imports: [
+    TurnFrameComponent,
+    AltitudeGuideComponent,
+    HudPlaceDirective,
+    MovableDirective,
+    RotableDirective,
+    SelectableDirective,
+    NgTemplateOutlet,
+    FormsModule,
+    LinkifyPipe,
+    SafePipe,
+  ],
   host: {
     '[style.display]': "isHiddenByFog() ? 'none' : null",
+    '[attr.data-object-id]': 'textNote().identifier',
     class: 'block',
     '(dragstart)': 'onDragstart($event)',
     '(mousedown)': 'onMouseDown($event)',
+    '(document:mouseup)': 'onMouseUp($event)',
     '(contextmenu)': 'onContextMenu($event)',
   },
 })
 export class TextNoteComponent {
-  private readonly contextMenuService = inject(ContextMenuService);
   private readonly pieceContextMenu = inject(PieceContextMenuService);
   private readonly rolePermission = inject(RolePermissionService);
   private readonly disclosureService = inject(DisclosureService);
@@ -90,11 +115,42 @@ export class TextNoteComponent {
   private readonly inventoryService = inject(GameObjectInventoryService);
   private readonly uiSignalService = inject(UiSignalService);
   private readonly objectChange = inject(ObjectChangeService);
+  private readonly objectStore = inject(ObjectStore);
   private readonly visionService = inject(VisionService);
   protected readonly tabletopService = inject(TabletopService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
   private readonly translateFn = inject(TRANSLATE_FN);
+  /**
+   * Where the note stands for the frame that turns it, about the middle of its lower edge, which is
+   * where it hangs from: round the whole of it where it lies, along its foot where it stands up.
+   */
+  protected readonly turnStand = computed<TurnStand>(() => {
+    const note = this.textNote();
+    this.ownVersion();
+    const foot = this.pieces.footOf(note);
+    const width = this.width() * this.gridSize();
+    const depth = this.isUpright() ? 0 : this.height() * this.gridSize();
+    return {
+      surface: foot.surface,
+      height: foot.height + Math.max(0, this.altitude()) * this.gridSize(),
+      foot: {
+        left: foot.x - width / 2,
+        top: foot.y - depth,
+        width,
+        depth,
+        pivot: { x: foot.x, y: foot.y },
+        rotateDeg: note.rotate,
+      },
+    };
+  });
+
+  private readonly pieces = inject(TablePiecesService);
+  /**
+   * The note's panel, laid out here for the table's canvas to draw the note from a picture of it:
+   * left clear, still taking the presses where the canvas draws it, until it is written in.
+   */
+  private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
 
   readonly isHiddenByFog = computed(() => {
     const piece = this.textNote();
@@ -114,43 +170,55 @@ export class TextNoteComponent {
     setupMovableRotableForPiece(this, {
       target: this.textNote,
       collideLayers: ['terrain'],
-      transformCssOffset: translateZCss(Z_OFFSET_TABLETOP_OBJECT_PX),
+      footprint: () => NOTE_FOOTPRINT,
+    });
+    pictureForCanvas({
+      identifier: () => this.textNote().identifier,
+      element: () => this.panel()?.nativeElement,
+      pictured: () => true,
+      follows: () => {
+        this.textNoteVersion();
+        this.canView();
+        this.limitHeight();
+        this.imageFile();
+      },
+      paper: (panel) => paintedColorOf(getComputedStyle(panel).backgroundColor),
     });
     this.destroyRef.onDestroy(() => {
       this.writeTextSoon.cancel();
     });
     effect(() => {
-      const note = this.textNote();
-      this.objectChange.versionOf(note.identifier)();
-      const trackChildren = (elms: readonly DataElement[]) => {
-        for (const elm of elms) {
-          this.objectChange.versionOf(elm.identifier)();
-          if (elm.children.length) trackChildren(elm.children as DataElement[]);
-        }
-      };
-      if (note.commonDataElement) trackChildren(note.commonDataElement.children as DataElement[]);
-      this._text.set(note.text);
-      this._fontSize.set(note.fontSize);
+      this.noteVersion();
       this.calcFitHeightIfNeeded();
-    });
-    // A seat made a guest while it wrote leaves the note as the room has it, the draft unwritten.
-    effect(() => {
-      this.objectChange.trackMyCursor();
-      if (this.rolePermission.canEditTabletop() || !untracked(this.isEditing)) return;
-      untracked(() => {
-        this.writeTextSoon.cancel();
-        this._text.set(this.textNote().text);
-        this.isEditing.set(false);
-      });
     });
   }
 
   readonly textAreaElementRef = viewChild<ElementRef<HTMLTextAreaElement>>('textArea');
 
   readonly textNote = input.required<TextNote>();
-  readonly is3D = input(false);
 
-  readonly isEditing = signal(false);
+  /** Follows the note and every element under it, however deep, which its text and font size are kept in. */
+  private readonly noteVersion = computed(() => {
+    const note = this.textNote();
+    let v = this.objectChange.versionOf(note.identifier)();
+    const trackChildren = (elms: readonly DataElement[]) => {
+      for (const elm of elms) {
+        v += this.objectChange.versionOf(elm.identifier)();
+        if (elm.children.length) trackChildren(elm.children as DataElement[]);
+      }
+    };
+    if (note.commonDataElement) trackChildren(note.commonDataElement.children as DataElement[]);
+    return v;
+  });
+
+  /** Whether this seat may write the note, which a seat made a guest loses, and with it its draft. */
+  private readonly mayWrite = computed(() => {
+    this.objectChange.trackMyCursor();
+    return this.rolePermission.canEditTabletop();
+  });
+
+  /** Whether the note is being edited; a seat that loses the right to write it is taken out of editing. */
+  readonly isEditing = linkedSignal<boolean, boolean>({ source: this.mayWrite, computation: () => false });
   readonly decoratedHtml = computed(() => {
     const note = this.textNote();
     this.objectChange.versionOf(note.identifier)();
@@ -211,7 +279,7 @@ export class TextNoteComponent {
     return note.title;
   });
 
-  /** Follows every change to the note and its elements; the template reads it to get past OnPush. */
+  /** Follows every change to the note and its elements, for the picture the canvas draws of it. */
   readonly textNoteVersion = computed(() => {
     const note = this.textNote();
     let v = this.objectChange.versionOf(note.identifier)();
@@ -223,19 +291,29 @@ export class TextNoteComponent {
     return v;
   });
 
-  /**
-   * Whether the note is locked, which keeps it from being moved or edited; setting it writes
-   * straight to the note.
-   */
-  get isLock(): boolean {
-    return this.textNote().isLock;
-  }
-  set isLock(isLock: boolean) {
-    this.textNote().isLock = isLock;
-  }
+  /** Follows the note itself, which its lock and standing are kept on. */
+  private readonly ownVersion = computed(() => this.objectChange.versionOf(this.textNote().identifier)());
 
-  private readonly _text = signal('');
-  private readonly _fontSize = signal(9);
+  /** Whether the note is locked, which keeps it from being moved or edited. */
+  readonly isLock = computed(() => {
+    this.ownVersion();
+    return this.textNote().isLock;
+  });
+
+  /**
+   * The note's text as held by the text area: the note's own, taken afresh whenever the note or
+   * this seat's right to write it changes, and in between whatever has been typed. A seat made a
+   * guest while it wrote is left with the note as the room has it, the draft unwritten.
+   */
+  private readonly _text = linkedSignal(() => {
+    this.noteVersion();
+    this.mayWrite();
+    return this.textNote().text;
+  });
+  private readonly _fontSize = computed(() => {
+    this.noteVersion();
+    return this.textNote().fontSize;
+  });
   private readonly writeTextSoon = debounce(() => {
     const note = this.textNote();
     if (note.text !== this._text()) note.text = this._text();
@@ -255,10 +333,10 @@ export class TextNoteComponent {
     this._text.set(text);
     this.writeTextSoon();
   }
-  /** The note's font size setting; the text is drawn at this many pixels plus 9. */
-  get fontSize(): number {
-    return this._fontSize();
-  }
+  /** The note's font size setting; the text is drawn at this many pixels plus `FONT_BASE_PX`. */
+  readonly fontSize = this._fontSize;
+  /** The size the note's text is drawn at, in pixels. */
+  protected readonly fontPx = computed(() => this._fontSize() + FONT_BASE_PX);
 
   readonly imageFile = computed(() => {
     this.objectChange.fileVersion();
@@ -266,29 +344,28 @@ export class TextNoteComponent {
     this.objectChange.versionOf(textNote.identifier)();
     return textNote.imageFile;
   });
-  /** The note's rotation in degrees; setting it writes straight to the note. */
-  get rotate(): number {
-    return this.textNote().rotate;
-  }
-  set rotate(rotate: number) {
-    this.textNote().rotate = rotate;
-  }
   /** The note's height in cells, never negative. */
-  get height(): number {
+  readonly height = computed(() => {
+    this.noteVersion();
     return Math.max(0, this.textNote().height);
-  }
+  });
   /** The note's width in cells, never negative. */
-  get width(): number {
+  readonly width = computed(() => {
+    this.noteVersion();
     return Math.max(0, this.textNote().width);
-  }
+  });
 
-  /** How high the note floats above the table, in cells; setting it writes straight to the note. */
-  get altitude(): number {
+  /** How high the note floats above the table, in cells. */
+  readonly altitude = computed(() => {
+    this.noteVersion();
     return this.textNote().altitude;
-  }
-  set altitude(altitude: number) {
-    this.textNote().altitude = altitude;
-  }
+  });
+
+  /** Whether the note stands up rather than lying flat on the table. */
+  readonly isUpright = computed(() => {
+    this.ownVersion();
+    return this.textNote().isUpright;
+  });
 
   /**
    * The altitude shown on the altitude label, rounded to one decimal place.
@@ -296,80 +373,35 @@ export class TextNoteComponent {
    * A standing note sunk under the table is measured from its top edge, and reads 0 while any of it
    * still shows above.
    */
-  get textNoteAltitude(): number {
-    let ret = this.altitude;
-    if (this.isUpright && this.altitude < 0) {
-      if (-this.height <= this.altitude) return 0;
-      ret += this.height;
+  readonly textNoteAltitude = computed(() => {
+    const altitude = this.altitude();
+    let ret = altitude;
+    if (this.isUpright() && altitude < 0) {
+      if (-this.height() <= altitude) return 0;
+      ret += this.height();
     }
     return +ret.toFixed(1);
-  }
+  });
 
-  /**
-   * Whether the note stands up rather than lying flat on the table; setting it writes straight to
-   * the note.
-   */
-  get isUpright(): boolean {
-    return this.textNote().isUpright;
-  }
-  set isUpright(isUpright: boolean) {
-    this.textNote().isUpright = isUpright;
-  }
-
-  /**
-   * Whether the note shows a line and label for its altitude; setting it writes straight to the
-   * note.
-   */
-  get isAltitudeIndicate(): boolean {
-    return this.textNote().isAltitudeIndicate;
-  }
-  set isAltitudeIndicate(isAltitudeIndicate: boolean) {
-    this.textNote().isAltitudeIndicate = isAltitudeIndicate;
-  }
-
-  /**
-   * Whether the note is being edited, which keeps it from being dragged and its menu from opening.
-   */
-  get isSelected(): boolean {
-    return this.isEditing();
-  }
-
-  private callbackOnMouseUp = (e: MouseEvent) => this.onMouseUp(e);
+  /** Whether a press on the note waits for its release, which is heard on the document. */
+  private pressed = false;
 
   /** The size of one table cell, in pixels. */
-  get gridSize(): number {
-    return this.tabletopService.gridSize();
-  }
-  math = Math;
+  readonly gridSize = this.tabletopService.gridSize;
 
-  private readonly _transition = transientSignal(false, 132);
   /**
-   * Whether the note animates as it stands up or lies down.
-   *
-   * Setting it true runs the animation for 132 ms and then turns it off again.
+   * The guide from the height the note floats at to the face it stands on, with the height written
+   * at its end: up from the face to a note raised off it, or down to the top of one sunk under it.
+   * Nothing for a note within half a cell of the face, or one set not to show it.
    */
-  get transition(): boolean {
-    return this._transition();
-  }
-  set transition(transition: boolean) {
-    if (transition) this._transition.show(true);
-    else this._transition.clear();
-  }
-  private readonly _fall = transientSignal(false, 132);
-  /**
-   * Whether the note animates a drop with a slight bounce.
-   *
-   * Setting it true runs the animation for 132 ms and then turns it off again.
-   */
-  get fall(): boolean {
-    return this._fall();
-  }
-  set fall(fall: boolean) {
-    if (fall) this._fall.show(true);
-    else this._fall.clear();
-  }
+  protected readonly altitudeGuide = computed(() => {
+    const note = this.textNote();
+    this.objectChange.versionOf(note.identifier)();
+    if (!note.isAltitudeIndicate) return null;
+    return altitudeGuideOf(this.pieces.footOf(note), this.textNoteAltitude(), this.gridSize());
+  });
 
-  private calcFitHeightTimer: ReturnType<typeof setTimeout> | null = null;
+  private fitHeightPending = false;
   readonly movableOption = signal<MovableOption>({});
   readonly rotableOption = signal<RotableOption>({});
 
@@ -382,7 +414,6 @@ export class TextNoteComponent {
   private get input() {
     return this.inputRef.current;
   }
-  readonly viewRotateZ = this.uiSignalService.tableViewRotationZ;
 
   /** Stops the browser starting a native drag on the note. */
   onDragstart(e: DragEvent) {
@@ -397,26 +428,30 @@ export class TextNoteComponent {
    * Ignored while the note is being edited. A right press only brings the note to the top.
    */
   onMouseDown(e: MouseEvent) {
-    if (this.isSelected) return;
+    if (this.isEditing()) return;
     e.preventDefault();
     if (this.rolePermission.canEditTabletop()) this.textNote().toTopmost();
 
     if (e.button === 2) return;
-    this.addMouseEventListeners();
+    this.pressed = true;
   }
 
   /**
    * Starts editing when a press on the note is let go without the pointer having moved, clearing
    * any text selection first.
+   *
+   * Heard on the document, so a release off the note ends the press too; a release with no press
+   * on the note waiting is left alone.
    */
   onMouseUp(e: MouseEvent) {
+    if (!this.pressed) return;
+    this.pressed = false;
     if (this.pointerDeviceService.isAllowedToOpenContextMenu) {
       const selection = window.getSelection();
-      if (!selection!.isCollapsed) selection!.removeAllRanges();
+      if (selection && !selection.isCollapsed) selection.removeAllRanges();
 
       this.enterEdit();
     }
-    this.removeMouseEventListeners();
     e.preventDefault();
   }
 
@@ -428,7 +463,7 @@ export class TextNoteComponent {
 
   /** Cancels the input handler's gesture as soon as a press starts. */
   onInputStart(_e: Event) {
-    this.input!.cancel();
+    this.input?.cancel();
   }
 
   /**
@@ -439,14 +474,14 @@ export class TextNoteComponent {
    * view with a radial menu style chosen, it opens as a radial menu.
    */
   onContextMenu(e: MouseEvent) {
-    this.removeMouseEventListeners();
-    if (this.isSelected) return;
+    this.pressed = false;
+    if (this.isEditing()) return;
     e.stopPropagation();
     e.preventDefault();
 
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
     const position = this.pointerDeviceService.pointers[0];
-    if (this.pieceContextMenu.openForSelection(this.textNote(), this.gridSize, position)) return;
+    if (this.pieceContextMenu.openForSelection(this.textNote(), this.gridSize(), position)) return;
     const surfaceEntries = buildSurfaceSwitchContextMenu(
       this.textNote(),
       this.tabletopService.currentTable,
@@ -454,32 +489,26 @@ export class TextNoteComponent {
     );
     const menu = buildTextNoteContextMenuModel(
       this.textNote(),
-      this.gridSize,
+      this.gridSize(),
       this.inventoryService,
       {
         onSetUpright: (isUpright) => {
-          this.transition = true;
           this.textNote().isUpright = isUpright;
         },
         onShowDetail: () => this.showDetail(this.textNote()),
+        onPutAwayTutorial: () => {
+          putAwayTutorial(this.tabletopService, this.objectStore);
+          SoundEffect.play(PresetSound.sweep);
+        },
+        onClearToBlankTable: () => {
+          clearToBlankTable(this.tabletopService, this.objectStore);
+          SoundEffect.play(PresetSound.sweep);
+        },
       },
       this.translateFn,
       surfaceEntries
     );
-    const display = this.tabletopService.display();
-    if (this.tabletopService.mode2d() && display.tabletopMenuStyle !== 'standard') {
-      this.contextMenuService.openRadial(
-        position,
-        menu.actions,
-        menu.radialGroups,
-        this.title(),
-        display.tabletopMenuStyle === 'radial',
-        display.radialMenuRotationSpeed,
-        multiAngleFontScaleFactor(display.multiAngleFontScale)
-      );
-      return;
-    }
-    this.contextMenuService.open(position, menu.actions, this.title());
+    this.pieceContextMenu.openPieceMenu(position, menu, this.title());
   }
 
   /** Plays the pick-up sound when a drag or turn of the note starts. */
@@ -492,13 +521,17 @@ export class TextNoteComponent {
     SoundEffect.play(PresetSound.cardPut);
   }
 
-  /** Refits the text area's height on the next task, gathering repeated requests into one. */
+  /** Refits the text area's height once the note is next drawn, gathering repeated requests into one. */
   calcFitHeightIfNeeded() {
-    if (this.calcFitHeightTimer) return;
-    this.calcFitHeightTimer = setTimeout(() => {
-      this.calcFitHeight();
-      this.calcFitHeightTimer = null;
-    }, 0);
+    if (this.fitHeightPending) return;
+    this.fitHeightPending = true;
+    afterNextRender(
+      () => {
+        this.fitHeightPending = false;
+        this.calcFitHeight();
+      },
+      { injector: this.injector }
+    );
   }
 
   oldScrollHeight = 0;
@@ -520,9 +553,9 @@ export class TextNoteComponent {
     } else {
       textArea.style.height = '0';
       let textAreaHeight = textArea.scrollHeight;
-      let textAreaMax = this.height * this.gridSize - 2;
+      let textAreaMax = this.height() * this.gridSize() - 2;
 
-      if (textAreaMax < this.gridSize) textAreaMax = this.gridSize - 2;
+      if (textAreaMax < this.gridSize()) textAreaMax = this.gridSize() - 2;
       if (this.title().length) {
         textAreaMax -= 32;
       } else {
@@ -531,14 +564,6 @@ export class TextNoteComponent {
       if (textAreaHeight > textAreaMax) textAreaHeight = textAreaMax;
       textArea.style.height = textAreaHeight + 'px';
     }
-  }
-
-  private addMouseEventListeners() {
-    document.body.addEventListener('mouseup', this.callbackOnMouseUp, false);
-  }
-
-  private removeMouseEventListeners() {
-    document.body.removeEventListener('mouseup', this.callbackOnMouseUp, false);
   }
 
   private showDetail(gameObject: TextNote) {

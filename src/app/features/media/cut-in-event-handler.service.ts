@@ -9,12 +9,12 @@ import { VolumeType } from '@axe/core/storage/audio-output';
 import { AudioPlayer } from '@axe/core/storage/audio-player';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
-import { CutIn, cutInPanelChrome } from '@axe/domain/media/cut-in';
+import { CutIn, cutInPanelBox, cutInPanelChrome } from '@axe/domain/media/cut-in';
 import type { CutInSpeaker } from '@axe/domain/media/cut-in-speaker';
 import { mixLevelOf } from '@axe/domain/media/mix-level';
 import { asCutInMultiDirectionMode } from '@axe/domain/tabletop/cut-in-multi-direction';
 import { makeCutInMultiDirectionLayout } from '@axe/features/media/cut-in-multi-direction-layout';
-import type { CutInWindowComponent } from '@axe/features/media/cut-in-window/cut-in-window.component';
+import type { CutInVideoClock, CutInWindowComponent } from '@axe/features/media/cut-in-window/cut-in-window.component';
 import { CUT_IN_WINDOW_LOADER, type CutInWindowType } from '@axe/features/media/cut-in-window-loader';
 
 export const CUT_IN_MULTI_DIRECTION_PREPARE_TIMEOUT_MS = 500;
@@ -48,22 +48,22 @@ export class CutInEventHandlerService {
     // come first, so a sound-only cut-in puts aside those before it and not the one it asks for.
     this.objectChange.stopCutIn$.subscribe((event) => {
       const cutIn = event.cutIn as CutIn;
-      this.cancelWaiting((waiting) => waiting.identifier == cutIn?.identifier);
+      this.cancelWaiting((waiting) => waiting.identifier === cutIn?.identifier);
     }, this.destroyRef);
     this.objectChange.stopCutInByBgm$.subscribe(() => {
-      this.cancelWaiting((waiting) => waiting.tagName == '' && !!this.audioStorage.get(waiting.audioIdentifier));
+      this.cancelWaiting((waiting) => waiting.tagName === '' && !!this.audioStorage.get(waiting.audioIdentifier));
     }, this.destroyRef);
     this.objectChange.soundOnlyCutIn$.subscribe((event) => {
       const cutIn = event.cutIn as CutIn;
       if (!cutIn?.videoId) return;
-      this.cancelWaiting((waiting) => waiting.identifier == cutIn.identifier || waiting.tagName == cutIn.tagName);
+      this.cancelWaiting((waiting) => waiting.identifier === cutIn.identifier || waiting.tagName === cutIn.tagName);
     }, this.destroyRef);
     this.objectChange.startCutIn$.subscribe((event) => {
       const cutIn = event.cutIn as CutIn;
       // An open window closes for a cut-in with its name or its tag, and so does one still waiting,
       // before this one waits in turn.
       if (cutIn) {
-        this.cancelWaiting((waiting) => waiting.identifier == cutIn.identifier || waiting.tagName == cutIn.tagName);
+        this.cancelWaiting((waiting) => waiting.identifier === cutIn.identifier || waiting.tagName === cutIn.tagName);
       }
       this.openCutInPanel(cutIn, false, (event.speaker as CutInSpeaker | null | undefined) ?? null);
     }, this.destroyRef);
@@ -190,12 +190,13 @@ export class CutInEventHandlerService {
     await this.waitForPanelPreparation(panels.map(({ component }) => component.prepareCutIn()));
 
     const startedAtMs = Date.now();
+    const videoClock: CutInVideoClock = { startedAtMs: null };
     // South is opened last so that it is drawn on top, but it starts first here so its
     // one audio session owns the exact zero of the shared clock. Signals raised in this
     // loop are rendered together after the current task, so every face starts as one frame.
     const primaryFirst = [...panels].sort((left, right) => Number(right.primary) - Number(left.primary));
     for (const { component, primary } of primaryFirst) {
-      component.startCutIn(startedAtMs, primary ? 0 : undefined);
+      component.startCutIn(startedAtMs, primary ? 0 : undefined, videoClock);
     }
   }
 
@@ -219,16 +220,9 @@ export class CutInEventHandlerService {
     invisible: boolean,
     speaker: CutInSpeaker | null
   ): void {
-    const chrome = cutInPanelChrome(cutIn);
-    const marginW = Math.max(0, window.innerWidth - cutIn.width);
-    const marginH = Math.max(0, window.innerHeight - cutIn.height - chrome);
-
     const option: PanelOption = {
       title: this.t('feature.media.cutIn.panelTitleWith', { name: cutIn.name }),
-      width: cutIn.width,
-      height: cutIn.height + chrome,
-      left: (marginW * cutIn.x_pos) / 100,
-      top: (marginH * cutIn.y_pos) / 100,
+      ...cutInPanelBox(cutIn, { width: window.innerWidth, height: window.innerHeight }),
       isCutIn: true,
       cutInIdentifier: cutIn.identifier,
       leastSize: () => this.videoLeastSize(cutIn.identifier),

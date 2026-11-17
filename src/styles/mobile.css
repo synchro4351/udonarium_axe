@@ -6,60 +6,60 @@
  * what keeps iOS from zooming onto a box as it is typed in, the chat's editor among them.
  */
 body.mobile-layout
-  :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar)
+  :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar)
   input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
-body.mobile-layout :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar) select,
-body.mobile-layout :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar) textarea,
-body.mobile-layout :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar) .chat-rich {
+body.mobile-layout :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar) select,
+body.mobile-layout :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar) textarea,
+body.mobile-layout :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar) .chat-rich {
   font-size: 16px;
 }
 
 body.mobile-layout
-  :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar)
+  :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar)
   input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
     [data-own-mobile-layout] *
   ),
 body.mobile-layout
-  :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar)
+  :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar)
   select:not([data-own-mobile-layout] *),
 body.mobile-layout
-  :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar)
+  :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar)
   textarea:not([data-own-mobile-layout] *) {
   min-height: 40px;
 }
 
 body.mobile-layout
-  :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar)
+  :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar)
   button:not(.material-icons):not([data-own-mobile-layout] *) {
   min-height: 36px;
 }
 
 body.mobile-layout
-  :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar)
+  :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar)
   input[type='checkbox']:not([data-own-mobile-layout] *),
 body.mobile-layout
-  :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar)
+  :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar)
   input[type='radio']:not([data-own-mobile-layout] *) {
   width: 20px;
   height: 20px;
 }
 
 body.mobile-layout
-  :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar)
+  :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar)
   table:not([data-own-mobile-layout] *) {
   display: block;
   max-width: 100%;
   overflow-x: auto;
 }
 
-body.mobile-layout :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar) img,
-body.mobile-layout :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar) canvas,
-body.mobile-layout :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar) video {
+body.mobile-layout :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar) img,
+body.mobile-layout :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar) canvas,
+body.mobile-layout :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar) video {
   max-width: 100%;
 }
 
 body.mobile-layout .modal-window,
-body.mobile-layout :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar) {
+body.mobile-layout :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar) {
   -webkit-text-size-adjust: 100%;
 }
 
@@ -68,34 +68,34 @@ body.mobile-layout remote-controller input[name='data-value'] {
   min-height: 32px;
 }
 
-body.mobile-layout app-hand-rail .hand-rail {
+body.mobile-layout hand-rail .hand-rail {
   max-width: 100vw;
 }
 
-body.mobile-layout app-mobile-shell [data-chat-input-box] {
+body.mobile-layout mobile-shell [data-chat-input-box] {
   height: auto !important;
   max-height: 22dvh;
 }
 
-body.mobile-layout app-mobile-shell chat-window > div {
+body.mobile-layout mobile-shell chat-window > div {
   height: 100%;
 }
 
-body.mobile-layout app-mobile-shell chat-window > div > div:nth-child(2) {
+body.mobile-layout mobile-shell chat-window > div > div:nth-child(2) {
   border-radius: 0;
   border-width: 1px 0 0;
   box-shadow: none;
 }
 
-body.mobile-layout app-mobile-shell chat-input > div {
+body.mobile-layout mobile-shell chat-input > div {
   grid-template-columns: 44px minmax(0, 1fr);
   gap: 6px;
   padding: 6px;
   border-radius: 0;
 }
 
-body.mobile-layout app-mobile-shell chat-tab-list,
-body.mobile-layout app-mobile-shell .chat-tab-pill {
+body.mobile-layout mobile-shell chat-tab-list,
+body.mobile-layout mobile-shell .chat-tab-pill {
   font-size: 11px;
 }
 
@@ -103,6 +103,9 @@ body.mobile-layout ui-panel [class*='ui-resize-handler'] {
   display: none;
 }
 
+/* Keeps a drag past the end of what scrolls from pulling the page down to reload it or bouncing it.
+   It is the root that the page as a whole would scroll by, the body being one that never scrolls. */
+html:has(> body.mobile-layout),
 body.mobile-layout {
   overscroll-behavior: none;
 }
@@ -162,6 +165,38 @@ body.touch-input .group-hover\:opacity-100 {
   opacity: 1;
 }
 
+/*
+ * The turn handles of what lies on the table come out as a pointer passes over it, which the rule
+ * above would turn into handles out on everything at once, hiding what they stand round. On a touch
+ * screen only the handles of the thing last pressed come out and take a press, as a piece's do, and
+ * the rest let a tap through to the table. The frame round a block, a die, a note or a board comes
+ * out by the same rule of its own.
+ */
+body.touch-input :is(light-source, range, card) .rotate-grab {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* A range's handle stands in a box of its own beside the one that is pressed, so the range as a whole is looked at. */
+body.touch-input :is(light-source, card) [data-pressed] .rotate-grab,
+body.touch-input range:has([data-pressed]) .rotate-grab {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* As faint as a pointer passing over it brings it out. */
+body.touch-input :is([data-pressed], range:has([data-pressed])) .rotate-grab.group-hover\:opacity-50 {
+  opacity: 0.5;
+}
+
+body.touch-input :is([data-pressed], range:has([data-pressed])) .rotate-grab.group-hover\:opacity-86 {
+  opacity: 0.86;
+}
+
+body.touch-input :is([data-pressed], range:has([data-pressed])) .rotate-grab.group-hover\:opacity-90 {
+  opacity: 0.9;
+}
+
 body.mobile-layout ui-panel .grid-cols-2:not([data-own-mobile-layout] *) {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -208,7 +243,7 @@ body.touch-input button {
   pointer-events: auto !important;
 }
 
-body.touch-input :is(ui-panel, app-mobile-shell, visual-novel-overlay) button:active:not(:disabled) {
+body.touch-input :is(ui-panel, mobile-shell, visual-novel-overlay) button:active:not(:disabled) {
   transform: scale(0.97);
 }
 
@@ -226,7 +261,7 @@ body.mobile-layout visual-novel-overlay button:not(.material-icons) {
   min-height: 40px;
 }
 
-body.touch-input :is(ui-panel, app-mobile-shell, modal, context-menu, app-hand-rail, app-hotbar, visual-novel-overlay) {
+body.touch-input :is(ui-panel, mobile-shell, modal, context-menu, hand-rail, hotbar, visual-novel-overlay) {
   -webkit-touch-callout: none;
 }
 
@@ -291,7 +326,7 @@ game-table {
   }
 }
 
-body.mobile-layout app-mobile-chat-pane [data-chat-input],
+body.mobile-layout mobile-chat-pane [data-chat-input],
 body.mobile-layout ui-panel input,
 body.mobile-layout ui-panel textarea {
   -webkit-user-select: text;

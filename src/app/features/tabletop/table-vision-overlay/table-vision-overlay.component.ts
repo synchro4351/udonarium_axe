@@ -1,26 +1,44 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, ElementRef, inject, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  effect,
+  ElementRef,
+  inject,
+  untracked,
+  viewChild,
+} from '@angular/core';
+import { LightFlickerClockService } from '@axe/application/tabletop/light-flicker-clock.service';
+import { LightSlotsService } from '@axe/application/tabletop/light-slots.service';
+import { TableVeilService } from '@axe/application/tabletop/table-veil.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
 import { RenderLiteService } from '@axe/application/ui/render-lite.service';
 import { perfCounters, perfTimed } from '@axe/core/util/perf-counters';
 import { GridType } from '@axe/domain/tabletop/game-table';
 import { computeHexMaskGeometry } from '@axe/domain/tabletop/hex-mask-geometry';
 import { HEX_SURFACE_INFLATE_PX, hexSurfaceCells, SurfacePoint } from '@axe/domain/tabletop/surface-cells';
-import { computeOverlayPlan, OverlayPlan, sameOverlayPlan } from '@axe/domain/tabletop/vision-scene';
+import { computeOverlayPlan, OverlayPlan, sameOverlayPlan, VisionScene } from '@axe/domain/tabletop/vision-scene';
 import {
-  animatedGlowPatches,
   type BakeCanvas,
-  bakeOverlayPlan,
-  type DirtyRect,
   drawOverlayPlan,
   LIGHT_MIN_OVERLAY_SCALE,
   LIGHT_OVERLAY_PIXEL_BUDGET,
-  type OverlayBake,
   overlayScale,
   overlayScratch,
 } from '@axe/infrastructure/tabletop/vision/vision-overlay-render';
 import { translateZCss, Z_OFFSET_DARKNESS_PX } from '@axe/ui/tabletop/z-offset';
 
 const SPILL_MARGIN_CAP_PX = 800;
+
+/** The scene with some of its lights left out. */
+function withoutLights(scene: VisionScene, left: ReadonlySet<string>): VisionScene {
+  return { ...scene, lights: scene.lights.filter((light) => !left.has(light.sourceId)) };
+}
+
+/** Whether a plan lays fog, or what is only remembered, over the table: without it the veil holds nothing. */
+function holdsFog(plan: OverlayPlan): boolean {
+  return plan.vision?.fogEnabled === true;
+}
 /** How often the flicker is redrawn, about twenty times a second. */
 export const VISION_ANIMATION_INTERVAL_MS = 50;
 
@@ -32,6 +50,9 @@ export const VISION_ANIMATION_INTERVAL_MS = 50;
 })
 export class TableVisionOverlayComponent {
   protected readonly visionService = inject(VisionService);
+  private readonly lightSlots = inject(LightSlotsService);
+  private readonly flickerClock = inject(LightFlickerClockService);
+  private readonly tableVeil = inject(TableVeilService);
   private readonly renderLite = inject(RenderLiteService);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly zTransform = translateZCss(Z_OFFSET_DARKNESS_PX);
@@ -52,13 +73,22 @@ export class TableVisionOverlayComponent {
   private surfaceKey = '';
   private margin = 0;
   private scale = 1;
+  /** How many pixels across and down the canvases of the surface are drawn at, as the scene was last laid out. */
+  private pixelWidth = 0;
+  private pixelHeight = 0;
+  /** Where the canvases of the surface lie on the board, as the scene was last laid out, as their style places them. */
+  private box = { left: '0px', top: '0px', width: '0px', height: '0px' };
   private animated = false;
-  private bake: OverlayBake | null = null;
   private scratch: BakeCanvas | null = null;
   private scratchSize = '';
-  private dirty: DirtyRect[] = [];
   private rafId: number | null = null;
   private readonly images = new Map<string, HTMLImageElement>();
+  private darkness: HTMLCanvasElement | null = null;
+  private glowing: HTMLCanvasElement | null = null;
+  /** The plan the glow of the lamps a table drawn on a canvas adds is drawn from, or none. */
+  private glowPlan: OverlayPlan | null = null;
+  /** The plan the darkness a table drawn on a canvas lights itself by is drawn from. */
+  private darkPlan: OverlayPlan | null = null;
 
   constructor() {
     effect(() => {
@@ -101,25 +131,36 @@ export class TableVisionOverlayComponent {
         : overlayScale(cw, ch);
       const pw = Math.ceil(cw * this.scale);
       const ph = Math.ceil(ch * this.scale);
-      if (canvas.width !== pw) canvas.width = pw;
-      if (canvas.height !== ph) canvas.height = ph;
-      canvas.style.left = this.surfaceOriginX - this.margin + 'px';
-      canvas.style.top = this.surfaceOriginY - this.margin + 'px';
-      canvas.style.width = cw + 'px';
-      canvas.style.height = ch + 'px';
-      const plan = computeOverlayPlan(scene, viewer, this.visionService.overlayVision());
-      const layout = `${pw}x${ph}@${this.scale}:${this.margin}:${this.surfaceOriginX}:${this.surfaceOriginY}`;
+      this.pixelWidth = pw;
+      this.pixelHeight = ph;
+      this.box = {
+        left: this.surfaceOriginX - this.margin + 'px',
+        top: this.surfaceOriginY - this.margin + 'px',
+        width: cw + 'px',
+        height: ch + 'px',
+      };
+      const vision = this.visionService.overlayVision();
+      const plan = computeOverlayPlan(scene, viewer, vision);
+      this.sizeToSurface(canvas, holdsFog(plan));
+      const lit = this.lightSlots.ids();
+      const darkPlan = lit.size > 0 ? computeOverlayPlan(withoutLights(scene, lit), viewer, vision) : plan;
+      const layout = `${pw}x${ph}@${this.scale}:${this.margin}:${this.surfaceOriginX}:${this.surfaceOriginY}:${[...lit]}`;
       if (this.plan && layout === this.drawnLayout && sameOverlayPlan(this.plan, plan)) return;
       this.plan = plan;
+      this.darkPlan = darkPlan;
       this.drawnLayout = layout;
       this.refreshScratch(cw, ch);
-      this.animated = scene.lights.some((light) => light.animation && light.animation !== 'none');
       this.ensureImages();
-      this.refreshBake();
-      this.draw(this.now(), null);
-      this.syncLoop();
+      untracked(() => this.drawForCanvas());
     });
-    this.destroyRef.onDestroy(() => this.stopLoop());
+    effect(() => {
+      this.flickerClock.held();
+      untracked(() => this.drawFlicker());
+    });
+    this.destroyRef.onDestroy(() => {
+      this.stopLoop();
+      this.tableVeil.forget();
+    });
   }
 
   /**
@@ -129,17 +170,18 @@ export class TableVisionOverlayComponent {
    * a scene coming back would otherwise be drawn against.
    */
   private forgetScene(): void {
+    this.tableVeil.forget();
     this.plan = null;
     this.drawnLayout = '';
     this.animated = false;
-    this.bake = null;
     this.scratch = null;
     this.scratchSize = '';
-    this.dirty = [];
     this.margin = 0;
     this.scale = 1;
     this.surfaceCells = undefined;
     this.surfaceKey = '';
+    this.darkness = null;
+    this.glowing = null;
     this.stopLoop();
   }
 
@@ -164,6 +206,97 @@ export class TableVisionOverlayComponent {
     return typeof performance !== 'undefined' ? performance.now() : 0;
   }
 
+  /**
+   * Draws what a table drawn on a canvas lays over its own scene, out of sight: on this canvas the fog
+   * and what is only remembered, and on another the darkness with the light carved out of it, black,
+   * which the scene takes as light. The glow of the lamps is left to the scene. A table with no fog
+   * lays no veil, and one that is not dark no darkness, nor holds a canvas of the board's size for it.
+   */
+  private drawForCanvas(): void {
+    this.stopLoop();
+    this.glowPlan = null;
+    this.animated = false;
+    const plan = this.plan;
+    const canvas = this.canvasRef()?.nativeElement;
+    const ctx = canvas?.getContext('2d');
+    if (!plan || !canvas || !ctx) return;
+    if (holdsFog(plan)) {
+      const fog = { ...plan, darknessAlpha: 0, reveals: [], revealCells: [], glows: [], shadows: [] };
+      this.paint(ctx, fog);
+      this.tableVeil.show(canvas);
+    } else {
+      this.tableVeil.forgetVeil();
+    }
+    if (!(plan.darknessAlpha > 0)) {
+      this.tableVeil.forgetDarkness();
+      this.darkness = null;
+      this.glowing = null;
+      return;
+    }
+    const dark = this.darkCanvas();
+    const darkCtx = dark.getContext('2d');
+    if (!darkCtx) return;
+    const darkPlan = this.darkPlan ?? plan;
+    const vision = darkPlan.vision ? { ...darkPlan.vision, fogEnabled: false } : darkPlan.vision;
+    this.paint(darkCtx, { ...darkPlan, darknessColor: '#000000', glows: [], vision });
+    this.tableVeil.showDarkness(dark, plan.darknessAlpha * (1 - plan.baseRevealAlpha));
+    this.glowPlan =
+      darkPlan.glows.length > 0
+        ? { ...darkPlan, darknessAlpha: 0, reveals: [], revealCells: [], shadows: [], vision }
+        : null;
+    this.drawGlow();
+    this.animated = !!this.glowPlan?.glows.some((shape) => shape.animation && shape.animation !== 'none');
+    this.syncLoop();
+  }
+
+  /** Draws the glow of the lamps the scene does not light itself, out of sight, for the scene to add. */
+  private drawGlow(): void {
+    if (!this.glowPlan || !this.canvasRef()) {
+      this.tableVeil.forgetGlow();
+      this.glowing = null;
+      return;
+    }
+    const glow = (this.glowing ??= document.createElement('canvas'));
+    this.sizeToSurface(glow);
+    const ctx = glow.getContext('2d');
+    if (!ctx) return;
+    this.paint(ctx, this.glowPlan);
+    this.tableVeil.showGlow(glow);
+  }
+
+  /** A canvas of the surface, kept off the page, for the darkness to be drawn on. */
+  private darkCanvas(): HTMLCanvasElement {
+    const dark = (this.darkness ??= document.createElement('canvas'));
+    this.sizeToSurface(dark);
+    return dark;
+  }
+
+  /**
+   * Sizes a canvas to the surface as the scene was last laid out, and places it as the surface lies on
+   * the board; one that is to hold nothing is kept a pixel across, which the table can still be sent.
+   */
+  private sizeToSurface(canvas: HTMLCanvasElement, holds = true): void {
+    const width = holds ? this.pixelWidth : 1;
+    const height = holds ? this.pixelHeight : 1;
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
+    Object.assign(canvas.style, this.box);
+  }
+
+  private paint(ctx: CanvasRenderingContext2D, plan: OverlayPlan): void {
+    perfCounters.bump('overlayDraw');
+    perfTimed('overlay', () =>
+      drawOverlayPlan(ctx, plan, this.surfaceWidth, this.surfaceHeight, {
+        timeMs: this.flickerClock.now(),
+        images: this.images,
+        margin: this.margin,
+        surface: this.surfaceOf(),
+        scale: this.scale,
+        scratch: this.scratch,
+      })
+    );
+  }
+
   private ensureImages(): void {
     if (!this.plan) return;
     const live = new Set<string>();
@@ -172,10 +305,12 @@ export class TableVisionOverlayComponent {
       live.add(shadow.imageUrl);
       if (this.images.has(shadow.imageUrl)) continue;
       const image = new Image();
+      const loaded = this.tableVeil.pictureLoading();
       image.onload = () => {
-        this.refreshBake();
-        this.draw(this.now(), null);
+        this.drawForCanvas();
+        loaded();
       };
+      image.onerror = loaded;
       image.src = shadow.imageUrl;
       this.images.set(shadow.imageUrl, image);
     }
@@ -185,58 +320,8 @@ export class TableVisionOverlayComponent {
     }
   }
 
-  /**
-   * Only a table with a flickering light bakes the part that does not change.
-   *
-   * A baked surface holds as many pixels as the board. A table without a flicker never
-   * redraws at all, so holding one would be waste.
-   */
-  private refreshBake(): void {
-    if (!this.plan || !this.animated) {
-      this.bake = null;
-      this.dirty = [];
-      return;
-    }
-    this.bake = bakeOverlayPlan(
-      this.plan,
-      this.surfaceWidth,
-      this.surfaceHeight,
-      this.images,
-      this.margin,
-      this.surfaceOf(),
-      this.bake,
-      this.scale,
-      this.scratch
-    );
-    this.dirty = animatedGlowPatches(this.plan, this.surfaceWidth, this.surfaceHeight, this.margin, this.surfaceOf());
-  }
-
   private surfaceOf() {
     return { originX: this.surfaceOriginX, originY: this.surfaceOriginY, cells: this.surfaceCells };
-  }
-
-  private draw(timeMs: number, dirty: DirtyRect | null): void {
-    perfCounters.bump('overlayDraw');
-    perfTimed('overlay', () => this.drawNow(timeMs, dirty));
-  }
-
-  private drawNow(timeMs: number, dirty: DirtyRect | null): void {
-    const ctx = this.canvasRef()?.nativeElement.getContext('2d');
-    if (!ctx || !this.plan) return;
-    drawOverlayPlan(
-      ctx,
-      this.plan,
-      this.surfaceWidth,
-      this.surfaceHeight,
-      timeMs,
-      this.images,
-      this.margin,
-      this.surfaceOf(),
-      this.bake,
-      dirty,
-      this.scale,
-      this.scratch
-    );
   }
 
   /**
@@ -251,13 +336,15 @@ export class TableVisionOverlayComponent {
     const now = this.now();
     if (now - this.lastFrameAt >= VISION_ANIMATION_INTERVAL_MS) {
       this.lastFrameAt = now;
-      // Only the ground the flickering lights cover; the rest was laid down once. With nothing
-      // laid down, the whole board is drawn.
-      if (!this.bake) this.draw(now, null);
-      else for (const patch of this.dirty) this.draw(now, patch);
+      this.drawFlicker();
     }
     this.rafId = requestAnimationFrame(this.loop);
   };
+
+  /** Draws again what the flickering lights light, as they are at the moment they are drawn at. */
+  private drawFlicker(): void {
+    if (this.animated) this.drawGlow();
+  }
 
   private syncLoop(): void {
     if (this.animated) {

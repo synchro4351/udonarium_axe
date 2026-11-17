@@ -80,10 +80,13 @@ export function buildMultiSelectionContextMenu(
     {
       name: t('feature.tabletop.selection.copyAll'),
       action: () => {
+        // A part whose body is copied too comes with the body's copy, not as one more part of the body.
+        const withBody = (obj: TabletopObject) =>
+          obj instanceof GameCharacter && obj.isWrittenAsPart && movable.some((one) => one.identifier === obj.ridingOn);
         const handled = new Set<string>();
         const cloned: string[] = [];
         for (const obj of movable) {
-          if (handled.has(obj.identifier) || isWithheldHere(obj)) continue;
+          if (handled.has(obj.identifier) || isWithheldHere(obj) || withBody(obj)) continue;
           if (obj instanceof GameCharacter && copyCharacterGroup) {
             const copies = copyCharacterGroup(obj);
             const sourceGroup = obj.partGroup;

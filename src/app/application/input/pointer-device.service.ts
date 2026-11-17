@@ -1,4 +1,5 @@
-import { Injectable, signal, untracked } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { DestroyRef, inject, Injectable, signal, untracked } from '@angular/core';
 import { AttachedDocuments } from '@axe/domain/ui/attached-documents';
 
 export interface PointerCoordinate {
@@ -19,6 +20,8 @@ const TOUCH_CONTEXT_MENU_SLOP_PX = 12;
   providedIn: 'root',
 })
 export class PointerDeviceService {
+  private readonly document = inject(DOCUMENT);
+
   private callbackOnPointerDown = (e: MouseEvent | TouchEvent) => this.onPointerDown(e);
   private callbackOnPointerMove = (e: MouseEvent | TouchEvent) => this.onPointerMove(e);
   private callbackOnPointerUp = (e: MouseEvent | TouchEvent) => this.onPointerUp(e);
@@ -27,7 +30,7 @@ export class PointerDeviceService {
     if (e.target === e.currentTarget) this.resetDraggingState();
   };
   private callbackOnVisibilityChange = () => {
-    if (document.visibilityState === 'hidden') this.resetDraggingState();
+    if (this.document.visibilityState === 'hidden') this.resetDraggingState();
   };
 
   private _isAllowedToOpenContextMenu: boolean = false;
@@ -54,7 +57,7 @@ export class PointerDeviceService {
     this.primaryPointer = primed;
   }
 
-  targetElement: HTMLElement = document.body;
+  targetElement: HTMLElement = this.document.body;
 
   pointers: PointerData[] = [{ x: 0, y: 0, z: 0, identifier: -1 }];
   private startPosition: PointerData = this.pointers[0];
@@ -88,14 +91,10 @@ export class PointerDeviceService {
     this._isDragging.set(isDragging);
   }
 
-  /** Starts following the mouse and touches on the page. Call once when the app starts. */
-  initialize() {
+  /** Follows the mouse and touches on the page from the moment it is made until its injector goes. */
+  constructor() {
     this.addEventListeners();
-  }
-
-  /** Stops following the mouse and touches. */
-  destroy() {
-    this.removeEventListeners();
+    inject(DestroyRef).onDestroy(() => this.removeEventListeners());
   }
 
   private onPointerDown(e: MouseEvent | TouchEvent) {
@@ -142,7 +141,7 @@ export class PointerDeviceService {
     } else {
       this.onMouseMove(e as MouseEvent);
     }
-    this.targetElement = e.target as HTMLElement;
+    this.targetElement = e.target instanceof HTMLElement ? e.target : this.targetElement;
   }
 
   private onPointerUp(e: MouseEvent | TouchEvent) {
@@ -194,10 +193,10 @@ export class PointerDeviceService {
     }
   }
 
-  private isSyntheticEvent(mosuePointer: PointerData, threshold: number = 15): boolean {
+  private isSyntheticEvent(mousePointer: PointerData, threshold: number = 15): boolean {
     for (const pointer of this.pointers) {
-      if (pointer.identifier === mosuePointer.identifier) continue;
-      const distance = (mosuePointer.x - pointer.x) ** 2 + (mosuePointer.y - pointer.y) ** 2;
+      if (pointer.identifier === mousePointer.identifier) continue;
+      const distance = (mousePointer.x - pointer.x) ** 2 + (mousePointer.y - pointer.y) ** 2;
       if (distance < threshold ** 2) return true;
     }
     return false;
@@ -212,7 +211,7 @@ export class PointerDeviceService {
    * there is known where it was made and a context menu may open from it.
    */
   private followWindows(documents: readonly Document[]): void {
-    const bodies = new Set(documents.filter((held) => held !== document && held.body).map((held) => held.body));
+    const bodies = new Set(documents.filter((held) => held !== this.document && held.body).map((held) => held.body));
     for (const body of [...this.followedAbroad]) {
       if (bodies.has(body)) continue;
       this.listenOn(body, false);
@@ -239,17 +238,18 @@ export class PointerDeviceService {
 
   private addEventListeners() {
     this.stopFollowingWindows ??= AttachedDocuments.onChange((documents) => this.followWindows(documents));
-    document.body.addEventListener('mousedown', this.callbackOnPointerDown, true);
-    document.body.addEventListener('mousemove', this.callbackOnPointerMove, true);
-    document.body.addEventListener('mouseup', this.callbackOnPointerUp, true);
-    document.body.addEventListener('touchstart', this.callbackOnPointerDown, true);
-    document.body.addEventListener('touchmove', this.callbackOnPointerMove, true);
-    document.body.addEventListener('touchend', this.callbackOnPointerUp, true);
-    document.body.addEventListener('touchcancel', this.callbackOnPointerUp, true);
-    document.body.addEventListener('drop', this.callbackOnPointerUp, true);
-    document.body.addEventListener('contextmenu', this.callbackOnContextMenu, true);
-    window.addEventListener('blur', this.callbackOnWindowBlur, true);
-    document.addEventListener('visibilitychange', this.callbackOnVisibilityChange, true);
+    const body = this.document.body;
+    body.addEventListener('mousedown', this.callbackOnPointerDown, true);
+    body.addEventListener('mousemove', this.callbackOnPointerMove, true);
+    body.addEventListener('mouseup', this.callbackOnPointerUp, true);
+    body.addEventListener('touchstart', this.callbackOnPointerDown, true);
+    body.addEventListener('touchmove', this.callbackOnPointerMove, true);
+    body.addEventListener('touchend', this.callbackOnPointerUp, true);
+    body.addEventListener('touchcancel', this.callbackOnPointerUp, true);
+    body.addEventListener('drop', this.callbackOnPointerUp, true);
+    body.addEventListener('contextmenu', this.callbackOnContextMenu, true);
+    this.document.defaultView?.addEventListener('blur', this.callbackOnWindowBlur, true);
+    this.document.addEventListener('visibilitychange', this.callbackOnVisibilityChange, true);
   }
 
   private removeEventListeners() {
@@ -257,16 +257,17 @@ export class PointerDeviceService {
     this.stopFollowingWindows = null;
     for (const body of this.followedAbroad) this.listenOn(body, false);
     this.followedAbroad.clear();
-    document.body.removeEventListener('mousedown', this.callbackOnPointerDown, true);
-    document.body.removeEventListener('mousemove', this.callbackOnPointerMove, true);
-    document.body.removeEventListener('mouseup', this.callbackOnPointerUp, true);
-    document.body.removeEventListener('touchstart', this.callbackOnPointerDown, true);
-    document.body.removeEventListener('touchmove', this.callbackOnPointerMove, true);
-    document.body.removeEventListener('touchend', this.callbackOnPointerUp, true);
-    document.body.removeEventListener('touchcancel', this.callbackOnPointerUp, true);
-    document.body.removeEventListener('drop', this.callbackOnPointerUp, true);
-    document.body.removeEventListener('contextmenu', this.callbackOnContextMenu, true);
-    window.removeEventListener('blur', this.callbackOnWindowBlur, true);
-    document.removeEventListener('visibilitychange', this.callbackOnVisibilityChange, true);
+    const body = this.document.body;
+    body.removeEventListener('mousedown', this.callbackOnPointerDown, true);
+    body.removeEventListener('mousemove', this.callbackOnPointerMove, true);
+    body.removeEventListener('mouseup', this.callbackOnPointerUp, true);
+    body.removeEventListener('touchstart', this.callbackOnPointerDown, true);
+    body.removeEventListener('touchmove', this.callbackOnPointerMove, true);
+    body.removeEventListener('touchend', this.callbackOnPointerUp, true);
+    body.removeEventListener('touchcancel', this.callbackOnPointerUp, true);
+    body.removeEventListener('drop', this.callbackOnPointerUp, true);
+    body.removeEventListener('contextmenu', this.callbackOnContextMenu, true);
+    this.document.defaultView?.removeEventListener('blur', this.callbackOnWindowBlur, true);
+    this.document.removeEventListener('visibilitychange', this.callbackOnVisibilityChange, true);
   }
 }

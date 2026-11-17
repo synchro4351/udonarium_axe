@@ -1,4 +1,4 @@
-type Callback = (srcEvent: TouchEvent | MouseEvent | PointerEvent) => void;
+type Callback = (srcEvent: Event) => void;
 type OnGestureCallback = (srcEvent: TouchEvent | MouseEvent | PointerEvent) => void;
 type OnTransformCallback = (
   transformX: number,
@@ -19,6 +19,35 @@ export enum TableTouchGestureEvent {
 }
 
 export const TABLE_LONG_PRESS_MS = 400;
+
+/** How far from the last tap, in pixels, a second finger may come down and still start a tap-and-drag zoom. */
+const TAP_DRAG_REACH_PX = 50;
+/** How long after a tap, in milliseconds, a second press still starts a tap-and-drag zoom. */
+const TAP_DRAG_WINDOW_MS = 400;
+/** How far a finger may wander, in pixels, and still count as held still. */
+const TOUCH_SLOP_PX = 6;
+/** The longest press, in milliseconds, that still counts as a tap. */
+const TAP_MAX_MS = 250;
+/** How much zoom one pixel of a tap-and-drag gives. */
+const TAP_DRAG_ZOOM_PER_PX = 7.5;
+/** How much zoom a pinch gives for doubling the distance between the fingers. */
+const PINCH_ZOOM_PER_SCALE = 500;
+/** How far two fingers dragged the whole height of the window tilt the view. */
+const TILT_PER_WINDOW_HEIGHT = 100;
+
+/**
+ * The event a finger held on the table by something else is handed over to the table's gesture by,
+ * as the ground brush hands its finger over once a second comes down: sent from where the finger was
+ * pressed, it joins the gesture where it stands now.
+ */
+export const ADOPT_TOUCH_EVENT = 'table-touch-adopt';
+
+/** A finger handed over to the table's gesture: which it is, and where on the page it stands now. */
+export interface AdoptedTouch {
+  readonly pointerId: number;
+  readonly clientX: number;
+  readonly clientY: number;
+}
 
 export class TableTouchGesture {
   shouldSynthesizeContextMenu: (() => boolean) | null = null;
@@ -57,10 +86,13 @@ export class TableTouchGesture {
   private readonly onPointerMoveBound = (ev: PointerEvent) => this.onPointerMove(ev);
   private readonly onPointerUpBound = (ev: PointerEvent) => this.onPointerUp(ev);
   private readonly onPointerCancelBound = (ev: PointerEvent) => this.onPointerCancel(ev);
+  private readonly onAdoptBound = (ev: Event) => this.adopt(ev as CustomEvent<AdoptedTouch>);
 
   onstart: Callback | null = null;
   onend: Callback | null = null;
   ongesture: OnGestureCallback | null = null;
+  /** Called on a single finger's tap, with what the finger came down on. */
+  ontap: ((ev: PointerEvent, pressedOn: EventTarget | null) => void) | null = null;
   ontransform: OnTransformCallback | null = null;
   constructor(readonly targetElement: Element) {
     this.originalTouchAction = (this.targetElement as HTMLElement).style.touchAction;
@@ -81,6 +113,7 @@ export class TableTouchGesture {
     element.removeEventListener('pointermove', this.onPointerMoveBound);
     element.removeEventListener('pointerup', this.onPointerUpBound);
     element.removeEventListener('pointercancel', this.onPointerCancelBound);
+    element.removeEventListener(ADOPT_TOUCH_EVENT, this.onAdoptBound);
   }
 
   private initializeGesture() {
@@ -90,6 +123,32 @@ export class TableTouchGesture {
     element.addEventListener('pointermove', this.onPointerMoveBound, { passive: false });
     element.addEventListener('pointerup', this.onPointerUpBound, { passive: true });
     element.addEventListener('pointercancel', this.onPointerCancelBound, { passive: true });
+    element.addEventListener(ADOPT_TOUCH_EVENT, this.onAdoptBound);
+  }
+
+  /**
+   * Takes in a finger something else held until now, where it stands, as though it had just come down
+   * there and already moved: no long press or tap comes of it.
+   */
+  private adopt(ev: CustomEvent<AdoptedTouch>): void {
+    const { pointerId, clientX: x, clientY: y } = ev.detail;
+    if (this.activePointers.has(pointerId)) return;
+    this.activePointers.set(pointerId, {
+      x,
+      y,
+      startX: x,
+      startY: y,
+      startAt: Date.now(),
+      moved: true,
+      target: ev.target,
+    });
+    if (!this.isGestureActive) {
+      this.isGestureActive = true;
+      this.prevCenter = { x, y };
+      if (this.onstart) this.onstart(ev);
+    }
+    this.clearLongPressTimer();
+    this.resetMultiTouchReferenceIfNeeded();
   }
 
   private onPointerDown(ev: PointerEvent) {
@@ -113,7 +172,7 @@ export class TableTouchGesture {
 
     if (this.activePointers.size === 1) {
       const distance = (this.tappedPanCenter.x - ev.clientX) ** 2 + (this.tappedPanCenter.y - ev.clientY) ** 2;
-      if (this.tappedPanTimer != null && distance <= 50 ** 2) {
+      if (this.tappedPanTimer != null && distance <= TAP_DRAG_REACH_PX ** 2) {
         this.isTappedPanGesture = true;
         this.clearTappedPanTimer(false);
         if (this.ongesture) this.ongesture(ev);
@@ -133,7 +192,7 @@ export class TableTouchGesture {
     if (!pointer) return;
 
     const moveDistance = (pointer.startX - ev.clientX) ** 2 + (pointer.startY - ev.clientY) ** 2;
-    if (moveDistance > 6 ** 2) {
+    if (moveDistance > TOUCH_SLOP_PX ** 2) {
       pointer.moved = true;
       this.clearLongPressTimer();
     }
@@ -148,7 +207,7 @@ export class TableTouchGesture {
       this.prevCenter = center;
 
       if (this.isTappedPanGesture) {
-        const transformZ = deltaY * 7.5;
+        const transformZ = deltaY * TAP_DRAG_ZOOM_PER_PX;
         if (this.ongesture) this.ongesture(ev);
         if (this.ontransform) this.ontransform(0, 0, transformZ, 0, 0, 0, TableTouchGestureEvent.TAP_PINCH, ev);
       } else {
@@ -163,7 +222,7 @@ export class TableTouchGesture {
       const deltaCenterY = center.y - prevCenter.y;
       this.prevCenter = center;
 
-      const rotateX = (-deltaCenterY / window.innerHeight) * 100;
+      const rotateX = (-deltaCenterY / window.innerHeight) * TILT_PER_WINDOW_HEIGHT;
       if (this.ongesture) this.ongesture(ev);
       if (this.ontransform) this.ontransform(0, 0, 0, rotateX, 0, 0, TableTouchGestureEvent.ROTATE, ev);
 
@@ -173,7 +232,7 @@ export class TableTouchGesture {
         const deltaScale = currentScale - this.pinchPrevScale;
         this.pinchPrevScale = currentScale;
 
-        const transformZ = deltaScale * 500;
+        const transformZ = deltaScale * PINCH_ZOOM_PER_SCALE;
         if (this.ongesture) this.ongesture(ev);
         if (this.ontransform) this.ontransform(0, 0, transformZ, 0, 0, 0, TableTouchGestureEvent.PINCH, ev);
       }
@@ -195,12 +254,12 @@ export class TableTouchGesture {
     if (!pointer) return;
 
     const tapDuration = Date.now() - pointer.startAt;
-    const isTap = !pointer.moved && tapDuration <= 250 && this.activePointers.size === 1;
+    const isTap = !pointer.moved && tapDuration <= TAP_MAX_MS && this.activePointers.size === 1;
 
     this.activePointers.delete(ev.pointerId);
     this.clearLongPressTimer();
 
-    if (isTap) this.onTap(ev);
+    if (isTap) this.onTap(ev, pointer.target);
 
     if (this.activePointers.size === 0) {
       this.resetTouchState();
@@ -225,12 +284,13 @@ export class TableTouchGesture {
     }
   }
 
-  private onTap(ev: PointerEvent) {
+  private onTap(ev: PointerEvent, pressedOn: EventTarget | null) {
     this.tappedPanCenter = { x: ev.clientX, y: ev.clientY };
     this.tappedPanTimer = setTimeout(() => {
       this.tappedPanTimer = null;
-    }, 400);
+    }, TAP_DRAG_WINDOW_MS);
     if (this.ongesture) this.ongesture(ev);
+    if (this.ontap) this.ontap(ev, pressedOn);
   }
 
   private resetTouchState() {

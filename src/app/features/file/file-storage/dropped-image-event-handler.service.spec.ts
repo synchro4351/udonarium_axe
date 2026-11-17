@@ -142,7 +142,9 @@ describe('DroppedImageEventHandlerService', () => {
     });
 
     it('loads pictures dropped for a panel that never appears where they were dropped, then tries again', () => {
-      const load = vi.spyOn(archiver, 'load').mockResolvedValue({ dataRead: false, images: [], audios: [] });
+      const load = vi
+        .spyOn(archiver, 'load')
+        .mockResolvedValue({ dataRead: false, images: [], audios: [], models: [] });
       TestBed.inject(DroppedImageEventHandlerService);
       const file = png();
 
@@ -155,7 +157,9 @@ describe('DroppedImageEventHandlerService', () => {
     });
 
     it('does not load them twice should the panel appear after all', () => {
-      const load = vi.spyOn(archiver, 'load').mockResolvedValue({ dataRead: false, images: [], audios: [] });
+      const load = vi
+        .spyOn(archiver, 'load')
+        .mockResolvedValue({ dataRead: false, images: [], audios: [], models: [] });
       const service = TestBed.inject(DroppedImageEventHandlerService);
 
       drop(png());
@@ -231,7 +235,9 @@ describe('DroppedImageEventHandlerService', () => {
 
     it('waits for the next panel rather than loading when the reopened one never appears', async () => {
       vi.useFakeTimers();
-      const load = vi.spyOn(archiver, 'load').mockResolvedValue({ dataRead: false, images: [], audios: [] });
+      const load = vi
+        .spyOn(archiver, 'load')
+        .mockResolvedValue({ dataRead: false, images: [], audios: [], models: [] });
       loadImages.mockResolvedValue({ images: [], oversized: ['big.png'] });
       const service = TestBed.inject(DroppedImageEventHandlerService);
       const big = png('big.png');

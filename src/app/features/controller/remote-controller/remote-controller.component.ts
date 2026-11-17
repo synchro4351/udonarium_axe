@@ -13,8 +13,11 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BattleLaunchService } from '@axe/application/battle/battle-launch.service';
+import { PieceNameService } from '@axe/application/character/piece-name.service';
+import { StatusAilmentService } from '@axe/application/character/status-ailment.service';
 import { CharacterMacroService } from '@axe/application/chat/character-macro.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
+import { VisibleChatTabsService } from '@axe/application/chat/visible-chat-tabs.service';
 import { DiceBotCatalogService } from '@axe/application/dice/dice-bot-catalog.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
@@ -22,25 +25,31 @@ import { GameObjectInventoryService } from '@axe/application/inventory/game-obje
 import { DisclosureService } from '@axe/application/permission/disclosure.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { VisionService } from '@axe/application/tabletop/vision.service';
 import { closeWhenOffTheTable } from '@axe/application/ui/close-when-off-the-table';
 import { PanelOption, PanelService } from '@axe/application/ui/panel.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
+import { Logger } from '@axe/core/logging/logger';
 import { getMyPeerId } from '@axe/core/network/peer-context-source';
 import { readLocal, writeLocal } from '@axe/core/storage/local-preference';
 import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
 import { isInStore, ObjectStore } from '@axe/core/sync/object-store';
 import { BattleTake } from '@axe/domain/battle/battle-take';
+import { writeElementField } from '@axe/domain/character/alias-mate-follow';
 import { BUFF_COLORS, resolveBuffColor } from '@axe/domain/character/buff-appearance';
+import { BUFF_KINDS, type BuffKind, buffKindFrom } from '@axe/domain/character/buff-kind';
 import { ControllerResourcePick, controllerShowsResource } from '@axe/domain/character/controller-resource-pick';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { saidNameOf } from '@axe/domain/character/hidden-name';
 import { type ResourceCatalogEntry, resourceCatalogOf } from '@axe/domain/character/resource-catalog';
 import { isChangeableElementType } from '@axe/domain/character/status-accessor';
+import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { ChatPalette } from '@axe/domain/chat/chat-palette';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
-import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
-import { canRoleSpeakTab, canRoleViewTab } from '@axe/domain/chat/chat-tab-permission';
+import { canRoleSpeakTab } from '@axe/domain/chat/chat-tab-permission';
+import { tellThoseWhoMaySee } from '@axe/domain/chat/game-master-lines';
 import { PaletteRow, paletteRowsOf } from '@axe/domain/chat/palette-rows';
 import { DataElement } from '@axe/domain/data/data-element';
 import { DataSummarySetting, SortOrder } from '@axe/domain/data/data-summary-setting';
@@ -52,6 +61,7 @@ import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
 import { ControllerInputComponent } from '@axe/features/controller/controller-input/controller-input.component';
 import {
   addBuffRound,
+  chosenKindMark,
   decreaseBuffRound,
   deleteZeroRoundBuffs,
   parseBuffInput,
@@ -65,6 +75,7 @@ import {
   getInventoryTags,
   getTabTitleKey,
   getTargetCharacters,
+  shownChangeDetail,
 } from '@axe/features/controller/remote-controller/remote-controller-helpers';
 import { TextTooltipDirective } from '@axe/ui/directives/text-tooltip.directive';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
@@ -82,6 +93,9 @@ const SLOT_LABEL_KEYS: Record<ResourceSlot, string> = {
   minCorrection: 'feature.controller.remote.slotMinCorrection',
 };
 
+/** How soon a second click on the same palette line counts with the first, sending the line. */
+const PALETTE_DOUBLE_CLICK_MS = 400;
+
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'remote-controller',
@@ -97,12 +111,16 @@ const SLOT_LABEL_KEYS: Record<ResourceSlot, string> = {
   ],
 })
 export class RemoteControllerComponent {
+  /** Writes a value typed into a field of a piece, and carries it to the items sharing an alias with it. */
+  protected readonly writeField = writeElementField;
+
   protected readonly isCompact = inject(ViewportService).isCompact;
   readonly chatMessageService = inject(ChatMessageService);
   private readonly characterMacro = inject(CharacterMacroService);
   private readonly panelService = inject(PanelService);
   private readonly inventoryService = inject(GameObjectInventoryService);
   private readonly disclosureService = inject(DisclosureService);
+  private readonly vision = inject(VisionService);
   private readonly pointerDeviceService = inject(PointerDeviceService);
   private readonly objectStore = inject(ObjectStore);
   private readonly selectionSignalService = inject(SelectionSignalService);
@@ -111,6 +129,8 @@ export class RemoteControllerComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly t = inject(TRANSLATE_FN);
   private readonly battle = inject(BattleLaunchService);
+  private readonly names = inject(PieceNameService);
+  private readonly statusAilments = inject(StatusAilmentService);
   protected readonly rolePermission = inject(RolePermissionService);
 
   /**
@@ -169,13 +189,15 @@ export class RemoteControllerComponent {
     return this._gameSystem == null ? '' : this._gameSystem.ID;
   }
   set gameType(gameType: string) {
-    DiceBot.loadGameSystemAsync(gameType).then((gameSystem) => {
-      this._gameSystem = gameSystem;
-      const char = this.character();
-      if (char?.remoteController) {
-        char.remoteController.dicebot = gameSystem.ID;
-      }
-    });
+    DiceBot.loadGameSystemAsync(gameType)
+      .then((gameSystem) => {
+        this._gameSystem = gameSystem;
+        const char = this.character();
+        if (char?.remoteController) {
+          char.remoteController.dicebot = gameSystem.ID;
+        }
+      })
+      .catch((reason) => Logger.warn('[RemoteController] failed to load the dice bot', gameType, reason));
   }
 
   /**
@@ -202,23 +224,17 @@ export class RemoteControllerComponent {
     return this.objectStore.get<ChatTab>(this.chatTabidentifier())!;
   });
 
-  readonly chatTabsVersion = computed(() => {
-    this.objectChange.collectionOf('chat-tab')();
-    this.objectChange.versionOf(ChatTabList.instance.identifier)();
-    const tabs = this.chatMessageService.chatTabs;
-    for (const tab of tabs) this.objectChange.versionOf(tab.identifier)();
-    return [...tabs];
-  });
+  private readonly visibleChatTabs = inject(VisibleChatTabsService).tabs;
 
   /**
    * The tabs the panel may send its word to: those this seat's role may read and speak in, which
    * leaves out the system tab, where nobody speaks.
    */
   readonly sendableChatTabs = computed(() => {
-    const tabs = this.chatTabsVersion();
+    const tabs = this.visibleChatTabs();
     this.objectChange.trackMyCursor();
     const role = PeerCursor.myRole;
-    return tabs.filter((tab) => canRoleViewTab(tab, role) && canRoleSpeakTab(tab, role));
+    return tabs.filter((tab) => canRoleSpeakTab(tab, role));
   });
   /** This user's own cursor. */
   get myPeer(): PeerCursor {
@@ -232,7 +248,13 @@ export class RemoteControllerComponent {
   constructor() {
     // Made a guest meanwhile, the seat may no longer write what this panel writes.
     closeWhenOffTheTable();
-    queueMicrotask(() => this.updatePanelTitle());
+    // The title names the piece as this seat is told it, so it follows the piece and the seat's role.
+    effect(() => {
+      const character = this.character();
+      if (character) this.objectChange.versionOf(character.identifier)();
+      this.objectChange.trackMyCursor();
+      untracked(() => this.updatePanelTitle());
+    });
     this.chatTabidentifier.set(this.sendableChatTabs()[0]?.identifier ?? '');
     // A tab gone, or one this seat may no longer speak in, gives way to the first it may.
     effect(() => {
@@ -331,6 +353,19 @@ export class RemoteControllerComponent {
   readonly buffSectionOpen = signal(true);
   readonly buffColors = BUFF_COLORS;
   readonly buffColorId = signal('');
+
+  readonly buffKinds = BUFF_KINDS;
+  /** The kind picked on the form by hand, or null while the choice is left as it came. */
+  readonly buffKindPicked = signal<BuffKind | null>(null);
+  /**
+   * The kind the choice shows: the one picked by hand, or, left as it came, the kind the name typed
+   * makes the buff, a debuff for a state the room keeps and a buff for anything else. A kind written
+   * on the line itself still wins over it.
+   */
+  readonly buffKind = computed<BuffKind>(() => {
+    const name = parseBuffInput(this.text().trim())?.buffname ?? '';
+    return this.buffKindPicked() ?? buffKindFrom(null, name, this.statusAilments.ailments());
+  });
   readonly counterSectionOpen = signal(true);
 
   readonly chatTabidentifier = signal('');
@@ -356,7 +391,7 @@ export class RemoteControllerComponent {
 
   protected targetNames(): string {
     return this.getTargetCharacters(true)
-      .map((character) => character.name)
+      .map((character) => this.shownName(character))
       .join('、');
   }
 
@@ -374,7 +409,8 @@ export class RemoteControllerComponent {
    * Puts the buff typed into the buff field on every ticked target and announces it in the chat,
    * from Enter or the add button.
    *
-   * A colour chosen in the panel is added unless the typed line names one. A `+` in front of the
+   * A colour chosen in the panel is added unless the typed line names one, and so is the kind picked
+   * there, as {@link chosenKindMark} reads it. A `+` in front of the
    * name adds the line's number to a buff of that name already standing, and `++` lengthens it by
    * the rounds as well. Empty text does nothing, and with no ticked target an error is shown
    * instead.
@@ -391,12 +427,17 @@ export class RemoteControllerComponent {
       return;
     }
     const ci = this.controllerInputComponent();
-    const parts = gameCharacters.map((o) => `[${o.name}]`).join('');
+    const parts = gameCharacters.map((o) => `[${saidNameOf(o)}]`).join('');
     const appearance = { ...parsed.appearance };
     let bufftext = parsed.bufftext;
     if (appearance.color === undefined && this.buffColorId().length > 0) {
       appearance.color = resolveBuffColor(this.buffColorId());
       bufftext += `/${this.buffColorId()}`;
+    }
+    const kind = chosenKindMark(appearance, this.buffKindPicked(), parsed.buffname, this.statusAilments.ailments());
+    if (kind) {
+      appearance.kind = kind;
+      bufftext += `/${this.t(`feature.character.buff.kind_${kind}`)}`;
     }
     if (parsed.piles === 'none') addBuffRound(gameCharacters, parsed.buffname, parsed.sub, parsed.round, appearance);
     else pileBuffRound(gameCharacters, parsed.piles, parsed.buffname, parsed.sub, parsed.round, appearance);
@@ -493,7 +534,7 @@ export class RemoteControllerComponent {
   updatePanelTitle() {
     const char = this.character();
     this.panelService.title = char
-      ? this.t('feature.controller.remote.panelTitleWithName', { name: char.name })
+      ? this.t('feature.controller.remote.panelTitleWithName', { name: this.shownName(char) })
       : this.t('feature.controller.remote.panelTitle');
   }
 
@@ -525,7 +566,7 @@ export class RemoteControllerComponent {
   }
 
   /**
-   * Puts a palette line into the buff field; clicking the same line again within 400ms sends it as
+   * Puts a palette line into the buff field; clicking the same line again within `PALETTE_DOUBLE_CLICK_MS` sends it as
    * a buff.
    */
   clickPalette(line: string) {
@@ -537,7 +578,7 @@ export class RemoteControllerComponent {
       this.text.set(line);
       this.doubleClickTimer = setTimeout(() => {
         this.doubleClickTimer = null;
-      }, 400);
+      }, PALETTE_DOUBLE_CLICK_MS);
     }
   }
 
@@ -577,19 +618,29 @@ export class RemoteControllerComponent {
   }
 
   /**
-   * The pieces listed under an inventory tab that this user may view, re-read as the inventory,
-   * files, characters or this user's cursor change.
+   * The pieces listed under an inventory tab, re-read as the inventory, files, characters or this
+   * user's cursor change. A piece this user may not view is listed too, by its name and picture
+   * alone, so it can still be ticked as a target; one the table does not draw for them, in the dark,
+   * under the fog or in stealth, is not listed at all.
    */
   getGameObjects(inventoryType: string): TabletopObject[] {
     this.inventoryService.inventoryVersion();
     this.objectChange.fileVersion();
     this.objectChange.collectionOf('character')();
     this.objectChange.trackMyCursor();
-    return getGameObjects(inventoryType, this.inventoryService).filter((object) => this.canView(object));
+    return getGameObjects(inventoryType, this.inventoryService).filter(
+      (object) => !(object instanceof GameCharacter) || this.vision.mayBeListed(object)
+    );
+  }
+
+  /** A piece's name in the target list as this user may be told it: one whose name is kept from them goes unnamed. */
+  shownName(object: TabletopObject): string {
+    return this.names.shown(object);
   }
 
   /**
-   * Whether this user may see a piece in the target list; only characters can be hidden from them.
+   * Whether this user may see what a piece in the target list holds; only characters can be hidden
+   * from them.
    */
   canView(object: TabletopObject): boolean {
     return object instanceof GameCharacter ? this.disclosureService.canView(object) : true;
@@ -624,8 +675,13 @@ export class RemoteControllerComponent {
     return Config.instance.controllerResources;
   });
 
+  /**
+   * The pieces whose items name the buttons: the ticked ones this user may view, or with none of
+   * those, every one in the tab they may view. A piece whose contents are kept from them is still
+   * operated on, but by the names the others carry, so its own never reach the buttons.
+   */
   private resourceTargets(): GameCharacter[] {
-    const targeted = this.getTargetCharacters(true);
+    const targeted = this.getTargetCharacters(true).filter((character) => this.canView(character));
     return targeted.length > 0 ? targeted : this.getTargetCharacters(false);
   }
 
@@ -672,11 +728,11 @@ export class RemoteControllerComponent {
   }
 
   /** Everything this panel says is already worked out, so none of it is evaluated again. */
-  private announce(text: string, options: { portraitIndex: number; color?: string }): void {
+  private announce(text: string, options: { portraitIndex: number; color?: string }): ChatMessage | null {
     // Without a tab it may speak in, the panel says nothing rather than fall back on another.
     const tab = this.sendableChatTabs().find((candidate) => candidate.identifier === this.chatTabidentifier());
-    if (!tab) return;
-    this.characterMacro.announce(this.character(), text, {
+    if (!tab) return null;
+    return this.characterMacro.announce(this.character(), text, {
       tab,
       gameSystem: this._gameSystem,
       sendFrom: this.sendFrom,
@@ -685,14 +741,40 @@ export class RemoteControllerComponent {
       bubbles: null,
     });
   }
+  /**
+   * Tells those who may see what the pieces keep back what a line said to everyone says in full, as a
+   * line of the tool's own: the change to the pieces whose contents are kept from anyone, with what
+   * is left of them.
+   */
+  private tellThoseWhoMaySee(said: ChatMessage, text: string, pieces: readonly GameCharacter[]): void {
+    const tab = this.sendableChatTabs().find((candidate) => candidate.identifier === said.tabIdentifier);
+    if (!tab) return;
+    tellThoseWhoMaySee(
+      tab,
+      {
+        identifier: '',
+        tabIdentifier: tab.identifier,
+        from: 'System',
+        timestamp: said.timestamp + 1,
+        imageIdentifier: '',
+        tag: 'system',
+        name: said.name,
+        text,
+      },
+      text,
+      pieces
+    );
+  }
 
   /**
    * The characters in the selected tab that the panel's operations apply to: only the ticked ones
-   * with `checkedOnly`, otherwise all of them.
+   * with `checkedOnly`, otherwise all of those this user may view, as one they may not is taken only
+   * where they ticked it.
    */
   getTargetCharacters(checkedOnly: boolean): GameCharacter[] {
     this.uiSignalService.targetChange();
-    const objectList = this.getGameObjects(this.selectTab());
+    const listed = this.getGameObjects(this.selectTab());
+    const objectList = checkedOnly ? listed : listed.filter((object) => this.canView(object));
     return getTargetCharacters(objectList, checkedOnly);
   }
 
@@ -762,33 +844,46 @@ export class RemoteControllerComponent {
   remoteChangeValue() {
     const gameCharacters = this.getTargetCharacters(true);
     const chosen = this.remoteControllerSelect();
-    if (chosen.name == '') {
+    if (chosen.name === '') {
       this.errorMessageController = this.t('feature.controller.remote.noChangeTarget');
       return;
     }
     const take = this.takeBattle(gameCharacters);
     const parts: string[] = [];
+    const shownParts: string[] = [];
     const name = chosen.name;
     const nowOrMax = chosen.nowOrMax;
     const addValue = this.remoteNumber;
     for (const object of gameCharacters) {
-      parts.push(
-        object.status.changeValue(name, nowOrMax, addValue, this.recoveryLimitFlagMin, this.recoveryLimitFlag)
+      const report = object.status.changeValue(
+        name,
+        nowOrMax,
+        addValue,
+        this.recoveryLimitFlagMin,
+        this.recoveryLimitFlag
       );
+      parts.push(report);
+      shownParts.push(shownChangeDetail(object, report, name, nowOrMax));
     }
     const text = parts.join('');
-    if (text != '') {
+    if (text !== '') {
       const sign = this.remoteNumber < 0 ? '' : '+';
-      const mess = this.t('feature.controller.remote.changeValueMessage', {
-        name: chosen.dispName,
-        sign,
-        value: this.remoteNumber,
-        detail: text,
-      });
-      this.announce(mess, {
+      const messageOf = (detail: string) =>
+        this.t('feature.controller.remote.changeValueMessage', {
+          name: chosen.dispName,
+          sign,
+          value: this.remoteNumber,
+          detail,
+        });
+      const shown = shownParts.join('');
+      const said = this.announce(messageOf(shown), {
         portraitIndex: this.controllerInputComponent().portraitIndex(),
         color: this.controllerInputComponent().selectChatColor,
       });
+      if (said && shown !== text) {
+        const kept = gameCharacters.filter((piece, index) => parts[index] !== shownParts[index]);
+        this.tellThoseWhoMaySee(said, messageOf(text), kept);
+      }
       if (take) this.battle.finish(take);
       this.errorMessageController = '';
     } else {
@@ -816,7 +911,7 @@ export class RemoteControllerComponent {
       width: 420,
       height: 300,
     };
-    option.title = this.t('feature.controller.remote.buffEditWithName', { name: gameCharacter.name });
+    option.title = this.t('feature.controller.remote.buffEditWithName', { name: this.shownName(gameCharacter) });
     this.panelService.openLazy(
       () =>
         import('@axe/features/character/game-character-buff-view/game-character-buff-view.component').then(
@@ -828,7 +923,8 @@ export class RemoteControllerComponent {
   }
 
   /**
-   * Ticks or unticks every character in the selected tab as a target, from the select-all box.
+   * Ticks or unticks every character in the selected tab as a target, from the select-all box: every
+   * one whose contents the reader may view, as a piece kept from them is ticked only by its own row.
    *
    * The tick stays in this browser: `targeted` is not synced, and the change is announced only to
    * this client's views.
@@ -836,7 +932,7 @@ export class RemoteControllerComponent {
   allBoxCheck(value: { check: boolean }) {
     const objectList = this.getGameObjects(this.selectTab());
     for (const object of objectList) {
-      if (object instanceof GameCharacter) {
+      if (object instanceof GameCharacter && (this.canView(object) || !value.check)) {
         object.targeted = value.check;
         this.uiSignalService.notifyTargetChange(object.identifier, object.aliasName);
       }

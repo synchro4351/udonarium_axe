@@ -93,6 +93,16 @@ describe('Matrix3D', () => {
     });
   });
 
+  describe('appendPosition()', () => {
+    it('adds the same translation given a point or x, y and z', () => {
+      const byPoint = new Matrix3D().appendPosition({ x: 5, y: 10, z: 15, w: 1 });
+      const byParts = new Matrix3D().appendPosition(5, 10, 15);
+
+      expect(byParts.getPosition()).toEqual(byPoint.getPosition());
+      expect(byPoint.getPosition()).toMatchObject({ x: 5, y: 10, z: 15 });
+    });
+  });
+
   describe('multiply()', () => {
     it('multiplying two identities gives the identity', () => {
       const a = new Matrix3D();
@@ -243,6 +253,25 @@ describe('Matrix3D', () => {
     it('a perspective of zero leaves the depth term at zero', () => {
       const m = Matrix3D.makePerspective(0);
       expect(m.m34).toBe(0);
+    });
+  });
+
+  describe('toCss', () => {
+    it('writes the numbers in the order CSS lists them, reading back as the same matrix', () => {
+      const m = new Matrix3D().setData([1, 2, 3, 0.0003, 5, 6, 7, 0, 9, 10, 11, -0.00012, 1500, -40, 0.5, 1]);
+
+      const written = m.toCss();
+
+      expect(written).toBe('matrix3d(1, 2, 3, 0.0003, 5, 6, 7, 0, 9, 10, 11, -0.00012, 1500, -40, 0.5, 1)');
+      const read = new Matrix3D().setCSS(written);
+      expect([read.m14, read.m34, read.m41, read.m43]).toEqual([0.0003, -0.00012, 1500, 0.5]);
+    });
+
+    it('never writes a number in exponent form, nor a negative zero', () => {
+      const m = new Matrix3D().setData([1e-7, -1e-12, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+
+      expect(m.toCss()).toBe('matrix3d(0.0000001, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)');
+      expect(new Matrix3D().setData([100, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]).toCss(0)).toContain('(100, ');
     });
   });
 });

@@ -1,9 +1,12 @@
-import { afterNextRender, DestroyRef, effect, ElementRef, Signal, WritableSignal } from '@angular/core';
+import { afterNextRender, DestroyRef, effect, ElementRef, inject, Signal, WritableSignal } from '@angular/core';
+import { TablePiecesService } from '@axe/application/tabletop/table-pieces.service';
+import { PieceFootprint } from '@axe/application/ui/tabletop-overlap.service';
 import { GridSnapStyle } from '@axe/domain/tabletop/game-table';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
 import { InputHandler } from '@axe/ui/directives/input-handler';
 import { MovableOption } from '@axe/ui/directives/movable.directive';
-import { RotableOption, RotableTabletopObject } from '@axe/ui/directives/rotable.directive';
+import { RotableOption, RotableTabletopObject, TurnAbout } from '@axe/ui/directives/rotable.directive';
+import { DoubleTap } from '@axe/ui/tabletop/double-tap';
 
 export interface MovableSetup<T extends TabletopObject> {
   readonly target: Signal<T | null | undefined>;
@@ -12,8 +15,13 @@ export interface MovableSetup<T extends TabletopObject> {
   readonly snapOrigin?: (t: T) => { x: number; y: number } | undefined;
   /** Where the piece goes when snapped from a place, ahead of the table's own snap; see {@link MovableOption}. */
   readonly snapToSquare?: (t: T, at: { x: number; y: number }) => { x: number; y: number } | null;
-  readonly transformCssOffset?: string;
   readonly layerName?: string;
+  /** How much of its face the piece covers; see {@link MovableOption}. */
+  readonly footprint?: (t: T) => PieceFootprint;
+  /** Whether the piece is put down wherever it is let go, off the table's grid; see `MovableOption.freeOfGrid`. */
+  readonly freeOfGrid?: (t: T) => boolean;
+  /** Where the piece turns about, for one that does not turn about its middle; see {@link RotableOption}. */
+  readonly turnsAbout?: (t: T) => TurnAbout | null;
 }
 
 function applyMovableOption<T extends TabletopObject>(
@@ -26,8 +34,7 @@ function applyMovableOption<T extends TabletopObject>(
   const snapOrigin = opts.snapOrigin?.(piece);
   signal.set({
     tabletopObject: piece,
-    transformCssOffset: opts.transformCssOffset,
-    colideLayers: opts.collideLayers ? [...opts.collideLayers] : undefined,
+    collideLayers: opts.collideLayers ? [...opts.collideLayers] : undefined,
     snapStyle,
     // A style read from the piece is read again at each snap, since what it is read from (as a
     // character's size) can change without the piece itself being replaced.
@@ -35,6 +42,8 @@ function applyMovableOption<T extends TabletopObject>(
     snapOrigin,
     snapToSquare: opts.snapToSquare ? (at) => opts.snapToSquare!(piece, at) : undefined,
     layerName: opts.layerName,
+    footprint: opts.footprint ? () => opts.footprint!(piece) : undefined,
+    freeOfGrid: opts.freeOfGrid ? () => opts.freeOfGrid!(piece) : undefined,
   });
 }
 
@@ -68,11 +77,15 @@ export function setupMovableRotableForPiece<T extends RotableTabletopObject>(
   },
   opts: MovableSetup<T>
 ): void {
+  const pieces = inject(TablePiecesService);
   effect(() => {
     const piece = opts.target();
     if (piece == null) return;
     applyMovableOption(ctx.movableOption, piece, opts);
-    ctx.rotableOption.set({ tabletopObject: piece });
+    ctx.rotableOption.set({
+      tabletopObject: piece,
+      turnsAbout: () => (opts.turnsAbout ? opts.turnsAbout(piece) : pieces.turnAboutOf(piece)),
+    });
   });
 }
 
@@ -108,4 +121,36 @@ export function setupInputHandler(opts: InputHandlerSetup): InputHandlerRef {
     ref.current = null;
   });
   return ref;
+}
+
+export interface DoubleTapSetup extends InputHandlerSetup {
+  /** Runs on a second tap that landed where the first did. */
+  readonly onDoubleTap: () => void;
+}
+
+export interface DoubleTapRef {
+  /** The piece's input handler, which holds nothing before the first render or once destroyed. */
+  readonly input: InputHandlerRef;
+  /** Counts a press on the piece towards a double tap. */
+  press(event: MouseEvent | TouchEvent): void;
+}
+
+/**
+ * Attaches an input handler to a piece and watches the presses handed to `press` for a double tap.
+ *
+ * A second tap that strayed from the first runs nothing, and a tap still waited on is forgotten
+ * with the component. With a finger, the second tap acts when it lifts.
+ */
+export function setupDoubleTap(opts: DoubleTapSetup): DoubleTapRef {
+  const input = setupInputHandler(opts);
+  const doubleTap = new DoubleTap(() => input.current);
+  opts.destroyRef.onDestroy(() => doubleTap.cancel());
+  return {
+    input,
+    press: (event) =>
+      doubleTap.handle(event, () => {
+        doubleTap.cancel();
+        if (doubleTap.isInPlace()) opts.onDoubleTap();
+      }),
+  };
 }

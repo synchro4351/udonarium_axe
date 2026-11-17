@@ -12,7 +12,7 @@ import {
   buildLockToggleAction,
   buildToggleAction,
 } from '@axe/application/ui/tabletop-context-menu-actions';
-import { Network } from '@axe/core/index';
+import { Network } from '@axe/core/network/network';
 import type { BattleSide } from '@axe/domain/battle/battle-lineup';
 import { BUFF_VIEW_MODES } from '@axe/domain/character/buff-view-mode';
 import { heldDiceOf } from '@axe/domain/character/character-dice';
@@ -31,6 +31,10 @@ import { decodeRangeShapeField, RangeShapeFieldValue } from '@axe/domain/data/ra
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { asMoveMode, MOVE_MODES } from '@axe/domain/tabletop/move/move-mode';
+import {
+  buildPieceResetMenu,
+  type PieceResetChoice,
+} from '@axe/features/character/game-character/piece-reset-context-menu';
 import { buildDisclosureContextMenu } from '@axe/features/disclosure/disclosure-context-menu';
 
 export interface RegisteredRangeShape {
@@ -86,6 +90,22 @@ export interface GameCharacterContextMenuCallbacks {
   onShareFirstPerson?: () => void;
   /** Stops sharing the first-person view with the room. Left out when another piece is shared. */
   onStopSharingFirstPerson?: () => void;
+  /** Follows the piece from behind with the table's camera, on a table drawn on a canvas. */
+  onFollowFromBehind?: () => void;
+  /** Gives the table its own camera back, where the piece is followed from behind. */
+  onStopFollowing?: () => void;
+  /**
+   * Hides the piece's name from all but the game masters, or shows it again. Left out but for one
+   * who may see what is kept back, or a player could show a name the master hid.
+   */
+  onSetNameHidden?: (hidden: boolean) => void;
+  /**
+   * Resets the piece and its parts: clears them of buffs, puts their values back to their defaults,
+   * or both. Left out for a seat that may not edit the table.
+   */
+  onResetPiece?: (choice: PieceResetChoice) => void;
+  /** The resets that would do something to the piece now; one that would do nothing is not listed. */
+  resetOffers?: readonly PieceResetChoice[];
 }
 
 /**
@@ -108,6 +128,26 @@ const NO_FIGHT_ENTRIES: FightMenuEntries = { onAndOff: [], fight: [], handling: 
 export interface GameCharacterContextMenuModel {
   actions: ContextMenuAction[];
   radialGroups: ContextMenuRadialGroup[];
+}
+
+/**
+ * The menu of a piece the reader may not view, as one kept to the game master: only what aims at it,
+ * which says nothing of what it holds, so a player can still take it for a target.
+ */
+export function buildUnviewableCharacterContextMenu(
+  char: GameCharacter,
+  callbacks: Pick<GameCharacterContextMenuCallbacks, 'onToggleTarget' | 'onClearTargets'>,
+  t: TranslateFn
+): ContextMenuAction[] {
+  return [
+    {
+      name: (char.targeted ? '✔ ' : '') + t('feature.character.contextMenu.target'),
+      action: () => callbacks.onToggleTarget?.(),
+    },
+    ...(callbacks.onClearTargets
+      ? [{ name: t('feature.character.contextMenu.clearTargets'), action: () => callbacks.onClearTargets?.() }]
+      : []),
+  ];
 }
 
 /**
@@ -213,7 +253,7 @@ export function buildGameCharacterContextMenu(
  * Builds a character's context menu, both as a flat list and grouped for the radial menu.
  *
  * An entry whose callback is left out is left out of the menu, as are range shapes, effects and
- * held dice the character does not have. Overlap entries lead the flat list and surface entries
+ * held dice the character does not have, and the resets that would do nothing to it. Overlap entries lead the flat list and surface entries
  * close it. What fights and mounts bring is set among the rest by what it goes with: getting on or
  * off with working a move out, the fight with what else the piece is used for, its state and its
  * being a mount with how it is shown and handled, and managing the zones last. The display toggles
@@ -331,6 +371,7 @@ export function buildGameCharacterContextMenuModel(
           } as ContextMenuAction,
         ]
       : []),
+    ...buildPieceResetMenu(callbacks.resetOffers ?? [], callbacks.onResetPiece, t),
   ];
   const lightActions: ContextMenuAction[] = [
     {
@@ -355,6 +396,12 @@ export function buildGameCharacterContextMenuModel(
           },
         ]
       : []),
+    ...(callbacks.onFollowFromBehind
+      ? [{ name: t('feature.character.contextMenu.followFromBehind'), action: () => callbacks.onFollowFromBehind?.() }]
+      : []),
+    ...(callbacks.onStopFollowing
+      ? [{ name: t('feature.character.contextMenu.stopFollowing'), action: () => callbacks.onStopFollowing?.() }]
+      : []),
   ];
 
   // display settings
@@ -372,22 +419,29 @@ export function buildGameCharacterContextMenuModel(
       ),
     ],
   });
-  const lookToggles: ContextMenuAction[] = [
-    char.hideName
-      ? {
-          name: t('feature.character.contextMenu.hideNameOn'),
+  // One who may not hide a name still sees that it is hidden, and that the master alone may show it.
+  const nameToggle: ContextMenuAction[] = callbacks.onSetNameHidden
+    ? [
+        {
+          name: t(
+            char.hideName ? 'feature.character.contextMenu.hideNameOn' : 'feature.character.contextMenu.hideNameOff'
+          ),
           action: () => {
-            char.hideName = false;
-            SoundEffect.play(PresetSound.sweep);
-          },
-        }
-      : {
-          name: t('feature.character.contextMenu.hideNameOff'),
-          action: () => {
-            char.hideName = true;
+            callbacks.onSetNameHidden?.(!char.hideName);
             SoundEffect.play(PresetSound.sweep);
           },
         },
+      ]
+    : char.hideName
+      ? [
+          {
+            name: t('feature.character.contextMenu.hideNameOn') + t('feature.character.contextMenu.hideNameGmOnly'),
+            enabled: false,
+          },
+        ]
+      : [];
+  const lookToggles: ContextMenuAction[] = [
+    ...nameToggle,
     char.hideBuff
       ? {
           name: t('feature.character.contextMenu.hideBuffOn'),
@@ -540,7 +594,7 @@ export function buildGameCharacterContextMenuModel(
     {
       name: t('feature.character.contextMenu.movePersonal'),
       action: () => {
-        char.setLocation(Network.peerId);
+        char.setLocation(Network.instance.peerId);
         SoundEffect.play(PresetSound.piecePut);
       },
     },

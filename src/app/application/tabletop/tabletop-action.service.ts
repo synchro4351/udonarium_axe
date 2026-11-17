@@ -5,22 +5,25 @@ import { PointerCoordinate } from '@axe/application/input/pointer-device.service
 import { PartyService } from '@axe/application/party/party.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { PartySetOutService } from '@axe/application/tabletop/party-set-out.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import {
+  bundledTerrainImage,
   type DiceMenuItem,
   type DicePlacement,
+  dressDiceFaces,
   getDicePlacements,
   getTrumpCardCodes,
-  TERRAIN_TEXTURE_PATH,
   TRUMP_BACK_IMAGE_PATH,
 } from '@axe/application/tabletop/tabletop-action-helpers';
 import {
   makeDefaultTable as _makeDefaultTable,
   makeDefaultTabletopObjects as _makeDefaultTabletopObjects,
 } from '@axe/application/tabletop/tabletop-default-setup';
+import { StartupLoadingService } from '@axe/application/ui/startup-loading.service';
 import { ViewModePreferenceService } from '@axe/application/ui/view-mode-preference.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
-import { GameObject } from '@axe/core/sync/game-object';
+import { clamp } from '@axe/core/util/clamp';
 import { Card } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
 import { toDeckCardSources } from '@axe/domain/card/deck-builder';
@@ -30,6 +33,7 @@ import { DiceSymbol, DiceType } from '@axe/domain/dice/dice-symbol';
 import { DisclosureMode } from '@axe/domain/disclosure/disclosure';
 import { type AmbienceKind } from '@axe/domain/effect/ambience/ambience-kind';
 import { canBrowseImage, ImageTag } from '@axe/domain/media/image-tag';
+import { fileUntaggedImage } from '@axe/domain/media/image-tagging';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { Party } from '@axe/domain/party/party';
 import { isAccountAvatar } from '@axe/domain/peer/account-avatar';
@@ -66,11 +70,13 @@ export class TabletopActionService {
   private readonly tagLock = inject(ImageTagLockService);
   private readonly partyService = inject(PartyService);
   private readonly objectChange = inject(ObjectChangeService);
-  private readonly tableSelecter = inject(TableSelecter);
+  private readonly setOut = inject(PartySetOutService);
+  private get tableSelecter(): TableSelecter {
+    return TableSelecter.instance;
+  }
   private readonly viewMode = inject(ViewModePreferenceService);
   private readonly t = inject(TRANSLATE_FN);
-
-  constructor() {}
+  private readonly startupLoading = inject(StartupLoadingService);
 
   /** Makes a character with the default name and no picture, centred on a point; see `createGameCharacterWith`. */
   createGameCharacter(position: PointerCoordinate): GameCharacter {
@@ -142,12 +148,7 @@ export class TabletopActionService {
    * Nothing is made when no table is in view.
    */
   createTerrain(position: PointerCoordinate): Terrain | undefined {
-    const url = TERRAIN_TEXTURE_PATH;
-    let image = this.imageStorage.get(url);
-    if (!image) {
-      image = this.imageStorage.add(url);
-      ImageTag.create(image.identifier).tag = '地形';
-    }
+    const image = bundledTerrainImage(this.imageStorage);
     const viewTable = this.getViewTable();
     if (!viewTable) return undefined;
 
@@ -204,8 +205,8 @@ export class TabletopActionService {
     const title = speaker.trim() || this.t('feature.tabletop.action.defaultNoteName');
     const lines = text.split('\n');
     const longest = Math.max(...lines.map((line) => line.length));
-    const width = Math.max(3, Math.min(8, Math.ceil(longest / 12)));
-    const height = Math.max(2, Math.min(8, Math.ceil(lines.length / 3)));
+    const width = clamp(Math.ceil(longest / 12), 3, 8);
+    const height = clamp(Math.ceil(lines.length / 3), 2, 8);
     const note = TextNote.create(title, text, 14, width, height);
     note.isUpright = !this.tabletopService.mode2d();
     note.location.x = Math.floor(Math.random() * 200 - 100);
@@ -228,15 +229,7 @@ export class TabletopActionService {
     placement?: DicePlacement
   ): DiceSymbol {
     const diceSymbol = DiceSymbol.create(name, diceType, 1);
-    diceSymbol.faces.forEach((face) => {
-      const url: string = `./assets/images/dice/${imagePathPrefix}/${imagePathPrefix}[${face}].png`;
-      let image = this.imageStorage.get(url);
-      if (!image) {
-        image = this.imageStorage.add(url);
-      }
-      const faceEl = diceSymbol.imageDataElement?.getFirstElementByName(face);
-      if (faceEl) faceEl.value = image.identifier;
-    });
+    dressDiceFaces(diceSymbol, imagePathPrefix, this.imageStorage);
 
     const place = placement ?? getDicePlacements(position, 1, this.tabletopService.gridSize())[0];
     diceSymbol.location.x = place.x;
@@ -364,13 +357,13 @@ export class TabletopActionService {
     const back = TRUMP_BACK_IMAGE_PATH;
     if (!this.imageStorage.get(back)) {
       const image = this.imageStorage.add(back);
-      ImageTag.create(image.identifier).tag = 'トランプ';
+      fileUntaggedImage(image.identifier, 'トランプ');
     }
     for (const trump of getTrumpCardCodes()) {
       const url: string = './assets/images/trump/' + trump + '.webp';
       if (!this.imageStorage.get(url)) {
         const image = this.imageStorage.add(url);
-        ImageTag.create(image.identifier).tag = 'トランプ';
+        fileUntaggedImage(image.identifier, 'トランプ');
       }
       const card = Card.create(this.t('feature.tabletop.action.defaultCardName'), url, back);
       cardStack.putOnBottom(card);
@@ -385,11 +378,11 @@ export class TabletopActionService {
 
     if (!this.imageStorage.get(front)) {
       const image = this.imageStorage.add(front);
-      ImageTag.create(image.identifier).tag = 'トランプ';
+      fileUntaggedImage(image.identifier, 'トランプ');
     }
     if (!this.imageStorage.get(back)) {
       const image = this.imageStorage.add(back);
-      ImageTag.create(image.identifier).tag = 'トランプ';
+      fileUntaggedImage(image.identifier, 'トランプ');
     }
 
     const card = Card.create(this.t('feature.tabletop.action.defaultCardName'), front, back);
@@ -407,9 +400,14 @@ export class TabletopActionService {
     _makeDefaultTable(this.imageStorage);
   }
 
-  /** Sets out the sample pieces a new room opens with. */
+  /**
+   * Sets out the sample pieces a new room opens with, and the board and notes that explain the table
+   * in the language shown: standing, or laid flat where this reader looks at the table from above, as
+   * a note made here would be.
+   */
   makeDefaultTabletopObjects() {
-    _makeDefaultTabletopObjects(this.imageStorage);
+    const standing = !laysFlat(this.viewMode.mode(), this.getViewTable()?.mode2d ?? false);
+    _makeDefaultTabletopObjects(this.imageStorage, this.t, standing, (work) => this.startupLoading.hold(work));
   }
 
   /**
@@ -421,7 +419,10 @@ export class TabletopActionService {
    * asked to gather where it already stands does not have to squeeze past itself.
    *
    * A member that is not on the table is left where it is unless it was asked for by name: a
-   * piece that was put away was put away on purpose. Answers with how many were placed.
+   * piece that was put away was put away on purpose. A member is set down as what it is carried off
+   * with, the mount it rides or the body it is a part of, and what goes with that, its parts, what
+   * rides it and what it holds, goes along; see `PartySetOutService`. Answers with how many members
+   * were placed.
    */
   gatherParty(position: PointerCoordinate, party: Party, bringInAway = false): number {
     const table = this.getViewTable();
@@ -436,23 +437,19 @@ export class TabletopActionService {
     const start = cellIndexAt(grid, position.x, position.y);
     if (start < 0) return 0;
 
-    const moving = new Set(gathering.map((member) => member.identifier));
-    const standing = this.partyService.characters().filter((character) => !moving.has(character.identifier));
-    const spots = GameObject.batch(() => {
-      const placed = gatherSpotsAround(grid, table.gridSize, start, gathering, occupiedCells(grid, standing, ''));
-      for (const spot of placed) {
-        if (!spot.character.isVisibleOnTable) spot.character.setLocation('table');
-        spot.character.location.x = spot.x;
-        spot.character.location.y = spot.y;
-        spot.character.location.surface = undefined;
-        spot.character.posZ = 0;
-        spot.character.update();
-      }
-      return placed;
-    });
-    for (const spot of spots) this.objectChange.notifyChanged(spot.character.identifier);
+    const chains = this.setOut.chainsOf(gathering);
+    const carriers = this.setOut.carriersOf(chains);
+    const moving = this.setOut.movingWith(carriers, gathering);
+    const standing = this.partyService.characters().filter((character) => !moving.has(character));
+    const spots = gatherSpotsAround(grid, table.gridSize, start, carriers, occupiedCells(grid, standing, ''));
+    const moved = this.setOut.setOut(
+      spots.map((spot) => ({ carrier: spot.character, x: spot.x, y: spot.y })),
+      chains
+    );
+    for (const piece of moved) this.objectChange.notifyChanged(piece.identifier);
     if (spots.length > 0) SoundEffect.play(PresetSound.piecePut);
-    return spots.length;
+    const placed = new Set(spots.map((spot) => spot.character));
+    return gathering.filter((member) => placed.has(chains.get(member)?.at(-1) ?? member)).length;
   }
 
   /**

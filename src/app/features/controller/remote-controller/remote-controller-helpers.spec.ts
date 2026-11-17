@@ -1,9 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { ObjectInventory } from '@axe/application/inventory/object-inventory';
-import { Network } from '@axe/core/index';
+import { Network } from '@axe/core/network/network';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { resolveBuffColor } from '@axe/domain/character/buff-appearance';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { DataElement, DataElementAttribute, DataElementRole, DataElementType } from '@axe/domain/data/data-element';
 import { DataSummarySetting } from '@axe/domain/data/data-summary-setting';
 import { parseBuffInput } from '@axe/features/controller/remote-controller/remote-controller-buff';
 import {
@@ -13,6 +14,7 @@ import {
   getTabTitle,
   getTargetCharacters,
   RemoteControllerInventoryContext,
+  shownChangeDetail,
 } from '@axe/features/controller/remote-controller/remote-controller-helpers';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -27,7 +29,7 @@ describe('remote-controller-helpers', () => {
     inventoryContext = {
       tableInventory: new ObjectInventory((object) => object.location.name === 'table'),
       commonInventory: new ObjectInventory(() => false),
-      privateInventory: new ObjectInventory((object) => object.location.name === Network.peerId),
+      privateInventory: new ObjectInventory((object) => object.location.name === Network.instance.peerId),
       graveyardInventory: new ObjectInventory((object) => object.location.name === 'graveyard'),
     };
   });
@@ -129,7 +131,7 @@ describe('remote-controller-helpers', () => {
     });
 
     it('names your own hands', () => {
-      expect(getTabTitle(Network.peerId)).toBe('個人');
+      expect(getTabTitle(Network.instance.peerId)).toBe('個人');
     });
 
     it('names the graveyard', () => {
@@ -147,8 +149,8 @@ describe('remote-controller-helpers', () => {
       expect(inventory).toBe(inventoryContext.tableInventory);
     });
 
-    it('should return privateInventory for Network.peerId type', () => {
-      const inventory = getInventory(Network.peerId, inventoryContext);
+    it('should return privateInventory for Network.instance.peerId type', () => {
+      const inventory = getInventory(Network.instance.peerId, inventoryContext);
       expect(inventory).toBe(inventoryContext.privateInventory);
     });
 
@@ -243,5 +245,44 @@ describe('remote-controller-helpers', () => {
       const result = getTargetCharacters([mockChar], false);
       expect(result.length).toBe(0);
     });
+  });
+});
+
+describe('shownChangeDetail()', () => {
+  const made: GameCharacter[] = [];
+
+  afterEach(() => {
+    for (const one of made.splice(0)) one.destroy();
+  });
+
+  /** A goblin with a resource standing at a value out of 10, disclosed as given, counting up where told. */
+  function piece(disclosureMode: string, now: number, countsUp = false): GameCharacter {
+    const goblin = GameCharacter.create('ゴブリン', 1, '');
+    made.push(goblin);
+    goblin.disclosureMode = disclosureMode;
+    const hp = DataElement.create('傷', 10, {
+      [DataElementAttribute.ROLE]: DataElementRole.FIELD,
+      type: DataElementType.NUMBER_RESOURCE,
+      currentValue: now,
+    });
+    if (countsUp) hp.setAttribute(DataElementAttribute.GAUGE_INVERTED, 'true');
+    goblin.detailDataElement!.appendChild(hp);
+    return goblin;
+  }
+
+  it('says a change as it was reported of a piece disclosed to all', () => {
+    expect(shownChangeDetail(piece('all', 7), '[ゴブリン 10>7] ', '傷', 'now')).toBe('[ゴブリン 10>7] ');
+  });
+
+  it('names a piece kept from anyone alone, until its current value runs out', () => {
+    expect(shownChangeDetail(piece('gm', 7), '[ゴブリン 10>7] ', '傷', 'now')).toBe('[ゴブリン] ');
+    expect(shownChangeDetail(piece('selected', 0), '[ゴブリン 10>7] ', '傷', 'max')).toBe('[ゴブリン] ');
+    expect(shownChangeDetail(piece('gm', 0), '[ゴブリン 3>0] ', '傷', 'now')).toBe('[ゴブリン 3>0] ');
+    expect(shownChangeDetail(piece('gm', 7), '', '傷', 'now')).toBe('');
+  });
+
+  it('judges a resource counting up to its end run out at its maximum, not at nothing', () => {
+    expect(shownChangeDetail(piece('gm', 0, true), '[ゴブリン 3>0] ', '傷', 'now')).toBe('[ゴブリン] ');
+    expect(shownChangeDetail(piece('gm', 10, true), '[ゴブリン 9>10] ', '傷', 'now')).toBe('[ゴブリン 9>10] ');
   });
 });

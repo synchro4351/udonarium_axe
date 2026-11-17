@@ -2,6 +2,7 @@ import { ImageFile } from '@axe/core/storage/image-file';
 import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
 import { DataElement } from '@axe/domain/data/data-element';
 import { BoardSwitch, switchOf } from '@axe/domain/tabletop/board-switch/board-switch';
+import { appendPieceDataElements } from '@axe/domain/tabletop/piece-data-elements';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
 import {
   encodeSlopeSides,
@@ -146,6 +147,26 @@ export class Terrain extends TabletopObject {
   @SyncVar() lightDirection: number = 0;
   @SyncVar() lightPitch: number = 0;
   @SyncVar() lightAnimation: string = LightAnimation.NONE;
+
+  /**
+   * The 3D model the block is drawn as on a table drawn on a canvas, in place of its faces, by the
+   * identifier it is kept under; empty for none. Read it, with the four after it, through
+   * `pieceModelOf`, as a peer that has never heard of models sends none of the five.
+   */
+  @SyncVar() modelIdentifier: string = '';
+  /** How many times larger than the block's footprint its model is drawn; empty for the footprint itself. */
+  @SyncVar() modelScale: string = '';
+  /** How far its model is turned from the way the block faces, in degrees clockwise; empty for not at all. */
+  @SyncVar() modelTurn: string = '';
+  /** The motion its model plays standing still, by name; empty for the model's own. */
+  @SyncVar() modelIdle: string = '';
+  /** The motion its model plays walking, by name; empty for the model's own. */
+  @SyncVar() modelWalk: string = '';
+  /**
+   * `'1'` where the map editor's brush for 3D objects laid the block, which a scene painting such
+   * objects alone answers for; empty for every other block, a generated field's trees among them.
+   */
+  @SyncVar() paintedObject: string = '';
 
   /**
    * The terrain's light settings gathered into the shape the vision scene reads, with the direction
@@ -329,16 +350,10 @@ export class Terrain extends TabletopObject {
     }
     object.createDataElements();
 
-    object.commonDataElement!.appendChild(DataElement.create('name', name, {}, `name_${object.identifier}`));
-    object.commonDataElement!.appendChild(DataElement.create('width', width, {}, `width_${object.identifier}`));
-    object.commonDataElement!.appendChild(DataElement.create('height', height, {}, `height_${object.identifier}`));
-    object.commonDataElement!.appendChild(DataElement.create('depth', depth, {}, `depth_${object.identifier}`));
-    object.imageDataElement!.appendChild(
-      DataElement.create('wall', wall, { type: 'image' }, `wall_${object.identifier}`)
-    );
-    object.imageDataElement!.appendChild(
-      DataElement.create('floor', floor, { type: 'image' }, `floor_${object.identifier}`)
-    );
+    appendPieceDataElements(object, name, { width, height, depth });
+    const image = object.imageDataElement!;
+    image.appendChild(DataElement.create('wall', wall, { type: 'image' }, `wall_${object.identifier}`));
+    image.appendChild(DataElement.create('floor', floor, { type: 'image' }, `floor_${object.identifier}`));
     object.initialize();
 
     return object;

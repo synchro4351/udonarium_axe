@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-import { waitAppReady } from './helpers';
+import { rightClickPiece, waitAppReady } from './helpers';
 
 test.describe("a piece picture's width and height", () => {
   test.beforeEach(async ({ page }) => {
     await waitAppReady(page);
     const piece = page.locator('game-character').filter({ hasText: 'キャラクターB' }).first();
-    await piece.dispatchEvent('contextmenu');
+    await rightClickPiece(piece);
     await page.locator('context-menu').getByText('詳細を表示').click();
     const sheet = page.locator('game-character-sheet');
     await expect(sheet).toBeVisible({ timeout: 10000 });
@@ -39,18 +39,32 @@ test.describe("a piece picture's width and height", () => {
     await width.dispatchEvent('change');
     await expect(height).toHaveValue(heightNow);
 
-    const picture = page
-      .locator('game-character')
-      .filter({ hasText: 'キャラクターB' })
-      .first()
-      .locator('img.image.chrome-smooth-image-trick');
-    await expect
-      .poll(() => picture.evaluate((img) => parseFloat(img.style.width) / parseFloat(img.style.height)))
-      .toBeCloseTo(333 / Number(heightNow), 3);
+    const piece = page.locator('game-character').filter({ hasText: 'キャラクターB' }).first();
+    const picture = piece.locator('[data-part="picture"]');
+    // A table drawn on a canvas draws the picture as a sprite of the size asked for; the page sizes its own picture.
+    const onCanvas = (await page.getByTestId('table-scene').count()) > 0;
+    const shape = async () => {
+      if (!onCanvas) {
+        return picture.evaluate((img) => ({
+          width: (img as HTMLElement).style.width,
+          height: (img as HTMLElement).style.height,
+        }));
+      }
+      const id = (await piece.getAttribute('data-object-id'))!;
+      const sprites = await page.evaluate((identifier) => window.__axeTable.spritesOf(identifier), id);
+      const sprite = sprites.find((each) => each.part === 'picture');
+      return { width: `${sprite?.widthPx}px`, height: `${sprite?.heightPx}px` };
+    };
+    const ratio = async () => {
+      const { width, height } = await shape();
+      return parseFloat(width) / parseFloat(height);
+    };
+    await expect.poll(ratio).toBeCloseTo(333 / Number(heightNow), 3);
 
     await chain.click();
     await expect(chain).toHaveAttribute('aria-pressed', 'true');
     await expect(width).toHaveValue(widthInProportion);
-    await expect.poll(() => picture.evaluate((img) => img.style.width)).toBe('auto');
+    if (onCanvas) await expect.poll(ratio).toBeCloseTo(Number(widthInProportion) / Number(heightNow), 2);
+    else await expect.poll(async () => (await shape()).width).toBe('auto');
   });
 });

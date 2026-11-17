@@ -1,10 +1,14 @@
 import { inject, Injectable } from '@angular/core';
 import { BattleLaunchLoaderService } from '@axe/application/battle/battle-launch-loader.service';
+import { PieceNameService } from '@axe/application/character/piece-name.service';
+import { PieceResetService } from '@axe/application/character/piece-reset.service';
 import { ResourceSliderService } from '@axe/application/character/resource-slider.service';
 import { StealthService } from '@axe/application/character/stealth.service';
 import { CharacterDiceService } from '@axe/application/dice/character-dice.service';
 import { EffectCastService } from '@axe/application/effect/effect-cast.service';
 import { EffectLibraryService } from '@axe/application/effect/effect-library.service';
+import { EffectTargetingService } from '@axe/application/effect/effect-targeting.service';
+import { encodeI18nMessage } from '@axe/application/i18n/i18n-message';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerCoordinate, PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { GameObjectInventoryService } from '@axe/application/inventory/game-object-inventory.service';
@@ -18,15 +22,19 @@ import { MovePlannerService } from '@axe/application/tabletop/move-planner.servi
 import { MoveRangeService } from '@axe/application/tabletop/move-range.service';
 import { MultipartCharacterService } from '@axe/application/tabletop/multipart-character.service';
 import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
+import { hasPartLook, PiecePartsService } from '@axe/application/tabletop/piece-parts.service';
 import { PieceTargetService } from '@axe/application/tabletop/piece-target.service';
 import { RangeShapeInvokeService } from '@axe/application/tabletop/range-shape-invoke.service';
 import { RideMenuModel, RideService } from '@axe/application/tabletop/ride.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
+import { ThirdPersonService } from '@axe/application/tabletop/third-person.service';
+import { ConfirmService } from '@axe/application/ui/confirm.service';
 import { ContextMenuAction, ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { buildOverlapContextMenu } from '@axe/application/ui/overlap-context-menu';
 import { PanelOption, PanelService } from '@axe/application/ui/panel.service';
 import { PieceContextMenuService } from '@axe/application/ui/piece-context-menu.service';
 import { sheetPanelBox, sheetPanelTitle } from '@axe/application/ui/sheet-panel';
+import { SnackbarService } from '@axe/application/ui/snackbar.service';
 import { buildSurfaceSwitchContextMenu } from '@axe/application/ui/surface-switch-context-menu';
 import { TabletopOverlapService } from '@axe/application/ui/tabletop-overlap.service';
 import { isInStore, ObjectStore } from '@axe/core/sync/object-store';
@@ -34,14 +42,23 @@ import { putOnBattleSide, standingBattleSide } from '@axe/domain/battle/battle-s
 import { handHolderForCharacter } from '@axe/domain/card/character-hands';
 import { type BuffViewMode } from '@axe/domain/character/buff-view-mode';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { saidNameOf } from '@axe/domain/character/hidden-name';
 import { isLinkedPart } from '@axe/domain/character/part-group';
 import { multiAngleFontScaleFactor } from '@axe/domain/tabletop/multi-angle-font-scale';
 import { CardGameService } from '@axe/features/card/card-game.service';
 import { buildConditionContextMenu } from '@axe/features/character/game-character/condition-context-menu';
 import {
   buildGameCharacterContextMenuModel,
+  buildUnviewableCharacterContextMenu,
   FightMenuEntries,
 } from '@axe/features/character/game-character/game-character-context-menu';
+import { buildPartContextMenu } from '@axe/features/character/game-character/part-context-menu';
+import {
+  doesAnything,
+  offeredPieceResets,
+  type PieceResetChoice,
+  resetRequestOf,
+} from '@axe/features/character/game-character/piece-reset-context-menu';
 import { buildRideContextMenu, RideMenuEntries } from '@axe/features/character/game-character/ride-context-menu';
 import {
   buildZoneContextMenu,
@@ -59,8 +76,6 @@ interface BattleCutInPanelHandle {
 
 /** What a character's menu reads of the piece as it is drawn on the table. */
 export interface GameCharacterMenuHost {
-  /** The name the piece is shown under, which heads its menu. */
-  name(): string;
   /** How the buffs over the piece are drawn, which its menu switches. */
   buffViewMode(): BuffViewMode;
   setBuffViewMode(mode: BuffViewMode): void;
@@ -100,15 +115,20 @@ export class GameCharacterMenuService {
   private readonly tabletopService = inject(TabletopService);
   private readonly tabletopOverlap = inject(TabletopOverlapService);
   private readonly translateFn = inject(TRANSLATE_FN);
+  private readonly snackbar = inject(SnackbarService);
+  private readonly names = inject(PieceNameService);
   private readonly rangeShapeInvoke = inject(RangeShapeInvokeService);
   private readonly moveRangeService = inject(MoveRangeService);
   private readonly movePlan = inject(MovePlannerService);
   private readonly firstPerson = inject(FirstPersonService);
+  private readonly thirdPerson = inject(ThirdPersonService);
   private readonly effectLibrary = inject(EffectLibraryService);
   private readonly effectCast = inject(EffectCastService);
+  private readonly effectTargeting = inject(EffectTargetingService);
   private readonly rolePermission = inject(RolePermissionService);
   private readonly engagementZones = inject(EngagementZoneService);
   private readonly ride = inject(RideService);
+  private readonly parts = inject(PiecePartsService);
   private readonly stealth = inject(StealthService);
   private readonly resourceSliders = inject(ResourceSliderService);
   private readonly disclosureService = inject(DisclosureService);
@@ -117,6 +137,8 @@ export class GameCharacterMenuService {
   private readonly cardGame = inject(CardGameService);
   private readonly multipart = inject(MultipartCharacterService);
   private readonly partGroups = inject(MultipartGroupService);
+  private readonly pieceReset = inject(PieceResetService);
+  private readonly confirm = inject(ConfirmService);
 
   /**
    * Opens a character's menu at a position, if the reader may view the piece.
@@ -132,7 +154,10 @@ export class GameCharacterMenuService {
     radialCenter?: { x: number; y: number },
     radialAnchor?: { x: number; y: number }
   ): void {
-    if (!this.disclosureService.canView(char)) return;
+    if (!this.disclosureService.canView(char)) {
+      this.openUnviewable(char, position);
+      return;
+    }
 
     const gridSize = this.tabletopService.gridSize();
     if (this.pieceContextMenu.openForSelection(char, gridSize, position)) return;
@@ -193,6 +218,18 @@ export class GameCharacterMenuService {
           this.firstPerson.isGameMaster() && this.firstPerson.sharedPiece() === char.identifier
             ? () => this.firstPerson.share(null)
             : undefined,
+        onFollowFromBehind:
+          this.firstPerson.canLookOutOf(char) && !this.thirdPerson.isFollowing(char.identifier)
+            ? () => this.thirdPerson.follow(char.identifier)
+            : undefined,
+        onStopFollowing: this.thirdPerson.isFollowing(char.identifier) ? () => this.thirdPerson.stop() : undefined,
+        onSetNameHidden: this.rolePermission.canSeeHidden() ? (hidden) => (char.hideName = hidden) : undefined,
+        onResetPiece: this.rolePermission.canEditTabletop()
+          ? (choice) => void this.resetPiece(char, choice)
+          : undefined,
+        resetOffers: this.rolePermission.canEditTabletop()
+          ? offeredPieceResets((request) => this.pieceReset.count(this.pieceReset.withParts(char), request))
+          : [],
       },
       this.translateFn,
       overlapEntries,
@@ -201,7 +238,7 @@ export class GameCharacterMenuService {
       this.fightMenuOf(char)
     );
     if (!this.tabletopService.mode2d() || display.tabletopMenuStyle === 'standard') {
-      this.contextMenuService.open(position, menu.actions, host.name());
+      this.contextMenuService.open(position, menu.actions, this.shownName(char));
       return;
     }
 
@@ -213,7 +250,7 @@ export class GameCharacterMenuService {
       menuCenter,
       menu.actions,
       menu.radialGroups,
-      host.name(),
+      this.shownName(char),
       display.tabletopMenuStyle === 'radial',
       display.radialMenuRotationSpeed,
       multiAngleFontScaleFactor(display.multiAngleFontScale),
@@ -228,6 +265,52 @@ export class GameCharacterMenuService {
   }
 
   /**
+   * Resets a piece and the parts that go with it as its menu asked, once the reader has confirmed
+   * what that reaches, and reports it in chat on a line the reset can be taken back from. Nothing
+   * for a seat that may not edit the table, or where the reset would by now do nothing. The report
+   * names the piece as everyone may be told it, and gives counts alone.
+   */
+  async resetPiece(char: GameCharacter, choice: PieceResetChoice): Promise<void> {
+    if (!this.rolePermission.canEditTabletop()) return;
+    const request = resetRequestOf(choice);
+    const reach = this.pieceReset.count(this.pieceReset.withParts(char), request);
+    if (!doesAnything(reach)) return;
+    const asked = this.translateFn(`feature.character.contextMenu.resetConfirm_${choice}`, {
+      name: this.shownName(char),
+      buffs: reach.buffs,
+      items: reach.items,
+    });
+    if (!(await this.confirm.ask(asked))) return;
+    this.pieceReset.run(this.pieceReset.withParts(char), request, (done) =>
+      doesAnything(done)
+        ? encodeI18nMessage(`feature.character.contextMenu.resetDone_${choice}`, {
+            name: saidNameOf(char),
+            buffs: done.buffs,
+            items: done.items,
+          })
+        : null
+    );
+  }
+
+  /** Opens the menu of a piece the reader may not view: only what aims at it. */
+  private openUnviewable(char: GameCharacter, position: PointerCoordinate): void {
+    const actions = buildUnviewableCharacterContextMenu(
+      char,
+      {
+        onToggleTarget: () => this.pieceTarget.toggle(char),
+        onClearTargets: this.pieceTarget.anything() ? () => this.pieceTarget.clear() : undefined,
+      },
+      this.translateFn
+    );
+    this.contextMenuService.open(position, actions, this.shownName(char));
+  }
+
+  /** A piece's name as the reader may be told it: one whose name is kept from them goes unnamed. */
+  private shownName(char: GameCharacter): string {
+    return this.names.shown(char);
+  }
+
+  /**
    * The entries of a piece's menu that fights and mounts bring: getting on or off, its fight, its
    * state and its being a mount, and managing the zones.
    */
@@ -236,11 +319,61 @@ export class GameCharacterMenuService {
     const rideModel = this.ride.menuOf(char);
     const ride = this.rideMenuOf(char, rideModel);
     return {
-      onAndOff: ride.onAndOff,
+      onAndOff: [...ride.onAndOff, ...this.partMenuOf(char)],
       fight: this.zoneMenuOf(char, zoneModel),
       handling: [...this.conditionMenuOf(char, zoneModel, rideModel), ...ride.group],
       manage: this.zoneManageMenuOf(char, zoneModel),
     };
+  }
+
+  /** Taking a piece off the body it is a part of, or making it a part of one it stands on. */
+  private partMenuOf(char: GameCharacter): ContextMenuAction[] {
+    const body = this.parts.bodyOf(char);
+    return buildPartContextMenu(
+      {
+        body: body ? this.shownName(body) : null,
+        bodies: body ? [] : this.parts.bodiesFor(char).map((one) => ({ id: one.identifier, name: one.name })),
+        hasParts: this.parts.partsOf(char).length > 0,
+        canEditLook: this.rolePermission.canEditTabletop(),
+      },
+      {
+        attach: (bodyId) => {
+          const chosen = this.objectStore.get<GameCharacter>(bodyId);
+          if (chosen instanceof GameCharacter) this.attachPart(char, chosen);
+        },
+        detach: this.rolePermission.canEditTabletop() ? () => this.parts.detach(char) : undefined,
+        editLook: () => this.showPartLook(body ?? char, body ? char : null),
+      },
+      this.translateFn
+    );
+  }
+
+  /**
+   * Makes a piece a part of a body, saying so where how it was drawn on a body before was let go of,
+   * with a press that puts that back while it is still a part of this body.
+   */
+  private attachPart(part: GameCharacter, body: GameCharacter): void {
+    const was = this.parts.lookOf(part);
+    if (!this.parts.attach(part, body) || !hasPartLook(was)) return;
+    const kinds = [
+      was.layer ? 'feature.ride.part.look.lookLayer' : '',
+      was.mask ? 'feature.ride.part.look.lookMask' : '',
+      was.faces ? 'feature.ride.part.look.lookFaces' : '',
+    ]
+      .filter((key) => key.length > 0)
+      .map((key) => this.translateFn(key));
+    const what =
+      kinds.length > 1
+        ? kinds.slice(0, -1).join(this.translateFn('feature.ride.part.look.lookJoin')) +
+          this.translateFn('feature.ride.part.look.lookJoinLast') +
+          kinds[kinds.length - 1]
+        : (kinds[0] ?? '');
+    this.snackbar.show(this.translateFn('feature.ride.part.look.letGo', { name: this.shownName(part), what }), {
+      action: {
+        label: this.translateFn('feature.ride.part.look.putBack'),
+        run: () => this.parts.putBackLook(part, body, was),
+      },
+    });
   }
 
   private zoneMenuOf(char: GameCharacter, model: ZoneMenuModel): ContextMenuAction[] {
@@ -356,7 +489,6 @@ export class GameCharacterMenuService {
     );
   }
 
-  /** Fires an effect from a character sheet. It is looked up by name, so the same row works in any room. */
   /**
    * Plays the battle stage with the piece striking: at the pieces aimed at, or, with none, at the
    * other side of the master's lineup.
@@ -368,9 +500,13 @@ export class GameCharacterMenuService {
     else battle?.playLineupAs(char, 'everywhere');
   }
 
+  /**
+   * Fires an effect from a character sheet, or holds it ready from the piece where it needs a target
+   * and nobody is aimed at. It is looked up by name, so the same row works in any room.
+   */
   private invokeEffect(char: GameCharacter, name: string): void {
     const preset = this.effectLibrary.findByName(name);
-    if (preset) this.effectCast.fireFromCharacter(preset, char);
+    if (preset) this.effectTargeting.castFrom(preset, char);
   }
 
   showDetail(gameObject: GameCharacter) {
@@ -389,7 +525,7 @@ export class GameCharacterMenuService {
           (loaded) => loaded.CharacterMemoComponent
         ),
       {
-        title: this.translateFn('feature.character.memo.title', { name: gameObject.name }),
+        title: this.translateFn('feature.character.memo.title', { name: this.names.shown(gameObject) }),
         left: at.x - 160,
         top: at.y - 120,
         width: 320,
@@ -427,7 +563,7 @@ export class GameCharacterMenuService {
       width: 420,
       height: 300,
     };
-    option.title = this.translateFn('feature.character.panel.buffEditWithName', { name: gameObject.name });
+    option.title = this.translateFn('feature.character.panel.buffEditWithName', { name: this.names.shown(gameObject) });
     const component = this.panelService.open<GameCharacterBuffViewComponent>(GameCharacterBuffViewComponent, option);
     component.character.set(gameObject);
   }
@@ -452,6 +588,26 @@ export class GameCharacterMenuService {
     );
   }
 
+  /** Opens where the parts of a body are drawn on its picture worked on, the part given chosen. */
+  private showPartLook(body: GameCharacter, part: GameCharacter | null) {
+    const coordinate = this.pointerDeviceService.pointers[0];
+    this.panelService.openLazy(
+      () =>
+        import('@axe/features/character/part-look-editor/part-look-editor.component').then(
+          (m) => m.PartLookEditorComponent
+        ),
+      {
+        title: this.translateFn('feature.ride.part.look.title', { name: this.shownName(body) }),
+        ...sheetPanelBox(coordinate, 380, 560),
+        stillWanted: () => isInStore(body),
+      },
+      (component) => {
+        component.bodyIdentifier.set(body.identifier);
+        if (part) component.partIdentifier.set(part.identifier);
+      }
+    );
+  }
+
   /** Opens the line of fire from this piece to every piece it aims at. */
   private showLineOfFire(gameObject: GameCharacter) {
     const coordinate = this.pointerDeviceService.pointers[0];
@@ -461,7 +617,7 @@ export class GameCharacterMenuService {
       width: 360,
       height: 280,
     };
-    option.title = this.translateFn('feature.zone.fire.title', { name: gameObject.name });
+    option.title = this.translateFn('feature.zone.fire.title', { name: this.names.shown(gameObject) });
     this.panelService.openLazy(
       () =>
         import('@axe/features/character/line-of-fire-panel/line-of-fire-panel.component').then(

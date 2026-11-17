@@ -501,6 +501,26 @@ describe('CutInSceneEditorComponent', () => {
       expect(component.selected()).toBeNull();
     });
 
+    it('starts over for another cut-in put under edit, with nothing picked and nothing to take back', () => {
+      editor().addImageLayer();
+      expect(editor().canUndo()).toBe(true);
+      expect(component.selected()).not.toBeNull();
+      const other = new CutIn();
+      other.initialize();
+      try {
+        fixture.componentRef.setInput('cutIn', other);
+
+        expect(component.selected()).toBeNull();
+        expect(editor().canUndo()).toBe(false);
+
+        editor().addImageLayer();
+        editor().undo();
+        expect(component.layers()).toEqual([]);
+      } finally {
+        other.destroy();
+      }
+    });
+
     it('listens for the keys', () => {
       editor().addImageLayer();
 
@@ -1198,5 +1218,18 @@ describe('CutInSceneEditorComponent', () => {
 
       expect(editor().playheadMs()).toBe(0);
     });
+  });
+
+  it('draws how long a scene runs and whether it loops as closed to a reader from the first drawing', async () => {
+    const late = TestBed.createComponent(CutInSceneEditorComponent);
+    late.componentRef.setInput('cutIn', cutIn);
+    late.componentRef.setInput('isEditable', false);
+    late.detectChanges();
+    await late.whenStable();
+
+    const named = (name: string) =>
+      (late.nativeElement as HTMLElement).querySelector<HTMLInputElement>(`input[name="${name}"]`)!;
+    expect(named('cut-in-scene-seconds').hasAttribute('disabled')).toBe(true);
+    expect(named('cut-in-scene-loop').hasAttribute('disabled')).toBe(true);
   });
 });

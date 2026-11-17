@@ -1,3 +1,4 @@
+import { PercentPipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -12,6 +13,7 @@ import { FormsModule } from '@angular/forms';
 import { StatusAilmentService } from '@axe/application/character/status-ailment.service';
 import { EffectLibraryService } from '@axe/application/effect/effect-library.service';
 import { ImageTagLockService } from '@axe/application/file/image-tag-lock.service';
+import { textureImagesOf } from '@axe/application/file/texture-images';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { DungeonBuildService } from '@axe/application/tabletop/dungeon-build.service';
@@ -23,14 +25,11 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { resourceNamesOf } from '@axe/domain/character/resource-catalog';
 import { ambiencePalette } from '@axe/domain/effect/ambience/ambience-kind';
-import { isBuiltinMaterial } from '@axe/domain/media/builtin-materials';
 import { CutIn } from '@axe/domain/media/cut-in';
-import { ImageTag } from '@axe/domain/media/image-tag';
 import {
   TEXTURE_ASSET_URLS,
   TEXTURE_BASE_COLOR,
   TEXTURE_IDS,
-  TEXTURE_IMAGE_TAG,
   WALL_TEXTURE_ASSET_URLS,
   WALL_TEXTURE_BASE_COLOR,
   WALL_TEXTURE_IDS,
@@ -53,6 +52,7 @@ import {
   waterDirtOf,
   waterFlowDirectionOf,
   waterFlowSpeedOf,
+  waterIceOf,
   waterLeavesOf,
   waterTurbidityOf,
 } from '@axe/domain/tabletop/function-paint';
@@ -72,6 +72,7 @@ import {
   waterPresetOf,
 } from '@axe/domain/tabletop/water/water-presets';
 import { MAX_SURFACE_CELLS } from '@axe/domain/tabletop/water/water-surface';
+import { MapEditorObjectPaintComponent } from '@axe/features/map-editor/editor/map-editor-object-paint.component';
 import { EditorTool, MapEditorState } from '@axe/features/map-editor/editor/map-editor-state';
 import { TextureIntakeService } from '@axe/features/map-editor/editor/texture-intake.service';
 import { SwitchDefinitionFieldsComponent } from '@axe/features/tabletop/board-switch/switch-definition-fields.component';
@@ -90,12 +91,26 @@ const MOVE_COST_ROAD = -1;
  * The settings of the brush that paints what a cell does: which role it paints, and how the wall,
  * the water, the cost of crossing, the mask or the trigger it lays down is set up.
  */
+/** A setting of the terrain brush that is either on or off. */
+type TerrainFlag =
+  'blocksSight' | 'blocksLight' | 'blocksClimb' | 'tiledTexture' | 'showsGrid' | 'dropShadow' | 'surfaceShading';
+
+const TERRAIN_FLAGS: readonly { key: TerrainFlag; labelKey: string }[] = [
+  { key: 'blocksSight', labelKey: 'feature.mapEditor.function.terrainBlocksSight' },
+  { key: 'blocksLight', labelKey: 'feature.mapEditor.function.terrainBlocksLight' },
+  { key: 'blocksClimb', labelKey: 'feature.mapEditor.function.terrainBlocksClimb' },
+  { key: 'tiledTexture', labelKey: 'feature.mapEditor.function.terrainTiled' },
+  { key: 'showsGrid', labelKey: 'feature.mapEditor.function.terrainGrid' },
+  { key: 'dropShadow', labelKey: 'feature.mapEditor.function.terrainShadow' },
+  { key: 'surfaceShading', labelKey: 'feature.mapEditor.function.terrainShading' },
+];
+
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'map-editor-function-paint',
   templateUrl: './map-editor-function-paint.component.html',
   host: { class: 'contents' },
-  imports: [FormsModule, TranslocoModule, SwitchDefinitionFieldsComponent],
+  imports: [FormsModule, PercentPipe, TranslocoModule, SwitchDefinitionFieldsComponent, MapEditorObjectPaintComponent],
 })
 export class MapEditorFunctionPaintComponent {
   protected readonly state = inject(MapEditorState);
@@ -105,7 +120,9 @@ export class MapEditorFunctionPaintComponent {
   private readonly rolePermission = inject(RolePermissionService);
   private readonly tagLock = inject(ImageTagLockService);
   private readonly objectChange = inject(ObjectChangeService);
-  private readonly tableSelecter = inject(TableSelecter);
+  private get tableSelecter(): TableSelecter {
+    return TableSelecter.instance;
+  }
   private readonly objectStore = inject(ObjectStore);
   private readonly effectLibrary = inject(EffectLibraryService);
   private readonly modalService = inject(ModalService);
@@ -122,6 +139,13 @@ export class MapEditorFunctionPaintComponent {
   protected setTerrainPaint(patch: Partial<TerrainPaintSpec>): void {
     const spec = this.state.functionSpec();
     this.state.setFunctionSpec({ ...spec, terrain: { ...spec.terrain, ...patch } });
+  }
+
+  /** The yes-or-no settings of the terrain brush, in the order their checkboxes stand. */
+  protected readonly terrainFlags = TERRAIN_FLAGS;
+
+  protected setTerrainFlag(key: TerrainFlag, on: boolean): void {
+    this.setTerrainPaint({ [key]: on });
   }
 
   protected readonly triggerRepeats = TRIGGER_REPEATS;
@@ -192,6 +216,14 @@ export class MapEditorFunctionPaintComponent {
   /** Sets how fast the water brush paints the water flowing, from a percentage. */
   protected setWaterFlowSpeed(percent: unknown): void {
     this.setHazardPaint({ flowSpeed: waterFlowSpeedOf(Number(percent) / 100) });
+  }
+
+  /** How much of the water the water brush paints frozen over, as a percentage. */
+  protected readonly waterIcePercent = computed(() => Math.round(this.state.functionSpec().hazard.ice * 100));
+
+  /** Sets how much of the water the water brush paints frozen over, from a percentage. */
+  protected setWaterIce(percent: unknown): void {
+    this.setHazardPaint({ ice: waterIceOf(Number(percent) / 100) });
   }
 
   /** The ways the water brush can paint the water flowing. */
@@ -407,16 +439,9 @@ export class MapEditorFunctionPaintComponent {
     this.wearFaceImage(face, identifier);
   }
 
-  protected readonly faceTextures = computed<ImageFile[]>(() => {
-    this.objectChange.fileVersion();
-    this.objectChange.collectionOf('image-tag')();
-    this.tagLock.track();
-    // What the tool is built with is shown by its own swatches here, and it is in the library
-    // as well, so it is left out of this list rather than offered twice over.
-    return ImageTag.searchImages([TEXTURE_IMAGE_TAG], this.rolePermission.canSeeHidden(), this.tagLock.hides).filter(
-      (file) => !isBuiltinMaterial(file.identifier)
-    );
-  });
+  protected readonly faceTextures = computed<ImageFile[]>(() =>
+    textureImagesOf(this.objectChange, this.rolePermission, this.tagLock)
+  );
 
   protected chooseFaceImageTexture(face: keyof TerrainFaceImages, file: ImageFile): void {
     this.wearFaceImage(face, file.identifier);

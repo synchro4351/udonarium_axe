@@ -285,6 +285,19 @@ describe('GmToolbarComponent', () => {
       objectChange.notifyChanged(PeerCursor.myCursor.identifier);
     }
 
+    it('shows itself to the game master alone, and neither to a player nor to a guest', async () => {
+      const seenAs = async (role: PeerRole) => {
+        setRole(role);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        return bar() !== null;
+      };
+
+      expect(await seenAs(PeerRole.GameMaster)).toBe(true);
+      expect(await seenAs(PeerRole.Guest)).toBe(false);
+      expect(await seenAs(PeerRole.Player)).toBe(false);
+    });
+
     it('stays where it was dragged through a round trip of roles', async () => {
       fixture.detectChanges();
       await fixture.whenStable();
@@ -346,7 +359,7 @@ describe('GmToolbarComponent', () => {
 
       expect(tools()).toBe(1);
       expect(fixture.nativeElement.textContent).toContain('GMツール');
-      expect(fixture.nativeElement.querySelector('app-npc-bar')).toBeNull();
+      expect(fixture.nativeElement.querySelector('npc-bar')).toBeNull();
       expect(TestBed.inject(ToolbarFoldService).isFolded('gm')).toBe(true);
       expect(TestBed.inject(ToolbarFoldService).isFolded('pl')).toBe(false);
 

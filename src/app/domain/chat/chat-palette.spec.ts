@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import {
+  aimsAtOnce,
   BuffPalette,
   ChatPalette,
   DiceTablePalette,
@@ -400,6 +401,45 @@ describe('ChatPalette', () => {
       });
     });
 
+    describe('what the target gives whoever aims at it', () => {
+      function wearing(character: GameCharacter, command: string): GameCharacter {
+        character.addBuffDataElement();
+        applyBuffEdit({ command, object: character, targeted: false }, character);
+        return character;
+      }
+
+      it("adds a 相手の buff of the target's to the speaker's value in a number worked out, and only aimed at it", () => {
+        const speaker = makeCharacter(false);
+        const weak = wearing(makeCharacter(false, '4'), '&!弱点/相手の HP+2/none');
+        const plain = makeCharacter(false, '4');
+
+        expect(evaluateCharacterReferences('2d6+{HP}', speaker, weak).text).toBe('2d6+15');
+        expect(evaluateCharacterReferences('2d6+{HP}', speaker, plain).text).toBe('2d6+13');
+        expect(evaluateCharacterReferences('2d6+{HP}', speaker).text).toBe('2d6+13');
+        expect(weak.rootDataElement?.getFirstElementByName('HP')?.value).toBe('4');
+      });
+
+      it('adds up the 相手の items of every buff, a plain buff and those of several at once among them', () => {
+        const speaker = makeCharacter(false);
+        const weak = wearing(
+          wearing(makeCharacter(false, '4'), '&!弱点/相手の物理特攻+2,相手の命中修正+1/none'),
+          '&看破/相手の物理特攻+1'
+        );
+
+        expect(evaluateCharacterReferences('k20+{物理特攻}', speaker, weak).text).toBe('k20+3');
+        expect(evaluateCharacterReferences('2d6+{命中修正}', speaker, weak).text).toBe('2d6+1');
+      });
+
+      it('brackets a sum below nought after an operator, joins one on with its sign, and leaves words alone', () => {
+        const speaker = makeCharacter(false);
+        const tough = wearing(makeCharacter(false, '4'), '&硬い/相手の HP-20/none');
+
+        expect(evaluateCharacterReferences('2d6+{HP}', speaker, tough).text).toBe('2d6+(-7)');
+        expect(evaluateCharacterReferences('2d6+10{HP}', speaker, tough).text).toBe('2d6+10-7');
+        expect(evaluateCharacterReferences('2d6 {HP}', speaker, tough).text).toBe('2d6 13');
+      });
+    });
+
     it('leaves the line alone when nobody is speaking it', () => {
       expect(evaluateCharacterReferences('2d6+{HP}', null).text).toBe('2d6+{HP}');
     });
@@ -519,6 +559,17 @@ describe('ChatPalette', () => {
       expect(textTargetsCharacter('ｔ： 2d+8')).toBe(true);
       expect(textTargetsCharacter('ポイントt: 2d+8')).toBe(false);
       expect(textTargetsCharacter('2d+8 at:')).toBe(false);
+    });
+
+    it('counts a t:範囲 or a t:area standing as a word of its own as aiming at them all at once, and takes it out', () => {
+      for (const line of ['2d+8 魔法行使 t:範囲', 'ｔ：範囲 2d+8 魔法行使', '2d+8 魔法行使 T:Area']) {
+        expect(textTargetsCharacter(line)).toBe(true);
+        expect(aimsAtOnce(line)).toBe(true);
+        expect(withoutAimMarks(line)).toBe('2d+8 魔法行使');
+      }
+      expect(aimsAtOnce('2d+8 魔法行使 t:')).toBe(false);
+      expect(aimsAtOnce('2d+8 t:範囲外')).toBe(false);
+      expect(withoutAimMarks('2d+8 t:範囲外')).toBe('2d+8 t:範囲外');
     });
 
     it('takes such a t: out of the line with the space beside it, keeping the lines apart', () => {

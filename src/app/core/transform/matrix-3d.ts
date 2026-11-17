@@ -1,6 +1,17 @@
 import { Logger } from '@axe/core/logging/logger';
 import { CSSNumber } from '@axe/core/transform/css-number';
-import { IPoint2D, IPoint3D } from '@axe/core/transform/transform';
+
+/** A point of a plane. */
+export interface IPoint2D {
+  x: number;
+  y: number;
+}
+
+/** A point of space, with the weight it is divided by once it has been carried through a perspective. */
+export interface IPoint3D extends IPoint2D {
+  z: number;
+  w: number;
+}
 
 export interface IMatrix3D {
   m11: number;
@@ -63,7 +74,7 @@ export class Matrix3D {
     if (data == null) return this;
 
     const l = data.length;
-    if (l == 16) {
+    if (l === 16) {
       this.m11 = data[0];
       this.m12 = data[1];
       this.m13 = data[2];
@@ -80,7 +91,7 @@ export class Matrix3D {
       this.m42 = data[13];
       this.m43 = data[14];
       this.m44 = data[15];
-    } else if (l == 6) {
+    } else if (l === 6) {
       this.m11 = data[0];
       this.m12 = data[1];
       this.m13 = 0;
@@ -97,7 +108,7 @@ export class Matrix3D {
       this.m42 = data[5];
       this.m43 = 0;
       this.m44 = 1;
-    } else if (l == 9) {
+    } else if (l === 9) {
       this.m11 = data[0];
       this.m12 = data[1];
       this.m13 = 0;
@@ -275,8 +286,10 @@ export class Matrix3D {
   }
 
   /** Adds a translation after the current transform, given as a point or as x, y and z. */
-  appendPosition(positionOrX: IPoint3D | number, y?: number, z?: number): Matrix3D {
-    const position = typeof positionOrX === 'number' ? { x: positionOrX, y: y!, z: z!, w: 1 } : positionOrX;
+  appendPosition(position: IPoint3D): Matrix3D;
+  appendPosition(x: number, y: number, z: number): Matrix3D;
+  appendPosition(positionOrX: IPoint3D | number, y = 0, z = 0): Matrix3D {
+    const position = typeof positionOrX === 'number' ? { x: positionOrX, y, z, w: 1 } : positionOrX;
     return this.append(Matrix3D.makePosition(position, Matrix3D._scratch));
   }
 
@@ -376,7 +389,7 @@ export class Matrix3D {
    * else leaves the matrix as it was.
    */
   setCSS(cssString: string): Matrix3D {
-    if (!cssString || cssString == 'none') return this.identity();
+    if (!cssString || cssString === 'none') return this.identity();
     const parts = cssString.replace('matrix3d(', '').replace('matrix(', '').replace(')', '').split(',');
     const trans = parts.map((p) => CSSNumber.parse(p));
     return this.setData(trans);
@@ -388,7 +401,7 @@ export class Matrix3D {
    * With `force2D`, a `matrix3d()` is flattened to its effect on the plane first.
    */
   appendCSS(cssString: string, force2D: boolean = false): Matrix3D {
-    if (!cssString || cssString == 'none') return this;
+    if (!cssString || cssString === 'none') return this;
     if (force2D && cssString.indexOf('matrix3d') >= 0) {
       return this.append(Matrix3D._scratch.setCSS(cssString).flatten());
     }
@@ -450,6 +463,32 @@ export class Matrix3D {
     return ret;
   }
 
+  /**
+   * The matrix as a CSS `matrix3d()`, its numbers in the order CSS lists them, each written to the
+   * fraction digits given and never in exponent form.
+   */
+  toCss(fractionDigits: number = 9): string {
+    const numbers = [
+      this.m11,
+      this.m12,
+      this.m13,
+      this.m14,
+      this.m21,
+      this.m22,
+      this.m23,
+      this.m24,
+      this.m31,
+      this.m32,
+      this.m33,
+      this.m34,
+      this.m41,
+      this.m42,
+      this.m43,
+      this.m44,
+    ];
+    return `matrix3d(${numbers.map((value) => cssNumber(value, fractionDigits)).join(', ')})`;
+  }
+
   /** The entries laid out as four tab-separated rows, for logging while debugging. */
   public toString(fractionalDigits: number = 3): string {
     const f = (v: number) => v.toFixed(fractionalDigits);
@@ -461,4 +500,11 @@ export class Matrix3D {
     ].join('\n');
   }
   private static _scratch = new Matrix3D();
+}
+
+/** A number as CSS reads it, to the fraction digits given, without trailing zeros. */
+function cssNumber(value: number, fractionDigits: number): string {
+  const fixed = value.toFixed(fractionDigits);
+  const written = fixed.includes('.') ? fixed.replace(/0+$/, '').replace(/\.$/, '') : fixed;
+  return written === '-0' ? '0' : written;
 }

@@ -1,5 +1,7 @@
+import { WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HandRailService } from '@axe/application/card/hand-rail.service';
+import { RoomFilesService } from '@axe/application/file/room-files.service';
 import { HotbarFillService } from '@axe/application/hotbar/hotbar-fill.service';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { ButtonGuideService } from '@axe/application/ui/button-guide.service';
@@ -215,6 +217,89 @@ describe('FabDrawerComponent', () => {
       expect(open).toHaveBeenCalledWith('skin');
       expect(display()).toBeNull();
     });
+
+    it('gathers a player’s seven kinds of media in a small menu of its own, saying it is open', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelector('[data-testid="fab-entry-jukebox"]')).toBeNull();
+
+      press('fab-entry-media');
+
+      const media = root.querySelector('[data-testid="fab-submenu-media"]')!;
+      expect([...media.querySelectorAll('[data-label]')].map((entry) => entry.getAttribute('data-testid'))).toEqual([
+        'fab-entry-images',
+        'fab-entry-models',
+        'fab-entry-jukebox',
+        'fab-entry-cutIn',
+        'fab-entry-stampPacks',
+        'fab-entry-effectLibrary',
+        'fab-entry-battleCutIn',
+      ]);
+      expect(root.querySelector('[data-testid="fab-entry-media"]')!.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('names the theme a seat is on, with its mark, in the display menu', () => {
+      press('fab-display');
+
+      const theme = display().querySelector('[data-testid="seat-theme"]') as HTMLElement;
+      expect(theme.getAttribute('data-label')).toBe('テーマ: 自動');
+      expect(theme.querySelector('i.material-icons')!.textContent!.trim()).toBe('brightness_auto');
+    });
+
+    it('swaps the display menu for the widgets one when widgets is pressed with it open, and shuts it on a second press', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const widgets = () => root.querySelector('[data-testid="seat-widgets"]');
+      const expanded = (testId: string) =>
+        root.querySelector(`[data-testid="${testId}"]`)!.getAttribute('aria-expanded');
+      press('fab-display');
+
+      press('fab-widgets');
+
+      expect(display()).toBeNull();
+      expect(widgets()).toBeTruthy();
+      expect(expanded('fab-widgets')).toBe('true');
+      expect(expanded('fab-display')).toBe('false');
+
+      press('fab-widgets');
+      expect(widgets()).toBeNull();
+    });
+  });
+
+  describe('the drawer opened and shut from its button', () => {
+    let fixture: ComponentFixture<FabDrawerComponent>;
+
+    beforeEach(async () => {
+      await TestBed.configureTestingModule({
+        imports: [FabDrawerComponent],
+        providers: [...TEST_PROVIDERS],
+      }).compileComponents();
+      PeerCursor.createMyCursor().role = PeerRole.Player;
+      fixture = TestBed.createComponent(FabDrawerComponent);
+      fixture.detectChanges();
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('leaves its entries where they are, out of the pointer’s way, while it is shut, and says which it is', () => {
+      const root = fixture.nativeElement as HTMLElement;
+      const toggle = root.querySelector('[data-testid="fab-toggle"]') as HTMLButtonElement;
+      const drawer = root.querySelector('[data-testid="fab-menu"]')!;
+      const nav = drawer.querySelector('nav')!;
+      fixture.componentInstance.fabOpen.set(true);
+      fixture.detectChanges();
+      expect(drawer.classList).toContain('open');
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(toggle.getAttribute('aria-label')).toBe('メニューを閉じる');
+
+      toggle.click();
+      fixture.detectChanges();
+
+      expect(drawer.classList).not.toContain('open');
+      expect(nav.classList).toContain('pointer-events-none');
+      expect(nav.classList).toContain('group-[.open]:pointer-events-auto');
+      expect(nav.querySelector('[data-testid="fab-entry-media"]')).toBeTruthy();
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(toggle.getAttribute('aria-label')).toBe('メニューを開く');
+    });
   });
 
   describe('the drawer from the keyboard', () => {
@@ -386,6 +471,26 @@ describe('FabDrawerComponent', () => {
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('[data-testid="fab-submenu-gameResources"]')).toBeNull();
+    });
+
+    it('closes a small menu left open as a save runs, and lets one be opened again', () => {
+      const entry = () => fixture.nativeElement.querySelector('[data-testid="fab-entry-gameResources"]') as HTMLElement;
+      const submenu = () => fixture.nativeElement.querySelector('[data-testid="fab-submenu-gameResources"]');
+      const saving = (TestBed.inject(RoomFilesService) as unknown as { saving: WritableSignal<boolean> }).saving;
+      entry().click();
+      fixture.detectChanges();
+      expect(submenu()).toBeTruthy();
+
+      saving.set(true);
+      fixture.detectChanges();
+      expect(submenu()).toBeNull();
+
+      saving.set(false);
+      fixture.detectChanges();
+      expect(submenu()).toBeNull();
+      entry().click();
+      fixture.detectChanges();
+      expect(submenu()).toBeTruthy();
     });
 
     describe('once somebody has arranged the drawer', () => {

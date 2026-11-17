@@ -1,5 +1,16 @@
 import { NgStyle } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, inject, viewChildren } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  ElementRef,
+  inject,
+  untracked,
+  viewChildren,
+} from '@angular/core';
+import { TableVeilService } from '@axe/application/tabletop/table-veil.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
 import { FogAirLayer, fogAirLayers } from '@axe/infrastructure/tabletop/fog/fog-air-layers';
@@ -11,7 +22,23 @@ import {
 
 interface Sheet {
   layer: FogAirLayer;
+  /** The style of the frame that lifts the sheet to the layer's height over the board. */
+  wrapperStyle: Record<string, string>;
   style: Record<string, string>;
+}
+
+/** The frame a sheet hangs in, lifted to the height of its layer and keeping the sheet's depth under it. */
+function wrapperStyle(layer: FogAirLayer): Record<string, string> {
+  return {
+    position: 'absolute',
+    left: '0px',
+    top: '0px',
+    width: '0px',
+    height: '0px',
+    'transform-style': 'preserve-3d',
+    transform: `translateZ(${layer.heightPx}px)`,
+    'pointer-events': 'none',
+  };
 }
 
 /**
@@ -21,6 +48,9 @@ interface Sheet {
  * affordable: fog in the air has no edges to hold, so a board a hundred cells across is
  * still a picture a few hundred pixels wide. The drifting is a transform, so it costs the
  * browser a composite and this code nothing at all.
+ *
+ * A table drawn on a canvas hangs the sheets in its own scene: they are still painted here, out of
+ * sight, and handed over each time they are painted.
  */
 @Component({
   selector: 'table-fog-air-overlay',
@@ -33,6 +63,7 @@ export class TableFogAirOverlayComponent {
   private readonly visionService = inject(VisionService);
   private readonly tabletopService = inject(TabletopService);
   private readonly canvasRefs = viewChildren<ElementRef<HTMLCanvasElement>>('sheet');
+  private readonly tableVeil = inject(TableVeilService);
 
   readonly sheets = computed<Sheet[]>(() => {
     const vision = this.visionService.overlayVision();
@@ -46,6 +77,7 @@ export class TableFogAirOverlayComponent {
     const marginY = heightPx * FOG_AIR_SHEET_MARGIN;
     return fogAirLayers(table.gridSize).map((layer) => ({
       layer,
+      wrapperStyle: wrapperStyle(layer),
       style: {
         position: 'absolute',
         left: -marginX + 'px',
@@ -63,24 +95,23 @@ export class TableFogAirOverlayComponent {
       const sheets = this.sheets();
       const vision = this.visionService.overlayVision();
       const canvases = this.canvasRefs();
-      if (sheets.length === 0 || !vision) return;
+      if (sheets.length === 0 || !vision) {
+        untracked(() => this.tableVeil.forgetFogAir());
+        return;
+      }
       const table = this.tabletopService.currentTableVersion();
       for (let i = 0; i < canvases.length && i < sheets.length; i++) {
         paintFogAirSheet(canvases[i].nativeElement, vision, table.gridSize, i);
       }
+      const hung = sheets.slice(0, canvases.length).map((sheet, index) => ({
+        canvas: canvases[index].nativeElement,
+        heightPx: sheet.layer.heightPx,
+        alpha: sheet.layer.alpha,
+        durationSec: sheet.layer.durationSec,
+        delaySec: sheet.layer.delaySec,
+      }));
+      untracked(() => this.tableVeil.showFogAir(hung));
     });
-  }
-
-  protected wrapperStyle(layer: FogAirLayer): Record<string, string> {
-    return {
-      position: 'absolute',
-      left: '0px',
-      top: '0px',
-      width: '0px',
-      height: '0px',
-      'transform-style': 'preserve-3d',
-      transform: `translateZ(${layer.heightPx}px)`,
-      'pointer-events': 'none',
-    };
+    inject(DestroyRef).onDestroy(() => this.tableVeil.forgetFogAir());
   }
 }

@@ -2,22 +2,28 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { GroundService } from '@axe/application/tabletop/ground.service';
+import type { HudAnchor } from '@axe/application/tabletop/hud-frame.service';
+import { PiecePicturesService } from '@axe/application/tabletop/piece-pictures.service';
+import { PieceTargetService } from '@axe/application/tabletop/piece-target.service';
+import { StandingGroundService } from '@axe/application/tabletop/standing-ground.service';
+import { TablePiecesService } from '@axe/application/tabletop/table-pieces.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { PieceContextMenuService } from '@axe/application/ui/piece-context-menu.service';
-import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
-import { GameCharacter } from '@axe/domain/character/game-character';
 import { GameTable } from '@axe/domain/tabletop/game-table';
 import { RangeArea } from '@axe/domain/tabletop/range';
 import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
 import { RangeComponent } from '@axe/features/tabletop/range/range.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 import { RotableDirective } from '@axe/ui/directives/rotable.directive';
+import { HudPlaceDirective } from '@axe/ui/tabletop/hud-place.directive';
 
 describe('RangeComponent', () => {
   let component: RangeComponent;
+  let given: { destroy(): void };
   let fixture: ComponentFixture<RangeComponent>;
 
   beforeEach(async () => {
@@ -33,7 +39,13 @@ describe('RangeComponent', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null as never);
     fixture = TestBed.createComponent(RangeComponent);
     component = fixture.componentInstance;
+    // Given its piece at once, as a template gives it, so that no drawing of the page made before a
+    // test gives its own reads the required input unset.
+    given = RangeArea.create('テスト範囲', 3, 5, 1);
+    fixture.componentRef.setInput('range', given);
   });
+
+  afterEach(() => given.destroy());
 
   afterEach(() => {
     fixture.destroy();
@@ -46,15 +58,55 @@ describe('RangeComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  describe('viewRotateZ computed signal', () => {
-    it('starts at ten', () => {
-      expect(component.viewRotateZ()).toBe(10);
+  describe('the guide to how high it floats', () => {
+    let table: GameTable;
+    let range: RangeArea;
+
+    beforeEach(() => {
+      table = new GameTable();
+      table.width = 20;
+      table.height = 20;
+      table.initialize();
+      TableSelecter.instance.viewTableIdentifier = table.identifier;
+      range = RangeArea.create('浮く範囲', 3, 3, 1);
+      range.location = { name: 'table', x: 300, y: 250 };
+      range.isAltitudeIndicate = true;
+      fixture.componentRef.setInput('range', range);
     });
 
-    it('turns with the table view', () => {
-      const uiSignalService = TestBed.inject(UiSignalService);
-      uiSignalService.notifyTableViewRotation(50, 20, 90);
-      expect(component.viewRotateZ()).toBe(90);
+    type Guide = { lifted: { x: number; y: number; height: number }; altitude: number } | null;
+    const guide = () => (component as unknown as { altitudeGuide(): Guide }).altitudeGuide();
+
+    it('runs from the point of a range raised off the face down to the face, in the range’s colour', async () => {
+      range.altitude = 2;
+      range.rangeColor = '#ff0000';
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(guide()).toMatchObject({ lifted: { x: 300, y: 250, height: 2 * component.gridSize }, altitude: 2 });
+      const line = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="altitude-guide"]'
+      ) as HTMLElement;
+      expect(line.style.borderLeftColor).toBe('#ff0000');
+    });
+
+    it('stands its handle and its guide on the raised ground the canvas draws it on', () => {
+      TestBed.inject(GroundService).dab({ kind: 'raise', x: 6, y: 5, radius: 3, strength: 1 });
+      range.altitude = 2;
+
+      const lift = TestBed.inject(TablePiecesService).footOf(range).height;
+      expect(lift).toBeGreaterThan(0);
+      expect(component.turnPoint().height).toBeCloseTo(lift + 2 * component.gridSize, 6);
+      expect(guide()?.lifted.height).toBeCloseTo(lift + 2 * component.gridSize, 6);
+    });
+
+    it('is left out within half a cell of the face, or where the range is set not to show it', () => {
+      range.altitude = -0.4;
+      expect(guide()).toBeNull();
+
+      range.altitude = -2;
+      range.isAltitudeIndicate = false;
+      expect(guide()).toBeNull();
     });
   });
 
@@ -73,6 +125,35 @@ describe('RangeComponent', () => {
       expect(option!.stillWanted!()).toBe(true);
       ObjectStore.instance.remove(range);
       expect(option!.stillWanted!()).toBe(false);
+    });
+  });
+
+  describe('the box the pointer rests on over the picture', () => {
+    it('is cut to the one shape the range is painted as, and left whole for a range of its own cells', () => {
+      const pictures = TestBed.inject(PiecePicturesService);
+      const range = given as RangeArea;
+      const picture = { url: 'blob:cells', widthPx: 100, heightPx: 100 };
+      fixture.detectChanges();
+
+      expect(component.pointerClipPath()).toBeNull();
+
+      const shape = [
+        { x: 50, y: 0 },
+        { x: 100, y: 100.004 },
+        { x: 0, y: 100 },
+      ];
+      const cell = [
+        { x: 40, y: 40 },
+        { x: 60, y: 40 },
+        { x: 60, y: 60 },
+      ];
+      pictures.show(range.identifier, { ...picture, pickAreas: [shape, cell] });
+      expect(component.pointerClipPath()).toBe('polygon(50px 0px, 100px 100px, 0px 100px)');
+
+      range.type = 'CUSTOM';
+      fixture.componentRef.setInput('range', range);
+      pictures.show(range.identifier, { ...picture, url: 'blob:cells-2', pickAreas: [cell] });
+      expect(component.pointerClipPath()).toBeNull();
     });
   });
 
@@ -104,20 +185,19 @@ describe('RangeComponent', () => {
     });
   });
 
+  it('draws itself anew as its length, width or opacity is edited in its sheet', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const asked = vi.mocked(HTMLCanvasElement.prototype.getContext);
+    asked.mockClear();
+
+    (given as RangeArea).commonDataElement!.getFirstElementByName('width')!.value = 7;
+    await Promise.resolve();
+
+    expect(asked).toHaveBeenCalled();
+  });
+
   describe('the clip version signal', () => {
-    type PrivClipVersion = { _clipVersion: { (): number; update(fn: (v: number) => number): void } };
-
-    it('starts at zero', () => {
-      const priv = component as unknown as PrivClipVersion;
-      expect(priv._clipVersion()).toBe(0);
-    });
-
-    it('counts up on an update', () => {
-      const priv = component as unknown as PrivClipVersion;
-      priv._clipVersion.update((v) => v + 1);
-      expect(priv._clipVersion()).toBe(1);
-    });
-
     it('gives a cone a polygon clip path', () => {
       const range = RangeArea.create('テスト', 3, 5, 1);
       range.type = 'CORN';
@@ -143,6 +223,36 @@ describe('RangeComponent', () => {
   });
 
   describe('the turn handle', () => {
+    it('stands on the ground under it where the range lies on the ground, as the range follows the raised ground', () => {
+      const table = new GameTable();
+      table.width = 20;
+      table.height = 20;
+      table.initialize();
+      TableSelecter.instance.viewTableIdentifier = table.identifier;
+      const range = RangeArea.create('テスト', 3, 3, 1);
+      range.type = 'SQUARE';
+      range.location = { name: 'table', x: 100, y: 200 };
+      fixture.componentRef.setInput('range', range);
+      fixture.detectChanges();
+      const flat = component.grabPoint();
+      expect(flat.height).toBe(component.turnPoint().height);
+
+      TestBed.inject(GroundService).dab({ kind: 'raise', x: flat.x / 50, y: flat.y / 50, radius: 1, strength: 1 });
+
+      const raised = component.grabPoint();
+      expect(raised.height).toBeCloseTo(TestBed.inject(StandingGroundService).heightPxAt(flat.x, flat.y), 6);
+      expect(raised.height).toBeGreaterThan(component.turnPoint().height);
+
+      const onBlock = RangeArea.create('テスト', 3, 3, 1);
+      onBlock.type = 'SQUARE';
+      onBlock.location = { name: 'table', x: 100, y: 200 };
+      onBlock.posZ = 50;
+      fixture.componentRef.setInput('range', onBlock);
+      expect(component.grabPoint().height).toBe(component.turnPoint().height);
+      range.destroy();
+      onBlock.destroy();
+    });
+
     it('keeps rotation enabled for a rotatable shape in 2D mode', () => {
       const range = RangeArea.create('テスト', 3, 3, 1);
       range.type = 'SQUARE';
@@ -163,6 +273,29 @@ describe('RangeComponent', () => {
 
       expect(component.usesSingleRotateGrab()).toBe(true);
       expect(fixture.nativeElement.querySelector('.rotate-grab')).toBeTruthy();
+    });
+
+    it('puts the turn handle in a root raised over every piece, and the shape in a root among them', () => {
+      const range = RangeArea.create('テスト', 3, 3, 1);
+      range.type = 'SQUARE';
+      fixture.componentRef.setInput('range', range);
+      fixture.detectChanges();
+      const placed = fixture.debugElement.queryAll(By.directive(HudPlaceDirective)).map((found) => ({
+        element: found.nativeElement as HTMLElement,
+        anchor: found.injector.get(HudPlaceDirective).anchor() as HudAnchor,
+      }));
+      const rootOf = (element: Element) =>
+        placed.find(
+          (one) => one.element !== element && one.element.contains(element) && !one.anchor.part && !one.anchor.at
+        );
+
+      const handle = fixture.nativeElement.querySelector('.rotate-grab') as HTMLElement;
+      const picture = fixture.nativeElement.querySelector('[data-part="picture"]') as HTMLElement;
+      expect(rootOf(handle)?.anchor).toEqual({ owner: range.identifier, raised: true });
+      expect(rootOf(picture)?.anchor).toEqual({ owner: range.identifier });
+      expect(rootOf(picture)?.element.matches('[data-hud-box]')).toBe(true);
+      expect((fixture.nativeElement as HTMLElement).classList).toContain('group');
+      range.destroy();
     });
 
     it('shows none on a circle', () => {
@@ -188,8 +321,8 @@ describe('RangeComponent', () => {
 
         expect(handle).toBeTruthy();
         expect(handle.closest('.range-clip-layer')).toBeNull();
-        expect(handle.style.left).toBe('0px');
-        expect(handle.style.top).toBe('-150px');
+        const about = component.turnPoint();
+        expect(component.grabPoint()).toMatchObject({ x: about.x, y: about.y - 150 });
       }
     );
   });
@@ -251,34 +384,11 @@ describe('RangeComponent', () => {
     });
   });
 
-  it('aims at the pieces a circle takes in, and takes the aim off the rest and off pieces out of the fight', () => {
+  it('hands the aim to the piece targets, counted in the squares of the table being viewed', async () => {
     const range = RangeArea.create('円', 1, 2, 50);
     range.type = 'CIRCLE';
-    range.location = { name: 'table', x: 300, y: 300 };
-    const inside = GameCharacter.create('中', 1, '');
-    inside.location = { name: 'table', x: 325, y: 275 };
-    const outside = GameCharacter.create('外', 1, '');
-    outside.location = { name: 'table', x: 600, y: 600 };
-    outside.targeted = true;
-    const resting = GameCharacter.create('除外', 1, '');
-    resting.location = { name: 'table', x: 300, y: 300 };
-    resting.offField = '1';
     fixture.componentRef.setInput('range', range);
-
-    component.targetInside(range);
-
-    expect(inside.targeted).toBe(true);
-    expect(outside.targeted).toBe(false);
-    expect(resting.targeted).toBe(false);
-  });
-
-  it('takes in pieces as far off as its length counts squares, on a table counting squares of two cells', async () => {
-    const range = RangeArea.create('円', 1, 2, 50);
-    range.type = 'CIRCLE';
-    range.location = { name: 'table', x: 300, y: 300 };
-    fixture.componentRef.setInput('range', range);
-    const twoSquaresOff = GameCharacter.create('二マス先', 1, '');
-    twoSquaresOff.location = { name: 'table', x: 425, y: 275 };
+    const aimed = vi.spyOn(TestBed.inject(PieceTargetService), 'targetInsideRange');
     const table = new GameTable();
     table.squareSpan = 2;
     table.initialize();
@@ -287,6 +397,23 @@ describe('RangeComponent', () => {
 
     component.targetInside(range);
 
-    expect(twoSquaresOff.targeted).toBe(true);
+    expect(aimed).toHaveBeenCalledWith(range, 100);
+  });
+
+  it('lets go of what the shape editor says on saving once the range is gone', async () => {
+    const range = RangeArea.create('形', 1, 1, 50);
+    range.type = 'CUSTOM';
+    fixture.componentRef.setInput('range', range);
+    const unsubscribe = vi.fn();
+    const editor = { initialize: vi.fn(), saved: { subscribe: vi.fn(() => ({ unsubscribe })) } };
+    vi.spyOn(TestBed.inject(PanelService), 'open').mockReturnValue(editor as never);
+
+    await (component as unknown as { openCellEditor(range: RangeArea): Promise<void> }).openCellEditor(range);
+    expect(editor.saved.subscribe).toHaveBeenCalledOnce();
+    expect(unsubscribe).not.toHaveBeenCalled();
+
+    fixture.destroy();
+
+    expect(unsubscribe).toHaveBeenCalledOnce();
   });
 });

@@ -1,6 +1,7 @@
 import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
+import { FloorCanvasesService } from '@axe/application/tabletop/floor-canvases.service';
 import {
   InterruptOffer,
   InterruptZoneChoice,
@@ -29,6 +30,10 @@ describe('the interrupt band and overlay', () => {
   );
   const interrupts = {
     waiting: waiting.asReadonly(),
+    secondsLeft: computed(() => {
+      const move = waiting();
+      return move ? Math.max(0, Math.ceil((move.deadline - Date.now()) / 1000)) : 0;
+    }),
     offer: offer.asReadonly(),
     choice,
     togglePiece: vi.fn(),
@@ -179,7 +184,12 @@ describe('the interrupt band and overlay', () => {
     await fixture.whenStable();
 
     const host = fixture.nativeElement as HTMLElement;
-    expect(host.querySelector('[data-testid="interrupt-lit"]')!.getAttribute('points')).toBe('20,0 80,0');
-    expect(host.querySelector('[data-testid="interrupt-point"]')!.getAttribute('cx')).toBe('20');
+    expect(host.querySelector('[data-testid="interrupt-lit"]')!.getAttribute('data-points')).toBe('20,0 80,0');
+    expect(host.querySelector('[data-testid="interrupt-point"]')!.getAttribute('data-x')).toBe('20');
+    expect(
+      TestBed.inject(FloorCanvasesService)
+        .all()
+        .map((laid) => laid.id)
+    ).toEqual(['interrupts-0']);
   });
 });

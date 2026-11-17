@@ -207,6 +207,7 @@ export default defineConfig({
       '/start/': [
         { text: 'はじめに', link: '/start/' },
         { text: 'Axeでできること', link: '/start/features' },
+        { text: '推奨環境', link: '/start/requirements' },
         { text: '招待リンクで参加する', link: '/start/join' },
         { text: 'はじめてのCoC（PL向け）', link: '/start/coc-player' },
         { text: 'はじめてのセッション（GM）', link: '/start/first-session' },
@@ -354,6 +355,12 @@ export default defineConfig({
           text: 'リリースノート',
           items: [
             { text: '一覧', link: '/release-notes/' },
+            { text: 'v1.79.0', link: '/release-notes/v1.79.0' },
+            { text: 'v1.78.1', link: '/release-notes/v1.78.1' },
+            { text: 'v1.78.0', link: '/release-notes/v1.78.0' },
+            { text: 'v1.77.2', link: '/release-notes/v1.77.2' },
+            { text: 'v1.77.1', link: '/release-notes/v1.77.1' },
+            { text: 'v1.77.0', link: '/release-notes/v1.77.0' },
             { text: 'v1.76.1', link: '/release-notes/v1.76.1' },
             { text: 'v1.76.0', link: '/release-notes/v1.76.0' },
             { text: 'v1.75.3', link: '/release-notes/v1.75.3' },

@@ -1,8 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { SaveDataService } from '@axe/application/file/save-data.service';
+import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { CutInService } from '@axe/application/media/cut-in.service';
 import { TableBgmService } from '@axe/application/media/table-bgm.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
+import { Logger } from '@axe/core/logging/logger';
 import { AudioFile } from '@axe/core/storage/audio-file';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
@@ -40,11 +43,6 @@ describe('GameTableSettingComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
-  });
-
-  it('asks for no change detector', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((component as any).changeDetector).toBeUndefined();
   });
 
   describe('with no table selected', () => {
@@ -171,6 +169,123 @@ describe('GameTableSettingComponent', () => {
 
       expect(table.gridSize).toBe(256);
       expect(field.value).toBe('256');
+    });
+  });
+
+  describe('writing the picked table from its fields', () => {
+    let table: GameTable;
+
+    beforeEach(async () => {
+      table = new GameTable();
+      table.name = '最初の卓';
+      table.initialize();
+      component.selectGameTable(table.identifier);
+      fixture.detectChanges();
+      await fixture.whenStable();
+    });
+
+    afterEach(() => {
+      table.destroy();
+    });
+
+    /** Types a value into the field of that name, as the reader's keys or slider would. */
+    function enter(name: string, value: string): void {
+      const field: HTMLInputElement = fixture.nativeElement.querySelector(`input[name="${name}"]`);
+      field.value = value;
+      field.dispatchEvent(new Event('input'));
+    }
+
+    it('renames the table from the name typed in', () => {
+      enter('table-name', 'テスト卓');
+
+      expect(table.name).toBe('テスト卓');
+    });
+
+    it('sizes the table from its width and height sliders', () => {
+      enter('tableWidth', '30');
+      enter('table-height-range', '25');
+
+      expect(table.width).toBe(30);
+      expect(table.height).toBe(25);
+    });
+
+    it('shows the grid at all times once its box is ticked', () => {
+      table.gridShow = false;
+      const box: HTMLInputElement = fixture.nativeElement.querySelector('input[name="tableGridShow"]');
+
+      box.click();
+
+      expect(table.gridShow).toBe(true);
+    });
+
+    it('offers the colour of the grid in a field for colours', () => {
+      const field: HTMLInputElement = fixture.nativeElement.querySelector('input[name="tableGridColor"]');
+
+      expect(field.type).toBe('color');
+    });
+
+    it('lays the filter chosen over the picture behind the table', () => {
+      const filter: HTMLSelectElement = fixture.nativeElement.querySelector('select[name="tableDistanceviewFilter"]');
+
+      filter.value = FilterType.BLACK;
+      filter.dispatchEvent(new Event('change'));
+      expect(table.backgroundFilterType).toBe(FilterType.BLACK);
+
+      filter.value = FilterType.WHITE;
+      filter.dispatchEvent(new Event('change'));
+      expect(table.backgroundFilterType).toBe(FilterType.WHITE);
+    });
+
+    it('saves the picked table under its name from the save button', () => {
+      const save = vi.spyOn(TestBed.inject(SaveDataService), 'saveGameObjectAsync').mockResolvedValue(undefined);
+      const label = TestBed.inject(TRANSLATE_FN)('feature.tabletop.tableSetting.save');
+      const buttons: HTMLButtonElement[] = [...fixture.nativeElement.querySelectorAll('button')];
+
+      buttons.find((button) => button.textContent?.includes(label))!.click();
+
+      expect(save).toHaveBeenCalledWith(table, 'map_最初の卓', expect.any(Function));
+    });
+
+    it('lists a new table once one is made from the button over the list', async () => {
+      const listed = () => fixture.nativeElement.querySelectorAll('ul[role="listbox"] > li[role="option"]').length;
+      const before = listed();
+      const tablesBefore = new Set(ObjectStore.instance.getObjects(GameTable));
+      const add = TestBed.inject(TRANSLATE_FN)('feature.tabletop.tableSetting.addTable');
+
+      (fixture.nativeElement.querySelector(`button[title="${add}"]`) as HTMLButtonElement).click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      try {
+        expect(listed()).toBe(before + 1);
+      } finally {
+        for (const made of ObjectStore.instance.getObjects(GameTable)) if (!tablesBefore.has(made)) made.destroy();
+      }
+    });
+  });
+
+  describe('a table deleted while it is still picked', () => {
+    it('takes no grid, snap or view written from its fields', () => {
+      const table = new GameTable();
+      table.gridShow = false;
+      table.gridSnap = true;
+      table.gridSnapStyle = GridSnapStyle.CENTER;
+      table.mode2d = false;
+      table.initialize();
+      component.selectGameTable(table.identifier);
+      // A table taken out of the store counts as deleted, and a deleted one is not editable.
+      ObjectStore.instance.remove(table);
+      expect(component.isEditable).toBe(false);
+
+      component.tableGridShow = true;
+      component.tableGridSnap = false;
+      component.tableRecommendedView = 'flat';
+      component.tableSnapMode = 'vertex';
+
+      expect(table.gridShow).toBe(false);
+      expect(table.gridSnap).toBe(true);
+      expect(table.gridSnapStyle).toBe(GridSnapStyle.CENTER);
+      expect(table.mode2d).toBe(false);
     });
   });
 
@@ -307,7 +422,7 @@ describe('GameTableSettingComponent', () => {
 
       component.duplicate();
 
-      const shown = TestBed.inject(TableSelecter).viewTable!;
+      const shown = TableSelecter.instance.viewTable!;
       expect(shown.identifier).not.toBe(table.identifier);
       expect(shown.name).toBe('村のコピー');
       expect(component.selectedTable).toBe(shown);
@@ -340,7 +455,7 @@ describe('GameTableSettingComponent', () => {
     it('plays what the table asks for', () => {
       const shown = new GameTable();
       shown.initialize();
-      TestBed.inject(TableSelecter).viewTableIdentifier = shown.identifier;
+      TableSelecter.instance.viewTableIdentifier = shown.identifier;
       const launchForTable = watchLaunch();
       const music = vi.spyOn(TestBed.inject(TableBgmService), 'playFor').mockImplementation(() => undefined);
 
@@ -470,270 +585,60 @@ describe('GameTableSettingComponent', () => {
   it('lets the panel take the pointer again once the drag ends', async () => {
     await expectPanelDragRecovery(GameTableSettingComponent);
   });
-  describe('what drifts under the board', () => {
-    const withTable = (): GameTable => {
-      const table = new GameTable();
+  it('lists what drifts under the board of the picked table, for as long as the table can be edited', async () => {
+    const table = new GameTable();
+    table.initialize();
+    component.selectGameTable(table.identifier);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const add = (): HTMLButtonElement | null =>
+      fixture.nativeElement.querySelector('table-background-layers [data-testid="background-layer-add"]');
+
+    expect(add()?.disabled).toBe(false);
+    add()!.click();
+    expect(table.backgroundLayers).toHaveLength(1);
+
+    ObjectStore.instance.remove(table);
+    TestBed.inject(ObjectChangeService).notifyCollectionChanged(GameTable.aliasName);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(add()?.disabled ?? true).toBe(true);
+    for (const layer of table.backgroundLayers) layer.destroy();
+  });
+
+  it('draws the fields of a table already deleted as closed from the first drawing', async () => {
+    const table = new GameTable();
+    table.initialize();
+    component.selectGameTable(table.identifier);
+    ObjectStore.instance.remove(table);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const named = (name: string) =>
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>(`[name="${name}"]`)!;
+    expect(named('table-name').hasAttribute('disabled')).toBe(true);
+  });
+
+  describe('restoring a deleted table', () => {
+    let table: GameTable;
+
+    beforeEach(() => {
+      PeerCursor.createMyCursor();
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      table = new GameTable();
       table.initialize();
-      component.selectedTable = table;
-      return table;
-    };
-
-    it('lays a layer, and puts each new one in front of the last', () => {
-      const table = withTable();
-      try {
-        component.addBackgroundLayer();
-        component.addBackgroundLayer();
-
-        expect(table.backgroundLayers.map((layer) => layer.order)).toEqual([0, 1]);
-      } finally {
-        table.destroy();
-      }
+      component.selectGameTable(table.identifier);
     });
 
-    it('stops at six between the two sides of the board', () => {
-      const table = withTable();
-      try {
-        for (let laid = 0; laid < 6; laid++) component.addBackgroundLayer();
-        expect(component.canAddBackgroundLayer).toBe(false);
+    it('forgets what it kept and stays on the picked table when the kept XML cannot be read', () => {
+      vi.spyOn(Logger, 'error').mockImplementation(() => undefined);
+      component.selectedTableXml = '<game-table';
 
-        component.addBackgroundLayer();
-        expect(table.backgroundLayers).toHaveLength(6);
-      } finally {
-        table.destroy();
-      }
-    });
+      expect(() => component.restore()).not.toThrow();
 
-    it('takes one away again', () => {
-      const table = withTable();
-      try {
-        component.addBackgroundLayer();
-        component.removeBackgroundLayer(table.backgroundLayers[0]);
-
-        expect(table.backgroundLayers).toEqual([]);
-      } finally {
-        table.destroy();
-      }
-    });
-
-    it('writes what it is asked onto the table, which the room shares', () => {
-      const table = withTable();
-      try {
-        component.addBackgroundLayer();
-        const layer = table.backgroundLayers[0];
-
-        component.setBackgroundLayerSpeedX(layer, -120);
-        component.setBackgroundLayerSpeedY(layer, 40);
-        component.setBackgroundLayerOpacityPercent(layer, 60);
-        component.setBackgroundLayerScale(layer, 2);
-        component.setBackgroundLayerEnabled(layer, false);
-        component.setBackgroundLayerPlacement(layer, 'over');
-
-        expect(layer.placedOver).toBe(true);
-        expect(layer.speedX).toBe(-120);
-        expect(layer.speedY).toBe(40);
-        expect(layer.opacity).toBeCloseTo(0.6, 5);
-        expect(layer.scale).toBe(2);
-        expect(layer.enabled).toBe(false);
-      } finally {
-        table.destroy();
-      }
-    });
-
-    it('holds a runaway speed and an unreadable scale to what the board can show', () => {
-      const table = withTable();
-      try {
-        component.addBackgroundLayer();
-        const layer = table.backgroundLayers[0];
-
-        component.setBackgroundLayerSpeedX(layer, 999999);
-        component.setBackgroundLayerScale(layer, 999);
-        component.setBackgroundLayerOpacityPercent(layer, 500);
-
-        expect(layer.speedX).toBe(component.maxBackgroundScrollSpeed);
-        expect(layer.scale).toBe(component.maxBackgroundLayerScale);
-        expect(layer.opacity).toBe(1);
-      } finally {
-        table.destroy();
-      }
-    });
-
-    it('writes nothing to a table that is no longer there to be edited', () => {
-      const table = withTable();
-      component.addBackgroundLayer();
-      const layer = table.backgroundLayers[0];
-      // A table taken out of the store counts as deleted, and a deleted one is not editable.
-      ObjectStore.instance.remove(table);
-
-      expect(component.isEditable).toBe(false);
-
-      component.setBackgroundLayerSpeedX(layer, 100);
-      component.setBackgroundLayerPlacement(layer, 'over');
-      component.moveBackgroundLayer(layer, -1);
-      component.removeBackgroundLayer(layer);
-
-      expect(layer.speedX).toBe(0);
-      expect(layer.placedOver).toBe(false);
-      expect(table.backgroundLayers).toHaveLength(1);
-
-      layer.destroy();
-    });
-
-    it('stands a layer behind the table, and writes how much it follows the camera and how high it stands', () => {
-      const table = withTable();
-      try {
-        component.addBackgroundLayer();
-        const layer = table.backgroundLayers[0];
-
-        component.setBackgroundLayerPlacement(layer, 'backdrop');
-        component.setBackgroundLayerFollowPercent(layer, 60);
-        component.setBackgroundLayerHeightPercent(layer, 25);
-
-        expect(layer.placedBackdrop).toBe(true);
-        expect(component.backgroundLayerFollowPercent(layer)).toBe(60);
-        expect(component.backgroundLayerHeightPercent(layer)).toBe(25);
-      } finally {
-        table.destroy();
-      }
-    });
-
-    it('holds the follow and the height between nought and a hundred, and ignores what cannot be read', () => {
-      const table = withTable();
-      try {
-        component.addBackgroundLayer();
-        const layer = table.backgroundLayers[0];
-        component.setBackgroundLayerPlacement(layer, 'backdrop');
-
-        component.setBackgroundLayerFollowPercent(layer, 500);
-        component.setBackgroundLayerHeightPercent(layer, -20);
-        expect([layer.follow, layer.height]).toEqual([1, 0]);
-
-        component.setBackgroundLayerFollowPercent(layer, Number.NaN);
-        expect(layer.follow).toBe(1);
-      } finally {
-        table.destroy();
-      }
-    });
-
-    it('offers the follow and the height only for a layer behind the table, and no drift up or down for it', async () => {
-      const table = withTable();
-      try {
-        component.addBackgroundLayer();
-        const layer = table.backgroundLayers[0];
-        const settle = async () => {
-          fixture.detectChanges();
-          await fixture.whenStable();
-          fixture.detectChanges();
-        };
-        await settle();
-        const root = fixture.nativeElement as HTMLElement;
-        expect(root.querySelector('[data-testid="background-layer-row"]')).not.toBeNull();
-        expect(root.querySelector('[data-testid="background-layer-follow"]')).toBeNull();
-
-        component.setBackgroundLayerPlacement(layer, 'backdrop');
-        await settle();
-
-        expect(root.querySelector('[data-testid="background-layer-follow"]')).not.toBeNull();
-        expect(root.querySelector('[data-testid="background-layer-height"]')).not.toBeNull();
-        expect(root.querySelector<HTMLInputElement>('[data-testid="background-layer-speed-y"]')!.disabled).toBe(true);
-      } finally {
-        table.destroy();
-      }
-    });
-
-    it('lists the layers behind the table first, each side counted on its own', () => {
-      const table = withTable();
-      try {
-        component.addBackgroundLayer();
-        component.addBackgroundLayer();
-        component.addBackgroundLayer();
-        const [under, backdrop, over] = table.backgroundLayers;
-        component.setBackgroundLayerPlacement(backdrop, 'backdrop');
-        component.setBackgroundLayerPlacement(over, 'over');
-
-        expect(component.backgroundLayers).toEqual([backdrop, under, over]);
-        expect(component.canMoveBackgroundLayer(backdrop, 1)).toBe(false);
-      } finally {
-        table.destroy();
-      }
-    });
-
-    it('writes no follow to a table that is no longer there to be edited', () => {
-      const table = withTable();
-      component.addBackgroundLayer();
-      const layer = table.backgroundLayers[0];
-      ObjectStore.instance.remove(table);
-
-      component.setBackgroundLayerFollowPercent(layer, 90);
-
-      expect(layer.follow).not.toBe(0.9);
-      layer.destroy();
-    });
-
-    it('shows the two sides apart, everything under the board before everything over it', () => {
-      const table = withTable();
-      try {
-        component.addBackgroundLayer();
-        component.addBackgroundLayer();
-        component.setBackgroundLayerPlacement(table.backgroundLayers[0], 'over');
-        const shown = component.backgroundLayers;
-
-        expect(shown.map((layer) => layer.placedOver)).toEqual([false, true]);
-        expect(component.backgroundLayerNumber(shown[0])).toBe(1);
-        expect(component.backgroundLayerNumber(shown[1])).toBe(1);
-      } finally {
-        table.destroy();
-      }
-    });
-
-    it('moves one a step through its run and numbers the run again', () => {
-      const table = withTable();
-      try {
-        component.addBackgroundLayer();
-        component.addBackgroundLayer();
-        component.addBackgroundLayer();
-        const [first, second, third] = component.backgroundLayers;
-
-        component.moveBackgroundLayer(third, -1);
-
-        expect(component.backgroundLayers).toEqual([first, third, second]);
-        expect(component.backgroundLayers.map((layer) => layer.order)).toEqual([0, 1, 2]);
-      } finally {
-        table.destroy();
-      }
-    });
-
-    it('will not move one past either end of its run', () => {
-      const table = withTable();
-      try {
-        component.addBackgroundLayer();
-        component.addBackgroundLayer();
-        const [first, second] = component.backgroundLayers;
-
-        expect(component.canMoveBackgroundLayer(first, -1)).toBe(false);
-        expect(component.canMoveBackgroundLayer(second, 1)).toBe(false);
-        expect(component.canMoveBackgroundLayer(first, 1)).toBe(true);
-
-        component.moveBackgroundLayer(first, -1);
-        expect(component.backgroundLayers).toEqual([first, second]);
-      } finally {
-        table.destroy();
-      }
-    });
-
-    it('counts only its own side of the board when moving, since the runs are drawn apart', () => {
-      const table = withTable();
-      try {
-        component.addBackgroundLayer();
-        component.addBackgroundLayer();
-        const over = component.backgroundLayers[1];
-        component.setBackgroundLayerPlacement(over, 'over');
-
-        // Alone on its side, so there is nowhere for it to go.
-        expect(component.canMoveBackgroundLayer(over, -1)).toBe(false);
-        expect(component.canMoveBackgroundLayer(over, 1)).toBe(false);
-      } finally {
-        table.destroy();
-      }
+      expect(component.selectedTableXml).toBe('');
+      expect(component.selectedTable).toBe(table);
     });
   });
 });

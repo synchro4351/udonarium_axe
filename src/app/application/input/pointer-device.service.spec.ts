@@ -12,11 +12,6 @@ describe('PointerDeviceService', () => {
     });
 
     service = TestBed.inject(PointerDeviceService);
-    service.initialize();
-  });
-
-  afterEach(() => {
-    service.destroy();
   });
 
   it('should ...', inject([PointerDeviceService], (service: PointerDeviceService) => {
@@ -95,10 +90,7 @@ describe('PointerDeviceService', () => {
 
   it('stops dragging when the page is hidden', () => {
     service.isDragging = true;
-    Object.defineProperty(document, 'visibilityState', {
-      configurable: true,
-      value: 'hidden',
-    });
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
 
     document.dispatchEvent(new Event('visibilitychange'));
 
@@ -206,5 +198,14 @@ describe('PointerDeviceService', () => {
 
       expect(opened).toHaveLength(0);
     });
+  });
+
+  it('stops following the page once its injector is destroyed', () => {
+    service.isDragging = true;
+
+    TestBed.resetTestingModule();
+    document.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+    expect(service.isDragging).toBe(true);
   });
 });

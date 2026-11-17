@@ -1,12 +1,17 @@
+import { clamp01 } from '@axe/core/util/clamp';
 import { catmullRomSegments } from '@axe/domain/map-editor/curve-geometry';
 import { functionInkOf } from '@axe/domain/map-editor/function-layer';
 import { cellCenter, pointToCell } from '@axe/domain/map-editor/grid-cells';
+import { objectPlacementsOf } from '@axe/domain/map-editor/object-placements';
+import { reliefChunksOf } from '@axe/domain/map-editor/relief';
 import {
   FillStyle,
   FreehandStroke,
+  FunctionLayer,
   ImageItem,
   MapScene,
   parseCellKey,
+  ReliefLayer,
   sceneHeightPx,
   sceneWidthPx,
   ShapeItem,
@@ -16,16 +21,22 @@ import {
   StrokeStyle,
   TextItem,
 } from '@axe/domain/map-editor/scene';
+import { cellGridOf } from '@axe/domain/tabletop/fog/cell-grid';
 import { GridType } from '@axe/domain/tabletop/game-table';
 import {
-  fillHexPath,
+  GROUND_CHUNK_SAMPLES,
+  GROUND_HEIGHT_STEP,
+  GROUND_PAINT_FULL,
+  GROUND_SAMPLES_PER_CELL,
+} from '@axe/domain/tabletop/ground/ground-chunk-data';
+import {
   hexCircumradius,
   hexStartAngle,
   isFlatTopGrid,
   isHexGrid,
-  strokeHexPath,
   traceHexPath,
 } from '@axe/domain/tabletop/hex-geometry';
+import { fillHexPath, strokeHexPath } from '@axe/infrastructure/tabletop/hex-canvas';
 export interface RenderHelpers {
   texturePattern(
     fill: { textureId: string; scale: number; rotation: number },
@@ -33,6 +44,8 @@ export interface RenderHelpers {
   ): CanvasPattern | string | null;
   stampImage(item: StampItem): CanvasImageSource | null;
   rasterImage?(item: ImageItem): CanvasImageSource | null;
+  /** A bundled model seen from straight above, as wide and deep as it stands, or null where there is none to hand. */
+  modelTop?(model: string): CanvasImageSource | null;
 }
 
 export interface RenderOptions {
@@ -207,6 +220,54 @@ function fitStampBox(image: CanvasImageSource, size: number): { w: number; h: nu
   return { w: iw * scale, h: ih * scale };
 }
 
+/** How a scene's cells are drawn: as hexes of a circumradius from a first corner, or as squares. */
+interface CellGeometry {
+  readonly hex: boolean;
+  readonly s: number;
+  readonly startAngle: number;
+}
+
+function cellGeometryOf(scene: MapScene): CellGeometry {
+  const hex = isHexGrid(scene.gridType);
+  return {
+    hex,
+    s: hex ? hexCircumradius(scene.cellPx) : 0,
+    startAngle: hex ? hexStartAngle(isFlatTopGrid(scene.gridType)) : 0,
+  };
+}
+
+/** Adds one cell's outline to the path being traced. */
+function traceCell(
+  ctx: CanvasRenderingContext2D,
+  scene: MapScene,
+  col: number,
+  row: number,
+  geometry: CellGeometry
+): void {
+  if (geometry.hex) {
+    const { x, y } = cellCenter(scene.gridType, col, row, scene.cellPx);
+    traceHexPath(ctx, x, y, geometry.s, geometry.startAngle);
+  } else {
+    ctx.rect(col * scene.cellPx, row * scene.cellPx, scene.cellPx, scene.cellPx);
+  }
+}
+
+/** Fills one cell with the context's current fill. */
+function fillCell(
+  ctx: CanvasRenderingContext2D,
+  scene: MapScene,
+  col: number,
+  row: number,
+  geometry: CellGeometry
+): void {
+  if (geometry.hex) {
+    const { x, y } = cellCenter(scene.gridType, col, row, scene.cellPx);
+    fillHexPath(ctx, x, y, geometry.s, geometry.startAngle);
+  } else {
+    ctx.fillRect(col * scene.cellPx, row * scene.cellPx, scene.cellPx, scene.cellPx);
+  }
+}
+
 function clipCellPath(
   ctx: CanvasRenderingContext2D,
   scene: MapScene,
@@ -215,9 +276,7 @@ function clipCellPath(
   maxX: number,
   maxY: number
 ): void {
-  const hex = isHexGrid(scene.gridType);
-  const s = hex ? hexCircumradius(scene.cellPx) : 0;
-  const startAngle = hex ? hexStartAngle(isFlatTopGrid(scene.gridType)) : 0;
+  const geometry = cellGeometryOf(scene);
   const a = pointToCell(scene.gridType, minX, minY, scene.cellPx);
   const b = pointToCell(scene.gridType, maxX, maxY, scene.cellPx);
   const c0 = Math.min(a.col, b.col) - 1;
@@ -229,11 +288,7 @@ function clipCellPath(
     for (let row = r0; row <= r1; row += 1) {
       const { x, y } = cellCenter(scene.gridType, col, row, scene.cellPx);
       if (x < minX || x > maxX || y < minY || y > maxY) continue;
-      if (hex) {
-        traceHexPath(ctx, x, y, s, startAngle);
-      } else {
-        ctx.rect(col * scene.cellPx, row * scene.cellPx, scene.cellPx, scene.cellPx);
-      }
+      traceCell(ctx, scene, col, row, geometry);
     }
   }
   ctx.clip();
@@ -249,7 +304,7 @@ function drawImageItem(
   const image = helpers.rasterImage?.(item);
   if (!image) return;
   ctx.save();
-  ctx.globalAlpha = layerAlpha * (Number.isFinite(item.opacity) ? Math.max(0, Math.min(1, item.opacity)) : 1);
+  ctx.globalAlpha = layerAlpha * (Number.isFinite(item.opacity) ? clamp01(item.opacity) : 1);
   if (item.clipToCells) {
     const minX = item.x - item.w / 2;
     const minY = item.y - item.h / 2;
@@ -405,6 +460,98 @@ function drawGridLines(ctx: CanvasRenderingContext2D, scene: MapScene, width: nu
   ctx.restore();
 }
 
+/** How high ground has to stand for its tint to be at its deepest, in cells. */
+const RELIEF_FULL_CELLS = 4;
+/** The colour each kind of ground is painted in on the editor's map, in the order of `GROUND_PAINT_LAYERS`. */
+const RELIEF_PAINT_COLOURS: readonly (readonly [number, number, number])[] = [
+  [92, 138, 59],
+  [122, 89, 59],
+  [128, 128, 128],
+  [217, 194, 140],
+];
+/** How much of the map the fullest paint covers, so what lies under it still shows. */
+const RELIEF_PAINT_COVER = 0.7;
+const RELIEF_RAISED = '140, 92, 44';
+const RELIEF_SUNK = '44, 96, 168';
+const RELIEF_CONTOUR = 'rgba(60, 36, 16, 0.75)';
+
+/**
+ * Draws the paint of a chunk of relief: a square round every painted sample in the colours of the
+ * kinds of ground it is painted with, mixed in their shares.
+ */
+function drawReliefPaint(
+  ctx: CanvasRenderingContext2D,
+  paint: Uint8Array,
+  left: number,
+  top: number,
+  step: number
+): void {
+  const kinds = RELIEF_PAINT_COLOURS.length;
+  for (let j = 0; j < GROUND_CHUNK_SAMPLES; j++) {
+    for (let i = 0; i < GROUND_CHUNK_SAMPLES; i++) {
+      const at = (j * GROUND_CHUNK_SAMPLES + i) * kinds;
+      let total = 0;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      for (let kind = 0; kind < kinds; kind++) {
+        const share = paint[at + kind];
+        if (share === 0) continue;
+        const [kr, kg, kb] = RELIEF_PAINT_COLOURS[kind];
+        total += share;
+        r += kr * share;
+        g += kg * share;
+        b += kb * share;
+      }
+      if (total <= 0) continue;
+      const cover = (Math.min(total, GROUND_PAINT_FULL) / GROUND_PAINT_FULL) * RELIEF_PAINT_COVER;
+      ctx.fillStyle = `rgba(${Math.round(r / total)}, ${Math.round(g / total)}, ${Math.round(b / total)}, ${cover})`;
+      ctx.fillRect((left + i - 0.5) * step, (top + j - 0.5) * step, step, step);
+    }
+  }
+}
+
+/**
+ * Draws a relief layer as a map of heights over the paint it lays: a square round every sample,
+ * tinted brown the higher it stands and blue the deeper it is dug, and a line wherever the ground
+ * crosses a whole cell of height between one sample and the next.
+ */
+function drawReliefLayer(ctx: CanvasRenderingContext2D, layer: ReliefLayer, cellPx: number): void {
+  const step = cellPx / GROUND_SAMPLES_PER_CELL;
+  for (const chunk of reliefChunksOf(layer)) {
+    const left = chunk.cx * GROUND_CHUNK_SAMPLES;
+    const top = chunk.cy * GROUND_CHUNK_SAMPLES;
+    if (chunk.paint) drawReliefPaint(ctx, chunk.paint, left, top, step);
+    const cells = (i: number, j: number) => chunk.heights[j * GROUND_CHUNK_SAMPLES + i] * GROUND_HEIGHT_STEP;
+    for (let j = 0; j < GROUND_CHUNK_SAMPLES; j++) {
+      for (let i = 0; i < GROUND_CHUNK_SAMPLES; i++) {
+        const height = cells(i, j);
+        if (height === 0) continue;
+        const depth = Math.min(1, Math.abs(height) / RELIEF_FULL_CELLS);
+        ctx.fillStyle = `rgba(${height > 0 ? RELIEF_RAISED : RELIEF_SUNK}, ${0.15 + 0.55 * depth})`;
+        ctx.fillRect((left + i - 0.5) * step, (top + j - 0.5) * step, step, step);
+      }
+    }
+    ctx.strokeStyle = RELIEF_CONTOUR;
+    ctx.lineWidth = Math.max(1, cellPx / 32);
+    ctx.beginPath();
+    for (let j = 0; j < GROUND_CHUNK_SAMPLES; j++) {
+      for (let i = 0; i < GROUND_CHUNK_SAMPLES; i++) {
+        const level = Math.floor(cells(i, j));
+        if (i + 1 < GROUND_CHUNK_SAMPLES && Math.floor(cells(i + 1, j)) !== level) {
+          ctx.moveTo((left + i + 0.5) * step, (top + j - 0.5) * step);
+          ctx.lineTo((left + i + 0.5) * step, (top + j + 0.5) * step);
+        }
+        if (j + 1 < GROUND_CHUNK_SAMPLES && Math.floor(cells(i, j + 1)) !== level) {
+          ctx.moveTo((left + i - 0.5) * step, (top + j + 0.5) * step);
+          ctx.lineTo((left + i + 0.5) * step, (top + j + 0.5) * step);
+        }
+      }
+    }
+    ctx.stroke();
+  }
+}
+
 /**
  * Draws the map onto the canvas: its background, then each visible layer in order at its own
  * opacity, then the grid.
@@ -434,20 +581,13 @@ export function renderScene(
     ctx.globalAlpha = layer.opacity;
     switch (layer.kind) {
       case 'cell': {
-        const hex = isHexGrid(scene.gridType);
-        const s = hex ? hexCircumradius(scene.cellPx) : 0;
-        const startAngle = hex ? hexStartAngle(isFlatTopGrid(scene.gridType)) : 0;
+        const geometry = cellGeometryOf(scene);
         for (const [key, fill] of Object.entries(layer.cells)) {
           const resolved = resolveFill(fill, helpers, scene.cellPx);
           if (!resolved) continue;
           const { col, row } = parseCellKey(key);
           ctx.fillStyle = resolved;
-          if (hex) {
-            const { x, y } = cellCenter(scene.gridType, col, row, scene.cellPx);
-            fillHexPath(ctx, x, y, s, startAngle);
-          } else {
-            ctx.fillRect(col * scene.cellPx, row * scene.cellPx, scene.cellPx, scene.cellPx);
-          }
+          fillCell(ctx, scene, col, row, geometry);
         }
         break;
       }
@@ -469,21 +609,18 @@ export function renderScene(
       case 'image':
         for (const item of layer.items) drawImageItem(ctx, item, helpers, layer.opacity, scene);
         break;
+      case 'relief':
+        if (options?.drawFunctionLayers) drawReliefLayer(ctx, layer, scene.cellPx);
+        break;
       case 'function': {
         if (!options?.drawFunctionLayers) break;
-        const hex = isHexGrid(scene.gridType);
-        const s = hex ? hexCircumradius(scene.cellPx) : 0;
-        const startAngle = hex ? hexStartAngle(isFlatTopGrid(scene.gridType)) : 0;
+        const geometry = cellGeometryOf(scene);
         ctx.fillStyle = functionInkOf(layer.role, layer.spec);
         for (const key of Object.keys(layer.cells)) {
           const { col, row } = parseCellKey(key);
-          if (hex) {
-            const { x, y } = cellCenter(scene.gridType, col, row, scene.cellPx);
-            fillHexPath(ctx, x, y, s, startAngle);
-          } else {
-            ctx.fillRect(col * scene.cellPx, row * scene.cellPx, scene.cellPx, scene.cellPx);
-          }
+          fillCell(ctx, scene, col, row, geometry);
         }
+        if (layer.role === 'object') drawObjectPlacements(ctx, layer, scene, helpers);
         break;
       }
     }
@@ -494,4 +631,46 @@ export function renderScene(
   if (options?.drawGrid ?? scene.gridVisible) {
     drawGridLines(ctx, scene, width, height);
   }
+}
+
+/** What the boxes the 3D objects of a layer stand in are outlined in while the layer is worked on. */
+const OBJECT_OUTLINE = 'rgba(20, 90, 75, 0.9)';
+
+/**
+ * Draws each 3D object a layer sets out where it comes to stand, as its box would stand on the table:
+ * a bundled model as it is seen from straight above, and one held in the room, which has no such
+ * picture, as the outline of its box with its name in the middle. The cells say where the brush
+ * went, and these what comes to stand there.
+ */
+function drawObjectPlacements(
+  ctx: CanvasRenderingContext2D,
+  layer: FunctionLayer,
+  scene: MapScene,
+  helpers: RenderHelpers
+): void {
+  const grid = cellGridOf(scene.cols, scene.rows, scene.cellPx, scene.gridType);
+  const spec = layer.spec.object;
+  const top = helpers.modelTop?.(spec.model) ?? null;
+  ctx.save();
+  ctx.strokeStyle = OBJECT_OUTLINE;
+  ctx.fillStyle = OBJECT_OUTLINE;
+  ctx.lineWidth = Math.max(1, scene.cellPx / 40);
+  ctx.font = `${Math.max(8, Math.round(scene.cellPx / 5))}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const placed of objectPlacementsOf(Object.keys(layer.cells), spec, grid)) {
+    const width = placed.width * scene.cellPx;
+    const depth = placed.depth * scene.cellPx;
+    ctx.save();
+    ctx.translate(placed.x + width / 2, placed.y + depth / 2);
+    ctx.rotate((placed.rotate * Math.PI) / 180);
+    if (top) {
+      ctx.drawImage(top, -width / 2, -depth / 2, width, depth);
+    } else {
+      ctx.strokeRect(-width / 2, -depth / 2, width, depth);
+      if (spec.name) ctx.fillText(spec.name, 0, 0, Math.max(width, scene.cellPx) * 0.9);
+    }
+    ctx.restore();
+  }
+  ctx.restore();
 }

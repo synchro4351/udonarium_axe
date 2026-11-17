@@ -1,5 +1,6 @@
 import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { PieceLinksService } from '@axe/application/tabletop/piece-links.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { coalesce } from '@axe/core/util/debounce';
 import {
@@ -10,6 +11,7 @@ import {
   perfCounters,
   perfTimed,
 } from '@axe/core/util/perf-counters';
+import { sameList } from '@axe/core/util/same-list';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { Party } from '@axe/domain/party/party';
 import { partyIdsOwnedBy } from '@axe/domain/party/party-membership';
@@ -36,7 +38,15 @@ import {
 import { computeVisibleCellsFor, VisibleCellsOptions } from '@axe/domain/tabletop/fog/visible-cells';
 import { visibleCellsLightKey, VisibleCellsMemo, visionSourceKey } from '@axe/domain/tabletop/fog/visible-cells-memo';
 import { GameTable } from '@axe/domain/tabletop/game-table';
+import { groundFieldOn } from '@axe/domain/tabletop/ground/ground-field';
+import {
+  FLAT_GROUND,
+  groundLiftOfBlock,
+  GroundSurface,
+  groundSurfaceOf,
+} from '@axe/domain/tabletop/ground/ground-surface';
 import { SegmentIndexes } from '@axe/domain/tabletop/los/segment-index';
+import { groundHeightsOn } from '@axe/domain/tabletop/move/landing-height';
 import { pieceCentreOf } from '@axe/domain/tabletop/move/piece-on-grid';
 import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
 import { surfaceOf, TabletopObject } from '@axe/domain/tabletop/tabletop-object';
@@ -121,24 +131,40 @@ function sameCoverScope(a: CoverScope, b: CoverScope): boolean {
     sameCells(a.explored, b.explored)
   );
 }
-const RELEVANT_ALIASES = new Set(['character', 'light-source', 'terrain', 'table-ambience', 'game-table']);
+const RELEVANT_ALIASES = new Set([
+  'character',
+  'light-source',
+  'terrain',
+  'table-ambience',
+  'game-table',
+  'ground-field',
+  'ground-chunk',
+]);
 /** How many table cells one bucket of the sight index spans. */
 const SIGHT_INDEX_BUCKET_CELLS = 2;
-/** What the walls of a place are cut from. A piece walking past moves none of it. */
-const STANDING_ALIASES = new Set(['terrain', 'table-ambience', 'game-table']);
+/** What the walls of a place are cut from, the raised ground among it. A piece walking past moves none of it. */
+const STANDING_ALIASES = new Set(['terrain', 'table-ambience', 'game-table', 'ground-field', 'ground-chunk']);
 /** How many answers to keep, set well above what a single repaint asks for. */
 const MEMO_LIMIT = 8192;
 const EMPTY_SILHOUETTES: WallSilhouette[] = [];
 const EMPTY_WALL_LIGHTS: WallLight[] = [];
 const EMPTY_FOUND: ReadonlySet<string> = new Set();
+/**
+ * The raised ground of a table, read from what it keeps. Read when the scene is built, which a change
+ * to the ground sets off as a change to anything else standing does.
+ */
+function groundOf(table: GameTable): GroundSurface {
+  const field = groundFieldOn(table);
+  return field ? groundSurfaceOf(field.readChunks()) : FLAT_GROUND;
+}
+
 function faceKey(face: WallFace): string {
   return `${face.ax}:${face.ay}:${face.bx}:${face.by}:${face.nx}:${face.ny}:${face.heightPx}`;
 }
 
 function sameIds(a: readonly string[] | undefined, b: readonly string[] | undefined): boolean {
   if (a === b) return true;
-  if (!a || !b || a.length !== b.length) return false;
-  return a.every((id, index) => id === b[index]);
+  return !!a && !!b && sameList(a, b);
 }
 
 /** Who is looking, by what they are rather than by the object that says so. */
@@ -177,8 +203,11 @@ export const GUEST_PERSONA = '@guest';
 export class VisionService {
   private readonly objectChange = inject(ObjectChangeService);
   private readonly objectStore = inject(ObjectStore);
-  private readonly tableSelecter = inject(TableSelecter);
+  private get tableSelecter(): TableSelecter {
+    return TableSelecter.instance;
+  }
   private readonly destroyRef = inject(DestroyRef);
+  private readonly links = inject(PieceLinksService);
 
   readonly previewAsUserId = signal<string | null>(null);
   private readonly geometryEpoch = signal(0);
@@ -254,7 +283,14 @@ export class VisionService {
     const table = this.currentTable();
     if (!table) return null;
     const gridSize = table.gridSize;
-    return collectSegments(table, gridSize, table.width * gridSize, table.height * gridSize);
+    return collectSegments(table, gridSize, table.width * gridSize, table.height * gridSize, this.raisedGround());
+  });
+
+  /** The raised ground of the table in view, read again only when what stands on the table changes. */
+  private readonly raisedGround = computed<GroundSurface>(() => {
+    this.standingEpoch();
+    const table = this.currentTable();
+    return table ? groundOf(table) : FLAT_GROUND;
   });
 
   readonly viewer = computed<SceneViewer>(
@@ -341,7 +377,13 @@ export class VisionService {
     const characters = this.objectStore.getObjects<GameCharacter>(GameCharacter);
     this.sceneKeys.clear();
     for (const character of characters) this.sceneKeys.set(character.identifier, characterSceneKey(character));
-    return assembleScene(table, characters, standing, (identifier) => this.objectStore.get<GameCharacter>(identifier));
+    return assembleScene(
+      table,
+      characters,
+      standing,
+      (identifier) => this.objectStore.get<GameCharacter>(identifier),
+      this.raisedGround()
+    );
   }
 
   /**
@@ -365,31 +407,30 @@ export class VisionService {
   });
 
   /**
-   * The cells a sight-stopping wall stands on.
-   *
-   * Kept with the walls rather than with the scene, so that a piece walking about does not
-   * cut every terrain on the table into cells again.
-   */
-  /**
-   * The cells a wall stands on: how high the tallest reaches, and how low the lowest hangs.
+   * The cells a sight-stopping wall stands on: how high the tallest reaches, and how low the lowest hangs.
    *
    * A cell nothing is standing on is ground, and a block hanging clear of the floor leaves
    * the ground under it just as walkable. Both ends are wanted, since which of them answers
    * turns on where the eye is: over the roof, under the arch, or up against the face.
+   *
+   * Kept with the walls rather than with the scene, so that a piece walking about does not
+   * cut every terrain on the table into cells again.
    */
   readonly blockingCells = computed<{ cells: CellBits; tops: Float32Array; bases: Float32Array } | null>(() => {
     this.standingEpoch();
     const grid = this.cellGrid();
     const table = this.currentTable();
     if (!grid || !table) return null;
+    const ground = this.raisedGround();
     const cells = new CellBits(cellCount(grid));
     const tops = new Float32Array(cellCount(grid));
     const bases = new Float32Array(cellCount(grid)).fill(Infinity);
     for (const terrain of table.terrains) {
       if (!terrain.hasWall || !terrain.blocksSightNow || surfaceOf(terrain) !== 'floor') continue;
       const box = terrainBoxOf(terrain, grid.sizePx);
-      const top = terrainTopPx(terrain, grid.sizePx);
-      const base = terrainBasePx(terrain, grid.sizePx);
+      const lift = groundLiftOfBlock(ground, grid.sizePx, terrain);
+      const top = terrainTopPx(terrain, grid.sizePx) + lift;
+      const base = terrainBasePx(terrain, grid.sizePx) + lift;
       forEachCellInBox(grid, box.minX, box.minY, box.maxX, box.maxY, (cell) => {
         cells.set(cell);
         if (top > tops[cell]) tops[cell] = top;
@@ -397,6 +438,12 @@ export class VisionService {
       });
     }
     return { cells, tops, bases };
+  });
+
+  /** How high the raised ground stands under the middle of each cell of the fog, or null where it is flat. */
+  private readonly groundHeights = computed<Float64Array | null>(() => {
+    const grid = this.cellGrid();
+    return grid ? groundHeightsOn(grid, this.raisedGround()) : null;
   });
 
   readonly sightIndexes = computed<SegmentIndexes | null>(() => {
@@ -429,6 +476,7 @@ export class VisionService {
           blocking: standing?.cells,
           blockingTops: standing?.tops,
           blockingBases: standing?.bases,
+          groundHeights: this.groundHeights(),
         };
         const surroundings = [
           grid,
@@ -437,6 +485,7 @@ export class VisionService {
           standing?.cells,
           standing?.tops,
           standing?.bases,
+          options.groundHeights,
           visibleCellsLightKey(scene),
         ];
         const perSource = new Map<string, CellBits>();
@@ -922,20 +971,23 @@ export class VisionService {
    * Always for the game master, for a piece of the reader's own or their party's, for a piece off
    * the floor, and for a piece the party has already found. Under fog a piece answers to the cells
    * the fog is drawn from; otherwise to a line of sight to its eyes. A piece in stealth is seen
-   * only by the game master, its owner and its party, whatever the light.
+   * only by the game master, its owner and its party, whatever the light. A part is drawn as its
+   * body, so it is seen where its body is: a body in stealth hides its parts with it.
    */
   isTokenVisible(character: GameCharacter): boolean {
     const scene = this.scene();
     const viewer = this.viewer();
+    const judged = this.links.bodyOf(character) ?? character;
     return tokenVisibleTo(
       {
         scene,
         viewer,
         found: () => this.foundPieces(),
         fog: () => this.overlayVision(),
-        pointVisible: (x, y, z) => this.recall(`tok:${x}:${y}:${z}`, () => isPointVisible(scene!, x, y, viewer, z)),
+        pointVisible: (x, y, z) =>
+          !scene || this.recall(`tok:${x}:${y}:${z}`, () => isPointVisible(scene, x, y, viewer, z)),
       },
-      character
+      judged
     );
   }
 
@@ -967,7 +1019,7 @@ export class VisionService {
    *
    * A list would otherwise name what the table keeps in the dark or under the fog, so a piece on
    * the table is listed only where it is drawn. Anything off the table, in a tab of its own or in
-   * the graveyard, is not the table's to hide.
+   * the graveyard, is not the table's to hide. A part is listed where its body would be.
    */
   mayBeListed(character: GameCharacter): boolean {
     return character.location.name !== 'table' || this.isTokenVisible(character);

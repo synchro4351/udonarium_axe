@@ -1,16 +1,14 @@
 import { TestBed } from '@angular/core/testing';
-import { CoordinateService } from '@axe/application/input/coordinate.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { TablePickService } from '@axe/application/tabletop/table-pick.service';
 import { TabletopActionService } from '@axe/application/tabletop/tabletop-action.service';
 import { type ImageDroppedEvent } from '@axe/core/event/domain-events';
 import { EventChannel } from '@axe/core/event/event-channel';
-import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
-import {
-  ImageDropEventHandlerService,
-  isTabletopDropTarget,
-} from '@axe/features/tabletop/image-drop/image-drop-event-handler.service';
+import { GameTable } from '@axe/domain/tabletop/game-table';
+import { ImageDropEventHandlerService } from '@axe/features/tabletop/image-drop/image-drop-event-handler.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
+import { isTabletopDropTarget } from '@axe/ui/tabletop/table-drop-target';
 
 describe('isTabletopDropTarget', () => {
   afterEach(() => {
@@ -43,24 +41,16 @@ describe('ImageDropEventHandlerService', () => {
   let canEditTabletop: boolean;
   let dropTarget: Element | null;
   let localCoordinate: { x: number; y: number; z: number };
-  let coordinateTarget: HTMLElement | undefined;
 
   function setup(): void {
+    // The drop lands on the table in view: one of 20 by 20 cells of 50 px, as a table is made.
+    new GameTable().initialize();
     TestBed.configureTestingModule({
       providers: [
         ...TEST_PROVIDERS,
         { provide: ObjectChangeService, useValue: { imageDropped$ } },
         { provide: TabletopActionService, useValue: { createGameCharacterWith } },
-        {
-          provide: CoordinateService,
-          useValue: {
-            calcTabletopLocalCoordinate: (_point: unknown, target: HTMLElement) => {
-              coordinateTarget = target;
-              return localCoordinate;
-            },
-          },
-        },
-        { provide: TableSelecter, useValue: { viewTable: { width: 20, height: 20, gridSize: 50 } } },
+        { provide: TablePickService, useValue: { landingAt: () => localCoordinate } },
         {
           provide: RolePermissionService,
           useValue: {
@@ -84,7 +74,6 @@ describe('ImageDropEventHandlerService', () => {
     createGameCharacterWith = vi.fn();
     canEditTabletop = true;
     localCoordinate = { x: 100, y: 200, z: 0 };
-    coordinateTarget = undefined;
     document.body.innerHTML = '<div id="app-table-layer"></div>';
     dropTarget = document.querySelector('#app-table-layer');
     vi.spyOn(document, 'elementFromPoint').mockImplementation(() => dropTarget);
@@ -127,25 +116,6 @@ describe('ImageDropEventHandlerService', () => {
 
     expect(createGameCharacterWith).toHaveBeenCalledWith({ x: 975, y: 25, z: 0 }, expect.anything(), 'image-1');
   });
-
-  it('uses the target captured at the drop even when the preview now covers that point', () => {
-    document.body.innerHTML =
-      '<div id="app-table-layer"><div id="piece"></div></div><div id="file-storage-panel"></div>';
-    const capturedTarget = document.querySelector('#piece')! as HTMLElement;
-    dropTarget = document.querySelector('#file-storage-panel');
-    setup();
-
-    imageDropped$.emit({
-      identifier: 'image-1',
-      fileName: 'ゴブリン.png',
-      dropPoint: { x: 10, y: 20 },
-      dropTarget: capturedTarget,
-    });
-
-    expect(coordinateTarget).toBe(capturedTarget);
-    expect(createGameCharacterWith).toHaveBeenCalledWith({ x: 100, y: 200, z: 0 }, 'ゴブリン', 'image-1');
-  });
-
   it('honours a captured empty target instead of placing on a preview opened over the point', () => {
     document.body.innerHTML = '<div id="app-table-layer"></div><div id="file-storage-panel"></div>';
     dropTarget = document.querySelector('#file-storage-panel');

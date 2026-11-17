@@ -150,7 +150,7 @@ describe('RoomSnapshotService', () => {
   it('reports failure restoring a snapshot whose room cannot be read, and says so', async () => {
     const meta = await service.capture();
     const shown = vi.spyOn(TestBed.inject(SnackbarService), 'show').mockImplementation(() => {});
-    load.mockResolvedValue({ dataRead: false, images: [], audios: [] });
+    load.mockResolvedValue({ dataRead: false, images: [], audios: [], models: [] });
 
     await expect(service.restore(meta!.id)).resolves.toBe(false);
     expect(shown).toHaveBeenCalledWith('このスナップショットの部屋は読み込めませんでした。');
@@ -163,7 +163,7 @@ describe('RoomSnapshotService', () => {
     const get = objects.get.bind(objects);
     vi.spyOn(objects, 'get').mockImplementation(((identifier: string) =>
       identifier === 'ReloadCheck' ? { reloadCheckStart: () => {}, isLoadOk: () => false } : get(identifier)) as never);
-    load.mockResolvedValue({ dataRead: false, images: [], audios: [] });
+    load.mockResolvedValue({ dataRead: false, images: [], audios: [], models: [] });
 
     await expect(service.restore(meta!.id)).resolves.toBe(false);
     expect(shown).not.toHaveBeenCalled();

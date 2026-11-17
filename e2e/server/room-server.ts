@@ -56,7 +56,7 @@ interface WranglerConfig {
 }
 
 /** Reads JSON with comments and trailing commas, as a wrangler.jsonc holds, leaving strings alone. */
-export function parseJsonc(text: string): unknown {
+function parseJsonc(text: string): unknown {
   return JSON.parse(dropTrailingCommas(dropComments(text)));
 }
 
@@ -315,14 +315,17 @@ export function uniqueName(prefix: string): string {
   return `${prefix}${randomUUID().slice(0, 6)}`;
 }
 
-/** Opens the lobby from the peer menu, unless it is open already. */
+/**
+ * Opens the lobby from the peer menu, unless it is open already. The peer menu comes in a while after
+ * the chat input on a page just opened, longer while other seats open beside it.
+ */
 export async function openLobby(page: Page): Promise<void> {
   const lobby = page.locator('lobby');
-  if (!(await lobby.isVisible()))
-    await page
-      .getByRole('button', { name: /ロビー/ })
-      .first()
-      .click();
+  if (!(await lobby.isVisible())) {
+    const opener = page.getByRole('button', { name: /ロビー/ }).first();
+    await expect(opener).toBeVisible({ timeout: 30_000 });
+    await opener.click();
+  }
   await expect(lobby).toBeVisible({ timeout: 10_000 });
 }
 

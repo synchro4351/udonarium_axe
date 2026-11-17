@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActiveCharacterService } from '@axe/application/character/active-character.service';
+import { PieceNameService } from '@axe/application/character/piece-name.service';
 import { ChatSpeakerService } from '@axe/application/chat/chat-speaker.service';
 import { SaveDataService } from '@axe/application/file/save-data.service';
 import { HotbarStoreService } from '@axe/application/hotbar/hotbar-store.service';
@@ -68,13 +69,14 @@ const EDITOR = { width: EDITOR_WIDTH, height: EDITOR_HEIGHT };
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  selector: 'app-hotbar',
+  selector: 'hotbar',
   templateUrl: './hotbar-bar.component.html',
   host: { '(document:keydown)': 'onKeydown($event)' },
   imports: [DraggableDirective, WidgetPlaceDirective, TranslocoModule],
 })
 export class HotbarBarComponent {
   private readonly objectStore = inject(ObjectStore);
+  private readonly names = inject(PieceNameService);
   private readonly audioStorage = inject(AudioStorage);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly activeCharacter = inject(ActiveCharacterService);
@@ -155,6 +157,7 @@ export class HotbarBarComponent {
         referencedName: (named) => this.referencedName(named),
         referencedIcon: (named) => this.referencedIcon(named),
         keyOf: (index) => this.keyOf(index),
+        nameOf: (piece) => this.names.shown(piece),
       });
     });
   });
@@ -421,9 +424,9 @@ export class HotbarBarComponent {
     this.layout.forget(WIDGET_HOTBAR);
     const element = this.barRef()?.nativeElement;
     if (!element) return;
-    const spot = this.fallback(element);
-    element.style.left = `${spot.left}px`;
-    element.style.top = `${spot.top}px`;
+    const { left, top } = this.fallback(element);
+    element.style.left = `${left}px`;
+    element.style.top = `${top}px`;
     this.place()?.remember();
   }
 

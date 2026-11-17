@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, ViewContainerRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { SCENE_IMAGE_EXPORTER } from '@axe/application/file/scene-image-exporter';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PartyService } from '@axe/application/party/party.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
@@ -55,19 +56,24 @@ import {
   MIN_CORRIDOR_WIDTH,
 } from '@axe/domain/tabletop/dungeon/dungeon-layout';
 import { musterCells } from '@axe/domain/tabletop/dungeon/entrance-muster';
+import { DOOR_KINDS, type DoorKind } from '@axe/domain/tabletop/dungeon/furnishing-models';
 import { MAX_DUNGEON_TRAPS } from '@axe/domain/tabletop/dungeon/trap-placing';
 import {
   clampFieldDensity,
+  clampFieldRelief,
   clampFieldSize,
+  DEFAULT_FIELD_RELIEF,
   FIELD_ATMOSPHERE_IDS,
   fieldAtmosphereById,
   FieldAtmosphereId,
   MAX_FIELD_DENSITY,
+  MAX_FIELD_RELIEF,
   MAX_FIELD_SIZE,
   MIN_FIELD_DENSITY,
   MIN_FIELD_SIZE,
 } from '@axe/domain/tabletop/field/field-atmosphere';
 import { FieldPlan, planField } from '@axe/domain/tabletop/field/field-generator';
+import { FIELD_SEASONS, type FieldSeason } from '@axe/domain/tabletop/field/field-models';
 import { GridType } from '@axe/domain/tabletop/game-table';
 import { GameTable } from '@axe/domain/tabletop/game-table';
 import { MAP_HEAVY_TERRAINS, MAP_MAX_TERRAINS, syncObjectCount } from '@axe/domain/tabletop/map-blocks';
@@ -77,7 +83,6 @@ import { withFieldMaterials } from '@axe/features/dungeon-generator/field-materi
 import { describeField } from '@axe/features/dungeon-generator/field-notes';
 import { buildGroundScene } from '@axe/features/dungeon-generator/ground-scene';
 import { buildMapPreview, previewColors } from '@axe/features/dungeon-generator/map-preview';
-import { exportSceneToBlob } from '@axe/infrastructure/map-editor/export-image';
 import { TranslocoModule } from '@jsverse/transloco';
 
 const SEED_LIMIT = 2 ** 31;
@@ -120,6 +125,7 @@ export class DungeonGeneratorComponent {
   protected readonly maxFieldSize = MAX_FIELD_SIZE;
   protected readonly minDensity = MIN_FIELD_DENSITY;
   protected readonly maxDensity = MAX_FIELD_DENSITY;
+  protected readonly maxRelief = MAX_FIELD_RELIEF;
   protected readonly minWallHeight = MIN_WALL_HEIGHT;
   protected readonly maxWallHeight = MAX_WALL_HEIGHT;
   protected readonly minCorridorWidth = MIN_CORRIDOR_WIDTH;
@@ -135,6 +141,18 @@ export class DungeonGeneratorComponent {
   protected readonly fieldAtmosphere = signal<FieldAtmosphereId>('woodland');
   protected readonly fieldSize = signal(40);
   protected readonly fieldDensity = signal(50);
+  /** How high the ground of open country is raised, in cells; a town is never raised. */
+  protected readonly fieldRelief = signal(DEFAULT_FIELD_RELIEF);
+  protected readonly fieldRaises = computed(() => !fieldAtmosphereById(this.fieldAtmosphere()).town);
+  /**
+   * Whether the trees, bushes and rocks of open country and the furniture of a dungeon are stood as the
+   * bundled 3D models, as a table drawn on a canvas draws them; a seat whose table the page draws
+   * itself builds them of blocks.
+   */
+  protected readonly models = signal(true);
+  protected readonly fieldSeasons = FIELD_SEASONS;
+  /** The season the trees of open country are grown in; none in particular grows them as in summer. */
+  protected readonly fieldSeason = signal<FieldSeason>('');
   protected readonly roomCount = signal(8);
   protected readonly trapCount = signal(0);
   protected readonly seed = signal(Math.floor(Math.random() * SEED_LIMIT));
@@ -148,6 +166,9 @@ export class DungeonGeneratorComponent {
   private readonly floorOverride = signal<DungeonMaterial | null>(null);
   private readonly heightOverride = signal<number | null>(null);
   private readonly entranceOverride = signal<DungeonEntranceStyle | null>(null);
+  /** The kind of door hung in every doorway, or null for the one the place hangs. */
+  protected readonly doorKind = signal<DoorKind | null>(null);
+  protected readonly doorKinds = DOOR_KINDS;
   private readonly corridorOverride = signal<CorridorWidths | null>(null);
   private readonly doorOverride = signal<DoorWidths | null>(null);
   private readonly doubleDoorOverride = signal<number | null>(null);
@@ -202,6 +223,7 @@ export class DungeonGeneratorComponent {
       this.floorOverride() === null &&
       this.heightOverride() === null &&
       this.entranceOverride() === null &&
+      this.doorKind() === null &&
       this.corridorOverride() === null &&
       this.doorOverride() === null &&
       this.doubleDoorOverride() === null
@@ -231,7 +253,13 @@ export class DungeonGeneratorComponent {
         trapCount: this.trapCount(),
         gridType: this.gridType(),
       },
-      { placeDoors: this.placeDoors(), placeStairs: this.placeStairs(), sheerWalls: this.sheerWalls() }
+      {
+        placeDoors: this.placeDoors(),
+        placeStairs: this.placeStairs(),
+        sheerWalls: this.sheerWalls(),
+        models: this.models(),
+        ...(this.doorKind() ? { door: this.doorKind()! } : {}),
+      }
     )
   );
 
@@ -243,6 +271,9 @@ export class DungeonGeneratorComponent {
       density: this.fieldDensity(),
       seed: this.seed(),
       gridType: this.gridType(),
+      relief: this.fieldRelief(),
+      models: this.models(),
+      season: this.fieldSeason(),
     })
   );
 
@@ -259,7 +290,7 @@ export class DungeonGeneratorComponent {
   protected readonly tooMany = computed(() => this.terrainCount() > MAP_MAX_TERRAINS);
   protected readonly heavy = computed(() => this.terrainCount() > MAP_HEAVY_TERRAINS && !this.tooMany());
 
-  private readonly exportFn = exportSceneToBlob;
+  private readonly exportScene = inject(SCENE_IMAGE_EXPORTER);
 
   protected readonly preview = computed(() => {
     const wall = this.wall();
@@ -300,6 +331,10 @@ export class DungeonGeneratorComponent {
 
   protected setFieldDensity(density: number): void {
     this.fieldDensity.set(clampFieldDensity(density));
+  }
+
+  protected setFieldRelief(relief: number): void {
+    this.fieldRelief.set(clampFieldRelief(relief));
   }
 
   protected setWall(material: DungeonMaterial): void {
@@ -357,6 +392,7 @@ export class DungeonGeneratorComponent {
     this.floorOverride.set(null);
     this.heightOverride.set(null);
     this.entranceOverride.set(null);
+    this.doorKind.set(null);
     this.corridorOverride.set(null);
     this.doorOverride.set(null);
     this.doubleDoorOverride.set(null);
@@ -405,6 +441,8 @@ export class DungeonGeneratorComponent {
           gridType: this.gridType(),
           fogEnabled: this.fogEnabled(),
           muster: this.musterStands(plan),
+          ground: this.field() ? (plan as FieldPlan).layout.relief : null,
+          skyKind: this.field() ? 'clock' : '',
         },
         // A map with nothing standing on it is finished the moment it starts, not NaN done.
         (done, total) => this.progress.set(total > 0 ? Math.round((done / total) * 100) : 100)
@@ -453,7 +491,7 @@ export class DungeonGeneratorComponent {
       this.gridType()
     );
     try {
-      const blob = await this.exportFn(scene, [], {
+      const blob = await this.exportScene(scene, [], {
         drawGrid: false,
         resolveImageUrl: (id) => this.imageStorage.get(id)?.url ?? null,
       });

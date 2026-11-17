@@ -1,3 +1,4 @@
+import { clamp } from '@axe/core/util/clamp';
 export type MultiAngleSeatKey = 'down' | 'left' | 'up' | 'right';
 export type MultiAngleMotionMode = 'continuous' | 'quarter-turn' | 'piece-quarter-turn';
 export type MultiAngleOrbitMode = Exclude<MultiAngleMotionMode, 'piece-quarter-turn'>;
@@ -57,7 +58,7 @@ export function multiAnglePieceMotionMode(mode: MultiAngleMotionMode): MultiAngl
 }
 
 function finiteInRange(value: number, fallback: number, min: number, max: number): number {
-  return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+  return Number.isFinite(value) ? clamp(value, min, max) : fallback;
 }
 
 function percentage(value: number, total: number): string {
@@ -87,6 +88,31 @@ export function multiAngleOrbitAnimation(
     stops.push(`${progress} ${percentage(pauseEnd, durationSeconds)}`);
   }
   return { durationSeconds, timingFunction: `linear(${stops.join(', ')})` };
+}
+
+/**
+ * How far round a piece turning on its own has come at a moment, in degrees, as the page turns it
+ * with the animation `multiAngleOrbitAnimation` describes: a share of a turn a phase ahead, all the
+ * way round evenly, or a quarter at a time with a pause after each.
+ */
+export function multiAngleTurnAt(
+  mode: MultiAngleOrbitMode,
+  revolutionSeconds: number,
+  pauseSeconds: number,
+  phase: number,
+  atSeconds: number
+): number {
+  const { durationSeconds } = multiAngleOrbitAnimation(mode, revolutionSeconds, pauseSeconds);
+  const share = (((atSeconds / durationSeconds + phase) % 1) + 1) % 1;
+  if (durationSeconds === finiteInRange(revolutionSeconds, DEFAULT_MULTI_ANGLE_REVOLUTION_SECONDS, 1, 120)) {
+    return share * 360;
+  }
+  const turn = finiteInRange(revolutionSeconds, DEFAULT_MULTI_ANGLE_REVOLUTION_SECONDS, 1, 120) / 4;
+  const pause = (durationSeconds - turn * 4) / 4;
+  const at = share * durationSeconds;
+  const quarter = Math.min(3, Math.floor(at / (turn + pause)));
+  const into = at - quarter * (turn + pause);
+  return (quarter + Math.min(1, into / turn)) * 90;
 }
 
 /** A deterministic pseudo-random phase, so every peer sees each piece at the same angle. */

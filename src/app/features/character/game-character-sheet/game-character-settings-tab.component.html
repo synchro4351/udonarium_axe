@@ -216,13 +216,23 @@
           'feature.inventory.settingsTab.showShadow' | transloco
         }}
       </label>
-      <label
-        class="text-ui-muted inline-flex cursor-pointer items-center gap-1.25 text-[0.82em] select-none [&_input[type=checkbox]]:cursor-pointer [&_input[type=checkbox]]:[accent-color:var(--ui-accent)]"
-      >
-        <input type="checkbox" [(ngModel)]="character().hideName" />{{
-          'feature.inventory.settingsTab.hideName' | transloco
-        }}
-      </label>
+      @if (canHideName()) {
+        <label
+          class="text-ui-muted inline-flex cursor-pointer items-center gap-1.25 text-[0.82em] select-none [&_input[type=checkbox]]:cursor-pointer [&_input[type=checkbox]]:[accent-color:var(--ui-accent)]"
+        >
+          <input type="checkbox" [(ngModel)]="character().hideName" />{{
+            'feature.inventory.settingsTab.hideName' | transloco
+          }}
+        </label>
+      } @else if (character().hideName) {
+        <label
+          class="text-ui-dim inline-flex cursor-default items-center gap-1.25 text-[0.82em] select-none [&_input[type=checkbox]]:[accent-color:var(--ui-accent)]"
+          data-testid="settings-hide-name-gm-only"
+        >
+          <input type="checkbox" checked disabled />{{ 'feature.inventory.settingsTab.hideName' | transloco
+          }}{{ 'feature.character.contextMenu.hideNameGmOnly' | transloco }}
+        </label>
+      }
       <label
         class="text-ui-muted inline-flex cursor-pointer items-center gap-1.25 text-[0.82em] select-none [&_input[type=checkbox]]:cursor-pointer [&_input[type=checkbox]]:[accent-color:var(--ui-accent)]"
       >
@@ -308,6 +318,15 @@
         {{ 'feature.inventory.settingsTab.reset' | transloco }}
       </button>
     </div>
+  </div>
+
+  <div class="bg-ui-elevated border-ui-border-panel flex flex-col gap-1.5 rounded-sm border border-solid px-3 py-2.5">
+    <div
+      class="border-ui-border-panel text-ui-accent mt-0 mb-2 flex items-center gap-1.25 border-b border-solid pb-1.25 text-[0.72em] font-semibold tracking-[0.06em] uppercase [&_.material-icons]:text-[14px]!"
+    >
+      <i class="material-icons">view_in_ar</i>{{ 'ui.pieceModel.model' | transloco }}
+    </div>
+    <piece-model-fields [target]="character()" />
   </div>
 
   @if (legacyCheckTableCount() > 0) {

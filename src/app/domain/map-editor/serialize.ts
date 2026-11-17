@@ -1,3 +1,4 @@
+import { clamp } from '@axe/core/util/clamp';
 import { MAP_FUNCTION_ROLES, MapFunctionRole, sanitizeFunctionLayerLook } from '@axe/domain/map-editor/function-layer';
 import {
   DEFAULT_SCENE_BACKGROUND,
@@ -15,6 +16,7 @@ import {
 } from '@axe/domain/map-editor/scene';
 import { normalizeTextureId } from '@axe/domain/map-editor/textures';
 import { GridType } from '@axe/domain/tabletop/game-table';
+import { decodeGroundHeights, decodeGroundPaint } from '@axe/domain/tabletop/ground/ground-chunk-data';
 
 /**
  * The JSON text of a scene, stamped with the current scene version, as map files and whiteboards
@@ -32,7 +34,7 @@ function isPositiveFiniteNumber(v: unknown): v is number {
   return isFiniteNumber(v) && (v as number) > 0;
 }
 
-const VALID_KINDS = new Set(['cell', 'shape', 'stamp', 'freehand', 'text', 'image', 'function']);
+const VALID_KINDS = new Set(['cell', 'shape', 'stamp', 'freehand', 'text', 'image', 'function', 'relief']);
 
 const VALID_DASHES = new Set<StrokeDash>(['solid', 'dashed', 'dotted', 'dashdot', 'longdash']);
 
@@ -78,37 +80,60 @@ function sanitizeFill(value: unknown): FillStyle | null {
   return null;
 }
 
+/** The numbers of a list of coordinates; a list with anything else in it, or no list, is empty. */
+function sanitizePoints(value: unknown): number[] {
+  return Array.isArray(value) && value.every(isFiniteNumber) ? (value as number[]) : [];
+}
+
+function sanitizeStroke(value: unknown): StrokeStyle | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const stroke: StrokeStyle = {
+    color: typeof v['color'] === 'string' ? v['color'] : '#000000',
+    width: isFiniteNumber(v['width']) ? v['width'] : 1,
+  };
+  const dash = sanitizeDash(v['dash']);
+  if (dash) stroke.dash = dash;
+  if ('fill' in v) stroke.fill = v['fill'] == null ? null : sanitizeFill(v['fill']);
+  return stroke;
+}
+
 function sanitizeShapeItem(raw: unknown): ShapeItem | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
-  if (!VALID_SHAPE_KINDS.has(r['shape'] as ShapeItem['shape'])) return null;
-  const item = { ...r } as unknown as ShapeItem;
-  if (r['stroke'] && typeof r['stroke'] === 'object') {
-    const rawStroke = r['stroke'] as Record<string, unknown>;
-    const stroke = { ...rawStroke } as unknown as StrokeStyle;
-    const dash = sanitizeDash(rawStroke['dash']);
-    if (dash) stroke.dash = dash;
-    else delete stroke.dash;
-    if ('fill' in rawStroke) {
-      stroke.fill = rawStroke['fill'] == null ? null : sanitizeFill(rawStroke['fill']);
-    }
-    item.stroke = stroke;
-  }
-  if ('shadow' in r) {
-    item.shadow = r['shadow'] == null ? null : sanitizeShadow(r['shadow']);
-  }
+  const shape = r['shape'] as ShapeItem['shape'];
+  if (!VALID_SHAPE_KINDS.has(shape)) return null;
+  const item: ShapeItem = {
+    id: String(r['id'] ?? ''),
+    shape,
+    points: sanitizePoints(r['points']),
+    fill: r['fill'] == null ? null : sanitizeFill(r['fill']),
+    stroke: sanitizeStroke(r['stroke']),
+    rotation: isFiniteNumber(r['rotation']) ? r['rotation'] : 0,
+  };
+  if ('shadow' in r) item.shadow = r['shadow'] == null ? null : sanitizeShadow(r['shadow']);
   return item;
 }
 
 function sanitizeImageItem(raw: unknown): ImageItem | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
-  const item = { ...r } as unknown as ImageItem;
+  const number = (key: string, miss: number): number => (isFiniteNumber(r[key]) ? r[key] : miss);
+  const item: ImageItem = {
+    id: String(r['id'] ?? ''),
+    imageIdentifier: typeof r['imageIdentifier'] === 'string' ? r['imageIdentifier'] : '',
+    x: number('x', 0),
+    y: number('y', 0),
+    w: number('w', 0),
+    h: number('h', 0),
+    rotation: number('rotation', 0),
+    opacity: number('opacity', 1),
+  };
   if ('clipToCells' in r) item.clipToCells = r['clipToCells'] === true;
   if ('flipX' in r) item.flipX = r['flipX'] === true;
   if ('flipY' in r) item.flipY = r['flipY'] === true;
-  item.crop = sanitizeCrop(r['crop']);
-  if (!item.crop) delete item.crop;
+  const crop = sanitizeCrop(r['crop']);
+  if (crop) item.crop = crop;
   return item;
 }
 
@@ -172,6 +197,20 @@ function sanitizeFunctionCells(value: unknown): Record<string, true> {
   return cells;
 }
 
+/**
+ * The chunks of a relief layer that read as chunks: a place of two whole numbers, and text that
+ * decodes as what the chunk keeps, its heights or its paint.
+ */
+function sanitizeReliefChunks(value: unknown, decodes: (text: string) => unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const chunks: Record<string, string> = {};
+  for (const [key, held] of Object.entries(value as Record<string, unknown>)) {
+    if (!/^\d+,\d+$/.test(key) || typeof held !== 'string' || !decodes(held)) continue;
+    chunks[key] = held;
+  }
+  return chunks;
+}
+
 function sanitizeLayer(raw: Record<string, unknown>): MapLayer {
   const base = {
     id: String(raw['id'] ?? ''),
@@ -179,7 +218,7 @@ function sanitizeLayer(raw: Record<string, unknown>): MapLayer {
     name: String(raw['name'] ?? ''),
     visible: raw['visible'] !== false,
     locked: raw['locked'] === true,
-    opacity: Math.max(0, Math.min(1, isFiniteNumber(raw['opacity']) ? (raw['opacity'] as number) : 1)),
+    opacity: clamp(isFiniteNumber(raw['opacity']) ? (raw['opacity'] as number) : 1, 0, 1),
     group: typeof raw['group'] === 'string' && raw['group'] ? (raw['group'] as string) : undefined,
   };
 
@@ -202,6 +241,13 @@ function sanitizeLayer(raw: Record<string, unknown>): MapLayer {
         spec: look.spec,
       };
     }
+    case 'relief':
+      return {
+        ...base,
+        kind: 'relief',
+        chunks: sanitizeReliefChunks(raw['chunks'], decodeGroundHeights),
+        paint: sanitizeReliefChunks(raw['paint'], decodeGroundPaint),
+      };
     case 'shape':
       return {
         ...base,
@@ -268,6 +314,7 @@ export function deserializeScene(json: string): MapScene | null {
     layers: rawLayers.map((l) => sanitizeLayer(l as Record<string, unknown>)),
     guides: sanitizeGuides(raw['guides']),
     paintedRoles: sanitizePaintedRoles(raw['paintedRoles']),
+    paintedRelief: raw['paintedRelief'] === true ? true : undefined,
   };
 }
 

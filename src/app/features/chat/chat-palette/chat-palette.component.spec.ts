@@ -2,11 +2,11 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CharacterMacroService } from '@axe/application/chat/character-macro.service';
 import { ChatLintService } from '@axe/application/chat/chat-lint.service';
 import { ChatPreferencesService } from '@axe/application/chat/chat-preferences.service';
+import { DisclosureService } from '@axe/application/permission/disclosure.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { PanelService } from '@axe/application/ui/panel.service';
-import { UiSignalService } from '@axe/application/ui/ui-signal.service';
 import { childrenChanged$ } from '@axe/core/sync/object-event-extension';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
@@ -61,6 +61,46 @@ describe('ChatPaletteComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('titles itself by the name the reader is shown, so a hidden name stays hidden', () => {
+    vi.spyOn(TestBed.inject(RolePermissionService), 'canSeeHidden').mockReturnValue(false);
+    const villain = createChar('黒幕');
+    villain.hideName = true;
+    component.character.set(villain);
+
+    component.updatePanelTitle();
+
+    const title = TestBed.inject(PanelService).title;
+    expect(title).toContain('？？？');
+    expect(title).not.toContain('黒幕');
+  });
+
+  it('names the piece anew in its title once its name is hidden while the palette is open', async () => {
+    vi.spyOn(TestBed.inject(RolePermissionService), 'canSeeHidden').mockReturnValue(false);
+    const villain = createChar('黒幕');
+    component.character.set(villain);
+    TestBed.tick();
+    const panel = TestBed.inject(PanelService);
+    expect(panel.title).toContain('黒幕');
+
+    villain.hideName = true;
+    await Promise.resolve();
+    TestBed.tick();
+
+    expect(panel.title).toContain('？？？');
+    expect(panel.title).not.toContain('黒幕');
+  });
+
+  it('does not switch to a character whose contents this seat may not view', () => {
+    const open = createChar('勇者');
+    const kept = createChar('秘密の魔物');
+    vi.spyOn(TestBed.inject(DisclosureService), 'canView').mockImplementation((character) => character !== kept);
+    component.onSelectedCharacter(open.identifier);
+
+    component.onSelectedCharacter(kept.identifier);
+
+    expect(component.character()).toBe(open);
+  });
+
   it('lets the panel take the pointer again once the drag ends', async () => {
     await expectPanelDragRecovery(ChatPaletteComponent, {
       beforeOpen: () => {
@@ -74,21 +114,21 @@ describe('ChatPaletteComponent', () => {
     });
   });
 
-  describe('chatTabsVersion signal', () => {
+  describe('visibleChatTabs signal', () => {
     it('exposes the tab version as a computed signal', () => {
-      expect(typeof component.chatTabsVersion).toBe('function');
+      expect(typeof component.visibleChatTabs).toBe('function');
     });
 
     it('returns the tabs from it', () => {
       fixture.detectChanges();
-      const tabs = component.chatTabsVersion();
+      const tabs = component.visibleChatTabs();
       expect(Array.isArray(tabs)).toBe(true);
     });
 
     it('bumps the version when the children change', () => {
       fixture.detectChanges();
       const objectChange = TestBed.inject(ObjectChangeService);
-      const tabs = component.chatTabsVersion();
+      const tabs = component.visibleChatTabs();
       if (tabs.length === 0) return;
 
       const tabId = tabs[0].identifier;
@@ -97,6 +137,42 @@ describe('ChatPaletteComponent', () => {
       childrenChanged$.emit({ identifier: tabId });
 
       expect(objectChange.versionOf(tabId)()).toBe(before + 1);
+    });
+  });
+
+  describe('clicking a palette line', () => {
+    it('sends a line clicked twice within 400 ms, even right after another line was clicked', () => {
+      vi.useFakeTimers();
+      try {
+        const send = vi.spyOn(component.chatInputComponent(), 'sendChat').mockImplementation(() => undefined);
+
+        component.clickPalette('2d6 攻撃');
+        vi.advanceTimersByTime(300);
+        component.clickPalette('2d6+2 回避');
+        vi.advanceTimersByTime(150);
+        component.clickPalette('2d6+2 回避');
+
+        expect(component.text()).toBe('2d6+2 回避');
+        expect(send).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('puts a line clicked again after 400 ms into the input without sending it', () => {
+      vi.useFakeTimers();
+      try {
+        const send = vi.spyOn(component.chatInputComponent(), 'sendChat').mockImplementation(() => undefined);
+
+        component.clickPalette('2d6+2 回避');
+        vi.advanceTimersByTime(401);
+        component.clickPalette('2d6+2 回避');
+
+        expect(component.text()).toBe('2d6+2 回避');
+        expect(send).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -179,6 +255,29 @@ describe('ChatPaletteComponent', () => {
       expect(stamp).not.toHaveBeenCalled();
       expect(macro).toHaveBeenCalledWith(speaker, '2d6 いくぞ', expect.objectContaining({ stamp: crit }));
     });
+  });
+
+  it('sends a line with the number to beat the reader picked for it, through the macros', () => {
+    const speaker = createChar('術者');
+    const tab = ChatTabList.instance.addChatTab('テストタブ');
+    component.character.set(speaker);
+    component.chatTabidentifier.set(tab.identifier);
+    const macro = vi.spyOn(TestBed.inject(CharacterMacroService), 'send').mockReturnValue(null);
+
+    component.sendChat({
+      text: '2d6+3>={目標値} 抵抗',
+      gameSystem: null,
+      sendFrom: speaker.identifier,
+      sendTo: '',
+      portraitIndex: 0,
+      messColor: '#112233',
+      replyTo: '',
+      quoteOf: '',
+      toTicker: false,
+      targetNumber: 15,
+    });
+
+    expect(macro).toHaveBeenCalledWith(speaker, '2d6+3>={目標値} 抵抗', expect.objectContaining({ targetNumber: 15 }));
   });
 
   describe('sending a line to the ticker', () => {
@@ -347,6 +446,21 @@ describe('ChatPaletteComponent', () => {
     });
   });
 
+  it('uses the number to beat where any of its lines holds one, a variable or a line under another tab among them', () => {
+    const speaker = createChar('術者');
+    speaker.chatPalette!.setPalette('2d6+3 攻撃\n◆◆抵抗\n2d6+{生命抵抗} 生命抵抗');
+    component.character.set(speaker);
+    expect(component.usesTargetNumber()).toBe(false);
+
+    speaker.chatPalette!.setPalette('//抵抗=2d6>={目標値}\n2d6+3 攻撃');
+    TestBed.inject(ObjectChangeService).notifyChanged(speaker.chatPalette!.identifier);
+    expect(component.usesTargetNumber()).toBe(true);
+
+    speaker.chatPalette!.setPalette('2d6+3 攻撃\n◆◆抵抗\n2d6>={目標値} 生命抵抗');
+    TestBed.inject(ObjectChangeService).notifyChanged(speaker.chatPalette!.identifier);
+    expect(component.usesTargetNumber()).toBe(true);
+  });
+
   describe('a palette parted into tabs', () => {
     function speakerWithTabs(name = '術者'): GameCharacter {
       const speaker = createChar(name);
@@ -377,11 +491,26 @@ describe('ChatPaletteComponent', () => {
       expect(component.paletteHeadings().map((row) => row.headingName)).toEqual(['攻撃']);
     });
 
+    it('jumps to the heading picked from the headings menu', () => {
+      speakerWithTabs();
+      fixture.detectChanges();
+      tabs()[1].click();
+      fixture.detectChanges();
+      const open = vi.spyOn(TestBed.inject(ContextMenuService), 'open').mockImplementation(() => undefined);
+
+      component.indexBtn();
+
+      const headings = open.mock.calls[0][1];
+      expect(headings.map((heading) => heading.name)).toEqual(['攻撃']);
+      expect(headings[0].line).toBe(component.paletteHeadings()[0].lineIndex);
+      headings[0].action!();
+      expect(component.selectedLine()).toBe(headings[0].line);
+    });
+
     it('lets another tab be opened after a jump to a heading in one', () => {
       speakerWithTabs();
       fixture.detectChanges();
-      const id = (component as unknown as { _timeId: string })._timeId;
-      TestBed.inject(UiSignalService).requestJumpIndex(id, 2);
+      component.japmIndex(2);
       TestBed.tick();
       fixture.detectChanges();
       expect(tabs()[1].getAttribute('aria-selected')).toBe('true');
@@ -497,6 +626,29 @@ describe('ChatPaletteComponent', () => {
 
       expect(shown<HTMLSelectElement>('palette-headings-list')?.disabled).toBe(true);
     });
+  });
+
+  it('turns to the character data from its button, and back to the palette from the one offered there', () => {
+    const speaker = createChar('術者');
+    speaker.chatPalette!.setPalette('2d6+3 攻撃');
+    component.character.set(speaker);
+    fixture.detectChanges();
+    const buttonSaying = (words: string) =>
+      [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find((button) =>
+        button.textContent?.includes(words)
+      ) ?? null;
+    expect(buttonSaying('パレットに戻る')).toBeNull();
+
+    buttonSaying('キャラ情報')!.click();
+    fixture.detectChanges();
+
+    expect(component.viewMode()).toBe('character');
+    expect(buttonSaying('キャラ情報')).toBeNull();
+
+    buttonSaying('パレットに戻る')!.click();
+    fixture.detectChanges();
+
+    expect(component.viewMode()).toBe('palette');
   });
 
   describe('the tabs lines are sent to', () => {

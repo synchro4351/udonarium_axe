@@ -1,5 +1,4 @@
-import { EffectParticleLayer } from '@axe/domain/effect/effect-particles';
-import { EffectSprite, Point3 } from '@axe/domain/effect/effect-timeline';
+import { EffectSprite } from '@axe/domain/effect/effect-timeline';
 import { ViewRotation } from '@axe/domain/effect/effect-view';
 
 /**
@@ -21,18 +20,9 @@ export interface EffectViewpoint {
   flatRisePx: number;
 }
 
-/** A canvas of glowing particles placed on the board, facing the camera. */
-export interface EffectCanvasPlacement {
-  key: string;
-  layer: EffectParticleLayer;
-  transform: string;
-  width: number;
-  height: number;
-}
-
 /** Whether a sprite has an inner layer to carry its look and its animation. */
 export function hasEffectPaintLayer(sprite: EffectSprite): boolean {
-  return sprite.animation.length > 0 || sprite.svg.length > 0;
+  return sprite.animation.length > 0;
 }
 
 /** The outer layer of a sprite, which only places it in space and fades it out. */
@@ -58,34 +48,6 @@ export function effectPaintStyle(sprite: EffectSprite): Record<string, string> {
   if (sprite.animation.length > 0) style['animation'] = sprite.animation;
   style['transform-origin'] = sprite.origin.length > 0 ? sprite.origin : '50% 50%';
   return style;
-}
-
-/** Where a canvas of particles stands, sized to its layer. */
-export function effectCanvasStyle(placement: EffectCanvasPlacement): Record<string, string> {
-  return {
-    position: 'absolute',
-    left: '0px',
-    top: '0px',
-    width: placement.width + 'px',
-    height: placement.height + 'px',
-    'transform-origin': '0 0',
-    transform: placement.transform,
-    'pointer-events': 'none',
-  };
-}
-
-/** Stands a layer of particles at a point on the board, facing the camera, its origin on the point. */
-export function effectBillboardTransform(
-  center: Point3,
-  layer: EffectParticleLayer,
-  viewpoint: EffectViewpoint
-): string {
-  const rotation = viewpoint.rotation;
-  return (
-    `translate3d(${center.x}px, ${center.y}px, ${center.z + viewpoint.risePx}px)` +
-    ` rotateZ(${-(rotation?.z ?? 10)}deg) rotateX(${-(rotation?.x ?? 50)}deg) rotateY(${-(rotation?.y ?? 0)}deg)` +
-    ` translateZ(${viewpoint.liftPx}px) translate(${-layer.originX}px, ${-layer.originY}px)`
-  );
 }
 
 function effectSpriteTransform(sprite: EffectSprite, viewpoint: EffectViewpoint): string {
@@ -116,19 +78,6 @@ function effectPaint(sprite: EffectSprite): Record<string, string> {
   if (sprite.background.length > 0) style['background'] = sprite.background;
   if (sprite.borderRadius.length > 0) style['border-radius'] = sprite.borderRadius;
   if (sprite.clipPath.length > 0) style['clip-path'] = sprite.clipPath;
-  if (sprite.shadow.length > 0) {
-    // A drawing does not always fill its element, so a box shadow lights the box rather than
-    // the picture and shows a square edge. A drop shadow follows the outline instead.
-    if (sprite.svg.length > 0) style['filter'] = dropShadowOf(sprite.shadow);
-    else style['box-shadow'] = sprite.shadow;
-  }
+  if (sprite.shadow.length > 0) style['box-shadow'] = sprite.shadow;
   return style;
-}
-
-/** Reads a box shadow as a drop shadow of the same spread. */
-function dropShadowOf(shadow: string): string {
-  return shadow
-    .split(', ')
-    .map((layer) => `drop-shadow(${layer})`)
-    .join(' ');
 }

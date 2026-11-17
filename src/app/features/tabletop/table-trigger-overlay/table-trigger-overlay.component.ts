@@ -3,10 +3,11 @@ import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { TableTriggerService } from '@axe/application/tabletop/table-trigger.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { CellBits } from '@axe/domain/tabletop/fog/cell-bits';
-import { cellCenterOf, CellGrid, cellGridOf, cellIndexOf, gridExtentPx } from '@axe/domain/tabletop/fog/cell-grid';
+import { cellCenterOf, CellGrid, cellGridOf, cellIndexOf } from '@axe/domain/tabletop/fog/cell-grid';
 import { triggerEffectLine } from '@axe/domain/tabletop/table-trigger';
-import { moveRangePolygons } from '@axe/features/tabletop/table-move-range-overlay/move-range-render';
-import { overlayScale } from '@axe/infrastructure/tabletop/vision/vision-overlay-render';
+import { cellAreaPath } from '@axe/features/tabletop/table-move-range-overlay/move-range-render';
+import { fitCanvasToGrid } from '@axe/ui/tabletop/fit-canvas-to-grid';
+import { laidOnCanvasFloor } from '@axe/ui/tabletop/laid-on-canvas-floor';
 import { translateZCss, Z_OFFSET_MASK_PX } from '@axe/ui/tabletop/z-offset';
 
 /** One piece of ground to draw, and how it is to be drawn. */
@@ -43,6 +44,11 @@ export class TableTriggerOverlayComponent {
   private readonly t = inject(TRANSLATE_FN);
   private readonly tabletopService = inject(TabletopService);
   private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('triggerCanvas');
+  private readonly painted = laidOnCanvasFloor({
+    id: () => 'trigger',
+    canvas: () => this.canvasRef()?.nativeElement,
+    heightPx: () => Z_OFFSET_MASK_PX,
+  });
 
   protected readonly zTransform = computed(() => translateZCss(Z_OFFSET_MASK_PX));
 
@@ -102,6 +108,7 @@ export class TableTriggerOverlayComponent {
       const canvas = this.canvasRef()?.nativeElement;
       if (!grid || !canvas || patches.length < 1) return;
       this.paint(canvas, grid, patches);
+      this.painted();
     });
   }
 
@@ -132,31 +139,11 @@ export class TableTriggerOverlayComponent {
   }
 
   private paint(canvas: HTMLCanvasElement, grid: CellGrid, patches: readonly TriggerPatch[]): void {
-    const extent = gridExtentPx(grid);
-    const width = Math.max(1, Math.ceil(extent.maxX - extent.minX));
-    const height = Math.max(1, Math.ceil(extent.maxY - extent.minY));
-    const scale = overlayScale(width, height);
-    const pixelWidth = Math.max(1, Math.ceil(width * scale));
-    const pixelHeight = Math.max(1, Math.ceil(height * scale));
-    if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
-    if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
-    canvas.style.left = extent.minX + 'px';
-    canvas.style.top = extent.minY + 'px';
-    canvas.style.width = width + 'px';
-    canvas.style.height = height + 'px';
-
-    const context = canvas.getContext('2d');
+    const context = fitCanvasToGrid(canvas, grid);
     if (!context) return;
-    context.setTransform(scale, 0, 0, scale, -extent.minX * scale, -extent.minY * scale);
-    context.clearRect(extent.minX, extent.minY, width, height);
 
     for (const patch of patches) {
-      const area = new Path2D();
-      for (const polygon of moveRangePolygons(grid, patch.cells)) {
-        area.moveTo(polygon[0].x, polygon[0].y);
-        for (let corner = 1; corner < polygon.length; corner++) area.lineTo(polygon[corner].x, polygon[corner].y);
-        area.closePath();
-      }
+      const area = cellAreaPath(grid, patch.cells);
       context.globalAlpha = patch.spent ? SPENT_ALPHA : patch.hidden ? HIDDEN_ALPHA : SHOWN_ALPHA;
       context.fillStyle = patch.color;
       context.fill(area);

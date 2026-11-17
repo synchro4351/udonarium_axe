@@ -33,7 +33,20 @@ export interface ChatMessageMenuState {
   isTouch: boolean;
   /** Whether the browser can read the line aloud to the reader. */
   canRead: boolean;
+  /**
+   * Whether the reader may set the line as its tab's number to beat, as a roll it is (`pin`) or as a
+   * line writing one out (`pinPresented`), or take it off as that; null where neither, as for a line
+   * that comes to no number or a reader who may not.
+   */
+  targetNumberPin: 'pin' | 'pinPresented' | 'unpin' | null;
 }
+
+/** The entry setting a line as its tab's number to beat, or taking it off, by what it does. */
+export const TARGET_NUMBER_PIN_KEYS: Readonly<Record<NonNullable<ChatMessageMenuState['targetNumberPin']>, string>> = {
+  pin: 'pinTargetNumber',
+  pinPresented: 'pinPresentedTargetNumber',
+  unpin: 'unpinTargetNumber',
+};
 
 export interface ChatMessageMenuCallbacks {
   reply: () => void;
@@ -52,6 +65,7 @@ export interface ChatMessageMenuCallbacks {
   copyText: (text: string) => void;
   selectText: () => void;
   read: () => void;
+  toggleTargetNumberPin: () => void;
 }
 
 /**
@@ -90,6 +104,13 @@ export function buildChatMessageContextMenu(
   }
   // A touch screen has no toolbar over the line, so reading it aloud is offered here as well.
   if (state.canRead) words.push({ name: t('feature.chat.speech.read'), action: () => callbacks.read() });
+
+  if (state.targetNumberPin) {
+    answer.push({
+      name: t(`feature.chat.message.${TARGET_NUMBER_PIN_KEYS[state.targetNumberPin]}`),
+      action: () => callbacks.toggleTargetNumberPin(),
+    });
+  }
 
   const keep: ContextMenuAction[] = [...buildChatBookmarkMenu(state.bookmarkKinds, callbacks.toggleBookmark, t)];
   if (state.canInteract && state.canShareAsMemo) {

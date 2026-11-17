@@ -1,5 +1,6 @@
 import { sampleCurvePoints } from '@axe/domain/map-editor/curve-geometry';
 import { DEFAULT_FUNCTION_SPEC } from '@axe/domain/map-editor/function-layer';
+import { sceneReliefChunks } from '@axe/domain/map-editor/relief';
 import {
   CellLayer,
   DEFAULT_SCENE_BACKGROUND,
@@ -13,6 +14,7 @@ import {
   TextLayer,
 } from '@axe/domain/map-editor/scene';
 import { GridType } from '@axe/domain/tabletop/game-table';
+import { groundSurfaceOf } from '@axe/domain/tabletop/ground/ground-surface';
 import { MapEditorState } from '@axe/features/map-editor/editor/map-editor-state';
 
 describe('MapEditorState', () => {
@@ -48,7 +50,6 @@ describe('MapEditorState', () => {
   });
 
   it('undoes a whole painting gesture in one step', () => {
-    state.beginGesture();
     state.paintCell(0, 0);
     state.paintCell(1, 0);
     state.paintCell(2, 0);
@@ -70,7 +71,6 @@ describe('MapEditorState', () => {
   });
 
   it('keeps the undo and redo flags in step as it goes back and forth', () => {
-    state.beginGesture();
     state.paintCell(0, 0);
     state.endGesture();
     expect(state.canUndo()).toBe(true);
@@ -87,7 +87,6 @@ describe('MapEditorState', () => {
   });
 
   it('takes a retexture of a painted layer back on its own, without the painting with it', () => {
-    state.beginGesture();
     state.paintFunctionCell(0, 0);
     state.endGesture();
     const painted = state.current.layers[0] as FunctionLayer;
@@ -104,7 +103,6 @@ describe('MapEditorState', () => {
 
   it('names a layer it starts for a painted cell rather than calling it by its role', () => {
     state.functionRole.set('terrain');
-    state.beginGesture();
     state.paintFunctionCell(0, 0);
     state.endGesture();
 
@@ -112,8 +110,49 @@ describe('MapEditorState', () => {
     expect(state.current.layers[0].name).not.toBe('terrain');
   });
 
+  describe('the relief brush', () => {
+    function reliefHeightAt(x: number, y: number): number {
+      return groundSurfaceOf(sceneReliefChunks(state.current)).heightAt(x, y);
+    }
+
+    it('raises the ground on a relief layer of its own along a stroke, and takes the stroke back as one step', () => {
+      const cellPx = state.current.cellPx;
+      state.reliefBrush.set({ kind: 'raise', radius: 1, strength: 0.5, layer: 'grass' });
+      state.beginReliefStroke(4 * cellPx, 4 * cellPx);
+      state.dabReliefAt(5 * cellPx, 4 * cellPx);
+      state.endGesture();
+
+      expect(state.current.layers.map((layer) => layer.kind)).toEqual(['relief']);
+      expect(reliefHeightAt(4, 4)).toBe(0.5);
+      expect(reliefHeightAt(5, 4)).toBe(0.5);
+
+      state.undo();
+
+      expect(reliefHeightAt(4, 4)).toBe(0);
+    });
+
+    it('flattens the layer towards the height it stood at where the stroke began', () => {
+      const cellPx = state.current.cellPx;
+      state.reliefBrush.set({ kind: 'raise', radius: 1, strength: 1, layer: 'grass' });
+      state.beginReliefStroke(4 * cellPx, 4 * cellPx);
+      state.reliefBrush.set({ kind: 'flatten', radius: 2, strength: 1, layer: 'grass' });
+
+      state.beginReliefStroke(8 * cellPx, 4 * cellPx);
+      state.dabReliefAt(4 * cellPx, 4 * cellPx);
+
+      expect(reliefHeightAt(4, 4)).toBe(0);
+    });
+
+    it('takes up the brush when a relief layer is chosen', () => {
+      state.addEmptyLayer('relief', 'hills');
+
+      state.setActiveLayer(state.current.layers[0].id);
+
+      expect(state.tool()).toBe('relief');
+    });
+  });
+
   it('clears the history for a new scene', () => {
-    state.beginGesture();
     state.paintCell(0, 0);
     state.endGesture();
     expect(state.canUndo()).toBe(true);
@@ -252,6 +291,43 @@ describe('MapEditorState', () => {
     const cellLayers = state.current.layers.filter((l) => l.kind === 'cell');
     expect(cellLayers.length).toBe(2);
     expect(state.canUndo()).toBe(true);
+  });
+
+  it('names a layer added by hand after its kind, with a count no other layer goes by', () => {
+    state.layerNameOf = (kind, role) => (role === undefined ? `層:${kind}` : `役:${role}`);
+    const first = state.addEmptyLayer('text');
+    const second = state.addEmptyLayer('text');
+    expect([first.name, second.name]).toEqual(['層:text 1', '層:text 2']);
+
+    state.applyCommitted((scene) => {
+      scene.layers = scene.layers.filter((layer) => layer.id !== first.id);
+    });
+    const third = state.addEmptyLayer('text');
+
+    expect(third.name).toBe('層:text 3');
+    expect(state.addEmptyLayer('text', 'じぶんの名前').name).toBe('じぶんの名前');
+  });
+
+  it('names a function layer added by hand after its role, counting the layers of that role alone', () => {
+    state.layerNameOf = (kind, role) => (role === undefined ? `層:${kind}` : `役:${role}`);
+
+    expect(state.addEmptyFunctionLayer('mask').name).toBe('役:mask 1');
+    expect(state.addEmptyFunctionLayer('terrain').name).toBe('役:terrain 1');
+    expect(state.addEmptyFunctionLayer('mask').name).toBe('役:mask 2');
+  });
+
+  it('hands the selected item as what it is, and as nothing of the other kinds', () => {
+    expect([state.selectedStamp(), state.selectedImage(), state.selectedFreehand()]).toEqual([null, null, null]);
+
+    state.stampId.set('door-single');
+    state.stampSize.set(64);
+    state.placeStamp(100, 100, 'スタンプ 1');
+    state.selection.set(state.hitTest(100, 100));
+
+    expect(state.selectedStamp()?.size).toBe(64);
+    expect(state.selectedStamp()).toBe(state.selectedItem()?.item);
+    expect(state.selectedImage()).toBeNull();
+    expect(state.selectedFreehand()).toBeNull();
   });
 
   it('gives each stamp its own layer', () => {
@@ -503,5 +579,21 @@ describe('taking a layer of functions in hand', () => {
     state.setActiveLayer(painted.id);
 
     expect(state.tool()).toBe('functionErase');
+  });
+});
+
+describe('the names of the layers made for new work', () => {
+  it('names one after its kind and the count, and never after a layer still there', () => {
+    const state = new MapEditorState();
+    state.newScene(10, 8, 50, 'transparent');
+    const first = state.ensureLayerFor('cell');
+    state.applyCommitted(() => (first.locked = true));
+    const second = state.ensureLayerFor('cell');
+    state.applyCommitted(() => (second.locked = true));
+    state.applyCommitted(() => (state.current.layers = state.current.layers.filter((layer) => layer !== first)));
+
+    const third = state.ensureLayerFor('cell');
+
+    expect([first.name, second.name, third.name]).toEqual(['cell 1', 'cell 2', 'cell 3']);
   });
 });

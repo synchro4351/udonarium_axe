@@ -1,3 +1,4 @@
+import { clamp } from '@axe/core/util/clamp';
 import { ImageLayer, MapLayer, MapScene, sceneHeightPx, sceneWidthPx } from '@axe/domain/map-editor/scene';
 import { imageBox } from '@axe/features/tabletop/white-board/white-board-scene';
 
@@ -102,8 +103,9 @@ function hasContent(layer: MapLayer): boolean {
     case 'cell':
       return Object.keys(layer.cells).length > 0;
     // What a cell does is never painted into the published picture, so it covers nothing and
-    // cannot be the reason a moving picture below it has to be flattened.
+    // cannot be the reason a moving picture below it has to be flattened. Nor is the relief.
     case 'function':
+    case 'relief':
       return false;
     case 'freehand':
       return layer.strokes.length > 0;
@@ -121,5 +123,5 @@ function transformOf(rotation: number, flipX?: boolean, flipY?: boolean): string
 
 function alphaOf(value: number): number {
   if (!Number.isFinite(value)) return 1;
-  return Math.min(1, Math.max(0, value));
+  return clamp(value, 0, 1);
 }

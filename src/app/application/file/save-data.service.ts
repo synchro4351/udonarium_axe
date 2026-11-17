@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import { inject, Injectable } from '@angular/core';
 import { ChatPreferencesService } from '@axe/application/chat/chat-preferences.service';
 import { ChatReactionService } from '@axe/application/chat/chat-reaction.service';
@@ -6,18 +7,21 @@ import { stampLabel } from '@axe/application/chat/stamp-words';
 import { decodeI18nMessage } from '@axe/application/i18n/i18n-message';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { SnackbarService } from '@axe/application/ui/snackbar.service';
-import { Network } from '@axe/core/index';
 import { Logger } from '@axe/core/logging/logger';
+import { Network } from '@axe/core/network/network';
 import { isNetworkIsolated } from '@axe/core/network/network-isolation';
 import { getAuthorityPeerId } from '@axe/core/network/peer-context-source';
 import { AudioFile } from '@axe/core/storage/audio-file';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
+import { isBundledModel } from '@axe/core/storage/bundled-models';
 import { FileArchiver } from '@axe/core/storage/file-archiver';
 import * as FileReaderUtil from '@axe/core/storage/file-reader-util';
 import { downscaleImageBlob } from '@axe/core/storage/image-downscale';
 import { ImageFile, ImageState } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import * as MimeType from '@axe/core/storage/mime-type';
+import { MODEL_TYPE, type ModelFile, modelNameOf } from '@axe/core/storage/model-file';
+import { ModelStorage } from '@axe/core/storage/model-storage';
 import { createZipBlob, ZipCodeUnavailableError } from '@axe/core/storage/zip-archive';
 import { GameObject } from '@axe/core/sync/game-object';
 import { ObjectStore } from '@axe/core/sync/object-store';
@@ -44,6 +48,7 @@ import { carriedImagesOf } from '@axe/domain/media/carried-images';
 import { ImageLinkList } from '@axe/domain/media/image-link-list';
 import { ImageTagList } from '@axe/domain/media/image-tag-list';
 import { ImageTagLockList } from '@axe/domain/media/image-tag-lock-list';
+import { ModelTagList } from '@axe/domain/media/model-tag-list';
 import { PlaylistList } from '@axe/domain/media/playlist-list';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
@@ -76,23 +81,33 @@ const CHAT_LOG_IMAGE_DECODE_LIMIT = 4;
 export class SaveDataService {
   private readonly imageStorage = inject(ImageStorage);
   private readonly audioStorage = inject(AudioStorage);
+  private readonly modelStorage = inject(ModelStorage);
   private readonly fileArchiver = inject(FileArchiver);
-  private readonly chatTabList = inject(ChatTabList);
-  private readonly appConfig = inject(Config);
-  private readonly dataSummarySetting = inject(DataSummarySetting);
-  private readonly statusAilmentCatalog = inject(StatusAilmentCatalog);
+  private get chatTabList(): ChatTabList {
+    return ChatTabList.instance;
+  }
+  private get appConfig(): Config {
+    return Config.instance;
+  }
+  private get dataSummarySetting(): DataSummarySetting {
+    return DataSummarySetting.instance;
+  }
+  private get statusAilmentCatalog(): StatusAilmentCatalog {
+    return StatusAilmentCatalog.instance;
+  }
   private readonly translate = inject(TRANSLATE_FN);
   private readonly snackbar = inject(SnackbarService);
   private readonly chatReactions = inject(ChatReactionService);
   private readonly stampPacks = inject(StampPackService);
   private readonly chatPreferences = inject(ChatPreferencesService);
   private readonly objectStore = inject(ObjectStore);
+  private readonly document = inject(DOCUMENT);
 
   // The exporter would write a raw `@i18n:key:{params}` message, as system notices are,
   // so the translated text is substituted before it gets there.
   private readonly chatLogTextDecoder: ChatLogTextDecoder = (text) => decodeI18nMessage(text, this.translate);
 
-  private static queue: PromiseQueue = new PromiseQueue('SaveDataServiceQueue');
+  private readonly queue = new PromiseQueue('SaveDataServiceQueue');
 
   /**
    * Saves the whole room as a zip download, named with a timestamp and reporting progress as a
@@ -111,7 +126,7 @@ export class SaveDataService {
       this.snackbar.show(this.translate('app.saveWhileReplayBoard'));
       return Promise.resolve();
     }
-    return SaveDataService.queue.add(() => this._saveRoomAsync(fileName, updateCallback));
+    return this.queue.add(() => this._saveRoomAsync(fileName, updateCallback));
   }
 
   /**
@@ -122,7 +137,7 @@ export class SaveDataService {
    */
   createRoomArchiveAsync(options: { background?: boolean } = {}): Promise<Blob> {
     const files = () => this.buildRoomFiles(false);
-    return SaveDataService.queue.add(() =>
+    return this.queue.add(() =>
       options.background ? createZipBlob(files()) : this.fileArchiver.createZipBlobAsync(files())
     );
   }
@@ -133,7 +148,7 @@ export class SaveDataService {
    * names it, so that the room comes back as it stood, image panel and jukebox included.
    */
   createWholeRoomArchiveAsync(): Promise<Blob> {
-    return SaveDataService.queue.add(() => this.fileArchiver.createZipBlobAsync(this.buildRoomFiles(false, true)));
+    return this.queue.add(() => this.fileArchiver.createZipBlobAsync(this.buildRoomFiles(false, true)));
   }
 
   /**
@@ -163,7 +178,7 @@ export class SaveDataService {
   }
 
   /**
-   * Who added the given pictures and sounds as `assetowner.xml`, and the tags kept to someone as
+   * Who added the given pictures, sounds and models as `assetowner.xml`, and the tags kept to someone as
    * `imagelock.xml`, so that both hold once the room is read back in. Only a whole room carries them:
    * a piece saved on its own, or a replay's pictures, may be carried into another room, which has
    * adders and locks of its own and would have them written over.
@@ -217,9 +232,10 @@ export class SaveDataService {
   }
 
   /**
-   * The files of a room save: the room's XML, the pictures it names and their tags and links, the
-   * list of sounds and the jukebox's playlists. With `everything`, every picture and sound this
-   * browser holds the bytes of goes in as well, named by the room or not.
+   * The files of a room save: the room's XML, the pictures and the 3D models it names, the pictures'
+   * tags and links, the models' tags, the list of sounds and the jukebox's playlists. With
+   * `everything`, every picture, sound and model this browser holds the bytes of goes in as well,
+   * named by the room or not.
    */
   private buildRoomFiles(pretty = true, everything = false): File[] {
     const { roomXml, chatXml, files } = this.buildRoomXmlParts(pretty);
@@ -241,11 +257,16 @@ export class SaveDataService {
 
     const audios: AudioFile[] = this.audioStorage.audios.filter((a) => !a.isHidden);
     if (everything) files.push(...audioArchiveFiles(audios, files));
+    const namedModels = everything ? this.modelStorage.models : this.searchModelFiles(roomXml);
+    const models = namedModels.filter((model) => !isBundledModel(model.identifier));
+    files.push(...modelArchiveFiles(models, files));
+    const modelTagXml = this.convertToXml(ModelTagList.create(namedModels), pretty);
+    files.push(new File([modelTagXml], 'modeltag.xml', { type: 'text/plain' }));
     const audioTagXml = this.convertToXml(AudioTagList.create(audios), pretty);
     files.push(new File([audioTagXml], 'audiotag.xml', { type: 'text/plain' }));
     const playlistXml = this.convertToXml(new PlaylistList(), pretty);
     files.push(new File([playlistXml], 'playlist.xml', { type: 'text/plain' }));
-    files.push(...this.roomRightsFiles([...images, ...audios], pretty));
+    files.push(...this.roomRightsFiles([...images, ...audios, ...models], pretty));
 
     return files;
   }
@@ -271,7 +292,7 @@ export class SaveDataService {
     fileName: string = 'xml_data',
     updateCallback?: UpdateCallback
   ): Promise<void> {
-    return SaveDataService.queue.add(() => this._saveGameObjectAsync(gameObject, fileName, updateCallback));
+    return this.queue.add(() => this._saveGameObjectAsync(gameObject, fileName, updateCallback));
   }
 
   private _saveGameObjectAsync(
@@ -347,6 +368,12 @@ export class SaveDataService {
       }
     }
     return [...kept.values()];
+  }
+
+  /** The 3D models the pieces and blocks in some room data wear, held here in full. */
+  private searchModelFiles(xml: string): ModelFile[] {
+    const named = new Set([...xml.matchAll(/\bmodelIdentifier="([^"]+)"/g)].map((match) => match[1]));
+    return this.modelStorage.models.filter((model) => named.has(model.identifier));
   }
 
   private searchImageFiles(xml: string): ImageFile[] {
@@ -442,9 +469,9 @@ export class SaveDataService {
       imageSrcResolver: images.resolver,
       textDecoder: this.chatLogTextDecoder,
       showTime: this.chatTabList.simpleDispFlagTime,
-      roomName: Network.peerContext?.roomName || undefined,
+      roomName: Network.instance.peerContext?.roomName || undefined,
       labels: this.chatLogLabels(),
-      lang: document.documentElement.lang || undefined,
+      lang: this.document.documentElement.lang || undefined,
       exportedAt: Date.now(),
       ruby: this.chatPreferences.rubyDisplay(),
       reactionsOf: (messageIdentifier) =>
@@ -459,7 +486,7 @@ export class SaveDataService {
   }
 
   private chatLogRoomName(): string {
-    return Network.peerContext?.roomName || this.translate('app.roomDataDefault');
+    return Network.instance.peerContext?.roomName || this.translate('app.roomDataDefault');
   }
 
   private chatLogLabels(): ChatLogLabels {
@@ -610,6 +637,24 @@ const AUDIO_EXTENSION_OF_TYPE: Readonly<Record<string, string>> = {
   'audio/flac': 'flac',
   'audio/x-flac': 'flac',
 };
+
+/**
+ * Archive files for the 3D models held here in full, each a `.glb` under the name it was added with,
+ * numbered where the name is taken by another model or a file alongside.
+ */
+function modelArchiveFiles(models: readonly ModelFile[], alongside: readonly File[]): File[] {
+  const taken = new Set(alongside.map((file) => file.name.toLowerCase()));
+  const files: File[] = [];
+  for (const model of models) {
+    if (!model.blob) continue;
+    const stem = modelNameOf(model.name).trim() || model.identifier;
+    let name = `${stem}.glb`;
+    for (let copy = 2; taken.has(name.toLowerCase()); copy++) name = `${stem} (${copy}).glb`;
+    taken.add(name.toLowerCase());
+    files.push(new File([model.blob], name, { type: MODEL_TYPE }));
+  }
+  return files;
+}
 
 /** Archive files for the sounds held here as files, named apart from each other and from the files alongside. */
 function audioArchiveFiles(audios: readonly AudioFile[], alongside: readonly File[]): File[] {

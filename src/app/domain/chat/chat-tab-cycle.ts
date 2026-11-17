@@ -10,3 +10,30 @@ export function tabBeside(tabs: readonly ChatTab[], current: string, direction: 
   const step = Math.sign(direction) || 1;
   return tabs[(index + step + tabs.length) % tabs.length];
 }
+
+/**
+ * The tab a view of the chat shows as the tabs in view change: the one it was showing when that went
+ * away, `lost`, once it is back, as a tab set aside for a join comes back once the room hands it
+ * over; else the one it shows, where it is still in view, unless that is the system tab it fell back
+ * on and a tab to talk in has come since; else the first tab to talk in, the system tab being kept
+ * for when there is no other; else none.
+ */
+export function tabToShow(visible: readonly ChatTab[], current: string, lost: string): string {
+  if (lost && visible.some((tab) => tab.identifier === lost)) return lost;
+  const talk = visible.find((tab) => !tab.isSystemTab);
+  const shown = visible.find((tab) => tab.identifier === current);
+  if (shown && !(lost && shown.isSystemTab && talk)) return current;
+  return (talk ?? visible[0])?.identifier ?? '';
+}
+
+/**
+ * Where a view of the chat stands once the tabs in view change: the tab it shows, by
+ * {@link tabToShow}, and the tab it has lost and is to go back to. The tab it was showing is
+ * remembered as lost when it goes away or out of view with none remembered already, and forgotten
+ * once it is gone back to.
+ */
+export function keptTabOf(visible: readonly ChatTab[], current: string, lost: string): { tab: string; lost: string } {
+  const remembered = current && !lost && !visible.some((tab) => tab.identifier === current) ? current : lost;
+  const tab = tabToShow(visible, current, remembered);
+  return { tab, lost: tab === remembered ? '' : remembered };
+}

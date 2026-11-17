@@ -9,6 +9,7 @@ import {
   inject,
   Injector,
   input,
+  linkedSignal,
   signal,
   untracked,
   viewChild,
@@ -20,6 +21,7 @@ import { ModalService } from '@axe/application/ui/modal.service';
 import { ShortcutScopeService } from '@axe/application/ui/shortcut-scope.service';
 import { capturePointer, releasePointer } from '@axe/core/input/pointer-capture';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { clamp } from '@axe/core/util/clamp';
 import { coalesce } from '@axe/core/util/debounce';
 import { EditHistory } from '@axe/core/util/edit-history';
 import { observeSize } from '@axe/core/util/observe-size';
@@ -134,6 +136,9 @@ interface Drag {
   rotation: number;
 }
 
+/** How far one press of an arrow moves the playhead: the same grid a moment is rounded to. */
+const STEP_MS = SNAP_MS;
+
 /**
  * Building a cut-in out of layers.
  *
@@ -142,9 +147,6 @@ interface Drag {
  * move, the way a piece being pushed around the table does, so a drag does not put sixty
  * messages a second onto the wire.
  */
-/** How far one press of an arrow moves the playhead: the same grid a moment is rounded to. */
-const STEP_MS = SNAP_MS;
-
 /** Gives each editor's folding timeline an id of its own, for the button that opens it to point at. */
 let nextTimelineRegion = 0;
 
@@ -180,7 +182,11 @@ export class CutInSceneEditorComponent {
   private readonly stageArea = viewChild<ElementRef<HTMLElement>>('stageArea');
   private readonly timelineArea = viewChild<ElementRef<HTMLElement>>('timelineArea');
 
-  protected readonly selectedIdentifier = signal<string>('');
+  /** The layer picked on the stage, let go of whenever another cut-in is put under edit. */
+  protected readonly selectedIdentifier = linkedSignal<CutIn | null, string>({
+    source: this.cutIn,
+    computation: () => '',
+  });
   protected readonly playing = signal(false);
   protected readonly playheadMs = signal(0);
   /** Where a template just made was opened, so playing from there untouched still plays it from the start. */
@@ -219,8 +225,9 @@ export class CutInSceneEditorComponent {
     const seconds = Number((event.target as HTMLInputElement).value);
     if (!Number.isFinite(seconds)) return;
     this.pause();
-    this.onSeek(Math.min(this.durationMs(), Math.max(0, Math.round(seconds * 1000))));
+    this.onSeek(clamp(Math.round(seconds * 1000), 0, this.durationMs()));
   }
+
   private readonly stageSize = signal({ width: 0, height: 0 });
   private readonly bumped = signal(0);
 
@@ -228,10 +235,21 @@ export class CutInSceneEditorComponent {
   /** The preview's own scene sounds, which a cut-in playing in the room knows nothing about. */
   private sceneSound: CutInSoundHandle | null = null;
   private clockId: number | null = null;
-  private history: EditHistory<CutInSceneSnapshot> | null = null;
-  private historyOf = '';
+  /** The changes that can be taken back, started afresh from the scene of each cut-in put under edit. */
+  private readonly history = linkedSignal<CutIn | null, EditHistory<CutInSceneSnapshot> | null>({
+    source: this.cutIn,
+    computation: (cutIn) => (cutIn ? new EditHistory(snapshotScene(cutIn.scene), cloneSceneSnapshot) : null),
+  });
   protected readonly historyVersion = signal(0);
   private pending: { layer: CutInLayer; box: LayerBox | null; rotation: number | null } | null = null;
+
+  /**
+   * The moment the layer in hand is holding, kept until it is laid down somewhere else.
+   *
+   * It lives for as long as the editor is open rather than going near the system clipboard,
+   * which holds text and would have nowhere to put nine numbers a reader could use.
+   */
+  private held: CutInPose | null = null;
   private readonly flushSoon = coalesce(() => this.flushDrag(), DRAG_FLUSH_MS);
 
   readonly scene = computed<CutInScene | null>(() => {
@@ -414,18 +432,16 @@ export class CutInSceneEditorComponent {
     inject(ShortcutScopeService).hold('cutInEditor', this.destroyRef);
     // The stack is started from the scene as it stands, before anything is changed, so the
     // very first change has something to be taken back to.
+    effect(() => this.history());
+    // A template just made would open on an empty stage, so it opens at its fullest moment instead (tyoitashi).
     effect(() => {
       const cutIn = this.cutIn();
-      this.historyOf = cutIn?.identifier ?? '';
-      this.history = cutIn ? new EditHistory(snapshotScene(cutIn.scene), cloneSceneSnapshot) : null;
-      this.selectedIdentifier.set('');
-      this.historyVersion.update((count) => count + 1);
-      this.posterMs = null;
-      // A template just made would open on an empty stage, so it opens at its fullest moment instead.
-      if (cutIn && untracked(() => this.freshScenes.take(cutIn.identifier))) {
-        this.posterMs = untracked(() => posterFrameMs(cutIn.scene));
+      untracked(() => {
+        this.posterMs = null;
+        if (!cutIn || !this.freshScenes.take(cutIn.identifier)) return;
+        this.posterMs = posterFrameMs(cutIn.scene);
         this.playheadMs.set(this.posterMs);
-      }
+      });
     });
 
     // The timeline comes and goes with its fold, so its room is measured afresh each time it is drawn.
@@ -815,14 +831,6 @@ export class CutInSceneEditorComponent {
   }
 
   /**
-   * The moment the layer in hand is holding, kept until it is laid down somewhere else.
-   *
-   * It lives for as long as the editor is open rather than going near the system clipboard,
-   * which holds text and would have nowhere to put nine numbers a reader could use.
-   */
-  private held: CutInPose | null = null;
-
-  /**
    * Moves the layer in hand by a pixel or ten, in the cut-in's own coordinates.
    *
    * Where the layer is keyed at the playhead, the key is what moves; where it is not, the
@@ -859,7 +867,7 @@ export class CutInSceneEditorComponent {
   /** A step along the scene, no smaller than what a moment is rounded to. */
   protected stepBy(deltaMs: number): void {
     this.pause();
-    this.onSeek(Math.min(this.durationMs(), Math.max(0, this.playheadMs() + deltaMs)));
+    this.onSeek(clamp(this.playheadMs() + deltaMs, 0, this.durationMs()));
   }
 
   /**
@@ -905,7 +913,7 @@ export class CutInSceneEditorComponent {
 
   /** The stack for the cut-in being edited. */
   private stack(): EditHistory<CutInSceneSnapshot> | null {
-    return this.historyOf === (this.cutIn()?.identifier ?? '') ? this.history : null;
+    return this.history();
   }
 
   private watchCutIn(): CutIn | null {

@@ -32,6 +32,7 @@ import { windowRendererFactory } from '@axe/features/panels/window-renderer';
  */
 const WINDOW_SHEET = `
   html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--ui-bg); }
+  body { display: flow-root; overflow: clip; }
   [data-panel-window-frame] [data-panel-frame-controls] { display: none !important; }
   [data-panel-window-frame] .draggable-panel {
     position: static !important;
@@ -94,6 +95,9 @@ interface OpenWindow {
  * The window's layer is offered to `OverlayLayers` as well, so a menu, a dialogue or a
  * tooltip opened from the panel appears in the window the reader is looking at.
  */
+/** How often a panel's window is looked at, for one shut from outside or left empty. */
+const WINDOW_WATCH_MS = 500;
+
 @Injectable({ providedIn: 'root' })
 export class PanelWindowService {
   private readonly document = inject(DOCUMENT);
@@ -126,7 +130,7 @@ export class PanelWindowService {
    * has its mouse or touchpad and opens a window of its own.
    */
   get isSupported(): boolean {
-    if (this.viewport.isTouch() && !this.viewport.hasFinePointer()) return false;
+    if (this.viewport.touchOnly()) return false;
     return typeof this.document.defaultView?.open === 'function';
   }
 
@@ -175,7 +179,7 @@ export class PanelWindowService {
     this.overlays.attach(target, layer.instance.overlay());
     request.open(layer.instance.layer());
 
-    const watchdog = setInterval(() => this.look(request.key), 500);
+    const watchdog = setInterval(() => this.look(request.key), WINDOW_WATCH_MS);
     opened.addEventListener('pagehide', () => this.bringBack(request.key));
 
     this.windows.set(request.key, {

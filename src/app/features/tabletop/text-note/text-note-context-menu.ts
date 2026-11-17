@@ -1,15 +1,20 @@
 import { TranslateFn } from '@axe/application/i18n/translate.token';
 import { GameObjectInventoryService } from '@axe/application/inventory/game-object-inventory.service';
+import { isTutorialPart } from '@axe/application/tabletop/tutorial-board';
 import {
   ContextMenuAction,
   ContextMenuRadialGroup,
   ContextMenuSeparator,
   ContextMenuType,
 } from '@axe/application/ui/context-menu.service';
-import { buildAltitudeAction, buildLockToggleAction } from '@axe/application/ui/tabletop-context-menu-actions';
+import {
+  buildAltitudeAction,
+  buildCopyAction,
+  buildDeleteAction,
+  buildLockToggleAction,
+} from '@axe/application/ui/tabletop-context-menu-actions';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { TextNote } from '@axe/domain/tabletop/text-note';
-import { isWithheldHere } from '@axe/domain/tabletop/withheld';
 import { buildDisclosureContextMenu } from '@axe/features/disclosure/disclosure-context-menu';
 
 export interface TextNoteContextMenuModel {
@@ -17,18 +22,14 @@ export interface TextNoteContextMenuModel {
   radialGroups: ContextMenuRadialGroup[];
 }
 
-/** The text note's right-click menu as a flat list, without the groups a radial menu needs. */
-export function buildTextNoteContextMenu(
-  textNote: TextNote,
-  gridSize: number,
-  inventoryService: GameObjectInventoryService,
-  callbacks: {
-    onSetUpright: (isUpright: boolean) => void;
-    onShowDetail: () => void;
-  },
-  t: TranslateFn
-): ContextMenuAction[] {
-  return buildTextNoteContextMenuModel(textNote, gridSize, inventoryService, callbacks, t).actions;
+/** What the note's menu hands back to the note to do. */
+export interface TextNoteMenuCallbacks {
+  onSetUpright: (isUpright: boolean) => void;
+  onShowDetail: () => void;
+  /** Takes the tutorial off the table and leaves the sample pieces, offered on the first table's tutorial note when given. */
+  onPutAwayTutorial?: () => void;
+  /** Clears the first table down to a blank one, offered on the first table's tutorial note when given. */
+  onClearToBlankTable?: () => void;
 }
 
 /**
@@ -36,16 +37,14 @@ export function buildTextNoteContextMenu(
  *
  * It offers editing, altitude, standing the note up or laying it down, disclosure, lock, copy and
  * delete, with any entries for moving it to another surface last. A copy is placed one cell down
- * and to the right, on top of the others.
+ * and to the right, on top of the others. The first table's tutorial note also offers, after delete,
+ * to put the tutorial away, leaving the sample pieces or leaving a blank table.
  */
 export function buildTextNoteContextMenuModel(
   textNote: TextNote,
   gridSize: number,
   inventoryService: GameObjectInventoryService,
-  callbacks: {
-    onSetUpright: (isUpright: boolean) => void;
-    onShowDetail: () => void;
-  },
+  callbacks: TextNoteMenuCallbacks,
   t: TranslateFn,
   surfaceEntries: ContextMenuAction[] = []
 ): TextNoteContextMenuModel {
@@ -74,24 +73,20 @@ export function buildTextNoteContextMenuModel(
   const disclosureActions = buildDisclosureContextMenu(textNote, t);
   const disclosureItems = disclosureActions.filter((action) => action.type !== ContextMenuType.SEPARATOR);
   const lockAction = buildLockToggleAction(textNote.isLock, (next) => (textNote.isLock = next), t);
-  const copyAction: ContextMenuAction = {
-    name: t('feature.tabletop.contextMenu.copy'),
-    enabled: !isWithheldHere(textNote),
-    action: () => {
-      const cloneObject = textNote.clone();
-      cloneObject.location.x += gridSize;
-      cloneObject.location.y += gridSize;
-      cloneObject.toTopmost();
-      SoundEffect.play(PresetSound.cardPut);
-    },
-  };
-  const deleteAction: ContextMenuAction = {
-    name: t('feature.tabletop.contextMenu.delete'),
-    action: () => {
-      textNote.destroy();
-      SoundEffect.play(PresetSound.sweep);
-    },
-  };
+  const copyAction = buildCopyAction(textNote, gridSize, t, {
+    sound: PresetSound.cardPut,
+    afterClone: (clone) => clone.toTopmost(),
+  });
+  const deleteAction = buildDeleteAction(textNote, t);
+
+  const { onPutAwayTutorial: putAway, onClearToBlankTable: clear } = callbacks;
+  const tutorialActions: ContextMenuAction[] =
+    putAway && clear && isTutorialPart(textNote.identifier)
+      ? [
+          { name: t('feature.tabletop.tutorial.putAway'), action: () => putAway() },
+          { name: t('feature.tabletop.tutorial.clearToBlank'), action: () => clear() },
+        ]
+      : [];
 
   return {
     actions: [
@@ -104,6 +99,7 @@ export function buildTextNoteContextMenuModel(
       lockAction,
       copyAction,
       deleteAction,
+      ...tutorialActions,
       ...(surfaceEntries.length > 0 ? [ContextMenuSeparator, ...surfaceEntries] : []),
     ],
     radialGroups: [
@@ -125,7 +121,7 @@ export function buildTextNoteContextMenuModel(
       {
         name: t('feature.textNote.contextMenu.radialObject'),
         icon: 'settings',
-        actions: [...surfaceEntries, lockAction, copyAction, deleteAction],
+        actions: [...surfaceEntries, lockAction, copyAction, deleteAction, ...tutorialActions],
       },
     ],
   };

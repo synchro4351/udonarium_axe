@@ -2,6 +2,12 @@
 
 バージョンごとのユーザー向け変更点です。
 
+- [v1.79.0](/release-notes/v1.79.0) — 2026-11-15
+- [v1.78.1](/release-notes/v1.78.1) — 2026-11-13
+- [v1.78.0](/release-notes/v1.78.0) — 2026-11-13
+- [v1.77.2](/release-notes/v1.77.2) — 2026-11-09
+- [v1.77.1](/release-notes/v1.77.1) — 2026-11-09
+- [v1.77.0](/release-notes/v1.77.0) — 2026-11-09
 - [v1.76.1](/release-notes/v1.76.1) — 2026-11-04
 - [v1.76.0](/release-notes/v1.76.0) — 2026-11-04
 - [v1.75.3](/release-notes/v1.75.3) — 2026-11-02
@@ -107,4 +113,4 @@
 - **[GitHub Releases](https://github.com/Xelltis/udonarium_axe/releases)** — 配布物（`axe_x.y.z.zip`）とリリースごとの概要
 - **[CHANGELOG.md](https://github.com/Xelltis/udonarium_axe/blob/main/CHANGELOG.md)** — Conventional Commitsから生成された全変更履歴
 
-> リリースは`package.json`の`version`を基準に管理されています。
+版の番号は`package.json`の`version`です。

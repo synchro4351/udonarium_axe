@@ -1,27 +1,28 @@
 import { cellPatternBoundingBox, parseCellPattern } from '@axe/domain/tabletop/cell-pattern';
 import { RangeArea } from '@axe/domain/tabletop/range';
+import type { PictureRegion } from '@axe/infrastructure/image/element-picture';
+import { ClipArea, RangeRender, RangeRenderSetting } from '@axe/infrastructure/tabletop/range/range-render';
 import {
-  ClipAreaCorn,
-  ClipAreaHexagon,
-  ClipAreaLine,
-  ClipAreaPentagon,
-  ClipAreaSquare,
-  ClipAreaTriangle,
-  RangeRender,
-  RangeRenderSetting,
-} from '@axe/infrastructure/tabletop/range/range-render';
-import { clipAreaToPolygonCss, clipCircleCss } from '@axe/infrastructure/tabletop/range/range-render-util';
-
-type ClipArea = ClipAreaLine | ClipAreaSquare | ClipAreaTriangle | ClipAreaPentagon | ClipAreaHexagon | ClipAreaCorn;
+  clipAreaToPolygonCss,
+  clipCircleCss,
+  clipCircleRadiusPx,
+} from '@axe/infrastructure/tabletop/range/range-render-util';
 
 /**
  * What a painted range is cut to: a polygon for most shapes, a circle for a circle, and for a
  * custom shape a box as far out as its cells reach.
  */
-export type RangeClip =
+export type RangeClip = (
   | { kind: 'polygon'; area: ClipArea }
   | { kind: 'circle' }
-  | { kind: 'custom'; halfWidthPx: number; halfHeightPx: number };
+  | { kind: 'custom'; halfWidthPx: number; halfHeightPx: number }
+) & {
+  /**
+   * What is painted within it, where it was painted: the shape and each cell filled, as polygons in
+   * pixels from the range's origin.
+   */
+  readonly painted?: readonly (readonly { x: number; y: number }[])[];
+};
 
 /** What a range is painted with beyond the range itself. */
 export interface RangePaintOptions {
@@ -76,7 +77,8 @@ export function rangeRenderSettingOf(range: RangeArea, options: RangePaintOption
 
 /**
  * Paints a range into its pair of canvases, the cells it covers into the first and its outline
- * into the second, sizing both, and gives back what the first is to be cut to.
+ * into the second, sizing both, and gives back what the first is to be cut to, with what was painted
+ * within it.
  */
 export function paintRange(
   gridCanvas: HTMLCanvasElement,
@@ -85,30 +87,31 @@ export function paintRange(
   options: RangePaintOptions
 ): RangeClip {
   const render = new RangeRender(gridCanvas, rangeCanvas);
-  const setting = rangeRenderSettingOf(range, options);
+  const painted: { x: number; y: number }[][] = [];
+  const setting = { ...rangeRenderSettingOf(range, options), painted };
   switch (range.type) {
     case 'LINE':
-      return { kind: 'polygon', area: render.renderLine(setting) };
+      return { kind: 'polygon', area: render.renderLine(setting), painted };
     case 'CIRCLE':
       render.renderCircle(setting);
-      return { kind: 'circle' };
+      return { kind: 'circle', painted };
     case 'SQUARE':
-      return { kind: 'polygon', area: render.renderSquare(setting) };
+      return { kind: 'polygon', area: render.renderSquare(setting), painted };
     case 'RHOMBUS':
-      return { kind: 'polygon', area: render.renderDiamond(setting) };
+      return { kind: 'polygon', area: render.renderDiamond(setting), painted };
     case 'TRIANGLE':
-      return { kind: 'polygon', area: render.renderTriangle(setting) };
+      return { kind: 'polygon', area: render.renderTriangle(setting), painted };
     case 'PENTAGON':
-      return { kind: 'polygon', area: render.renderPentagon(setting) };
+      return { kind: 'polygon', area: render.renderPentagon(setting), painted };
     case 'HEXAGON':
-      return { kind: 'polygon', area: render.renderHexagon(setting) };
+      return { kind: 'polygon', area: render.renderHexagon(setting), painted };
     case 'CUSTOM': {
       const box = render.renderCustom(setting, { cellPattern: range.cellPattern, rotationDegrees: setting.degree });
-      return { kind: 'custom', halfWidthPx: box.halfWidthPx, halfHeightPx: box.halfHeightPx };
+      return { kind: 'custom', halfWidthPx: box.halfWidthPx, halfHeightPx: box.halfHeightPx, painted };
     }
     case 'CORN':
     default:
-      return { kind: 'polygon', area: render.renderCorn(setting) };
+      return { kind: 'polygon', area: render.renderCorn(setting), painted };
   }
 }
 
@@ -127,6 +130,64 @@ export function rangeClipPathCss(clip: RangeClip, range: RangeArea, gridSize: nu
   }
 }
 
+/** How many corners the outline of a circle range is drawn round with, close enough to pick by. */
+const CIRCLE_OUTLINE_CORNERS = 64;
+
+/**
+ * The outline a range's cell canvas is cut to, as {@link rangeClipPathCss} cuts it, in pixels from
+ * the range's origin: the corners of the polygon, or of a circle walked round finely.
+ */
+export function rangeClipOutline(
+  clip: RangeClip,
+  range: RangeArea,
+  gridSize: number
+): readonly { x: number; y: number }[] {
+  switch (clip.kind) {
+    case 'circle': {
+      const radius = clipCircleRadiusPx(range.length, gridSize);
+      return Array.from({ length: CIRCLE_OUTLINE_CORNERS }, (_, at) => {
+        const angle = (at / CIRCLE_OUTLINE_CORNERS) * Math.PI * 2;
+        return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+      });
+    }
+    case 'custom': {
+      const hx = Math.max(gridSize, clip.halfWidthPx) + gridSize;
+      const hy = Math.max(gridSize, clip.halfHeightPx) + gridSize;
+      return [
+        { x: -hx, y: -hy },
+        { x: hx, y: -hy },
+        { x: hx, y: hy },
+        { x: -hx, y: hy },
+      ];
+    }
+    case 'polygon':
+      return clip.area;
+  }
+}
+
+/**
+ * The part of a box an outline reaches, the box itself where the outline reaches past it all round:
+ * what of a range's canvases its cells are cut to, so that its picture and where it is pressed keep
+ * to its shape rather than to canvases far enough for it at any turn. Null where none of it is.
+ */
+export function regionWithinOutline(
+  box: PictureRegion,
+  outline: readonly { x: number; y: number }[]
+): PictureRegion | null {
+  if (outline.length < 3) return box;
+  const left = Math.max(box.left, Math.floor(Math.min(...outline.map((point) => point.x))));
+  const top = Math.max(box.top, Math.floor(Math.min(...outline.map((point) => point.y))));
+  const right = Math.min(box.left + box.width, Math.ceil(Math.max(...outline.map((point) => point.x))));
+  const bottom = Math.min(box.top + box.height, Math.ceil(Math.max(...outline.map((point) => point.y))));
+  return right > left && bottom > top ? { left, top, width: right - left, height: bottom - top } : null;
+}
+
+/** An outline to picture and pick a range by, or null where any corner of it is no number or it has too few. */
+export function usableOutline(outline: readonly { x: number; y: number }[]): { x: number; y: number }[] | null {
+  if (outline.length < 3) return null;
+  return outline.every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y)) ? [...outline] : null;
+}
+
 /** What a range is cut to before it has first been painted, by its type. */
 export function initialRangeClip(type: string): RangeClip {
   switch (type) {
@@ -139,80 +200,60 @@ export function initialRangeClip(type: string): RangeClip {
     case 'RHOMBUS':
       return {
         kind: 'polygon',
-        area: {
-          clip01x: 0,
-          clip01y: 0,
-          clip02x: 0,
-          clip02y: -50,
-          clip03x: 100,
-          clip03y: -50,
-          clip04x: 100,
-          clip04y: 0,
-        },
+        area: [
+          { x: 0, y: 0 },
+          { x: 0, y: -50 },
+          { x: 100, y: -50 },
+          { x: 100, y: 0 },
+        ],
       };
     case 'TRIANGLE':
       return {
         kind: 'polygon',
-        area: { clip01x: 0, clip01y: -100, clip02x: 100, clip02y: 100, clip03x: -100, clip03y: 100 },
+        area: [
+          { x: 0, y: -100 },
+          { x: 100, y: 100 },
+          { x: -100, y: 100 },
+        ],
       };
     case 'PENTAGON':
       return {
         kind: 'polygon',
-        area: {
-          clip01x: 0,
-          clip01y: -100,
-          clip02x: 100,
-          clip02y: -30,
-          clip03x: 60,
-          clip03y: 100,
-          clip04x: -60,
-          clip04y: 100,
-          clip05x: -100,
-          clip05y: -30,
-        },
+        area: [
+          { x: 0, y: -100 },
+          { x: 100, y: -30 },
+          { x: 60, y: 100 },
+          { x: -60, y: 100 },
+          { x: -100, y: -30 },
+        ],
       };
     case 'HEXAGON':
       return {
         kind: 'polygon',
-        area: {
-          clip01x: 0,
-          clip01y: -100,
-          clip02x: 100,
-          clip02y: -50,
-          clip03x: 100,
-          clip03y: 50,
-          clip04x: 0,
-          clip04y: 100,
-          clip05x: -100,
-          clip05y: 50,
-          clip06x: -100,
-          clip06y: -50,
-        },
+        area: [
+          { x: 0, y: -100 },
+          { x: 100, y: -50 },
+          { x: 100, y: 50 },
+          { x: 0, y: 100 },
+          { x: -100, y: 50 },
+          { x: -100, y: -50 },
+        ],
       };
     case 'CORN':
     default:
       return {
         kind: 'polygon',
-        area: {
-          clip01x: 0,
-          clip01y: 0,
-          clip02x: 100,
-          clip02y: 0,
-          clip03x: 100,
-          clip03y: 100,
-          clip04x: 0,
-          clip04y: 100,
-          clip05x: 0,
-          clip05y: 0,
-          clip06x: 0,
-          clip06y: 0,
-          clip07x: 0,
-          clip07y: 0,
-          clip08x: 0,
-          clip08y: 0,
-          clip09x: 0,
-          clip09y: 0,
-        },
+        area: [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+          { x: 100, y: 100 },
+          { x: 0, y: 100 },
+          { x: 0, y: 0 },
+          { x: 0, y: 0 },
+          { x: 0, y: 0 },
+          { x: 0, y: 0 },
+          { x: 0, y: 0 },
+        ],
       };
   }
 }

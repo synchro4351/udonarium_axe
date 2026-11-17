@@ -17,12 +17,15 @@ import { LanguageService } from '@axe/application/i18n/language.service';
 import { AudioAnalysisService } from '@axe/application/media/audio-analysis.service';
 import { CutInService } from '@axe/application/media/cut-in.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
+import { ReplayStagingService } from '@axe/application/replay/replay-staging.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { FirstPersonService } from '@axe/application/tabletop/first-person.service';
 import { GravityService } from '@axe/application/tabletop/gravity.service';
+import { GroundBrushService } from '@axe/application/tabletop/ground-brush.service';
 import { LegacyScratchMaskMigrationService } from '@axe/application/tabletop/legacy-scratch-mask-migration.service';
 import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
+import { ThirdPersonService } from '@axe/application/tabletop/third-person.service';
 import { TurnOrderService } from '@axe/application/turn/turn-order.service';
 import { MobileLayoutService } from '@axe/application/ui/mobile-layout.service';
 import { MotionService } from '@axe/application/ui/motion.service';
@@ -32,12 +35,14 @@ import { OverlayModeService } from '@axe/application/ui/overlay-mode.service';
 import type { PanelOption } from '@axe/application/ui/panel.service';
 import { RenderLiteService } from '@axe/application/ui/render-lite.service';
 import { SkinService } from '@axe/application/ui/skin.service';
+import { StartupLoadingService } from '@axe/application/ui/startup-loading.service';
 import { ThemeService } from '@axe/application/ui/theme.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
 import { VisualNovelModeService } from '@axe/application/ui/visual-novel-mode.service';
 import { WidgetVisibilityService } from '@axe/application/ui/widget-visibility.service';
 import { FileArchiver } from '@axe/core/storage/file-archiver';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { parseInviteLink } from '@axe/domain/peer/invite-link';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { RoomPanelName } from '@axe/domain/ui/room-panel';
@@ -52,6 +57,7 @@ import { CardEventHandlerService } from '@axe/features/card/card-event-handler.s
 import { HandDragGhostComponent } from '@axe/features/card/hand-rail/hand-drag-ghost.component';
 import { HandRailComponent } from '@axe/features/card/hand-rail/hand-rail.component';
 import { CcfoliaRoomImportEventHandlerService } from '@axe/features/ccfolia-room-import/ccfolia-room-import-event-handler.service';
+import { ResetUndoEventHandlerService } from '@axe/features/character/reset-undo/reset-undo-event-handler.service';
 import { ChatSettingsEventHandlerService } from '@axe/features/chat/chat-settings-event-handler.service';
 import { ChatSoundEventHandlerService } from '@axe/features/chat/chat-sound-event-handler.service';
 import { ChatSpeechEventHandlerService } from '@axe/features/chat/chat-speech-event-handler.service';
@@ -63,6 +69,7 @@ import { AssetRemovalEventHandlerService } from '@axe/features/file/asset-remova
 import { DroppedImageEventHandlerService } from '@axe/features/file/file-storage/dropped-image-event-handler.service';
 import { FilesTooLargeEventHandlerService } from '@axe/features/file/files-too-large/files-too-large-event-handler.service';
 import { FirstPersonViewComponent } from '@axe/features/first-person/first-person-view/first-person-view.component';
+import { ThirdPersonHudComponent } from '@axe/features/first-person/third-person-hud/third-person-hud.component';
 import { GmToolbarComponent } from '@axe/features/gm-tools/gm-toolbar/gm-toolbar.component';
 import { GpuNoticeComponent } from '@axe/features/gpu-notice/gpu-notice.component';
 import { HotbarBarComponent } from '@axe/features/hotbar/hotbar-bar/hotbar-bar.component';
@@ -71,15 +78,23 @@ import { TabletopShortcutEventHandlerService } from '@axe/features/keyboard/tabl
 import { InviteJoinComponent } from '@axe/features/lobby/invite-join/invite-join.component';
 import { NetworkEventHandlerService } from '@axe/features/lobby/network-event-handler.service';
 import { NetworkIndicatorComponent } from '@axe/features/lobby/network-indicator/network-indicator.component';
+import { PeerHeartbeatEventHandlerService } from '@axe/features/lobby/peer-heartbeat-event-handler.service';
 import { BeatLightComponent } from '@axe/features/media/beat-light/beat-light.component';
 import { CutInEventHandlerService } from '@axe/features/media/cut-in-event-handler.service';
 import { MiniJukeboxComponent } from '@axe/features/media/mini-jukebox/mini-jukebox.component';
 import { MixEventHandlerService } from '@axe/features/media/mix-event-handler.service';
+import { ModelDropEventHandlerService } from '@axe/features/media/model-library/model-drop-event-handler.service';
 import { TurnSoundEventHandlerService } from '@axe/features/media/turn-sound/turn-sound-event-handler.service';
 import { FabDrawerComponent } from '@axe/features/menu/fab-drawer/fab-drawer.component';
 import { MenuFileDropHandlerService } from '@axe/features/menu/menu-file-drop-handler.service';
 import { MobileShellComponent } from '@axe/features/mobile/mobile-shell/mobile-shell.component';
-import { RoomPanelService } from '@axe/features/panels/room-panel.service';
+import {
+  RoomPanelService,
+  START_CHAT_BOTTOM_GAP,
+  START_CHAT_SIZE,
+  START_PANEL_LEFT,
+  START_PANEL_TOP,
+} from '@axe/features/panels/room-panel.service';
 import { PlToolbarComponent } from '@axe/features/pl-tools/pl-toolbar/pl-toolbar.component';
 import { ReplayBoardBannerComponent } from '@axe/features/replay/replay-board-banner/replay-board-banner.component';
 import { ReplayEventHandlerService } from '@axe/features/replay/replay-event-handler.service';
@@ -87,14 +102,19 @@ import { ReplayIndicatorComponent } from '@axe/features/replay/replay-indicator/
 import { ReplayStagingBannerComponent } from '@axe/features/replay/replay-staging-banner/replay-staging-banner.component';
 import { RoomArchiveEventHandlerService } from '@axe/features/room-archive/room-archive-event-handler.service';
 import { RoomRestoreBannerComponent } from '@axe/features/room-archive/room-restore-banner/room-restore-banner.component';
+import { StatusAilmentEffectEventHandlerService } from '@axe/features/status-ailment/status-ailment-effect-event-handler.service';
 import { StreamingOverlayComponent } from '@axe/features/streaming-overlay/streaming-overlay.component';
 import { SwitchNoticeComponent } from '@axe/features/tabletop/board-switch/switch-notice.component';
-import { FogMemoryWriterService } from '@axe/features/tabletop/fog-of-war/fog-memory-writer.service';
+import { FogMemoryEventHandlerService } from '@axe/features/tabletop/fog-of-war/fog-memory-event-handler.service';
 import { GameTableComponent } from '@axe/features/tabletop/game-table/game-table.component';
+import { GroundBrushBandComponent } from '@axe/features/tabletop/ground-brush-band/ground-brush-band.component';
 import { ImageDropEventHandlerService } from '@axe/features/tabletop/image-drop/image-drop-event-handler.service';
 import { InterruptPromptComponent } from '@axe/features/tabletop/interrupt-prompt/interrupt-prompt.component';
 import { MovePlanBandComponent } from '@axe/features/tabletop/move-plan-band/move-plan-band.component';
 import { MovePlanEventHandlerService } from '@axe/features/tabletop/table-move-range-overlay/move-plan-event-handler.service';
+import { TargetBandComponent } from '@axe/features/tabletop/target-band/target-band.component';
+import { TargetReleaseEventHandlerService } from '@axe/features/tabletop/target-release/target-release-event-handler.service';
+import { TurnFocusEventHandlerService } from '@axe/features/tabletop/turn-focus/turn-focus-event-handler.service';
 import { VisualNovelEventHandlerService } from '@axe/features/visual-novel/visual-novel-event-handler.service';
 import { VisualNovelOverlayComponent } from '@axe/features/visual-novel/visual-novel-overlay/visual-novel-overlay.component';
 import { VoteEventHandlerService } from '@axe/features/vote/vote-event-handler.service';
@@ -108,16 +128,16 @@ import { PanelDockPreviewComponent } from '@axe/ui/components/panel-dock-preview
 import { PieceDragGhostComponent } from '@axe/ui/components/piece-drag-ghost/piece-drag-ghost.component';
 import { SnackbarComponent } from '@axe/ui/components/snackbar/snackbar.component';
 import { ReloadNoticeDirective } from '@axe/ui/directives/reload-notice.directive';
-import { FIRST_CHAT_WINDOW } from '@axe/ui/panel-spot';
 import { version as APP_VERSION } from '@pkg';
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  selector: 'app-root',
+  selector: 'root',
   templateUrl: './app.component.html',
   imports: [
     BeatLightComponent,
     GameTableComponent,
     FirstPersonViewComponent,
+    ThirdPersonHudComponent,
     NetworkIndicatorComponent,
     MiniJukeboxComponent,
     GmToolbarComponent,
@@ -143,7 +163,9 @@ import { version as APP_VERSION } from '@pkg';
     InviteJoinComponent,
     StreamingOverlayComponent,
     SwitchNoticeComponent,
+    GroundBrushBandComponent,
     MovePlanBandComponent,
+    TargetBandComponent,
     InterruptPromptComponent,
     SnackbarComponent,
     ChatTickerComponent,
@@ -160,10 +182,17 @@ export class AppComponent {
   private readonly motion = inject(MotionService);
   private readonly renderLite = inject(RenderLiteService);
   private readonly language = inject(LanguageService);
-  readonly visualNovel = inject(VisualNovelModeService);
+  protected readonly visualNovel = inject(VisualNovelModeService);
   protected readonly battleCutIn = inject(BattleCutInStateService);
-  private readonly handRail = inject(HandRailService);
-  readonly widgets = inject(WidgetVisibilityService);
+  /** Whose hand rail is open, which the rail is fetched for only once it first is. */
+  protected readonly handRail = inject(HandRailService);
+  /** The brush that shapes the ground, whose band is fetched the first time it is taken up. */
+  protected readonly groundBrush = inject(GroundBrushService);
+  /** The staging of a replay's scene, whose banner is fetched the first time a scene is staged. */
+  protected readonly replayStaging = inject(ReplayStagingService);
+  /** Whether the page was opened from an invitation, which the join is fetched for only then. */
+  protected readonly invited = parseInviteLink(location.hash) !== null;
+  protected readonly widgets = inject(WidgetVisibilityService);
   private readonly rolePermission = inject(RolePermissionService);
   /**
    * Whether this seat draws the game master's bar, which only the game master does while it is not
@@ -175,19 +204,20 @@ export class AppComponent {
     this.objectChange.trackMyCursor();
     return PeerCursor.myRole === PeerRole.Player && this.widgets.plToolbar();
   });
-  readonly viewport = inject(ViewportService);
-  readonly mobile = inject(MobileLayoutService);
-  readonly overlayMode = inject(OverlayModeService);
-  readonly firstPerson = inject(FirstPersonService);
+  protected readonly viewport = inject(ViewportService);
+  protected readonly mobile = inject(MobileLayoutService);
+  protected readonly overlayMode = inject(OverlayModeService);
+  protected readonly firstPerson = inject(FirstPersonService);
+  protected readonly thirdPerson = inject(ThirdPersonService);
 
-  readonly isTableSplit = computed(() => this.mobile.isActive() && !this.visualNovel.active());
+  protected readonly isTableSplit = computed(() => this.mobile.isActive() && !this.visualNovel.active());
   private readonly roomPanels = inject(RoomPanelService);
   private readonly fileArchiver = inject(FileArchiver);
   private readonly objectStore = inject(ObjectStore);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly overlays = inject(OverlayLayers);
 
-  readonly modalLayerViewContainerRef = viewChild.required('modalLayer', { read: ViewContainerRef });
+  private readonly modalLayerViewContainerRef = viewChild.required('modalLayer', { read: ViewContainerRef });
 
   protected readonly tabletop = inject(TabletopService);
   /** The ticker is drawn for the screens that asked for it, and not fetched for the rest. */
@@ -217,7 +247,11 @@ export class AppComponent {
     inject(ChatSoundEventHandlerService);
     inject(ChatSpeechEventHandlerService);
     inject(TurnSoundEventHandlerService);
+    inject(TurnFocusEventHandlerService);
+    inject(TargetReleaseEventHandlerService);
     inject(EffectChatEventHandlerService);
+    inject(StatusAilmentEffectEventHandlerService);
+    inject(ResetUndoEventHandlerService);
     inject(BattleCutInEventHandlerService);
     inject(BattleChatEventHandlerService);
     inject(VoteEventHandlerService);
@@ -227,15 +261,17 @@ export class AppComponent {
     inject(CutInEventHandlerService);
     inject(MixEventHandlerService);
     inject(NetworkEventHandlerService);
+    inject(PeerHeartbeatEventHandlerService);
     inject(RoomArchiveEventHandlerService);
     inject(ReplayEventHandlerService);
     inject(ImageDropEventHandlerService);
     inject(DroppedImageEventHandlerService);
+    inject(ModelDropEventHandlerService);
     inject(FilesTooLargeEventHandlerService);
     inject(AssetRemovalEventHandlerService);
     inject(MovePlanEventHandlerService);
     inject(CcfoliaRoomImportEventHandlerService);
-    inject(FogMemoryWriterService);
+    inject(FogMemoryEventHandlerService);
     inject(CutInService);
     inject(AudioAnalysisService);
     inject(SpeechBubbleService);
@@ -248,13 +284,17 @@ export class AppComponent {
 
     this.fileArchiver.onCodeUnavailable = inject(LOAD_FAILURE_NOTICE);
 
+    const startupLoading = inject(StartupLoadingService);
     afterNextRender(() => {
+      startupLoading.begin();
       this.overlays.main = this.modalLayerViewContainerRef();
-      const startPanels: [RoomPanelName, PanelOption][] = [['peerMenu', { left: 80, top: 10 }]];
+      const startPanels: [RoomPanelName, PanelOption][] = [
+        ['peerMenu', { left: START_PANEL_LEFT, top: START_PANEL_TOP }],
+      ];
       if (!this.viewport.isCompact()) {
-        const chat = FIRST_CHAT_WINDOW;
-        const top = Math.max(10, window.innerHeight - chat.height - chat.bottomGap);
-        startPanels.push(['chatWindow', { width: chat.width, height: chat.height, left: chat.left, top }]);
+        const { width, height } = START_CHAT_SIZE;
+        const top = Math.max(START_PANEL_TOP, window.innerHeight - height - START_CHAT_BOTTOM_GAP);
+        startPanels.push(['chatWindow', { width, height, left: START_PANEL_LEFT, top }]);
       }
       // The chat window overlaps the connection panel, and stands over it.
       this.roomPanels.openInTurn(startPanels);

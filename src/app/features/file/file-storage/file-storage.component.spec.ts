@@ -4,6 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AssetOwnershipService } from '@axe/application/file/asset-ownership.service';
 import { AssetRemovalService } from '@axe/application/file/asset-removal.service';
 import { ImageTagLockService } from '@axe/application/file/image-tag-lock.service';
+import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { SnackbarService } from '@axe/application/ui/snackbar.service';
@@ -415,7 +416,7 @@ describe('FileStorageComponent', () => {
         .mockResolvedValue({ images: [ImageFile.createEmpty('pasted')], oversized: [] });
       load = vi
         .spyOn(TestBed.inject(FileArchiver), 'load')
-        .mockResolvedValue({ dataRead: false, images: [], audios: [] });
+        .mockResolvedValue({ dataRead: false, images: [], audios: [], models: [] });
       upload = vi.spyOn(TestBed.inject(ImageEditQueue), 'upload').mockResolvedValue({ images: [], oversized: [] });
       clearBackground = vi.fn<typeof clearBackgroundAt>().mockResolvedValue({
         kind: 'cleared',
@@ -1120,6 +1121,21 @@ describe('FileStorageComponent', () => {
 
       expect(shown()).toEqual({ upload: false, paste: false, editFirst: false, changeTag: false, tick: false });
     });
+
+    it('asks a player to add pictures, and holds a new tag name to twelve letters', () => {
+      canEdit = true;
+      fixture.detectChanges();
+      const t = TestBed.inject(TRANSLATE_FN);
+      const element = fixture.nativeElement as HTMLElement;
+
+      // tyoitashi lays the adding out as a bar of its own rather than official's drop box.
+      expect(element.querySelector('input[type="file"]')).not.toBeNull();
+      expect(element.textContent).toContain(t('feature.file.fileStorage.addImage'));
+      const tagName = element.querySelector<HTMLInputElement>(
+        `input[placeholder="${t('feature.file.fileStorage.newTagPlaceholder')}"]`
+      )!;
+      expect(tagName.maxLength).toBe(12);
+    });
   });
 
   describe('tags kept to one person', () => {
@@ -1189,7 +1205,7 @@ describe('FileStorageComponent', () => {
 
       component.changeTag();
 
-      expect(ImageTag.get('a-goblin').tag).toBe('雑魚');
+      expect(ImageTag.get('a-goblin')!.tag).toBe('雑魚');
       expect(show).toHaveBeenCalledOnce();
     });
   });

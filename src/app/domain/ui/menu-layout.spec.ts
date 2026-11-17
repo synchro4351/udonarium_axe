@@ -143,11 +143,12 @@ describe('how a menu is arranged', () => {
       ]);
     });
 
-    it('gathers the images, the music, the cut-ins, the stamps, the effects and the battle stage under media', () => {
+    it('gathers the images, the models, the music, the cut-ins, the stamps, the effects and the battle stage under media', () => {
       const media = DEFAULT_MENU_LAYOUTS.fab.nodes.find((node) => node.id === 'media') as MenuGroup;
 
       expect(media.items.map((item) => item.command)).toEqual([
         'images',
+        'models',
         'jukebox',
         'cutIn',
         'stampPacks',

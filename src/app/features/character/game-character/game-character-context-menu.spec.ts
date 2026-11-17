@@ -15,6 +15,7 @@ import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import {
   buildGameCharacterContextMenu,
   buildGameCharacterContextMenuModel,
+  buildUnviewableCharacterContextMenu,
   collectRegisteredEffects,
   collectRegisteredRangeShapes,
 } from '@axe/features/character/game-character/game-character-context-menu';
@@ -409,6 +410,52 @@ describe('buildGameCharacterContextMenu()', () => {
     expect(names(groupOf(menu, '視界と視点'))).toEqual(['視界・光源設定…', '視界範囲を表示']);
   });
 
+  describe('resetting the piece (acceptance 21)', () => {
+    const RESETS = ['バフをすべて外す', 'バフだけ外す', 'デバフだけ外す', '値を既定値に戻す', 'すべてリセット'];
+    const build = (extra: object) =>
+      buildGameCharacterContextMenuModel(
+        makeChar() as unknown as GameCharacter,
+        50,
+        makeService(),
+        { ...callbacks(), ...extra },
+        t
+      );
+
+    it('gathers the five resets with the buffs, after what was there, each running its choice', () => {
+      const onResetPiece = vi.fn();
+      const menu = build({ onResetPiece, resetOffers: ['allBuffs', 'buffs', 'debuffs', 'values', 'everything'] });
+      const group = groupOf(menu.actions, 'バフ・演出');
+
+      expect(names(group)).toEqual(['バフ編集', ...RESETS]);
+      group.find((entry) => entry.name === 'デバフだけ外す')!.action!();
+      expect(onResetPiece).toHaveBeenCalledExactlyOnceWith('debuffs');
+      expect(names(menu.actions.filter((entry) => entry.type !== ContextMenuType.SEPARATOR))).not.toContain(
+        'バフをすべて外す'
+      );
+    });
+
+    it('leaves out a reset that would do nothing, and all of them for a piece with nothing to reset', () => {
+      const some = build({ onResetPiece: vi.fn(), resetOffers: ['values', 'everything'] });
+      const none = build({ onResetPiece: vi.fn(), resetOffers: [] });
+
+      expect(names(groupOf(some.actions, 'バフ・演出'))).toEqual(['バフ編集', '値を既定値に戻す', 'すべてリセット']);
+      expect(names(groupOf(none.actions, 'バフ・演出'))).toEqual(['バフ編集']);
+    });
+
+    it('offers none to a seat that only watches, which is handed no way to reset', () => {
+      const menu = build({ resetOffers: ['allBuffs', 'values', 'everything'] });
+
+      expect(names(groupOf(menu.actions, 'バフ・演出'))).toEqual(['バフ編集']);
+    });
+
+    it('offers the same in the turning menu, among the buffs and effects', () => {
+      const menu = build({ onResetPiece: vi.fn(), resetOffers: ['allBuffs', 'everything'] });
+      const radial = menu.radialGroups.find((group) => group.name === 'バフ・演出')!;
+
+      expect(names(radial.actions)).toEqual(['バフ編集', 'バフをすべて外す', 'すべてリセット']);
+    });
+  });
+
   it('offers a group of who may see it and who owns it only to somebody who may change them', () => {
     const plain = buildGameCharacterContextMenu(
       makeChar() as unknown as GameCharacter,
@@ -545,20 +592,15 @@ describe('buildGameCharacterContextMenu()', () => {
   });
 
   it('ticks hiding the name and the buffs in the display submenu', () => {
-    const def = buildGameCharacterContextMenu(
-      makeChar() as unknown as GameCharacter,
-      50,
-      makeService(),
-      callbacks(),
-      t
-    );
+    const master = { ...callbacks(), onSetNameHidden: vi.fn() };
+    const def = buildGameCharacterContextMenu(makeChar() as unknown as GameCharacter, 50, makeService(), master, t);
     expect(names(groupOf(def, '表示と扱い')).slice(0, 2)).toEqual(['☐ 名前を隠す', '☐ バフを隠す']);
 
     const hidden = buildGameCharacterContextMenu(
       makeChar({ hideName: true, hideBuff: true }) as unknown as GameCharacter,
       50,
       makeService(),
-      callbacks(),
+      master,
       t
     );
     expect(names(groupOf(hidden, '表示と扱い')).slice(0, 2)).toEqual(['☑ 名前を隠す', '☑ バフを隠す']);
@@ -620,12 +662,35 @@ describe('buildGameCharacterContextMenu()', () => {
 
   it('hides and shows the name and the buffs', () => {
     const char = makeChar();
-    const menu = buildGameCharacterContextMenu(char as unknown as GameCharacter, 50, makeService(), callbacks(), t);
+    const onSetNameHidden = vi.fn();
+    const menu = buildGameCharacterContextMenu(
+      char as unknown as GameCharacter,
+      50,
+      makeService(),
+      { ...callbacks(), onSetNameHidden },
+      t
+    );
     const display = groupOf(menu, '表示と扱い');
     display.find((s) => s.name === '☐ 名前を隠す')!.action!();
     display.find((s) => s.name === '☐ バフを隠す')!.action!();
-    expect(char.hideName).toBe(true);
+    expect(onSetNameHidden).toHaveBeenCalledWith(true);
     expect(char.hideBuff).toBe(true);
+  });
+
+  it('offers hiding the name only where it may be hidden, so a player cannot show a name the master hid', () => {
+    const menu = buildGameCharacterContextMenu(
+      makeChar({ hideName: true }) as unknown as GameCharacter,
+      50,
+      makeService(),
+      callbacks(),
+      t
+    );
+
+    const display = groupOf(menu, '表示と扱い');
+    expect(names(display)).not.toContain('☑ 名前を隠す');
+    const told = display.find((entry) => entry.name === '☑ 名前を隠す（GMのみ）');
+    expect(told?.enabled).toBe(false);
+    expect(names(display)).toContain('☐ バフを隠す');
   });
 
   it('always offers the shared table, your own hands and the graveyard, and moves it to each', () => {
@@ -732,5 +797,27 @@ describe('what a piece can fire from its sheet', () => {
 
     expect(collectRegisteredEffects(piece)).toEqual([]);
     expect(collectRegisteredRangeShapes(piece)).toEqual([]);
+  });
+});
+
+describe('the menu of a piece the reader may not view', () => {
+  it('offers only to aim at it, and to let go of every aim while there is one', () => {
+    const char = { targeted: false } as GameCharacter;
+    const toggle = vi.fn();
+    const clear = vi.fn();
+
+    const aiming = buildUnviewableCharacterContextMenu(char, { onToggleTarget: toggle, onClearTargets: clear }, t);
+    expect(aiming.map((entry) => entry.name)).toEqual([
+      t('feature.character.contextMenu.target'),
+      t('feature.character.contextMenu.clearTargets'),
+    ]);
+    (aiming[0] as { action: () => void }).action();
+    (aiming[1] as { action: () => void }).action();
+    expect(toggle).toHaveBeenCalledTimes(1);
+    expect(clear).toHaveBeenCalledTimes(1);
+
+    char.targeted = true;
+    const aimed = buildUnviewableCharacterContextMenu(char, { onToggleTarget: toggle }, t);
+    expect(aimed.map((entry) => entry.name)).toEqual(['✔ ' + t('feature.character.contextMenu.target')]);
   });
 });

@@ -518,6 +518,17 @@ describe('EngagementZoneService', () => {
         expect(said).toHaveLength(2);
       });
 
+      it('offers no taking hold of a part, which goes where its body goes, and takes none', () => {
+        const { hero, foe } = fight();
+        const head = pieceAt(10, 10, true);
+        head.ridingOn = foe.identifier;
+        head.rideSeat = 'part';
+
+        expect(service.menuOf(hero).grabbable.map((one) => one.id)).not.toContain(head.identifier);
+        service.grab(hero, head);
+        expect(head.grabbedBy).toBe('');
+      });
+
       it('offers taking hold of an enemy at the same point only, and joining no zone of its own will', () => {
         const { hero, foe } = fight();
         pieceAt(16, 16, true);
@@ -731,22 +742,22 @@ describe('EngagementZoneService', () => {
     });
 
     it('is forming while turns are kept, and comes into force as a turn ends', () => {
-      TestBed.inject(TurnState).phase = 'acting';
+      TurnState.instance.phase = 'acting';
       const zone = service.formAt({ x: 5.5 * GRID, y: 5.5 * GRID }, [pieceAt(5, 5), pieceAt(5, 6, true)])!;
       expect(zone.isForming).toBe(true);
 
       TestBed.inject(TurnHooksService).turnEnded();
 
       expect(zone.isForming).toBe(false);
-      TestBed.inject(TurnState).phase = 'idle';
+      TurnState.instance.phase = 'idle';
     });
 
     it('forms at once while turns are kept, where it is asked to', () => {
-      TestBed.inject(TurnState).phase = 'acting';
+      TurnState.instance.phase = 'acting';
       const zone = service.formAt({ x: 5.5 * GRID, y: 5.5 * GRID }, [pieceAt(5, 5), pieceAt(5, 6, true)], true)!;
 
       expect(zone.isForming).toBe(false);
-      TestBed.inject(TurnState).phase = 'idle';
+      TurnState.instance.phase = 'idle';
     });
 
     it('forms nothing for fewer than two pieces', () => {

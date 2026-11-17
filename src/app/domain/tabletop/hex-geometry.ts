@@ -19,6 +19,9 @@ export function hexCircumradius(gridSize: number): number {
   return gridSize / Math.sqrt(3);
 }
 
+/** How much bigger than a cell each hex a board is cut to is, so the cut leaves no seam between cells. */
+export const HEX_CUT_OVERLAP_PX = 1;
+
 /** Whether the grid is the flat-topped hex grid, whose columns line up vertically. */
 export function isFlatTopGrid(gridType: GridType): boolean {
   return gridType === GridType.HEX_VERTICAL;
@@ -261,30 +264,4 @@ export function traceHexPath(sink: HexPathSink, cx: number, cy: number, s: numbe
     sink.lineTo(cx + s * cos[i], cy + s * sin[i]);
   }
   sink.closePath();
-}
-
-/** Outlines one hex on a canvas with the context's current stroke style. */
-export function strokeHexPath(
-  context: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  s: number,
-  startAngle: number
-): void {
-  context.beginPath();
-  traceHexPath(context, cx, cy, s, startAngle);
-  context.stroke();
-}
-
-/** Fills one hex on a canvas with the context's current fill style. */
-export function fillHexPath(
-  context: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  s: number,
-  startAngle: number
-): void {
-  context.beginPath();
-  traceHexPath(context, cx, cy, s, startAngle);
-  context.fill();
 }

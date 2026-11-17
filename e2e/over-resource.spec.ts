@@ -1,13 +1,13 @@
 import { expect, Locator, Page, test } from '@playwright/test';
 
-import { createCharacter, waitAppReady } from './helpers';
+import { createCharacter, rightClickPiece, waitAppReady } from './helpers';
 
 function newCharacterPiece(page: Page) {
   return page.locator('game-character').filter({ hasText: '新しいキャラクター' }).first();
 }
 
 async function openSheet(page: Page) {
-  await newCharacterPiece(page).dispatchEvent('contextmenu');
+  await rightClickPiece(newCharacterPiece(page));
   const menu = page.locator('context-menu');
   await expect(menu.locator('li').first()).toBeVisible({ timeout: 5000 });
   await menu.getByText('詳細を表示').click();
@@ -40,7 +40,7 @@ test.describe('a resource set to go over its maximum', () => {
     await current.blur();
     await expect(current).toHaveValue(String(most));
 
-    await row.locator('button[title="詳細設定"]').first().dispatchEvent('click');
+    await row.locator('button[aria-label="詳細設定"]').first().dispatchEvent('click');
     await row.locator('input[name="data-over-resource"]').check();
     await current.fill(String(most + 50));
     await current.blur();

@@ -35,8 +35,29 @@ export class RangeArea extends TabletopObject {
   @SyncVar() cellPattern: string = '';
   @SyncVar() customGridType: string = '';
   @SyncVar() isRotatable: boolean = false;
+  /**
+   * Whether it is put down wherever it is let go, off the table's grid whatever the table snaps to;
+   * read through {@link placesFreely}.
+   */
+  @SyncVar() freePlacement: boolean = false;
   /** The hotbar slot that laid this out, so the same slot can take it down again later. */
   @SyncVar() laidByHotbarSlot: string = '';
+
+  /**
+   * Whether it is put down wherever it is let go, as {@link freePlacement} is set: true alone, or the
+   * text a version that does not know the field passes on, so that `false` passed on as text is not
+   * taken to be set. A shape of its own cells never is, as they keep to the cell its point is in.
+   */
+  get placesFreely(): boolean {
+    if (this.type === 'CUSTOM') return false;
+    const set: unknown = this.freePlacement;
+    return set === true || set === 'true';
+  }
+
+  /** Sets it to be put down wherever it is let go, or not; see {@link placesFreely}. */
+  set placesFreely(free: boolean) {
+    this.freePlacement = free;
+  }
 
   /**
    * The range's shape: `LINE`, `CORN`, `TRIANGLE`, `SQUARE`, `RHOMBUS` (the diamond: the cells a
@@ -82,6 +103,16 @@ export class RangeArea extends TabletopObject {
     const whole = Number(element.value);
     const full = Number.isFinite(whole) && whole > 0 ? whole : 100;
     element.currentValue = Math.round(Math.max(0, Math.min(full, percent)));
+  }
+
+  /**
+   * Sizes the range to the box round its cell pattern, at least one cell each way, so a shape of its
+   * own cells is counted and painted at the size it was drawn.
+   */
+  fitToPattern(): void {
+    const bb = cellPatternBoundingBox(parseCellPattern(this.cellPattern));
+    this.length = Math.max(1, bb.height);
+    this.width = Math.max(1, bb.width);
   }
 
   /**
@@ -150,15 +181,12 @@ export class RangeArea extends TabletopObject {
     opacity: number,
     options: { isRotatable?: boolean; identifier?: string } = {}
   ): RangeArea {
-    const cells = parseCellPattern(cellPattern);
-    const bb = cellPatternBoundingBox(cells);
-    const width = Math.max(1, bb.width);
-    const length = Math.max(1, bb.height);
-    const object = RangeArea.create(name, width, length, opacity, options.identifier);
+    const object = RangeArea.create(name, 1, 1, opacity, options.identifier);
     object._type = 'CUSTOM';
     object.cellPattern = cellPattern;
     object.customGridType = gridType;
     object.isRotatable = options.isRotatable === true;
+    object.fitToPattern();
     return object;
   }
 

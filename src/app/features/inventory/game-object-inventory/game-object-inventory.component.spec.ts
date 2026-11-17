@@ -13,7 +13,7 @@ import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { PanelService } from '@axe/application/ui/panel.service';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
-import { Network } from '@axe/core/index';
+import { Network } from '@axe/core/network/network';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { resourceElementsOf } from '@axe/domain/character/resource-catalog';
 import { StatusAilmentCatalog } from '@axe/domain/character/status-ailment-catalog';
@@ -60,7 +60,7 @@ describe('GameObjectInventoryComponent', () => {
 
   afterEach(() => {
     localStorage.removeItem('ui-inventory-view');
-    (Config as unknown as { _instance: Config | undefined })._instance = undefined;
+    Config.forget();
   });
 
   it('should create', () => {
@@ -118,7 +118,7 @@ describe('GameObjectInventoryComponent', () => {
     beforeEach(() => {
       PeerCursor.myCursor = { role: PeerRole.GameMaster, identifier: 'seat-cursor' } as PeerCursor;
       vi.spyOn(TestBed.inject(ChatMessageService), 'sendSystemNotice').mockReturnValue(undefined as never);
-      const turnState = TestBed.inject(TurnState);
+      const turnState = TurnState.instance;
       Object.assign(turnState, {
         round: 0,
         phase: 'idle',
@@ -140,7 +140,7 @@ describe('GameObjectInventoryComponent', () => {
 
     afterEach(() => {
       turnOrder.reset();
-      TestBed.inject(TurnState).history = '[]';
+      TurnState.instance.history = '[]';
       vi.restoreAllMocks();
     });
 
@@ -187,14 +187,14 @@ describe('GameObjectInventoryComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       const element = fixture.nativeElement as HTMLElement;
-      const rounds = [...element.querySelectorAll<HTMLButtonElement>('button[title]')].map((button) => button.title);
-      const companions = [...element.querySelectorAll('[data-testid="turn-companions"] [title]')].map((round) =>
-        round.getAttribute('title')
+      const rounds = [...element.querySelectorAll('[data-turn-piece]')].map((round) =>
+        round.getAttribute('aria-label')!
       );
+      const riding = rounds.find((round) => round.startsWith('騎士'));
 
-      expect(rounds).toContain('騎士');
-      expect(rounds).not.toContain('馬');
-      expect(companions).toEqual(['馬', '従者']);
+      expect(riding).toContain('一緒に動く: 馬, 従者');
+      expect(rounds.some((round) => round.startsWith('馬'))).toBe(false);
+      expect(element.querySelectorAll('[data-testid="turn-companions"] > span')).toHaveLength(2);
       TestBed.inject(PanelService).isShrunk.set(false);
     });
   });
@@ -358,7 +358,7 @@ describe('GameObjectInventoryComponent', () => {
       // Personal folders live on the device, so they outlive the store cleanup too.
       localStorage.clear();
       // The summary settings are a synced singleton, so its folders outlive the store cleanup.
-      (DataSummarySetting as unknown as Record<string, unknown>)['_instance'] = undefined;
+      DataSummarySetting.forget();
       vi.unstubAllGlobals();
       vi.restoreAllMocks();
     });
@@ -517,7 +517,7 @@ describe('GameObjectInventoryComponent', () => {
 
       it('folds the shared folders after the reader has been through their own', () => {
         const mine = putInShared('相棒');
-        mine.setLocation(Network.peerId);
+        mine.setLocation(Network.instance.peerId);
         mine.folderName = '手持ち';
         const villager = putInShared('村長');
         villager.folderName = '村';
@@ -557,7 +557,7 @@ describe('GameObjectInventoryComponent', () => {
         const shared = putInShared('村長');
         shared.folderName = '村';
         const mine = putInShared('相棒');
-        mine.setLocation(Network.peerId);
+        mine.setLocation(Network.instance.peerId);
         mine.folderName = '村';
         TestBed.inject(InventoryViewPreferenceService).setFoldsOnOpen(true);
         const panel = opened();
@@ -695,6 +695,21 @@ describe('GameObjectInventoryComponent', () => {
 
       component.folders.startFolderRename('第1話');
       component.folders.commitFolderRename('第1話', '序章');
+      expect(goblin.folderName).toBe('序章');
+    });
+
+    it('renames to what the name field holds when it is committed from the field', () => {
+      const goblin = putInShared('ゴブリン');
+      goblin.folderName = '第1話';
+      component.selectTab.set('common');
+      const field = document.createElement('input');
+      field.value = '序章';
+      const typed = new Event('blur');
+      Object.defineProperty(typed, 'target', { value: field });
+
+      component.folders.startFolderRename('第1話');
+      component.folders.commitFolderRenameFrom('第1話', typed, true);
+
       expect(goblin.folderName).toBe('序章');
     });
 
@@ -881,7 +896,7 @@ describe('GameObjectInventoryComponent', () => {
       const shared = putInShared('ゴブリン');
       shared.folderName = '第1話';
       const mine = GameCharacter.create('相棒', 1, '');
-      mine.setLocation(Network.peerId);
+      mine.setLocation(Network.instance.peerId);
       mine.folderName = '第1話';
 
       component.selectTab.set(PERSONAL_INVENTORY_TAB);
@@ -895,7 +910,7 @@ describe('GameObjectInventoryComponent', () => {
       const shared = putInShared('ゴブリン');
       shared.folderName = '第1話';
       const mine = GameCharacter.create('相棒', 1, '');
-      mine.setLocation(Network.peerId);
+      mine.setLocation(Network.instance.peerId);
       mine.folderName = '第1話';
       vi.spyOn(TestBed.inject(ConfirmService), 'ask').mockResolvedValue(true);
 
@@ -1078,7 +1093,7 @@ describe('GameObjectInventoryComponent', () => {
 
       dragOnto(goblin, tab(PERSONAL_INVENTORY_TAB));
 
-      expect(goblin.location.name).toBe(Network.peerId);
+      expect(goblin.location.name).toBe(Network.instance.peerId);
     });
 
     it('moves the ticked selection along and lets it go from the selection', () => {
@@ -1277,7 +1292,7 @@ describe('GameObjectInventoryComponent', () => {
     describe('reading the cast as a table', () => {
       afterEach(() => {
         TestBed.inject(StatusAilmentService).save([]);
-        (StatusAilmentCatalog as unknown as Record<string, unknown>)['_instance'] = undefined;
+        StatusAilmentCatalog.forget();
       });
 
       function tableRows(): HTMLElement[] {
@@ -1327,6 +1342,32 @@ describe('GameObjectInventoryComponent', () => {
 
         const value = tableRows()[0].querySelector('input[name="table-current-value"]') as HTMLElement;
         expect(value.style.color).not.toBe('');
+      });
+
+      it('shows an alias as a column, and sets every item behind it when the column is typed in', async () => {
+        const piece = putOnTable('二つ持ち');
+        const speeds = [10, 12].map((current, at) => {
+          const group = DataElement.create(at === 0 ? '基本' : '戦闘', '');
+          const speed = DataElement.create('行動値', 20, {
+            type: DataElementType.NUMBER_RESOURCE,
+            currentValue: current,
+          });
+          piece.detailDataElement!.appendChild(group);
+          group.appendChild(speed);
+          return speed;
+        });
+        DataSummarySetting.instance.aliases = [{ name: '行動値', candidates: ['基本/行動値', '戦闘/行動値'] }];
+        TestBed.inject(GameObjectInventoryService).tableDataTag = '行動値';
+        component.setViewMode('table');
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const input = tableRows()[0].querySelector('input[name="table-current-value"]') as HTMLInputElement;
+        expect(input.value).toBe('10');
+        input.value = '15';
+        input.dispatchEvent(new Event('input'));
+
+        expect(speeds.map((speed) => Number(speed.currentValue))).toEqual([15, 15]);
       });
 
       it('gives the heading and every row the same columns', () => {
@@ -1493,6 +1534,30 @@ describe('GameObjectInventoryComponent', () => {
       expect(icons).not.toContain('create_new_folder');
     });
 
+    it('offers no folder on the graveyard tab either', () => {
+      GameCharacter.create('倒れた兵', 1, '').setLocation('graveyard');
+      component.selectTab.set('graveyard');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('button[title="新しいフォルダ"]')).toBeNull();
+    });
+
+    it('offers to empty the graveyard on that tab alone', () => {
+      GameCharacter.create('倒れた兵', 1, '').setLocation('graveyard');
+      const sweeper = () =>
+        [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find((button) =>
+          button.textContent?.includes('墓場を空にする')
+        );
+      component.selectTab.set('table');
+      fixture.detectChanges();
+      expect(sweeper()).toBeUndefined();
+
+      component.selectTab.set('graveyard');
+      fixture.detectChanges();
+
+      expect(sweeper()?.disabled).toBe(false);
+    });
+
     describe('a second window on the same table', () => {
       let closePanelLayer: (() => void) | null = null;
       let other: ComponentFixture<GameObjectInventoryComponent> | null = null;
@@ -1516,6 +1581,23 @@ describe('GameObjectInventoryComponent', () => {
 
         expect(other.componentInstance.viewMode()).toBe('rich');
         expect(other.componentInstance.searchQuery()).toBe('');
+      });
+
+      it('opens the settings window from its button, and puts it away with a second press', () => {
+        closePanelLayer = installPanelLayer();
+        fixture.detectChanges();
+        const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+          'button[title="表示設定"]'
+        )!;
+
+        button.click();
+        expect(component.isEdit()).toBe(true);
+        expect(document.querySelector('inventory-filter-panel')).not.toBeNull();
+
+        button.click();
+
+        expect(component.isEdit()).toBe(false);
+        expect(document.querySelector('inventory-filter-panel')).toBeNull();
       });
 
       it('takes the settings window off the first when it opens its own', () => {
@@ -1595,7 +1677,7 @@ describe('GameObjectInventoryComponent', () => {
 
         afterEach(() => {
           localStorage.removeItem('ui-inventory-round-in-play');
-          TestBed.inject(TurnState).round = 0;
+          TurnState.instance.round = 0;
           vi.restoreAllMocks();
         });
 
@@ -1617,7 +1699,7 @@ describe('GameObjectInventoryComponent', () => {
         });
 
         it('comes back once a round has begun', async () => {
-          TestBed.inject(TurnState).round = 2;
+          TurnState.instance.round = 2;
           await Promise.resolve();
           viewPreference().setRoundInPlay(true);
           fixture.detectChanges();
@@ -1720,7 +1802,7 @@ describe('GameObjectInventoryComponent', () => {
 
       it('shows the display items of a piece on the personal tab too', () => {
         const mine = putOnTable('相棒');
-        mine.setLocation(Network.peerId);
+        mine.setLocation(Network.instance.peerId);
         TestBed.inject(GameObjectInventoryService).dataTag = 'HP';
         component.selectTab.set(PERSONAL_INVENTORY_TAB);
         fixture.detectChanges();
@@ -2054,6 +2136,77 @@ describe('GameObjectInventoryComponent', () => {
 
         for (const action of actions()) expect(action.disabled).toBe(false);
       });
+
+      /** The button of the bar whose words are exactly the label. */
+      function buttonNamed(label: string): HTMLButtonElement | undefined {
+        return [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
+          (button) => button.textContent?.trim() === label
+        );
+      }
+
+      it('starts from its button in the bar above the list, and stops with the close button, dropping the picks', () => {
+        const goblin = putOnTable('ゴブリン');
+        fixture.detectChanges();
+
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button[title="一括移動"]')!.click();
+        fixture.detectChanges();
+        component.multiMoveTargets.set(new Set([goblin.identifier]));
+        expect(component.isMultiMove()).toBe(true);
+        expect(actions().length).toBeGreaterThan(0);
+
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button[title="キャンセル"]')!.click();
+        fixture.detectChanges();
+
+        expect(component.isMultiMove()).toBe(false);
+        expect(component.multiMoveTargets().size).toBe(0);
+        expect(actions()).toHaveLength(0);
+      });
+
+      it('picks the whole tab with "select all", which then lets them all go again', () => {
+        putOnTable('ゴブリン');
+        putOnTable('村長');
+        component.selectTab.set('table');
+        component.isMultiMove.set(true);
+        fixture.detectChanges();
+
+        buttonNamed('全選択')!.click();
+        fixture.detectChanges();
+        expect(component.multiMoveTargets().size).toBe(2);
+        expect(buttonNamed('全選択')).toBeUndefined();
+
+        buttonNamed('全解除')!.click();
+        fixture.detectChanges();
+
+        expect(component.multiMoveTargets().size).toBe(0);
+        expect(buttonNamed('全選択')).toBeDefined();
+      });
+
+      it('hides the picked pieces from the list, or shows them, from buttons on the table tab alone', () => {
+        const goblin = putOnTable('ゴブリン');
+        const keeper = putInShared('番人');
+        component.isMultiMove.set(true);
+        const hiders = () =>
+          ['インベントリで非表示', 'インベントリで表示'].map((title) =>
+            (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(`button[title="${title}"]`)
+          );
+
+        component.selectTab.set('common');
+        component.multiMoveTargets.set(new Set([keeper.identifier]));
+        fixture.detectChanges();
+        expect(hiders()).toEqual([null, null]);
+
+        component.selectTab.set('table');
+        component.multiMoveTargets.set(new Set([goblin.identifier]));
+        fixture.detectChanges();
+        hiders()[0]!.click();
+        expect(goblin.hideInventory).toBe(true);
+
+        component.isMultiMove.set(true);
+        component.multiMoveTargets.set(new Set([goblin.identifier]));
+        fixture.detectChanges();
+        hiders()[1]!.click();
+        expect(goblin.hideInventory).toBe(false);
+      });
     });
 
     describe('pressing a row inside a movable panel', () => {
@@ -2229,7 +2382,7 @@ describe('GameObjectInventoryComponent', () => {
 
     beforeEach(() => {
       peerId = 'peer-before';
-      vi.spyOn(Network, 'peerId', 'get').mockImplementation(() => peerId);
+      vi.spyOn(Network.instance, 'peerId', 'get').mockImplementation(() => peerId);
       fixture.detectChanges();
     });
 
@@ -2270,7 +2423,50 @@ describe('GameObjectInventoryComponent', () => {
       peerId = 'peer-after';
       component.selectTab.set(PERSONAL_INVENTORY_TAB);
 
-      expect(component.multiMoveLocations.map((loc) => loc.name)).toEqual(['table', 'common', 'graveyard']);
+      expect(component.multiMoveLocations().map((loc) => loc.tab)).toEqual(['table', 'common', 'graveyard']);
+    });
+  });
+
+  describe('the turn order alone', () => {
+    it('is reached from the one view button in the bar, past the table, and draws only the round, every piece on the table in it', async () => {
+      const seat = PeerCursor.myCursor;
+      PeerCursor.myCursor = { role: PeerRole.GameMaster, identifier: 'seat-cursor' } as PeerCursor;
+      const pieces = ['先手', '後手'].map((name) => {
+        const piece = GameCharacter.create(name, 1, '');
+        piece.setLocation('table');
+        return piece;
+      });
+      const panel = TestBed.inject(PanelService);
+      const asked: boolean[] = [];
+      const off = panel.shrinkRequest$.subscribe((shrink) => asked.push(shrink));
+      const pressViewButton = () => {
+        fixture.detectChanges();
+        panel.headerControls()[0].press();
+      };
+      try {
+        pressViewButton();
+        pressViewButton();
+        expect(asked).toEqual([false, true]);
+
+        panel.isShrunk.set(true);
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const element = fixture.nativeElement as HTMLElement;
+        expect(element.querySelector('[data-inventory-tab]')).toBeNull();
+        expect([...element.querySelectorAll('i.material-icons')].map((icon) => icon.textContent?.trim())).toContain(
+          'restart_alt'
+        );
+        const rounds = [...element.querySelectorAll('[data-turn-piece]')].map(
+          (round) => round.getAttribute('aria-label')!.split(' / ')[0]
+        );
+        expect(rounds).toEqual(expect.arrayContaining(['先手', '後手']));
+      } finally {
+        off();
+        panel.isShrunk.set(false);
+        for (const piece of pieces) piece.destroy();
+        PeerCursor.myCursor = seat;
+      }
     });
   });
 });

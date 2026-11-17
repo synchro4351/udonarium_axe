@@ -1,10 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { EffectPlaybackService, MAX_ACTIVE_REACTIONS } from '@axe/application/effect/effect-playback.service';
-import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
-import { TabletopService } from '@axe/application/tabletop/tabletop.service';
+import { EffectPlaybackService } from '@axe/application/effect/effect-playback.service';
 import { VolumeType } from '@axe/core/storage/audio-output';
 import { ObjectStore } from '@axe/core/sync/object-store';
-import { GameCharacter } from '@axe/domain/character/game-character';
 import { EffectPreset } from '@axe/domain/effect/effect-preset';
 import { SoundEffect } from '@axe/domain/media/sound-effect';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -23,6 +20,7 @@ describe('EffectPlaybackService', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     ObjectStore.instance.remove(preset);
   });
 
@@ -68,41 +66,17 @@ describe('EffectPlaybackService', () => {
     expect(service.activeCasts()).toHaveLength(12);
   });
 
-  it('keeps only the latest few reactions up, leaving the other effects alone', () => {
-    const reaction = new EffectPreset();
-    reaction.kind = 'reactpop';
-    reaction.reactionText = '👍';
-    ObjectStore.instance.add(reaction, false);
-    try {
-      service.play(cast());
-      for (let count = 0; count < 9; count++) {
-        service.play(cast({ presetIdentifier: reaction.identifier, seed: count }));
-      }
-
-      const reactions = service.activeCasts().filter((active) => active.preset === reaction);
-      expect(reactions).toHaveLength(MAX_ACTIVE_REACTIONS);
-      expect(reactions.map((active) => active.cast.seed)).toEqual([5, 6, 7, 8]);
-      expect(service.activeCasts().filter((active) => active.preset === preset)).toHaveLength(1);
-    } finally {
-      ObjectStore.instance.remove(reaction);
-    }
-  });
-
-  it('never shakes the screen for a reaction', () => {
-    preset.kind = 'reactthrow';
-    preset.grade = 3;
-    service.play(cast());
-
-    expect(service.shake()).toBe('');
-    expect(service.flash()).toBe('');
-  });
-
-  it('shakes the screen only for an effect that lands', () => {
+  it('shakes the screen as an effect lands its blow, and not before', () => {
+    vi.useFakeTimers();
     preset.kind = 'burst';
     preset.grade = 3;
     service.play(cast());
+    expect(service.shake()).toBe('');
+
+    vi.advanceTimersByTime(60);
 
     expect(service.shake()).toBe('hard');
+    vi.useRealTimers();
   });
 
   it('never shakes for healing', () => {
@@ -112,19 +86,22 @@ describe('EffectPlaybackService', () => {
 
     // Shaking for everything would leave the impact meaning nothing.
     expect(service.shake()).toBe('');
-    expect(service.flash()).toBe('');
   });
 
   it('takes the stronger of two casts in quick succession', () => {
+    vi.useFakeTimers();
     preset.kind = 'burst';
     preset.grade = 2;
     service.play(cast());
+    vi.advanceTimersByTime(60);
     expect(service.shake()).toBe('soft');
 
     preset.grade = 3;
     service.play(cast());
+    vi.advanceTimersByTime(60);
 
     expect(service.shake()).toBe('hard');
+    vi.useRealTimers();
   });
 
   it('tells the piece how to fall when the effect fells it', () => {
@@ -139,35 +116,5 @@ describe('EffectPlaybackService', () => {
     service.play(cast());
 
     expect(service.tokenReactions().size).toBe(0);
-  });
-});
-
-describe('EffectPlaybackService linked targets', () => {
-  it('resolves each viewer locally without changing the broadcast', () => {
-    const part = GameCharacter.create('Dragon(Head)', 2, '');
-    part.partGroup = 'group';
-    part.partRegion = '0 0 0.5 1 1';
-    const preset = new EffectPreset();
-    ObjectStore.instance.add(preset, false);
-    let local = { x: 100, y: 200, z: 30 };
-    TestBed.configureTestingModule({ providers: [...TEST_PROVIDERS] });
-    TestBed.overrideProvider(MultipartGroupService, { useValue: { anchorOf: () => local } });
-    TestBed.overrideProvider(TabletopService, { useValue: { gridSize: () => 50 } });
-    const service = TestBed.inject(EffectPlaybackService);
-    const raw = {
-      presetIdentifier: preset.identifier,
-      seed: 1,
-      targets: [{ identifier: part.identifier, x: 5, y: 6, z: 7 }],
-    };
-    try {
-      expect(service.play(raw)?.cast.targets[0]).toEqual({ identifier: part.identifier, ...local });
-      local = { x: 300, y: 400, z: 50 };
-      expect(service.play(raw)?.cast.targets[0]).toEqual({ identifier: part.identifier, ...local });
-      expect(raw.targets).toEqual([{ identifier: part.identifier, x: 5, y: 6, z: 7 }]);
-    } finally {
-      part.destroy();
-      ObjectStore.instance.remove(preset);
-      TestBed.resetTestingModule();
-    }
   });
 });

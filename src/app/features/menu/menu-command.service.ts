@@ -8,6 +8,8 @@ import { PointerDeviceService } from '@axe/application/input/pointer-device.serv
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { FirstPersonService } from '@axe/application/tabletop/first-person.service';
+import { GroundBrushService } from '@axe/application/tabletop/ground-brush.service';
+import { Table3dQualityService } from '@axe/application/tabletop/table-3d-quality.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { TurnOrderService } from '@axe/application/turn/turn-order.service';
 import { BuffViewPreferenceService } from '@axe/application/ui/buff-view-preference.service';
@@ -20,6 +22,7 @@ import { NpcBarService } from '@axe/application/ui/npc-bar.service';
 import { PieceOverlayPreferenceService } from '@axe/application/ui/piece-overlay-preference.service';
 import { RenderLiteService, RenderLiteSetting } from '@axe/application/ui/render-lite.service';
 import { Theme, ThemeService } from '@axe/application/ui/theme.service';
+import { TurnFocusPreferenceService, TurnFocusSetting } from '@axe/application/ui/turn-focus-preference.service';
 import { ViewModePreferenceService } from '@axe/application/ui/view-mode-preference.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
 import { VisualNovelModeService } from '@axe/application/ui/visual-novel-mode.service';
@@ -42,6 +45,7 @@ import {
 import { isMenuGroup, MenuLayout, MenuNode } from '@axe/domain/ui/menu-layout';
 import { nextViewMode, viewModeIcon, viewModeLabelKey } from '@axe/domain/ui/view-mode';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
+import type { Table3dQualitySetting } from '@axe/infrastructure/table-3d/table-3d-quality';
 
 const THEME_ICONS: Readonly<Record<Theme, string>> = {
   auto: 'brightness_auto',
@@ -53,10 +57,21 @@ const MOTION_ICONS: Readonly<Record<MotionSetting, string>> = {
   on: 'motion_photos_on',
   off: 'motion_photos_off',
 };
+const TURN_FOCUS_ICONS: Readonly<Record<TurnFocusSetting, string>> = {
+  all: 'center_focus_strong',
+  own: 'person_pin_circle',
+  none: 'location_disabled',
+};
 const RENDER_LITE_ICONS: Readonly<Record<RenderLiteSetting, string>> = {
   auto: 'blur_circular',
   on: 'blur_off',
   off: 'blur_on',
+};
+const TABLE_QUALITY_ICONS: Readonly<Record<Table3dQualitySetting, string>> = {
+  auto: 'hdr_auto',
+  high: 'high_quality',
+  standard: 'hd',
+  light: 'sd',
 };
 const BUFF_VIEW_ICONS: Readonly<Record<BuffViewMode, string>> = {
   icon: 'bubble_chart',
@@ -137,11 +152,14 @@ export class MenuCommandService {
   private readonly viewMode = inject(ViewModePreferenceService);
   private readonly theme = inject(ThemeService);
   private readonly motion = inject(MotionService);
+  private readonly turnFocus = inject(TurnFocusPreferenceService);
   private readonly renderLite = inject(RenderLiteService);
+  private readonly tableQuality = inject(Table3dQualityService);
   private readonly language = inject(LanguageService);
   private readonly buffView = inject(BuffViewPreferenceService);
   private readonly mobile = inject(MobileLayoutService);
   private readonly viewport = inject(ViewportService);
+  private readonly groundBrush = inject(GroundBrushService);
 
   private readonly roomFiles = inject(RoomFilesService);
   private filePicker: (() => void) | null = null;
@@ -241,10 +259,12 @@ export class MenuCommandService {
   /**
    * Whether the command is worth drawing now.
    *
-   * Only the switch to the small-screen layout answers no: it is meaningless on a screen wide
-   * enough for the desktop one, or on a screen already using it.
+   * The switch to the small-screen layout answers no on a screen wide enough for the desktop one,
+   * or on a screen already using it. A chat tool is pressed on a line said in chat and does nothing
+   * on a menu, so one carried into a menu's arrangement is not drawn there.
    */
   isAvailable(command: MenuCommand): boolean {
+    if (command.action.kind === 'chatTool') return false;
     if (command.action.kind === 'act' && command.action.act === 'useMobileLayout') {
       return this.viewport.isCompact() && this.mobile.prefersDesktop();
     }
@@ -262,8 +282,12 @@ export class MenuCommandService {
           return THEME_ICONS[this.theme.theme()];
         case 'motion':
           return MOTION_ICONS[this.motion.setting()];
+        case 'turnFocus':
+          return TURN_FOCUS_ICONS[this.turnFocus.setting()];
         case 'renderLite':
           return RENDER_LITE_ICONS[this.renderLite.setting()];
+        case 'tableQuality':
+          return TABLE_QUALITY_ICONS[this.tableQuality.setting()];
         case 'buffView':
           return BUFF_VIEW_ICONS[this.buffView.mode()];
         case 'buffIconSize':
@@ -275,6 +299,8 @@ export class MenuCommandService {
       switch (action.toggle) {
         case 'darkness':
           return this.darknessEnabled() ? 'bedtime' : 'bedtime_off';
+        case 'groundBrush':
+          return 'landscape';
         case 'fog':
           return this.fogEnabled() ? 'foggy' : 'filter_drama';
         case 'nameLabels':
@@ -301,8 +327,12 @@ export class MenuCommandService {
           return `common.theme.${this.theme.theme()}`;
         case 'motion':
           return `common.motion.${this.motion.setting()}`;
+        case 'turnFocus':
+          return `feature.turnFocus.${this.turnFocus.setting()}`;
         case 'renderLite':
           return `common.renderLite.${this.renderLite.setting()}`;
+        case 'tableQuality':
+          return `common.tableQuality.${this.tableQuality.setting()}`;
         case 'buffView':
           return BUFF_VIEW_LABEL_KEYS[this.buffView.mode()];
         case 'buffIconSize':
@@ -316,6 +346,8 @@ export class MenuCommandService {
       switch (action.toggle) {
         case 'darkness':
           return this.darknessEnabled() ? 'app.fab.darknessOn' : 'app.fab.darknessOff';
+        case 'groundBrush':
+          return 'app.fab.groundBrush';
         case 'fog':
           return this.fogEnabled() ? 'app.fab.fogOn' : 'app.fab.fogOff';
         case 'nameLabels':
@@ -359,6 +391,8 @@ export class MenuCommandService {
         return this.handRail.isOpen();
       case 'darkness':
         return this.darknessEnabled();
+      case 'groundBrush':
+        return this.groundBrush.active();
       case 'fog':
         return this.fogEnabled();
       case 'nameLabels':
@@ -472,6 +506,8 @@ export class MenuCommandService {
         return this.act(action.act);
       case 'custom':
         return 'drawsItself';
+      case 'chatTool':
+        return 'unavailable';
     }
   }
 
@@ -485,6 +521,9 @@ export class MenuCommandService {
         return;
       case 'darkness':
         this.flipTable('darknessEnabled');
+        return;
+      case 'groundBrush':
+        this.groundBrush.active.update((active) => !active);
         return;
       case 'fog':
         this.flipTable('fogEnabled');
@@ -545,8 +584,14 @@ export class MenuCommandService {
       case 'motion':
         this.motion.cycle();
         return;
+      case 'turnFocus':
+        this.turnFocus.cycle();
+        return;
       case 'renderLite':
         this.renderLite.cycle();
+        return;
+      case 'tableQuality':
+        this.tableQuality.cycle();
         return;
       case 'language':
         void this.language.toggle();

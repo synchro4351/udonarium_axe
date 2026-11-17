@@ -1,11 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ResourceSliderService } from '@axe/application/character/resource-slider.service';
+import { EffectLibraryService } from '@axe/application/effect/effect-library.service';
+import { EffectTargetingService } from '@axe/application/effect/effect-targeting.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ContextMenuAction, ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectNode } from '@axe/core/sync/object-node';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import {
   DataElement,
   DataElementAttribute,
@@ -14,6 +17,7 @@ import {
   DataElementType,
   DataElementViewMode,
 } from '@axe/domain/data/data-element';
+import { DataSummarySetting } from '@axe/domain/data/data-summary-setting';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { IN_DATA_ELEMENT_SHEET } from '@axe/features/data-element/game-data-element/data-element-sheet-host';
@@ -46,6 +50,7 @@ describe('GameDataElementComponent', () => {
 
   let component: GameDataElementComponent;
   let fixture: ComponentFixture<GameDataElementComponent>;
+  let given: DataElement;
 
   beforeEach(async () => {
     TestBed.configureTestingModule({
@@ -57,10 +62,39 @@ describe('GameDataElementComponent', () => {
   beforeEach(() => {
     fixture = TestBed.createComponent(GameDataElementComponent);
     component = fixture.componentInstance;
+    // Given its item at once, as a template gives it, so that no drawing of the page made before a
+    // test gives its own reads the required input unset.
+    given = DataElement.create('項目', '', {});
+    fixture.componentRef.setInput('gameDataElement', given);
   });
+
+  afterEach(() => given.destroy());
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('casts the effect its row names from the piece the sheet is of, through the choosing of targets', () => {
+    const character = GameCharacter.create('術者', 1, '');
+    const field = DataElement.create('演出', '', {
+      [DataElementAttribute.ROLE]: DataElementRole.FIELD,
+      [DataElementAttribute.FIELD_TYPE]: DataElementFieldType.EFFECT,
+    });
+    field.currentValue = '爆炎';
+    character.detailDataElement?.appendChild(field);
+    const preset = { identifier: 'preset', name: '爆炎' };
+    vi.spyOn(TestBed.inject(EffectLibraryService), 'findByName').mockReturnValue(preset as never);
+    const castFrom = vi.spyOn(TestBed.inject(EffectTargetingService), 'castFrom').mockReturnValue('held');
+
+    try {
+      fixture.componentRef.setInput('gameDataElement', field);
+      (component as unknown as { invokeEffect(): void }).invokeEffect();
+
+      expect(castFrom).toHaveBeenCalledWith(preset, character);
+    } finally {
+      vi.restoreAllMocks();
+      character.destroy();
+    }
   });
 
   describe('a long text being edited', () => {
@@ -653,6 +687,40 @@ describe('GameDataElementComponent', () => {
       component.addElement();
 
       expect(group.children.map((child) => child.name)).toEqual(['タグ', 'タグ 2']);
+    });
+
+    it('gives a value typed on the sheet to the items sharing an alias with it, in the same write', () => {
+      vi.useFakeTimers();
+      try {
+        const detail = DataElement.create('detail', '');
+        const [first, second] = ['基本', '戦闘'].map((name, at) => {
+          const group = DataElement.create(name, '', { role: DataElementRole.SECTION });
+          const speed = DataElement.create('行動値', 20, {
+            type: DataElementType.NUMBER_RESOURCE,
+            currentValue: at === 0 ? 10 : 12,
+          });
+          detail.appendChild(group);
+          group.appendChild(speed);
+          return speed;
+        });
+        DataSummarySetting.instance.aliases = [{ name: '行動値', candidates: ['基本/行動値', '戦闘/行動値'] }];
+        fixture.componentRef.setInput('gameDataElement', first);
+        fixture.detectChanges();
+
+        component.currentValue = 15;
+        vi.advanceTimersByTime(70);
+
+        expect(first.currentValue).toBe(15);
+        expect(second.currentValue).toBe(15);
+        expect(second.value).toBe(20);
+
+        component.value = 30;
+        vi.advanceTimersByTime(70);
+
+        expect(second.value).toBe(30);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('refuses to rename a tag onto one already taken', () => {
@@ -1588,11 +1656,137 @@ describe('GameDataElementComponent', () => {
   });
 });
 
+describe('GameDataElementComponent, the mark that puts a field back to its default (acceptance 19)', () => {
+  let fixture: ComponentFixture<GameDataElementComponent>;
+  let piece: GameCharacter;
+
+  /** A number field on the sheet of a piece, holding one value and keeping another as its default. */
+  function numberField(value: number, fallback?: string): DataElement {
+    const field = DataElement.create('命中', value, {
+      [DataElementAttribute.ROLE]: DataElementRole.FIELD,
+      [DataElementAttribute.FIELD_TYPE]: DataElementFieldType.NUMBER,
+      ...(fallback === undefined ? {} : { [DataElementAttribute.DEFAULT]: fallback }),
+    });
+    piece.detailDataElement!.children[0].appendChild(field);
+    return field;
+  }
+
+  function show(field: DataElement, isEdit = false): HTMLElement {
+    fixture = TestBed.createComponent(GameDataElementComponent);
+    fixture.componentRef.setInput('gameDataElement', field);
+    fixture.componentRef.setInput('isEdit', isEdit);
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  const mark = (host: HTMLElement) => host.querySelector<HTMLButtonElement>('[data-testid="default-mark"]');
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [GameDataElementComponent], providers: [...TEST_PROVIDERS] });
+    PeerCursor.createMyCursor().role = PeerRole.Player;
+    piece = GameCharacter.create('騎士', 1, '');
+  });
+
+  afterEach(() => {
+    PeerCursor.myCursor = null!;
+    piece.destroy();
+  });
+
+  it('shows the mark on a field that does not stand at its default, saying what the default is', () => {
+    const host = show(numberField(7, '5'));
+
+    expect(mark(host)?.textContent?.trim()).toBe('↺');
+    expect(mark(host)?.getAttribute('aria-label')).toBe(
+      TestBed.inject(TRANSLATE_FN)('feature.dataElement.field.backToDefault', { value: '5' })
+    );
+  });
+
+  it('shows no mark on a field at its default, on one that keeps none, or on one whose default is empty', () => {
+    expect(mark(show(numberField(5, '5')))).toBeNull();
+    expect(mark(show(numberField(7)))).toBeNull();
+    expect(mark(show(numberField(7, '')))).toBeNull();
+    expect(mark(show(numberField(0, '0')))).toBeNull();
+  });
+
+  it('puts that one field back at a press, leaves the others, and the mark goes', () => {
+    const hit = numberField(7, '5');
+    const dodge = numberField(9, '4');
+    const host = show(hit);
+
+    mark(host)!.click();
+    fixture.detectChanges();
+
+    expect([hit.value, dodge.value]).toEqual([5, 9]);
+    expect(mark(host)).toBeNull();
+  });
+
+  it('shows the mark again once the value is moved off the default', () => {
+    const hit = numberField(5, '5');
+    const host = show(hit);
+    expect(mark(host)).toBeNull();
+
+    hit.value = 8;
+    TestBed.inject(ObjectChangeService).notifyChanged(hit.identifier);
+    fixture.detectChanges();
+
+    expect(mark(host)).not.toBeNull();
+  });
+
+  it('tells a resource by what is left over its maximum, and a checkbox by its tick', () => {
+    const hp = DataElement.create('HP', 20, {
+      type: DataElementType.NUMBER_RESOURCE,
+      currentValue: 4,
+      [DataElementAttribute.DEFAULT]: '20',
+      [DataElementAttribute.DEFAULT_MAX]: '20',
+    });
+    const prone = DataElement.create('転倒', 1, {
+      type: DataElementType.CHECK,
+      [DataElementAttribute.FIELD_TYPE]: DataElementFieldType.CHECK,
+      [DataElementAttribute.DEFAULT]: '0',
+    });
+    piece.detailDataElement!.children[0].appendChild(hp);
+    piece.detailDataElement!.children[0].appendChild(prone);
+    const t = TestBed.inject(TRANSLATE_FN);
+
+    expect(mark(show(hp))?.getAttribute('aria-label')).toBe(
+      t('feature.dataElement.field.backToDefault', { value: '20/20' })
+    );
+    expect(mark(show(prone))?.getAttribute('aria-label')).toBe(
+      t('feature.dataElement.field.backToDefault', { value: t('feature.dataElement.field.defaultUnchecked') })
+    );
+  });
+
+  it('sits in the cell of the name, never among what the value is typed into, reading or editing', () => {
+    for (const isEdit of [false, true]) {
+      const host = show(numberField(7, '5'), isEdit);
+
+      expect(mark(host)?.closest('.elm-name-cell')).not.toBeNull();
+      expect(host.querySelector('.elm-value-cell [data-testid="default-mark"]')).toBeNull();
+    }
+  });
+
+  it('shows a seat that only watches no mark, and puts nothing back for it', () => {
+    PeerCursor.myCursor.role = PeerRole.Guest;
+    const hit = numberField(7, '5');
+    const host = show(hit);
+
+    expect(mark(host)).toBeNull();
+    fixture.componentInstance.backToDefault();
+
+    expect(hit.value).toBe(7);
+  });
+});
+
 describe('GameDataElementComponent on a sheet', () => {
   let component: GameDataElementComponent;
   let fixture: ComponentFixture<GameDataElementComponent>;
 
-  function show(element: DataElement, options: { inSheet?: boolean; isEdit?: boolean } = {}): HTMLElement {
+  afterEach(() => vi.restoreAllMocks());
+
+  function show(
+    element: DataElement,
+    options: { inSheet?: boolean; isEdit?: boolean; addsInView?: boolean } = {}
+  ): HTMLElement {
     TestBed.configureTestingModule({
       imports: [GameDataElementComponent],
       providers: [
@@ -1603,6 +1797,7 @@ describe('GameDataElementComponent on a sheet', () => {
     fixture = TestBed.createComponent(GameDataElementComponent);
     component = fixture.componentInstance;
     fixture.componentRef.setInput('isEdit', options.isEdit ?? false);
+    fixture.componentRef.setInput('addsInView', options.addsInView ?? false);
     fixture.componentRef.setInput('gameDataElement', element);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
@@ -1712,6 +1907,43 @@ describe('GameDataElementComponent on a sheet', () => {
     expect(show(group, { isEdit: true }).querySelector('[data-testid="group-add-field"]')).not.toBeNull();
     TestBed.resetTestingModule();
     expect(show(group, { isEdit: true, inSheet: false }).querySelector('[data-testid="group-add-field"]')).toBeNull();
+  });
+
+  it('offers an item at the end of a group being edited, and a group at the end of a section', () => {
+    const section = DataElement.create('能力', '', { [DataElementAttribute.ROLE]: DataElementRole.SECTION });
+    const group = DataElement.create('基本', '', { [DataElementAttribute.ROLE]: DataElementRole.GROUP });
+    group.appendChild(DataElement.create('HP', 10, { [DataElementAttribute.ROLE]: DataElementRole.FIELD }));
+    section.appendChild(group);
+
+    const host = show(section, { isEdit: true });
+
+    expect(host.querySelectorAll('[data-testid="group-add-field"]')).toHaveLength(1);
+    expect(host.querySelectorAll('[data-testid="group-add-group"]')).toHaveLength(1);
+    expect(host.querySelector('.elm-add-row:last-child [data-testid="group-add-group"]')).not.toBeNull();
+  });
+
+  it('puts a "+" on the heading of a group being read for a reader who may change the sheet, and none otherwise', () => {
+    const group = DataElement.create('基本', '', { [DataElementAttribute.ROLE]: DataElementRole.GROUP });
+    group.appendChild(DataElement.create('HP', 10, { [DataElementAttribute.ROLE]: DataElementRole.FIELD }));
+    const plus = (host: HTMLElement) => host.querySelector('[data-testid="group-add-field-in-view"]');
+
+    const reading = show(group, { addsInView: true });
+    expect(plus(reading)?.getAttribute('aria-label')).toContain('基本');
+    expect(reading.querySelector('[data-testid="group-add-field"]')).toBeNull();
+    TestBed.resetTestingModule();
+    expect(plus(show(group))).toBeNull();
+    TestBed.resetTestingModule();
+    vi.spyOn(PeerCursor, 'myRole', 'get').mockReturnValue(PeerRole.Guest);
+    expect(plus(show(group, { addsInView: true }))).toBeNull();
+  });
+
+  it('names each button in the bar of a row being edited, for its tooltip and for a screen reader', () => {
+    const host = show(hp(), { isEdit: true });
+    const unnamed = [...host.querySelectorAll('button:not([aria-hidden="true"])')].filter(
+      (button) => button.querySelector('.material-icons') && !button.getAttribute('aria-label')?.trim()
+    );
+
+    expect(unnamed.map((button) => button.textContent?.trim())).toEqual([]);
   });
 
   it('opens the editor from the name or the "⋯" of a row being edited on a sheet', () => {

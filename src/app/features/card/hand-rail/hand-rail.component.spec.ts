@@ -2,9 +2,9 @@ import { Injector, Type, ViewContainerRef, WritableSignal } from '@angular/core'
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HandRailService } from '@axe/application/card/hand-rail.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
-import { CoordinateService } from '@axe/application/input/coordinate.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
+import { TablePickService } from '@axe/application/tabletop/table-pick.service';
 import { ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { OverlayLayers } from '@axe/application/ui/overlay-layers';
 import { PanelService } from '@axe/application/ui/panel.service';
@@ -505,7 +505,8 @@ describe('HandRailComponent', () => {
     surface.dataset['surface'] = 'table';
     const originalElementsFromPoint = Object.getOwnPropertyDescriptor(document, 'elementsFromPoint');
     Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: () => [surface] });
-    vi.spyOn(TestBed.inject(CoordinateService), 'calcTabletopLocalCoordinate').mockReturnValue({ x: 120, y: 90, z: 0 });
+    vi.spyOn(TestBed.inject(TablePickService), 'faceAt').mockReturnValue('floor');
+    vi.spyOn(TestBed.inject(TablePickService), 'landingAt').mockReturnValue({ x: 120, y: 90, z: 0 });
     const controls = component as unknown as {
       activePointerId: number;
       dragPending: { card: Card; startX: number; startY: number; dragging: boolean };
@@ -839,11 +840,8 @@ describe('HandRailComponent', () => {
       // every element there where the browser can tell it.
       Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => surface });
       Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: () => [surface] });
-      vi.spyOn(TestBed.inject(CoordinateService), 'calcTabletopLocalCoordinate').mockReturnValue({
-        x: 300,
-        y: 200,
-        z: 0,
-      });
+      vi.spyOn(TestBed.inject(TablePickService), 'faceAt').mockReturnValue('floor');
+      vi.spyOn(TestBed.inject(TablePickService), 'landingAt').mockReturnValue({ x: 300, y: 200, z: 0 });
       TestBed.inject(HandRailService).open();
       fixture.detectChanges();
       await fixture.whenStable();

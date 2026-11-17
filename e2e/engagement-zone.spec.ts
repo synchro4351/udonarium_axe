@@ -1,36 +1,21 @@
 import { expect, Page, test } from '@playwright/test';
 
-import { openPanel, revealMenuEntry, waitAppReady } from './helpers';
-import { centreOf, pedestal, piece, Point, settle } from './see-through-helpers';
-
-async function becomeGm(page: Page) {
-  await page
-    .locator('ui-panel')
-    .filter({ hasText: '接続情報' })
-    .getByRole('button', { name: /^\s*GM\s*$/ })
-    .click();
-  await expect(page.locator('app-gm-toolbar button').first()).toBeVisible({ timeout: 10000 });
-}
-
-async function closePanels(page: Page) {
-  const panels = page.locator('ui-panel');
-  for (let round = 0; round < 8 && (await panels.count()) > 0; round++) {
-    await panels.first().locator('.bg-ui-titlebar button', { hasText: 'close' }).dispatchEvent('click');
-  }
-  await expect(panels).toHaveCount(0);
-}
-
-async function drag(page: Page, from: Point, to: Point) {
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 6 });
-  await page.mouse.move(to.x, to.y, { steps: 8 });
-  await page.mouse.up();
-}
+import {
+  becomeGm,
+  closePanels,
+  dragAndLeave,
+  openGroundAt,
+  openPanel,
+  revealMenuEntry,
+  rightClickPiece,
+  spotOnPiece,
+  waitAppReady,
+} from './helpers';
+import { centreOf, pedestal, piece, settle } from './see-through-helpers';
 
 /** Opens a piece's menu and chooses an entry, through the submenu named first where one is given. */
 async function choose(page: Page, name: string, entry: string | RegExp, submenu?: string) {
-  await piece(page, name).dispatchEvent('contextmenu');
+  await rightClickPiece(piece(page, name));
   const menu = page.locator('context-menu');
   await expect(menu.locator('li').first()).toBeVisible({ timeout: 5000 });
   if (submenu) await menu.getByText(submenu, { exact: true }).hover();
@@ -40,7 +25,7 @@ async function choose(page: Page, name: string, entry: string | RegExp, submenu?
 
 /** Whether a piece's menu offers an entry of that name at its top level. */
 async function menuOffers(page: Page, name: string, entry: string): Promise<boolean> {
-  await piece(page, name).dispatchEvent('contextmenu');
+  await rightClickPiece(piece(page, name));
   const menu = page.locator('context-menu');
   await expect(menu.locator('li').first()).toBeVisible({ timeout: 5000 });
   const offered = (await menu.getByText(entry, { exact: true }).count()) > 0;
@@ -62,7 +47,7 @@ test.describe('engagement zones', () => {
 
     const hero = piece(page, 'キャラクターA');
     const foe = piece(page, 'モンスターA');
-    await foe.dispatchEvent('contextmenu');
+    await rightClickPiece(foe);
     const menu = page.locator('context-menu');
     await expect(menu.locator('li').first()).toBeVisible({ timeout: 5000 });
     await revealMenuEntry(page, menu, 'NPC にする');
@@ -72,15 +57,18 @@ test.describe('engagement zones', () => {
     else await npc.click();
     await expect(page.locator('context-menu')).toHaveCount(0, { timeout: 5000 });
 
+    await settle(foe);
+    await dragAndLeave(page, await spotOnPiece(foe), await openGroundAt(page));
+    await settle(foe);
     await settle(hero);
-    await drag(page, await centreOf(pedestal(hero)), await centreOf(pedestal(foe)));
+    await dragAndLeave(page, await spotOnPiece(hero), await centreOf(pedestal(foe)));
     await settle(hero);
 
     await choose(page, 'キャラクターA', 'モンスターA と交戦する', '交戦エリア');
 
     const zones = page.getByTestId('zone-mark');
     await expect(zones).toHaveCount(1, { timeout: 5000 });
-    await expect(zones.first().locator('text')).toHaveText('2/20');
+    await expect(zones.first()).toHaveText('2/20');
 
     expect(await menuOffers(page, 'キャラクターA', '移動')).toBe(false);
     await choose(page, 'キャラクターA', '次の手番で離れると予告する', '交戦エリア');

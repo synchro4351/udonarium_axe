@@ -3,6 +3,7 @@ import { StatusAilmentService } from '@axe/application/character/status-ailment.
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { EffectCastService } from '@axe/application/effect/effect-cast.service';
 import { EffectLibraryService } from '@axe/application/effect/effect-library.service';
+import { decodeI18nMessage } from '@axe/application/i18n/i18n-message';
 import { TRANSLATE_FN, TranslateFn } from '@axe/application/i18n/translate.token';
 import { CutInService } from '@axe/application/media/cut-in.service';
 import { TableBgmService } from '@axe/application/media/table-bgm.service';
@@ -42,7 +43,7 @@ describe('TriggerFireService', () => {
     table.height = 12;
     table.gridSize = GRID;
     table.initialize();
-    TestBed.inject(TableSelecter).viewTableIdentifier = table.identifier;
+    TableSelecter.instance.viewTableIdentifier = table.identifier;
     service = TestBed.inject(TriggerFireService);
   });
 
@@ -72,6 +73,116 @@ describe('TriggerFireService', () => {
   function hpOf(piece: GameCharacter): number {
     return Number(DataElement.findElementByReference(piece.rootDataElement!, 'ライフ')!.currentValue);
   }
+
+  it('carries a creature of many parts off whole, its parts stood on it where it lands', () => {
+    const dragon = GameCharacter.create('竜', 3, '');
+    dragon.location = { name: 'table', x: 0, y: 0 };
+    const head = GameCharacter.create('頭', 1, '');
+    head.location = { name: 'table', x: GRID, y: GRID };
+    head.ridingOn = dragon.identifier;
+    head.rideSeat = 'part';
+
+    service.carryTo(dragon, 6, 6, table);
+
+    expect(dragon.location.x).toBeGreaterThan(GRID);
+    expect([head.location.x, head.location.y]).toEqual([dragon.location.x + GRID, dragon.location.y + GRID]);
+  });
+
+  it('stands what goes with a piece on it where it is carried to the ground it already stands on', () => {
+    const dragon = GameCharacter.create('竜', 3, '');
+    dragon.location = { name: 'table', x: 0, y: 0 };
+    service.carryTo(dragon, 6, 6, table);
+    const head = GameCharacter.create('頭', 1, '');
+    head.location = { name: 'table', x: 0, y: 0 };
+    head.ridingOn = dragon.identifier;
+    head.rideSeat = 'part';
+
+    service.carryTo(dragon, 6, 6, table);
+
+    expect([head.location.x, head.location.y]).toEqual([dragon.location.x + GRID, dragon.location.y + GRID]);
+  });
+
+  describe('a piece carried off with what it rides', () => {
+    function horseWithRider(): { horse: GameCharacter; rider: GameCharacter } {
+      const horse = heroWith(10);
+      horse.size = 2;
+      horse.mountable = '1';
+      horse.location = { name: 'table', x: 0, y: 0 };
+      const rider = heroWith(10);
+      rider.location = { name: 'table', x: 25, y: 25 };
+      rider.ridingOn = horse.identifier;
+      return { horse, rider };
+    }
+
+    it('carries a rider off on its mount, the mount set down where the rider would be', () => {
+      const { horse, rider } = horseWithRider();
+
+      service.carryTo(rider, 6, 6, table);
+
+      expect(horse.location.x).toBeGreaterThan(GRID);
+      expect([rider.location.x, rider.location.y]).toEqual([horse.location.x + 25, horse.location.y + 25]);
+      expect(rider.ridingOn).toBe(horse.identifier);
+    });
+
+    it('carries a part off as its body and the mount the body rides', () => {
+      const { horse, rider } = horseWithRider();
+      const arm = heroWith(10);
+      arm.location = { name: 'table', x: 25, y: 25 };
+      arm.ridingOn = rider.identifier;
+      arm.rideSeat = 'part';
+
+      service.carryTo(arm, 6, 6, table);
+
+      expect(horse.location.x).toBeGreaterThan(GRID);
+      expect([rider.location.x, rider.location.y]).toEqual([horse.location.x + 25, horse.location.y + 25]);
+      expect([arm.location.x, arm.location.y]).toEqual([rider.location.x, rider.location.y]);
+    });
+
+    it('carries a rider held fast on its mount all the same', () => {
+      const { horse, rider } = horseWithRider();
+      rider.heldFast = '1';
+
+      service.carryTo(rider, 6, 6, table);
+
+      expect([rider.location.x, rider.location.y]).toEqual([horse.location.x + 25, horse.location.y + 25]);
+    });
+
+    it('carries a rider held on to by another alone, as a captive is', () => {
+      const { horse, rider } = horseWithRider();
+      const ogre = heroWith(10);
+      ogre.location = { name: 'table', x: 400, y: 400 };
+      rider.grabbedBy = ogre.identifier;
+
+      service.carryTo(rider, 6, 6, table);
+
+      expect([horse.location.x, horse.location.y]).toEqual([0, 0]);
+      expect(rider.location.x).toBeGreaterThan(GRID);
+    });
+
+    it('springs the ground under a rider and its mount alike before carrying them off once', () => {
+      const { horse, rider } = horseWithRider();
+      const squares = cellGridOf(table.width, table.height, GRID, GridType.SQUARE);
+      for (const piece of [rider, horse]) {
+        const cell = pieceCellOf(squares, piece, GRID);
+        trapAt(cell % table.width, Math.floor(cell / table.width), {
+          moment: 'turnStart',
+          warps: true,
+          warpCol: 6,
+          warpRow: 6,
+        });
+      }
+      trapAt(6, 6, { moment: 'turnStart', warps: true, warpCol: 9, warpRow: 9 });
+
+      service.carryingAfter(() => {
+        service.standingOn(rider, 'turnStart');
+        service.standingOn(horse, 'turnStart');
+      });
+
+      expect([hpOf(rider), hpOf(horse)]).toEqual([7, 7]);
+      expect(pieceCellOf(cellGridOf(table.width, table.height, GRID, GridType.SQUARE), horse, GRID)).toBe(at(6, 6));
+      expect([rider.location.x, rider.location.y]).toEqual([horse.location.x + 25, horse.location.y + 25]);
+    });
+  });
 
   describe('on a table that counts two cells as one square', () => {
     it('springs ground under any cell of a square the piece enters, once', () => {
@@ -214,7 +325,7 @@ describe('TriggerFireService', () => {
         hex.gridSize = GRID;
         hex.gridType = GridType.HEX_VERTICAL;
         hex.initialize();
-        TestBed.inject(TableSelecter).viewTableIdentifier = hex.identifier;
+        TableSelecter.instance.viewTableIdentifier = hex.identifier;
 
         const board = cellGridOf(hex.width, hex.height, GRID, GridType.HEX_VERTICAL);
         const between = new TableTrigger();
@@ -523,7 +634,7 @@ describe('TriggerFireService and what the room is told', () => {
     table.height = 12;
     table.gridSize = GRID;
     table.initialize();
-    TestBed.inject(TableSelecter).viewTableIdentifier = table.identifier;
+    TableSelecter.instance.viewTableIdentifier = table.identifier;
     service = TestBed.inject(TriggerFireService);
     chat = TestBed.inject(ChatMessageService);
     vi.spyOn(chat, 'sendSystemNotice').mockReturnValue(null);
@@ -553,8 +664,10 @@ describe('TriggerFireService and what the room is told', () => {
   }
 
   const notices = () => vi.mocked(chat.sendSystemNotice).mock.calls;
-  const spoken = () => notices().flatMap(([, text, options]) => (options?.secret ? [] : [text]));
-  const kept = () => notices().flatMap(([, text, options]) => (options?.secret ? [text] : []));
+  const spoken = () =>
+    notices().flatMap(([, text, options]) => (options?.secret ? [] : [decodeI18nMessage(text, spell)]));
+  const kept = () =>
+    notices().flatMap(([, text, options]) => (options?.secret ? [decodeI18nMessage(text, spell)] : []));
 
   it('says only that the ground was stepped on where it was given no line', () => {
     trapAt(5, 5);
@@ -631,7 +744,7 @@ describe('TriggerFireService and the state it leaves a piece in', () => {
     table.height = 12;
     table.gridSize = GRID;
     table.initialize();
-    TestBed.inject(TableSelecter).viewTableIdentifier = table.identifier;
+    TableSelecter.instance.viewTableIdentifier = table.identifier;
     service = TestBed.inject(TriggerFireService);
     ailments = TestBed.inject(StatusAilmentService);
   });
@@ -729,7 +842,7 @@ describe('TriggerFireService and the roll it asks for', () => {
     table.height = 12;
     table.gridSize = GRID;
     table.initialize();
-    TestBed.inject(TableSelecter).viewTableIdentifier = table.identifier;
+    TableSelecter.instance.viewTableIdentifier = table.identifier;
     service = TestBed.inject(TriggerFireService);
     chat = TestBed.inject(ChatMessageService);
     vi.spyOn(chat, 'sendSystemNotice').mockReturnValue(null);
@@ -749,7 +862,7 @@ describe('TriggerFireService and the roll it asks for', () => {
     table.appendChild(trigger);
   }
 
-  const spoken = () => vi.mocked(chat.sendSystemNotice).mock.calls.map((call) => call[1]);
+  const spoken = () => vi.mocked(chat.sendSystemNotice).mock.calls.map((call) => decodeI18nMessage(call[1], spell));
   const walkOn = () => service.walked(GameCharacter.create('英雄', 1, ''), grid(), [at(4, 5), at(5, 5)]);
 
   it('asks for nothing where the ground wants no roll', () => {
@@ -803,7 +916,7 @@ describe('TriggerFireService and what is heard and seen', () => {
     table.height = 12;
     table.gridSize = GRID;
     table.initialize();
-    TestBed.inject(TableSelecter).viewTableIdentifier = table.identifier;
+    TableSelecter.instance.viewTableIdentifier = table.identifier;
     service = TestBed.inject(TriggerFireService);
     cutIns = TestBed.inject(CutInService);
     vi.spyOn(cutIns, 'launch').mockReturnValue(true);
@@ -894,7 +1007,7 @@ describe('TriggerFireService and the ground that carries a piece away', () => {
     table.height = 12;
     table.gridSize = GRID;
     table.initialize();
-    TestBed.inject(TableSelecter).viewTableIdentifier = table.identifier;
+    TableSelecter.instance.viewTableIdentifier = table.identifier;
     service = TestBed.inject(TriggerFireService);
   });
 
@@ -997,7 +1110,7 @@ describe('TriggerFireService and the ground that carries a piece away', () => {
 
       service.walked(piece, grid(), [at(4, 5), at(5, 5)]);
 
-      expect(TestBed.inject(TableSelecter).viewTableIdentifier).toBe(below.identifier);
+      expect(TableSelecter.instance.viewTableIdentifier).toBe(below.identifier);
       expect(pieceCellOf(cellGridOf(below.width, below.height, GRID, GridType.SQUARE), piece, GRID)).toBe(
         cellIndexOf(cellGridOf(below.width, below.height, GRID, GridType.SQUARE), 2, 9)
       );
@@ -1030,7 +1143,7 @@ describe('TriggerFireService and the ground that carries a piece away', () => {
 
       service.walked(piece, grid(), [at(4, 5), at(5, 5)]);
 
-      expect(TestBed.inject(TableSelecter).viewTableIdentifier).toBe(table.identifier);
+      expect(TableSelecter.instance.viewTableIdentifier).toBe(table.identifier);
     });
 
     it('opens onto the table it lies on where the one it names is not in this room', () => {
@@ -1039,7 +1152,7 @@ describe('TriggerFireService and the ground that carries a piece away', () => {
 
       service.walked(piece, grid(), [at(4, 5), at(5, 5)]);
 
-      expect(TestBed.inject(TableSelecter).viewTableIdentifier).toBe(table.identifier);
+      expect(TableSelecter.instance.viewTableIdentifier).toBe(table.identifier);
       expect(cellOf(piece)).toBe(at(2, 9));
     });
   });
@@ -1059,7 +1172,7 @@ describe('TriggerFireService and the ground a turn brings round', () => {
     table.height = 12;
     table.gridSize = GRID;
     table.initialize();
-    TestBed.inject(TableSelecter).viewTableIdentifier = table.identifier;
+    TableSelecter.instance.viewTableIdentifier = table.identifier;
     service = TestBed.inject(TriggerFireService);
   });
 
@@ -1161,8 +1274,8 @@ describe('TriggerFireService and how often ground has another go', () => {
     table.height = 12;
     table.gridSize = GRID;
     table.initialize();
-    TestBed.inject(TableSelecter).viewTableIdentifier = table.identifier;
-    turnState = TestBed.inject(TurnState);
+    TableSelecter.instance.viewTableIdentifier = table.identifier;
+    turnState = TurnState.instance;
     turnState.round = 1;
     service = TestBed.inject(TriggerFireService);
   });

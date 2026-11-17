@@ -171,7 +171,7 @@ describe('StampPackService', () => {
       const item = await addedStamp(newPack(), file);
 
       expect(item.imageIdentifier).toBe(stored.identifier);
-      expect(ImageTag.get(stored.identifier).tag).toBe('キャラ');
+      expect(ImageTag.get(stored.identifier)?.tag).toBe('キャラ');
     });
 
     it('adds no more stamps than a pack may hold', async () => {

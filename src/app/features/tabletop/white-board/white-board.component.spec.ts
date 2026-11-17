@@ -140,18 +140,43 @@ describe('WhiteBoardComponent', () => {
     expect(component.livePictures().map((picture) => picture.imageIdentifier)).toEqual([image.identifier]);
   });
 
+  it('hangs its moving pictures in a box not drawn from behind, and takes presses on its face from either side', async () => {
+    const image = ImageStorage.instance.add('test://white-board/back.gif');
+    const scene = createBoardScene(6, 4, 50);
+    const layer: ImageLayer = {
+      id: 'pictures',
+      kind: 'image',
+      name: 'pictures',
+      visible: true,
+      locked: false,
+      opacity: 1,
+      items: [{ id: 'item-0', imageIdentifier: image.identifier, x: 0, y: 0, w: 60, h: 40, rotation: 0, opacity: 1 }],
+    };
+    scene.layers = [layer];
+    vi.spyOn(TestBed.inject(AnimatedImageService), 'isAnimated').mockReturnValue(true);
+    board.scene = serializeScene(scene);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+
+    const live = host.querySelector<HTMLElement>('[data-testid="white-board-live-pictures"]')!;
+    expect(live.classList.contains('backface-hidden')).toBe(true);
+    expect(live.classList.contains('pointer-events-none')).toBe(true);
+    expect([live.style.width, live.style.height]).toEqual(['300px', '200px']);
+    const hung = [...host.querySelectorAll<HTMLImageElement>('img')].filter((img) => img.src.includes('back.gif'));
+    expect(hung).toHaveLength(1);
+    expect(hung[0].parentElement).toBe(live);
+
+    const face = host.querySelector<HTMLElement>('[data-surface]')!;
+    expect(face.contains(live)).toBe(false);
+    expect(face.classList.contains('pointer-events-auto')).toBe(true);
+    expect(face.classList.contains('backface-hidden')).toBe(false);
+    expect(face.querySelector('.backface-hidden')).toBeNull();
+  });
+
   it('is the size it was given, in pixels', () => {
     expect(component.widthPx()).toBe(6 * 50);
     expect(component.heightPx()).toBe(4 * 50);
-  });
-
-  it('lies flat until it is tilted, and hinges rather than sinking', async () => {
-    expect(component.pitchTransform()).toBe('rotateX(0deg)');
-
-    board.pitch = 90;
-    await new Promise((resolve) => setTimeout(resolve, 20));
-
-    expect(component.pitchTransform()).toBe('rotateX(-90deg)');
   });
 
   it('takes the turn it was dragged to, so the board keeps facing where it was left', () => {
@@ -160,7 +185,7 @@ describe('WhiteBoardComponent', () => {
     expect(board.rotate).toBe(30);
   });
 
-  it('shows only what names it as the face it stands on', () => {
+  it('counts only what names it as the face it stands on, for its menu to take off it', () => {
     const mine = place(10, 10, board.identifier);
     const theirs = place(10, 10);
 

@@ -1,54 +1,52 @@
-import { NgClass } from '@angular/common';
 import {
   afterNextRender,
   ChangeDetectionStrategy,
   Component,
   computed,
   DestroyRef,
+  effect,
   ElementRef,
   inject,
   input,
+  untracked,
   viewChild,
 } from '@angular/core';
-import { ChatMessageService } from '@axe/application/chat/chat-message.service';
-import { encodeI18nMessage } from '@axe/application/i18n/i18n-message';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
-import { CoordinateService } from '@axe/application/input/coordinate.service';
-import { PointerCoordinate } from '@axe/application/input/pointer-device.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
-import { TabletopService } from '@axe/application/tabletop/tabletop.service';
+import { TableCameraService } from '@axe/application/tabletop/table-camera.service';
+import { TablePickService } from '@axe/application/tabletop/table-pick.service';
+import { TableSurfaceService } from '@axe/application/tabletop/table-surface.service';
 import { BatchService } from '@axe/application/ui/batch.service';
-import { BillboardFacing, NOT_TURNED } from '@axe/application/ui/billboard-frame.service';
-import { callCursorMove, callHeartBeat } from '@axe/core/event/domain-events';
-import { Network } from '@axe/core/network/network';
-import { getPeerContexts, getPeerIds } from '@axe/core/network/peer-context-source';
-import { ObjectStore } from '@axe/core/sync/object-store';
+import { callCursorMove } from '@axe/core/event/domain-events';
+import { getPeerIds } from '@axe/core/network/peer-context-source';
 import { ResettableTimeout } from '@axe/core/util/resettable-timeout';
-import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole, roleShortLabelKey, roleTagClass } from '@axe/domain/peer/peer-role';
-import { BillboardDirective } from '@axe/ui/directives/billboard.directive';
-import { toTransformCss } from '@axe/ui/directives/movable-helpers';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
+
+/** How long a cursor that has stopped moving stays in sight. */
+const FADE_OUT_AFTER_MS = 3000;
+/** The least a cursor's movement is held back before it is sent. */
+const MIN_MOVE_DELAY_MS = 100;
+/** What each connected peer adds to that hold, a frame's worth. */
+const MOVE_DELAY_PER_PEER_MS = 16.6;
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'peer-cursor, [peer-cursor]',
   templateUrl: './peer-cursor.component.html',
   host: { class: 'block' },
-  imports: [BillboardDirective, NgClass, SafePipe],
+  imports: [SafePipe],
 })
 export class PeerCursorComponent {
-  private static readonly _sentLogoutIdentifiers = new Set<string>();
-
   private readonly batchService = inject(BatchService);
-  private readonly coordinateService = inject(CoordinateService);
-  private readonly chatMessageService = inject(ChatMessageService);
+  private readonly tablePick = inject(TablePickService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly objectChange = inject(ObjectChangeService);
-  private readonly objectStore = inject(ObjectStore);
-  private readonly tabletop = inject(TabletopService);
   private readonly t = inject(TRANSLATE_FN);
+
+  private readonly camera = inject(TableCameraService);
+  private readonly surfaces = inject(TableSurfaceService);
 
   readonly cursorElementRef = viewChild<ElementRef>('cursor');
   readonly opacityElementRef = viewChild<ElementRef>('opacity');
@@ -72,20 +70,6 @@ export class PeerCursorComponent {
     return roleTagClass(this.cursor().role);
   });
 
-  /**
-   * The faces the marker is drawn with. Along the table it stands up, with a back for a reader on
-   * the far side; seen from straight above a standing marker would be edge on, so it lies flat.
-   */
-  readonly faces = computed(() => (this.tabletop.mode2d() ? ['is-flat'] : ['is-front', 'is-back']));
-
-  /**
-   * How the marker is turned against the view. Lying flat, it is turned back by the view's own
-   * turn, so its point keeps pointing down the screen however the table is turned.
-   */
-  readonly facing = computed<BillboardFacing>(() =>
-    this.tabletop.mode2d() ? (rotation) => `rotateZ(${-(rotation?.z ?? 0)}deg)` : NOT_TURNED
-  );
-
   readonly name = computed(() => {
     this.objectChange.versionOf(this.cursor().identifier)();
     return this.cursor().name;
@@ -94,53 +78,25 @@ export class PeerCursorComponent {
     this.objectChange.versionOf(this.cursor().identifier)();
     return this.cursor()?.isMine ?? false;
   });
-  /**
-   * The room's chat tab list, which holds the system tab that connection notices about this peer
-   * are posted to.
-   */
-  get chatTabList(): ChatTabList {
-    return this.objectStore.get<ChatTabList>('ChatTabList')!;
-  }
-
   private cursorElement: HTMLElement | null = null;
   private opacityElement: HTMLElement | null = null;
   private fadeOutTimer: ResettableTimeout | null = null;
   private updateTimer: ReturnType<typeof setTimeout> | null = null;
-  private timestampTimer: ReturnType<typeof setTimeout> | null = null;
-  private timestampTimerEnabled = false;
 
-  private callcack: (e: Event) => void = (e) => this.onMouseMove(e);
+  private onMoveListener: (e: Event) => void = (e) => this.onMouseMove(e);
 
   private _x = 0;
   private _y = 0;
   private _target!: HTMLElement;
+  /** The point of the floor the cursor was last put at, laid on the screen again as the camera moves over a canvas. */
+  private at: { x: number; y: number; z: number } | null = null;
 
   /**
    * How long cursor movement is held back before being sent or animated, in milliseconds: 16.6 per
    * connected peer, never under 100, so a crowded room sends less often.
    */
   get delayMs(): number {
-    const maxDelay = getPeerIds().length * 16.6;
-    return maxDelay < 100 ? 100 : maxDelay;
-  }
-
-  /**
-   * How often a heartbeat is sent, or a peer's silence checked, in milliseconds: 166 per connected
-   * peer, never under 1000.
-   */
-  get delayMsHb(): number {
-    const maxDelay = getPeerIds().length * 166;
-    return maxDelay < 1000 ? 1000 : maxDelay;
-  }
-
-  /**
-   * Whether the room goes through a room server. There the server's own ping keeps the connection
-   * and a member who leaves is reported as leaving, so no heartbeat is sent or listened for: one
-   * from every seat every second would keep the server awake for as long as anybody is in. A seat
-   * counts as dropped while the server does not list it.
-   */
-  private get relayedByServer(): boolean {
-    return Network.authorityPeerId != null;
+    return Math.max(MIN_MOVE_DELAY_MS, getPeerIds().length * MOVE_DELAY_PER_PEER_MS);
   }
 
   constructor() {
@@ -155,36 +111,19 @@ export class PeerCursorComponent {
       }, this);
     }, this.destroyRef);
 
-    this.objectChange.heartBeat$.subscribe((event) => {
-      if (event.sendFrom !== this.cursor().peerId) return;
-
-      this.batchService.add(() => {
-        this.cursor().timestampSend = event.timestamp;
-        this.cursor().timestampReceive = Date.now();
-        this.cursor().timeDiffDown =
-          this.cursor().timestampReceive - this.cursor().timestampSend + PeerCursor.myCursor.debugReceiveDelay;
-
-        const messId = event.id;
-        const diffUp = event.diffDown;
-        this.cursor().lastTimeSignNo = event.secdCounter;
-        if (this.cursor().firstTimeSignNo < 0) {
-          this.cursor().firstTimeSignNo = event.secdCounter;
-        }
-        this.cursor().totalTimeSignNum++;
-
-        if (messId == PeerCursor.myCursor.peerId) {
-          if (diffUp != null) {
-            this.cursor().timeDiffUp = diffUp;
-            this.cursor().timeLatency = diffUp + this.cursor().timeDiffDown;
-          }
-        }
-      }, this);
-    }, this.destroyRef);
+    effect(() => {
+      this.camera.version();
+      untracked(() => {
+        if (!this.at || !this.cursorElement) return;
+        this.cursorElement.style.transition = 'opacity 0.5s ease-out';
+        this.layOnScreen();
+      });
+    });
 
     afterNextRender(() => {
       if (this.isMine()) {
-        document.body.addEventListener('mousemove', this.callcack);
-        document.body.addEventListener('touchmove', this.callcack);
+        document.body.addEventListener('mousemove', this.onMoveListener);
+        document.body.addEventListener('touchmove', this.onMoveListener);
       } else {
         this.cursorElement = this.cursorElementRef()?.nativeElement;
         this.opacityElement = this.opacityElementRef()?.nativeElement;
@@ -192,16 +131,11 @@ export class PeerCursorComponent {
         this.setPosition(0, 0, 0);
         this.resetFadeOut();
       }
-
-      this.timestampTimerEnabled = true;
-      this.timestampLoop();
     });
 
     this.destroyRef.onDestroy(() => {
-      this.logoutMessage();
-
-      document.body.removeEventListener('mousemove', this.callcack);
-      document.body.removeEventListener('touchmove', this.callcack);
+      document.body.removeEventListener('mousemove', this.onMoveListener);
+      document.body.removeEventListener('touchmove', this.onMoveListener);
       this.batchService.remove(this);
       if (this.fadeOutTimer) this.fadeOutTimer.clear();
 
@@ -209,106 +143,7 @@ export class PeerCursorComponent {
         clearTimeout(this.updateTimer);
         this.updateTimer = null;
       }
-      if (this.timestampTimer) {
-        clearTimeout(this.timestampTimer);
-        this.timestampTimer = null;
-      }
-      this.timestampTimerEnabled = false;
     });
-  }
-
-  private chkDisConnect() {
-    const timeout = PeerCursor.myCursor.timeout * 1000;
-    const elapsedTime = Date.now() - this.cursor().timestampReceive;
-
-    const chatTabList = this.objectStore.get<ChatTabList>('ChatTabList');
-    const sysTab = chatTabList!.systemMessageTab;
-
-    if (timeout <= elapsedTime) {
-      if (!this.cursor().isDisConnect) {
-        this.cursor().isDisConnect = true;
-        if (sysTab) {
-          const text = encodeI18nMessage('feature.lobby.peerCursor.noSignal', {
-            name: this.cursor().name || this.cursor().userId.slice(0, 6),
-            seconds: PeerCursor.myCursor.timeout,
-          });
-          this.chatMessageService.sendSystemMessageOnePlayer(sysTab, text, PeerCursor.myCursor.identifier, '#006633');
-        }
-      }
-    } else {
-      if (this.cursor().isDisConnect) {
-        setTimeout(() => {
-          this.timestampTimer = null;
-          const text = encodeI18nMessage('feature.lobby.peerCursor.reconnected', {
-            name: this.cursor().name || this.cursor().userId.slice(0, 6),
-          });
-          if (sysTab) {
-            this.chatMessageService.sendSystemMessageOnePlayer(sysTab, text, PeerCursor.myCursor.identifier, '#006633');
-          }
-        }, 1000);
-      }
-      this.cursor().isDisConnect = false;
-    }
-  }
-
-  private logoutMessage() {
-    if (!this.cursor() || this.cursor().isMine) return;
-    const identifier = this.cursor().identifier;
-    if (PeerCursorComponent._sentLogoutIdentifiers.has(identifier)) return;
-    PeerCursorComponent._sentLogoutIdentifiers.add(identifier);
-    setTimeout(() => PeerCursorComponent._sentLogoutIdentifiers.delete(identifier), 60_000);
-    const chatTabList = this.objectStore.get<ChatTabList>('ChatTabList');
-    if (!chatTabList) return;
-    const sysTab = chatTabList.systemMessageTab;
-    if (sysTab) {
-      const text = encodeI18nMessage('feature.lobby.peerCursor.loggedOut', {
-        name: this.cursor().name || this.cursor().userId.slice(0, 6),
-      });
-      this.chatMessageService.sendSystemMessageOnePlayer(sysTab, text, PeerCursor.myCursor.identifier, '#006633');
-    }
-  }
-
-  private secdCounter = 0;
-  private indexCounter = 0;
-
-  private timestampLoop() {
-    if (!this.timestampTimerEnabled) return;
-    if (!this.timestampTimer) {
-      this.timestampTimer = setTimeout(() => {
-        this.timestampTimer = null;
-
-        if (this.relayedByServer) {
-          if (!this.cursor().isMine) this.cursor().isDisConnect = !getPeerIds().includes(this.cursor().peerId);
-          this.timestampLoop();
-          return;
-        }
-        if (PeerCursor.myCursor.peerId == this.cursor().peerId) {
-          const peerlength = getPeerContexts().length;
-          if (peerlength) {
-            if (peerlength <= this.indexCounter) this.indexCounter = 0;
-            const timestanmp = Date.now() + PeerCursor.myCursor.debugTimeShift;
-            const peerContext = getPeerContexts()[this.indexCounter] || null;
-            let id = '';
-            if (peerContext) {
-              if (getPeerContexts()[this.indexCounter].isOpen) {
-                id = getPeerContexts()[this.indexCounter].peerId;
-              }
-            }
-
-            const peerCursor = PeerCursor.findByPeerId(id);
-            const diffDown = peerCursor ? peerCursor.timeDiffDown : null;
-
-            callHeartBeat([timestanmp, id, diffDown, this.secdCounter]);
-            this.indexCounter++;
-            this.secdCounter++;
-          }
-        } else {
-          this.chkDisConnect();
-        }
-
-        this.timestampLoop();
-      }, this.delayMsHb);
-    }
   }
 
   private onMouseMove(e: Event) {
@@ -329,8 +164,7 @@ export class PeerCursorComponent {
   private calcLocalCoordinate(x: number, y: number, target: HTMLElement) {
     if (!target.closest('#app-table-layer')) return;
 
-    let coordinate: PointerCoordinate = { x, y, z: 0 };
-    coordinate = this.coordinateService.calcTabletopLocalCoordinate(coordinate, target);
+    const coordinate = this.tablePick.landingAt(x, y);
 
     callCursorMove([coordinate.x, coordinate.y, coordinate.z]);
   }
@@ -340,7 +174,7 @@ export class PeerCursorComponent {
     if (this.fadeOutTimer == null) {
       this.fadeOutTimer = new ResettableTimeout(() => {
         this.opacityElement!.style.opacity = '0.0';
-      }, 3000);
+      }, FADE_OUT_AFTER_MS);
     }
     this.fadeOutTimer.reset();
   }
@@ -354,6 +188,16 @@ export class PeerCursorComponent {
   }
 
   private setPosition(x: number, y: number, z: number) {
-    this.cursorElement!.style.transform = toTransformCss(x, y, z, '');
+    this.at = { x, y, z };
+    this.layOnScreen();
+  }
+
+  /** Lays the cursor on the screen where the canvas draws the point of the floor it was last put at. */
+  private layOnScreen() {
+    const at = this.at;
+    const layout = this.camera.layout;
+    const onPage = at && layout ? this.surfaces.pageOf('floor', at.x, at.y, at.z) : null;
+    if (!onPage || !layout) return;
+    this.cursorElement!.style.transform = `translate(${onPage.x - layout.left}px, ${onPage.y - layout.top}px)`;
   }
 }

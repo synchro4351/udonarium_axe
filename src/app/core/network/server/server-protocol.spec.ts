@@ -34,6 +34,7 @@ import {
   RETRYABLE_ERROR_CODES,
   ROLE_REJECT_REASONS,
   ROLL_REJECT_REASONS,
+  seenRequest,
 } from '@axe/core/network/server/server-protocol';
 import { isNewerVersion } from '@axe/core/sync/object-version';
 import * as MessagePack from '@axe/core/util/message-pack';
@@ -107,6 +108,14 @@ describe('the room server protocol, held to the server’s fixtures', () => {
     expect(readServerMessage(tokenWithoutKept)).toEqual(tokenWithoutKept);
     expect(readServerMessage({ ...messages.server.welcome, keptRole: 'king' })).toBeNull();
     expect(readServerMessage({ ...messages.server.assetToken, keptRole: 'king' })).toBeNull();
+  });
+
+  it('reads an error with or without the protocol version the server speaks, but not with one that is no number', () => {
+    const { protocolVersion: _version, ...withoutVersion } = messages.server.error;
+
+    expect(readServerMessage(messages.server.error)).toEqual(messages.server.error);
+    expect(readServerMessage(withoutVersion)).toEqual(withoutVersion);
+    expect(readServerMessage({ ...messages.server.error, protocolVersion: '6' })).toBeNull();
   });
 
   it('reads how a server with a limit on its requests takes big pictures and sounds, and the ticket for one', () => {
@@ -187,6 +196,19 @@ describe('the room server protocol, held to the server’s fixtures', () => {
 
   it('asks for a fresh asset token as the server expects', () => {
     expect(assetTokenRequest()).toEqual(messages.client.assetToken);
+  });
+
+  it('asks when the others were last heard from as the server expects, and reads the answer', () => {
+    const { seen } = messages.server;
+    const [member] = seen.members;
+
+    expect(seenRequest()).toEqual(messages.client.seen);
+    expect(readServerMessage(seen)).toEqual(seen);
+    expect(readServerMessage({ ...seen, members: [] })).toEqual({ ...seen, members: [] });
+    expect(readServerMessage({ ...seen, serverTime: '1' })).toBeNull();
+    expect(readServerMessage({ ...seen, members: {} })).toBeNull();
+    expect(readServerMessage({ ...seen, members: [{ ...member, heardAt: null }] })).toBeNull();
+    expect(readServerMessage({ ...seen, members: [{ heardAt: member!.heardAt }] })).toBeNull();
   });
 
   it('reads no welcome without the asset token, and no asset token without its end', () => {

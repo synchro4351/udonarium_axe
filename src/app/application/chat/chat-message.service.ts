@@ -13,11 +13,12 @@ import { MyDiceService } from '@axe/application/dice/my-dice.service';
 import { encodeI18nMessage } from '@axe/application/i18n/i18n-message';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { emitDiceTableMessage, emitResourceEditMessage, emitSendMessage } from '@axe/core/event/domain-events';
-import { Network } from '@axe/core/index';
+import { Network } from '@axe/core/network/network';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { portraitNameOf } from '@axe/domain/character/character-portrait';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { saidNameOf } from '@axe/domain/character/hidden-name';
 import { chatBubbleOf, chatColorOf } from '@axe/domain/chat/chat-color';
 import { keptFromDecoration } from '@axe/domain/chat/chat-decoration';
 import { liftImageReferences } from '@axe/domain/chat/chat-image-references';
@@ -40,7 +41,7 @@ import { inlineStampSites } from '@axe/domain/chat/inline-stamp';
 import { stampOf } from '@axe/domain/chat/stamp-catalog';
 import { joinStampLine, standInForStamp } from '@axe/domain/chat/stamp-line';
 import { DEFAULT_NOTICE_PLACE, NOTICE_OFF, noticeRouteOf, SystemNoticeKind } from '@axe/domain/chat/system-notices';
-import { fillTargetNumber, findTargetNumber } from '@axe/domain/chat/target-number';
+import { fillTargetNumber, holdsTargetNumber, targetNumberOnce } from '@axe/domain/chat/target-number';
 import { DataElement } from '@axe/domain/data/data-element';
 import { encodeDiceLook } from '@axe/domain/dice/dice-3d/dice-look';
 import { DiceBot } from '@axe/domain/dice/dice-bot';
@@ -59,7 +60,9 @@ export class ChatMessageService {
   private readonly objectStore = inject(ObjectStore);
   private readonly rolePermission = inject(RolePermissionService);
   private readonly imageStorage = inject(ImageStorage);
-  private readonly chatTabList = inject(ChatTabList);
+  private get chatTabList(): ChatTabList {
+    return ChatTabList.instance;
+  }
   private readonly myDice = inject(MyDiceService);
   private readonly stampRules = inject(StampRulesService);
   private readonly clock = inject(ChatClockService);
@@ -73,8 +76,7 @@ export class ChatMessageService {
 
   /** Writes a notice into the system tab under the system's name, in green unless a colour is given. */
   sendSystemMessage(text: string, color?: string, from?: string): ChatMessage {
-    const chatTabList = this.objectStore.get<ChatTabList>('ChatTabList');
-    const sysTab = chatTabList!.systemMessageTab!;
+    const sysTab = this.chatTabList.systemMessageTab!;
     const messageColor = resolveMessageColor(color, '#006633');
     const chatMessage: ChatMessageContext = {
       from,
@@ -108,6 +110,7 @@ export class ChatMessageService {
       text,
       imagePos: -1,
       messColor: messageColor,
+      ...this.mastersMark(),
     };
     return chatTab.addMessage(chatMessage);
   }
@@ -141,8 +144,7 @@ export class ChatMessageService {
 
   /** A kept-back notice, as `sendSecretSystemMessageToTab` writes it, in the first tab of the room. */
   sendSecretSystemMessageToMainTab(text: string, from?: string, dieIdentifiers: readonly string[] = []): ChatMessage {
-    const chatTabList = this.objectStore.get<ChatTabList>('ChatTabList');
-    return this.sendSecretSystemMessageToTab(chatTabList!.chatTabs[0], text, from, undefined, dieIdentifiers);
+    return this.sendSecretSystemMessageToTab(this.chatTabList.chatTabs[0], text, from, undefined, dieIdentifiers);
   }
 
   /**
@@ -164,10 +166,45 @@ export class ChatMessageService {
     return this.sendSystemMessageToTab(tab, text, options.color, options.from);
   }
 
+  /**
+   * Writes a notice of one kind for this seat alone, where the room sends that kind nowhere: into the
+   * tab the kind always went to, addressed to this seat as a line said to one reader is, so no other
+   * seat is shown it and a room saved from another seat leaves it out. For the report of something
+   * this seat did and must still be able to read, which the room's choice would otherwise leave it
+   * without. Null where this seat has no cursor yet.
+   */
+  tellSelfSystemNotice(kind: SystemNoticeKind, text: string): ChatMessage | null {
+    const tab =
+      DEFAULT_NOTICE_PLACE[kind] === 'main'
+        ? (this.chatTabList.chatTabs[0] ?? null)
+        : this.chatTabList.systemMessageTab;
+    return tab ? this.tellSelfInTab(tab, text) : null;
+  }
+
+  /**
+   * Writes a notice into a tab for this seat alone, addressed to it as a notice for one reader is.
+   * Null, writing nothing, where this seat has no cursor yet, since a line addressed to nobody would
+   * be shown to everyone.
+   */
+  tellSelfInTab(chatTab: ChatTab, text: string): ChatMessage | null {
+    const userId = PeerCursor.myCursor?.userId ?? '';
+    if (userId.length < 1) return null;
+    return chatTab.addMessage({
+      from: userId,
+      to: userId,
+      name: encodeI18nMessage('common.chat.systemName'),
+      imageIdentifier: '',
+      timestamp: this.calcTimeStamp(chatTab),
+      tag: 'DiceBot to-pl-system-message',
+      text,
+      imagePos: -1,
+      messColor: resolveMessageColor(undefined, '#006633'),
+    });
+  }
+
   /** The tab a kind of notice goes to now, or null for a kind the room sends nowhere. */
   noticeTabOf(kind: SystemNoticeKind): ChatTab | null {
-    const chatTabList = this.objectStore.get<ChatTabList>('ChatTabList');
-    if (!chatTabList) return null;
+    const chatTabList = this.chatTabList;
     const config = Config.instance;
     const route = noticeRouteOf(config.systemNotices, kind);
     if (route === NOTICE_OFF) return null;
@@ -212,15 +249,14 @@ export class ChatMessageService {
    * on a room server says nothing in a tab guests may not speak in, which the server would take back.
    */
   sendSystemMessageAsLastSpeaker(text: string, chatTabIdentifier?: string) {
-    const chatTabList = this.objectStore.get<ChatTabList>('ChatTabList');
-    const sysTab = this.resolveChatTab(chatTabIdentifier) ?? chatTabList!.systemMessageTab!;
+    const sysTab = this.resolveChatTab(chatTabIdentifier) ?? this.chatTabList.systemMessageTab!;
     if (PeerCursor.isMyselfKeptOffTable && !sysTab?.guestCanSpeak) return;
     const sendFrom = PeerCursor.myCursor.lastControlSendFrom
       ? PeerCursor.myCursor.lastControlSendFrom
       : PeerCursor.myCursor.identifier;
     let imgIndex = PeerCursor.myCursor.lastControlImageIndex;
     const imageIdentifier = this.findImageIdentifier(sendFrom, imgIndex);
-    if (imageIdentifier != PeerCursor.myCursor.lastControlImageIdentifier) imgIndex = 0;
+    if (imageIdentifier !== PeerCursor.myCursor.lastControlImageIdentifier) imgIndex = 0;
     this.sendMessage(sysTab!, text, null, sendFrom, undefined, imgIndex, '#006633');
   }
 
@@ -272,7 +308,7 @@ export class ChatMessageService {
 
     const imgIndex = resolvePortraitIndex(portraitIndex);
     const chatMessage: ChatMessageContext = {
-      from: Network.peerContext.userId,
+      from: Network.instance.peerContext.userId,
       to: sendTo != null ? this.whisperTo(sendTo) : undefined,
       name: this.makeMessageName(sendFrom, sendTo, speakAs?.name),
       imageIdentifier: speakAs?.imageIdentifier || this.findImageIdentifier(sendFrom, imgIndex),
@@ -283,6 +319,7 @@ export class ChatMessageService {
       messColor: resolveMessageColor(color, '#000000'),
       sendFrom,
       senderRole: PeerCursor.myRole,
+      ...this.mastersMark(),
       stamp: stampId,
     };
     if (stamp.kind === 'image') chatMessage.attachmentImageIdentifiers = JSON.stringify([stamp.imageIdentifier]);
@@ -304,11 +341,12 @@ export class ChatMessageService {
    * room's images. A line not whispered to anyone also records who this reader last spoke as, which
    * `sendSystemMessageAsLastSpeaker` follows. A stamp sent with the line goes under it, with the
    * words standing in for it on a last line of their own, after everything else has been read out of
-   * the line. A guest on a room server changes no piece by speaking: resource edits are not read out
-   * of the line, a portrait command picks the line's portrait but leaves the piece's alone, and the
-   * portrait stands in none of the tab's slots. A `{目標値}` nothing else answered is filled in with
+   * the line. A guest changes no piece by speaking, as a guest may change none by its sheet: resource
+   * edits are not read out of the line, and a portrait command picks the line's portrait but leaves
+   * the piece's alone. On a room server a guest's portrait also stands in none of the tab's slots. A `{目標値}` nothing else answered is filled in with
    * the number the speaker has to beat, found among the tab's rolls (see {@link findTargetNumber}),
-   * in the line and in every copy of it aimed at a target alike.
+   * or with the one the reader picked where `targetNumber` is given, in the line and in every copy of
+   * it aimed at a target alike.
    */
   sendMessage(
     chatTab: ChatTab,
@@ -325,17 +363,20 @@ export class ChatMessageService {
     bubbles?: { light: string; dark: string },
     vnEmote?: string,
     stamp?: OutgoingStamp,
+    targetNumber?: number,
     speakAs?: ChatSpeakAs
   ): ChatMessage {
     const speaker = this.objectStore.get(sendFrom);
-    let targetNumber: number | null | undefined;
-    const toBeat = () => {
-      if (targetNumber === undefined) {
-        const name = speaker instanceof GameCharacter ? speaker.name : '';
-        targetNumber = findTargetNumber(chatTab, { identifier: sendFrom, name });
-      }
-      return targetNumber;
-    };
+    const toBeat =
+      targetNumber != null
+        ? () => targetNumber
+        : targetNumberOnce(chatTab, {
+            identifier: sendFrom,
+            name: speaker instanceof GameCharacter ? saidNameOf(speaker) : '',
+            ownName: speaker instanceof GameCharacter ? speaker.name : '',
+          });
+    const answers =
+      holdsTargetNumber(text) || (messageTargetContext ?? []).some((context) => holdsTargetNumber(context.text));
     text = fillTargetNumber(text, toBeat);
     messageTargetContext = messageTargetContext?.map((context) => ({
       ...context,
@@ -360,7 +401,7 @@ export class ChatMessageService {
     const chatMessageTag = resolveChatMessageTag(gameSystem, text, dicebot);
 
     const chatMessage: ChatMessageContext = {
-      from: Network.peerContext.userId,
+      from: Network.instance.peerContext.userId,
       to: sendTo != null ? this.whisperTo(sendTo) : undefined,
       name: this.makeMessageName(sendFrom, sendTo, speakAs?.name),
       imageIdentifier: speakAs?.imageIdentifier || this.findImageIdentifier(sendFrom, imgIndex),
@@ -373,6 +414,7 @@ export class ChatMessageService {
       messColor: messageColor,
       sendFrom: sendFrom,
       senderRole: PeerCursor.myRole,
+      ...this.mastersMark(),
     };
     if (attachments.length > 0) {
       chatMessage.attachmentImageIdentifiers = JSON.stringify(attachments);
@@ -390,6 +432,11 @@ export class ChatMessageService {
     if (bubbles?.light) chatMessage.messBubbleLight = bubbles.light;
     if (bubbles?.dark) chatMessage.messBubbleDark = bubbles.dark;
     if (vnEmote) chatMessage.vnEmote = vnEmote;
+    if (answers && toBeat() != null) chatMessage.answersTargetNumber = '1';
+    const together = (messageTargetContext ?? []).filter((context) => context.together && context.object);
+    if (together.length > 0) {
+      chatMessage.aimedTogether = JSON.stringify(together.map((context) => context.object!.identifier));
+    }
     const look = this.myDice.look();
     const diceLook = encodeDiceLook(look);
     if (diceLook) chatMessage.diceLook = diceLook;
@@ -412,7 +459,7 @@ export class ChatMessageService {
       });
     }
     emitDiceTableMessage({ messageIdentifier: chat.identifier });
-    if (!PeerCursor.isMyselfKeptOffTable) {
+    if (this.rolePermission.canEditTabletop()) {
       emitResourceEditMessage({
         messageIdentifier: chat.identifier,
         messageTargetContext: eventPlan.resourceEditTargetContext,
@@ -438,12 +485,14 @@ export class ChatMessageService {
     name: string,
     color?: string
   ): ChatMessage {
-    text = fillTargetNumber(text, () => findTargetNumber(chatTab, { identifier: '', name }));
+    const toBeat = targetNumberOnce(chatTab, { identifier: '', name });
+    const answers = holdsTargetNumber(text) && toBeat() != null;
+    text = fillTargetNumber(text, toBeat);
     const stamped = this.inlineStampsGoingOut(text);
     text = stamped.text;
     const dicebot = this.objectStore.get<DiceBot>('DiceBot')!;
     const chatMessage: ChatMessageContext = {
-      from: Network.peerContext.userId,
+      from: Network.instance.peerContext.userId,
       name,
       imageIdentifier: '',
       timestamp: this.calcTimeStamp(chatTab),
@@ -453,7 +502,9 @@ export class ChatMessageService {
       messColor: resolveMessageColor(color, '#000000'),
       sendFrom: '',
       senderRole: PeerCursor.myRole,
+      ...this.mastersMark(),
     };
+    if (answers) chatMessage.answersTargetNumber = '1';
     if (stamped.pictures.length > 0) {
       chatMessage.attachmentImageIdentifiers = JSON.stringify(stamped.pictures);
       chatMessage.stampAttachments = JSON.stringify(stamped.pictures);
@@ -485,7 +536,7 @@ export class ChatMessageService {
     const toNames = to.map((identifier) => this.findObjectName(identifier)).join(', ');
     const named = (name: string) => (toNames ? `${name} > ${toNames}` : name);
     const chatMessage: ChatMessageContext = {
-      from: Network.peerContext.userId,
+      from: Network.instance.peerContext.userId,
       name: '',
       imageIdentifier: '',
       timestamp: this.calcTimeStamp(chatTab),
@@ -494,6 +545,7 @@ export class ChatMessageService {
       imagePos: -1,
       messColor: resolveMessageColor(options.color, as.kind === 'system' ? '#006633' : '#000000'),
       senderRole: PeerCursor.myRole,
+      ...this.mastersMark(),
     };
     if (as.kind === 'system') {
       chatMessage.name = encodeI18nMessage('common.chat.systemName');
@@ -620,7 +672,7 @@ export class ChatMessageService {
     chatMessage.imageIdentifier = found.identifier;
     chatMessage.text = stripPortraitCommand(text);
     const obj = this.objectStore.get(sendFrom);
-    if (obj instanceof GameCharacter && !PeerCursor.isMyselfKeptOffTable) obj.selectedPortraitIndex = found.index;
+    if (obj instanceof GameCharacter && this.rolePermission.canEditTabletop()) obj.selectedPortraitIndex = found.index;
     return found;
   }
 
@@ -649,10 +701,31 @@ export class ChatMessageService {
     return tab instanceof ChatTab ? tab : null;
   }
 
+  /** How deep the sending is in lines a game master wrote for another to say; see {@link asMastersWords}. */
+  private mastersWordsDepth = 0;
+
+  /**
+   * Sends, through `send`, which sends at once, lines a game master wrote for whoever sets them off to
+   * say, as a switch's lines are: each is marked as the master's words, so that a number to beat it
+   * writes out is taken as the master's, whoever pressed it.
+   */
+  asMastersWords<T>(send: () => T): T {
+    this.mastersWordsDepth++;
+    try {
+      return send();
+    } finally {
+      this.mastersWordsDepth--;
+    }
+  }
+
+  private mastersMark(): Pick<ChatMessageContext, 'mastersWords'> {
+    return this.mastersWordsDepth > 0 ? { mastersWords: '1' } : {};
+  }
+
   private findObjectName(identifier: string): string {
     const object = this.objectStore.get(identifier);
     if (object instanceof GameCharacter) {
-      return object.name;
+      return saidNameOf(object);
     } else if (object instanceof PeerCursor) {
       return object.name;
     }
@@ -674,10 +747,10 @@ export class ChatMessageService {
       return;
     }
     if (sendTo == null || sendTo.length < 1) {
-      if (peerCursor.lastControlImageIdentifier != imageIdentifier) {
+      if (peerCursor.lastControlImageIdentifier !== imageIdentifier) {
         peerCursor.lastControlImageIdentifier = imageIdentifier;
       }
-      if (peerCursor.lastControlCharacterName != sendFromName) {
+      if (peerCursor.lastControlCharacterName !== sendFromName) {
         peerCursor.lastControlCharacterName = sendFromName;
       }
       peerCursor.lastControlSendFrom = sendFrom;

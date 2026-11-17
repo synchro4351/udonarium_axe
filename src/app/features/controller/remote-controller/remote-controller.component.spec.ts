@@ -1,13 +1,22 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { BattleLaunchService } from '@axe/application/battle/battle-launch.service';
+import { StatusAilmentService } from '@axe/application/character/status-ailment.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { GameObjectInventoryService } from '@axe/application/inventory/game-object-inventory.service';
+import { DisclosureService } from '@axe/application/permission/disclosure.service';
+import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { VisionService } from '@axe/application/tabletop/vision.service';
 import { UiSignalService } from '@axe/application/ui/ui-signal.service';
+import { Logger } from '@axe/core/logging/logger';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { buffKindOf } from '@axe/domain/character/buff-kind';
 import { GameCharacter } from '@axe/domain/character/game-character';
+import { newStatusAilment } from '@axe/domain/character/status-ailment';
+import { StatusAilmentCatalog } from '@axe/domain/character/status-ailment-catalog';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { DataElement, DataElementAttribute, DataElementRole, DataElementType } from '@axe/domain/data/data-element';
+import { DiceBot } from '@axe/domain/dice/dice-bot';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
@@ -49,6 +58,65 @@ describe('RemoteControllerComponent', () => {
 
   it('closes once its seat is made a guest, who may no longer write what it writes', () => {
     expectClosesForAGuest(() => TestBed.createComponent(RemoteControllerComponent));
+  });
+
+  it('lists a piece this seat may not view by its name alone, and takes it only where it is ticked', () => {
+    const open = createChar('勇者');
+    const kept = createChar('秘密の魔物');
+    open.setLocation('table');
+    kept.setLocation('table');
+    vi.spyOn(TestBed.inject(DisclosureService), 'canView').mockImplementation((character) => character !== kept);
+    component.selectTab.set('table');
+    fixture.detectChanges();
+
+    expect(component.getGameObjects('table')).toContain(kept);
+    expect(component.getTargetCharacters(false)).toContain(open);
+    expect(component.getTargetCharacters(false)).not.toContain(kept);
+    kept.targeted = true;
+    expect(component.getTargetCharacters(true)).toEqual([kept]);
+    const card = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="remote-target-秘密の魔物"]')!;
+    expect(card.parentElement!.textContent).not.toContain('バフ');
+    kept.targeted = false;
+  });
+
+  it('names a piece whose name is kept from this seat by no name in the list', () => {
+    const masked = createChar('黒幕');
+    masked.setLocation('table');
+    masked.hideName = true;
+    vi.spyOn(TestBed.inject(RolePermissionService), 'canSeeHidden').mockReturnValue(false);
+    component.selectTab.set('table');
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).not.toContain('黒幕');
+    expect(root.querySelector('[data-testid="remote-target-？？？"]')).not.toBeNull();
+  });
+
+  it('names the piece anew in its title once its name is hidden while the remote is open', async () => {
+    vi.spyOn(TestBed.inject(RolePermissionService), 'canSeeHidden').mockReturnValue(false);
+    const villain = createChar('黒幕');
+    component.character.set(villain);
+    TestBed.tick();
+    const panel = (component as unknown as { panelService: { title: string } }).panelService;
+    expect(panel.title).toContain('黒幕');
+
+    villain.hideName = true;
+    await Promise.resolve();
+    TestBed.tick();
+
+    expect(panel.title).toContain('？？？');
+    expect(panel.title).not.toContain('黒幕');
+  });
+
+  it('leaves out a piece the table does not draw for this seat, in the dark, under the fog or in stealth', () => {
+    const seen = createChar('勇者');
+    const unseen = createChar('潜む魔物');
+    seen.setLocation('table');
+    unseen.setLocation('table');
+    vi.spyOn(TestBed.inject(VisionService), 'isTokenVisible').mockImplementation((character) => character !== unseen);
+
+    expect(component.getGameObjects('table')).toContain(seen);
+    expect(component.getGameObjects('table')).not.toContain(unseen);
   });
 
   it('should create', () => {
@@ -117,6 +185,68 @@ describe('RemoteControllerComponent', () => {
 
       expect(said).not.toHaveBeenCalled();
       vi.restoreAllMocks();
+    });
+  });
+
+  describe('the kind of the buff the form lays', () => {
+    let target: GameCharacter;
+    const ailments = () => TestBed.inject(StatusAilmentService).ailments();
+
+    beforeEach(() => {
+      TestBed.inject(StatusAilmentService).save([newStatusAilment('毒')]);
+      target = createChar('相手');
+      target.addExtendData();
+      target.setLocation('table');
+      target.targeted = true;
+      component.selectTab.set('table');
+      fixture.detectChanges();
+    });
+
+    afterEach(() => {
+      target.targeted = false;
+      TestBed.inject(StatusAilmentService).save([]);
+      StatusAilmentCatalog.forget();
+    });
+
+    it('shows the kind the name typed makes the buff while the choice is left as it came', () => {
+      component.text.set('盾 防御+1 3');
+      expect(component.buffKind()).toBe('buff');
+
+      component.text.set('毒 継続 3');
+      expect(component.buffKind()).toBe('debuff');
+
+      component.buffKindPicked.set('buff');
+      expect(component.buffKind()).toBe('buff');
+    });
+
+    it('lays a name that is a state of the room with no mark, a debuff, while the choice is left as it came', () => {
+      component.text.set('毒 継続 3');
+
+      component.sendBuffChat(null);
+
+      const laid = target.buffs.find('毒')!;
+      expect(laid.toAttributes()).not.toHaveProperty(DataElementAttribute.BUFF_KIND);
+      expect(buffKindOf(laid, ailments())).toBe('debuff');
+    });
+
+    it('lays a buff picked by hand as a buff though its name is a state of the room', () => {
+      component.text.set('毒 継続 3');
+      component.buffKindPicked.set('buff');
+
+      component.sendBuffChat(null);
+
+      const laid = target.buffs.find('毒')!;
+      expect(laid.getAttribute(DataElementAttribute.BUFF_KIND)).toBe('buff');
+      expect(buffKindOf(laid, ailments())).toBe('buff');
+    });
+
+    it('lays a debuff picked by hand as a debuff, whatever its name', () => {
+      component.text.set('盾 防御+1 3');
+      component.buffKindPicked.set('debuff');
+
+      component.sendBuffChat(null);
+
+      expect(target.buffs.find('盾')!.getAttribute(DataElementAttribute.BUFF_KIND)).toBe('debuff');
     });
   });
 
@@ -207,6 +337,20 @@ describe('RemoteControllerComponent', () => {
 
       expect(offeredNames()).toContain('正気度');
       expect(offeredNames()).not.toContain('弾薬');
+    });
+
+    it('keeps the items of a ticked piece whose contents are kept from this seat off the buttons', () => {
+      const open = createChar('勇者');
+      const kept = createChar('秘密の魔物');
+      addResource(open, '正気度');
+      addResource(kept, '隠し玉');
+      kept.targeted = true;
+      vi.spyOn(component, 'getGameObjects').mockReturnValue([open, kept]);
+      vi.spyOn(TestBed.inject(DisclosureService), 'canView').mockImplementation((character) => character !== kept);
+
+      expect(offeredNames()).toContain('正気度');
+      expect(offeredNames()).not.toContain('隠し玉');
+      kept.targeted = false;
     });
 
     it('stands in with every piece in the tab while none is targeted', () => {
@@ -383,6 +527,20 @@ describe('RemoteControllerComponent', () => {
       expect(char1.targeted).toBe(false);
       expect(char2.targeted).toBe(false);
     });
+
+    it('leaves a piece kept from the reader to its own row, and still takes it off with the rest', () => {
+      const shown = createChar('a');
+      const keptBack = createChar('b');
+      vi.spyOn(TestBed.inject(DisclosureService), 'canView').mockImplementation((character) => character !== keptBack);
+      vi.spyOn(component, 'getGameObjects').mockReturnValue([shown, keptBack]);
+
+      component.allBoxCheck({ check: true });
+      expect([shown.targeted, keptBack.targeted]).toEqual([true, false]);
+
+      keptBack.targeted = true;
+      component.allBoxCheck({ check: false });
+      expect([shown.targeted, keptBack.targeted]).toEqual([false, false]);
+    });
   });
   describe('the battle stage', () => {
     let battle: { play: ReturnType<typeof vi.fn>; playLineupAs: ReturnType<typeof vi.fn> };
@@ -470,11 +628,72 @@ describe('RemoteControllerComponent', () => {
       expect(reading?.current).toBe(hpBefore - 3);
     });
 
+    it('says only the change to a piece kept from anyone, and what is left to the game masters alone', () => {
+      const hero = createChar('勇者');
+      const goblin = createChar('ゴブリン');
+      goblin.disclosureMode = 'gm';
+      const hpBefore = Number(goblin.detailDataElement?.getFirstElementByName('HP')?.currentValue);
+      component.character.set(hero);
+      fixture.detectChanges();
+      vi.spyOn(component, 'getTargetCharacters').mockReturnValue([goblin]);
+      const said = { tabIdentifier: 'tab', timestamp: 10, name: '勇者' };
+      const announce = vi
+        .spyOn(component as unknown as { announce: (text: string) => unknown }, 'announce')
+        .mockReturnValue(said);
+      const told = vi
+        .spyOn(
+          component as unknown as { tellThoseWhoMaySee: (line: unknown, text: string, pieces: unknown) => void },
+          'tellThoseWhoMaySee'
+        )
+        .mockImplementation(() => undefined);
+      component.remoteControllerSelect.set({ name: 'HP', nowOrMax: 'now', dispName: 'HP' });
+      component.remoteNumber = -3;
+
+      component.remoteChangeValue();
+
+      expect(announce.mock.calls[0][0]).toContain('[ゴブリン]');
+      expect(announce.mock.calls[0][0]).not.toContain(`${hpBefore - 3}`);
+      expect(told).toHaveBeenCalledWith(said, expect.stringContaining(`[ゴブリン ${hpBefore}>${hpBefore - 3}]`), [
+        goblin,
+      ]);
+
+      announce.mockClear();
+      told.mockClear();
+      component.remoteNumber = -hpBefore;
+      component.remoteChangeValue();
+
+      expect(announce.mock.calls[0][0]).toContain(`[ゴブリン ${hpBefore - 3}>`);
+      expect(told).not.toHaveBeenCalled();
+    });
+
     it('remembers whether changes are played on the stage', () => {
       component.setBattleOnChange(true);
 
       expect(component.battleOnChange()).toBe(true);
       expect(TestBed.createComponent(RemoteControllerComponent).componentInstance.battleOnChange()).toBe(true);
+    });
+  });
+
+  describe('the dice bot the panel loads', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('is taken up once it has loaded', async () => {
+      vi.spyOn(DiceBot, 'loadGameSystemAsync').mockResolvedValue({ ID: 'Cthulhu7th' } as never);
+
+      component.gameType = 'Cthulhu7th';
+
+      await vi.waitFor(() => expect(component.gameType).toBe('Cthulhu7th'));
+    });
+
+    it('is left as it was, with a warning, when it cannot be loaded', async () => {
+      vi.spyOn(DiceBot, 'loadGameSystemAsync').mockRejectedValue(new Error('no such system'));
+      const warn = vi.spyOn(Logger, 'warn').mockImplementation(() => undefined);
+      const before = component.gameType;
+
+      component.gameType = 'Missing';
+
+      await vi.waitFor(() => expect(warn).toHaveBeenCalled());
+      expect(component.gameType).toBe(before);
     });
   });
 });

@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { GameObject } from '@axe/core/sync/game-object';
+import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { DataElement } from '@axe/domain/data/data-element';
 
@@ -145,6 +146,22 @@ describe('GameObject', () => {
       const obj = DataElement.create('test', '', {});
       expect(() => obj.apply(null!)).not.toThrow();
     });
+
+    it('keeps the attributes a newer version sent that it has no SyncVar for, through an edit of its own and a save', () => {
+      const obj = DataElement.create('test', 'value', {});
+      const context = obj.toContext();
+      context.majorVersion += 1;
+      const attributes = context.syncData['attributes'] as Record<string, unknown>;
+      attributes['modelIdentifier'] = 'model-hash';
+      attributes['modelScale'] = '1.5';
+
+      obj.apply(context);
+      obj.name = 'edited';
+
+      const kept = { name: 'edited', modelIdentifier: 'model-hash', modelScale: '1.5' };
+      expect(obj.toContext().syncData['attributes']).toMatchObject(kept);
+      expect(obj.clone().readSyncData()['attributes']).toMatchObject(kept);
+    });
   });
 
   describe('toXml()', () => {
@@ -174,6 +191,14 @@ describe('GameObject', () => {
       // travels in the xml the copy can end up with the same one
       expect(cloned).toBeTruthy();
       expect(cloned).not.toBe(obj);
+    });
+
+    it('throws when the copy cannot be read back from its XML', () => {
+      const obj = DataElement.create('test', 'value', {});
+      vi.spyOn(ObjectSerializer.instance, 'parseXml').mockReturnValue(null);
+
+      expect(() => obj.clone()).toThrow(/could not be read back/);
+      vi.restoreAllMocks();
     });
   });
 

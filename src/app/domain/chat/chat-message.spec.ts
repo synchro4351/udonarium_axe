@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Network } from '@axe/core/index';
+import { Network } from '@axe/core/network/network';
 import { IPeerContext } from '@axe/core/network/peer-context';
 import { ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { ObjectStore } from '@axe/core/sync/object-store';
@@ -13,7 +13,7 @@ describe('ChatMessage', () => {
     TestBed.configureTestingModule({});
     store = ObjectStore.instance;
 
-    vi.spyOn(Network, 'peerContext', 'get').mockReturnValue({
+    vi.spyOn(Network.instance, 'peerContext', 'get').mockReturnValue({
       peerId: 'test-peer',
       userId: 'test-user',
       isOpen: true,
@@ -872,6 +872,18 @@ describe('ChatMessage', () => {
         { text: 'こんばんは', since: 2000, edit: 1 },
         { text: 'こんばんは！', since: 3000, edit: 2 },
       ]);
+    });
+
+    it('takes off the mark of a game master’s words once its number to beat is written over, and keeps it for other words', () => {
+      const message = said('解錠：目標値13');
+      message.mastersWords = '1';
+
+      message.edit('解錠：目標値13', 'smile', 2000);
+      expect(message.mastersWords).toBe('1');
+      message.edit('扉の解錠：目標値13', 'smile', 2500);
+      expect(message.mastersWords).toBe('1');
+      message.edit('解錠：目標値3', 'smile', 3000);
+      expect(message.mastersWords).toBe('');
     });
 
     it('keeps its history through a save', () => {

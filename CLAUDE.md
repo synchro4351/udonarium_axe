@@ -67,19 +67,19 @@ composition → features → ui → application → infrastructure → domain �
 
 ## 開発コマンド
 
-| コマンド                               | 用途                                                                                    |
-| -------------------------------------- | --------------------------------------------------------------------------------------- |
-| `npm start`                            | 開発サーバー（`ng serve`）                                                              |
-| `npm run build`                        | プロダクションビルド（`ng build` + 既定設定コピー + zip生成）                           |
-| `npm test`                             | ユニットテスト（Angular builder + Vitest）                                              |
-| `npx vitest run`                       | ユニットテスト（直接Vitest、上記とは別経路）                                            |
-| `npm run e2e`                          | Playwright E2E                                                                          |
-| `npm run e2e:ui`                       | Playwright UIモード                                                                     |
-| `npx playwright test --project=visual` | 演出のスクリーンショット比較（手元のみ・基準画像は`e2e/visual/__screenshots__/`）       |
-| `npx playwright test --project=server` | 部屋のサーバーの結合（手元のみ・隣に`udonarium_axe_backend`とビルド済みの`dist`が要る） |
-| `npm run lint`                         | ESLint                                                                                  |
-| `npm run format`                       | Prettier整形                                                                            |
-| `npm run format:check`                 | Prettierチェックのみ                                                                    |
+| コマンド                                      | 用途                                                                                                                         |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `npm start`                                   | 開発サーバー（`ng serve`）                                                                                                   |
+| `npm run build`                               | プロダクションビルド（`ng build` + 既定設定コピー + zip生成）                                                                |
+| `npm test`                                    | ユニットテスト（Angular builder + Vitest）                                                                                   |
+| `npx vitest run`                              | ユニットテスト（直接Vitest、上記とは別経路）                                                                                 |
+| `npm run e2e`                                 | Playwright E2E                                                                                                               |
+| `npm run e2e:ui`                              | Playwright UIモード                                                                                                          |
+| `npx playwright test --project=visual-webgl2` | 演出のスクリーンショット比較（手元のみ・基準画像は`e2e/visual/__screenshots__/webgl2/`。WebGPUは`visual-webgpu`と`webgpu/`） |
+| `npx playwright test --project=server`        | 部屋のサーバーの結合（手元のみ・隣に`udonarium_axe_backend`とビルド済みの`dist`が要る）                                      |
+| `npm run lint`                                | ESLint                                                                                                                       |
+| `npm run format`                              | Prettier整形                                                                                                                 |
+| `npm run format:check`                        | Prettierチェックのみ                                                                                                         |
 
 ## コミット・フック規約（要点）
 
@@ -108,7 +108,7 @@ README・`docs/`・`website/`のまとまった日本語は`yomiyasu`スキル�
 詳細は[docs/contribution.md](docs/contribution.md)にあり、ここには要点だけを書く。
 
 - 対象は新規執筆と書き直し。1〜2行の追記や表のセル修正はそのまま書いてよい
-- 和文と英数字の間に半角空白を入れない。空けてある既存の文書は書き直すときにそろえる
+- 和文と英数字の間に半角空白を入れない（yomiyasuは直さないので書き手が詰める）。空けてある既存の文書は書き直すときにそろえる
 - 比喩動詞・太字や箇条書きの多さ・文末コロンなどはスキル同梱のリンターが拾う。
   出るのは疑いなので、直すか残すかは文脈で決める
 - **コミットメッセージとCHANGELOGは対象外**。前者は英語で書き、後者はsemantic-releaseが生成する

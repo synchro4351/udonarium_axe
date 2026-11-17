@@ -4,20 +4,24 @@ import { GameObject } from '@axe/core/sync/game-object';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { parseAttributesKeepingIdentifier, toAttributesKeepingIdentifier } from '@axe/core/sync/persisted-identifier';
 import { clampOr } from '@axe/core/util/clamp';
-import { graphemesOf } from '@axe/domain/chat/emoji-only-text';
+import { darkSoundsAt } from '@axe/domain/effect/dark-looks';
+import { quakeSoundsAt } from '@axe/domain/effect/earth-looks';
 import {
   EffectKind,
   EffectTargeting,
   isEffectKind,
   isEffectTargeting,
   isProjectileStyle,
-  isReactionKind,
   isSlashStyle,
   ProjectileStyle,
   SlashStyle,
 } from '@axe/domain/effect/effect-kind';
 import { type EffectStage, parseEffectStages } from '@axe/domain/effect/effect-stage';
 import { stagedEffectDuration } from '@axe/domain/effect/effect-stage-timeline';
+import { holyStrikesAt } from '@axe/domain/effect/holy-looks';
+import { spaceSoundsAt } from '@axe/domain/effect/space-looks';
+import { boltStrokesOf, CURRENT_REACHES_AT } from '@axe/domain/effect/thunder-looks';
+import { stormSoundsAt } from '@axe/domain/effect/wind-looks';
 
 const MIN_DURATION_MS = 120;
 const MAX_DURATION_MS = 6000;
@@ -27,12 +31,6 @@ const MAX_STAGGER_MS = 2000;
 const MAX_TARGET_LIMIT = 20;
 const MAX_SHOTS = 24;
 const MAX_AREA_RADIUS = 12;
-/** The longest a reaction stays up, in milliseconds. */
-export const MAX_REACTION_DURATION_MS = 3000;
-/** Where through the playback a thrown reaction lands. */
-export const REACTION_THROW_LAND = 0.45;
-/** The most characters a reaction shows, counting an emoji as one. */
-export const MAX_REACTION_LABEL_LENGTH = 12;
 
 @SyncObject('effect-preset')
 export class EffectPreset extends GameObject {
@@ -68,14 +66,6 @@ export class EffectPreset extends GameObject {
   @SyncVar() areaRadius: number = 0;
   /** The particles scattered along the way. Empty for whatever the family gives. */
   @SyncVar() moteStyle: string = '';
-  /** What a reaction shows: an emoji or a few words. Only a reaction reads it. */
-  @SyncVar() reactionText: string = '';
-  /**
-   * A picture from the room's images for a reaction to show instead of its text. Empty for the text.
-   *
-   * The name ends as every picture reference does, so a saved room carries the picture with it.
-   */
-  @SyncVar() reactionImageIdentifier: string = '';
 
   /**
    * The run this effect goes through, written as a list of stages.
@@ -153,22 +143,7 @@ export class EffectPreset extends GameObject {
   get duration(): number {
     // A run is as long as its stages take; the written length belongs to the one look.
     if (this.isStaged) return stagedEffectDuration(this.stageList);
-    // A reaction is a passing remark; left up for long, a few of them bury the table.
-    if (this.isReaction) return clamp(this.durationMs, MIN_DURATION_MS, MAX_REACTION_DURATION_MS, 900);
     return clamp(this.durationMs, MIN_DURATION_MS, MAX_DURATION_MS, 900);
-  }
-
-  /** Whether this is one of the light reactions, which show a mark rather than an element. */
-  get isReaction(): boolean {
-    return !this.isStaged && isReactionKind(this.kind);
-  }
-
-  /**
-   * The text a reaction shows, trimmed and cut to a few characters so a pasted paragraph
-   * cannot cover the table. Empty when none was written.
-   */
-  get reactionLabel(): string {
-    return reactionLabelOf(this.reactionText);
   }
 
   /** How long each target waits after the one before it, in milliseconds, held to at most 2000. */
@@ -187,9 +162,27 @@ export class EffectPreset extends GameObject {
     return this.impactKind;
   }
 
-  /** Where through the effect the landing sounds. A projectile sounds it as it lands, and anything else a little later. */
+  /**
+   * Where through the effect the landing sounds. A projectile sounds it as it lands, a look of holy
+   * light, of darkness or a bolt of lightning as it strikes, once it has been seen coming, a quake as
+   * its rock first breaks, a storm as its first lightning strikes, a current of lightning as it reaches
+   * its target, and anything else a little later.
+   */
   get impactSoundAt(): number {
-    if (this.effectKind === 'arc') return 0.4;
+    const holy = holyStrikesAt(this.effectKind, this.gradeLevel, this.duration / 1000);
+    if (holy !== undefined) return holy / (this.duration / 1000);
+    const dark = darkSoundsAt(this.effectKind, this.gradeLevel, this.duration / 1000);
+    if (dark !== undefined) return dark;
+    const space = spaceSoundsAt(this.effectKind, this.gradeLevel, this.duration / 1000);
+    if (space !== undefined) return space;
+    const quake = quakeSoundsAt(this, this.duration / 1000);
+    if (quake !== undefined) return quake;
+    const storm = stormSoundsAt(this, this.duration / 1000);
+    if (storm !== undefined) return storm;
+    // A bolt sounds as it strikes, after its leader, and a current as it reaches its target.
+    if (this.effectKind === 'bolt')
+      return (boltStrokesOf(this.gradeLevel, this.duration / 1000)[0] * 1000) / this.duration;
+    if (this.effectKind === 'arc') return CURRENT_REACHES_AT;
     // A beam sounds as it fires; waiting for the landing leaves the gathering silent.
     if (this.effectKind === 'beam') return 0.28;
     // A great sword of light arrives after it falls; sounded while it is held up it becomes a starting gun.
@@ -198,8 +191,6 @@ export class EffectPreset extends GameObject {
     if (this.effectKind === 'arrowrain') return 0.35;
     // A ballistic shot strikes nothing between the launch and the fall.
     if (this.effectKind === 'ballistic') return 0.86;
-    // A thrown reaction sounds as it hits, not while it is still in the air.
-    if (this.effectKind === 'reactthrow') return REACTION_THROW_LAND;
     return 0.5;
   }
 
@@ -252,20 +243,6 @@ export class EffectPreset extends GameObject {
     const count = Math.max(targetCount, 1);
     return this.duration + this.stagger * (count - 1);
   }
-}
-
-/**
- * A reaction's text, trimmed, on one line and cut to at most 12 characters.
- *
- * An emoji built of several code points, such as a family or a skin tone, counts as one where
- * the runtime can tell where characters end.
- */
-export function reactionLabelOf(text: string | null | undefined): string {
-  const line = (text ?? '').replace(/\s+/g, ' ').trim();
-  if (line.length < 1) return '';
-  const characters = graphemesOf(line);
-  if (characters.length <= MAX_REACTION_LABEL_LENGTH) return line;
-  return characters.slice(0, MAX_REACTION_LABEL_LENGTH).join('');
 }
 
 function clamp(value: number, min: number, max: number, fallback: number): number {

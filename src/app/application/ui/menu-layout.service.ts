@@ -28,6 +28,7 @@ function stored(surface: MenuSurface): MenuLayout | null {
 @Injectable({ providedIn: 'root' })
 export class MenuLayoutService {
   private readonly held = new Map<MenuSurface, ReturnType<typeof signal<MenuLayout | null>>>();
+  private readonly layouts = new Map<MenuSurface, Signal<MenuLayout>>();
 
   constructor() {
     for (const surface of MENU_SURFACES) this.held.set(surface, signal<MenuLayout | null>(stored(surface)));
@@ -45,12 +46,17 @@ export class MenuLayoutService {
    * made before the command was kept or read in from a file.
    */
   layoutOf(surface: MenuSurface): Signal<MenuLayout> {
-    const slot = this.slot(surface);
-    const kept = KEPT_MENU_COMMANDS[surface];
-    return computed(() => {
-      const layout = slot() ?? defaultMenuLayout(surface);
-      return kept ? keepingMenuCommand(layout, kept) : layout;
-    });
+    let layout = this.layouts.get(surface);
+    if (!layout) {
+      const slot = this.slot(surface);
+      const kept = KEPT_MENU_COMMANDS[surface];
+      layout = computed(() => {
+        const shown = slot() ?? defaultMenuLayout(surface);
+        return kept ? keepingMenuCommand(shown, kept) : shown;
+      });
+      this.layouts.set(surface, layout);
+    }
+    return layout;
   }
 
   /** Writes the menu down as it now stands. */

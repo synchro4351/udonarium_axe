@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { PieceNameService } from '@axe/application/character/piece-name.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
+import { VisionService } from '@axe/application/tabletop/vision.service';
 import { closeWhenOffTheTable } from '@axe/application/ui/close-when-off-the-table';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { PanelService } from '@axe/application/ui/panel.service';
@@ -29,6 +31,8 @@ export class RangeDockingCharacterComponent {
   private readonly imageStorage = inject(ImageStorage);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly tabletop = inject(TabletopService);
+  private readonly vision = inject(VisionService);
+  private readonly names = inject(PieceNameService);
 
   tabletopObject: RangeArea | null = null;
 
@@ -38,7 +42,10 @@ export class RangeDockingCharacterComponent {
     this.objectChange.collectionOf(GameCharacter.aliasName)();
     const all = this.objectStore.getObjects<GameCharacter>(GameCharacter);
     for (const c of all) this.objectChange.versionOf(c.identifier)();
-    return all.filter((character) => character.isVisibleOnTable);
+    return all.filter(
+      (character) =>
+        character.isVisibleOnTable && this.vision.isTokenVisible(character) && !this.names.isKept(character)
+    );
   });
 
   constructor() {
@@ -70,15 +77,13 @@ export class RangeDockingCharacterComponent {
    * Docks the range to the character picked in the list, so it follows that piece about the table,
    * and closes the panel. With no character picked the panel only closes.
    */
-  followring() {
+  follow() {
     if (!this.tabletopObject) return;
     const object = this.objectStore.get(this.sendFrom());
     if (object instanceof GameCharacter) {
-      if (GameCharacter) {
-        SoundEffect.play(PresetSound.lock);
-        this.tabletopObject.followingCharacterIdentifier = object.identifier;
-        this.tabletopObject.following(this.tabletop.gridSize());
-      }
+      SoundEffect.play(PresetSound.lock);
+      this.tabletopObject.followingCharacterIdentifier = object.identifier;
+      this.tabletopObject.following(this.tabletop.gridSize());
     }
     this.panelService.close();
   }

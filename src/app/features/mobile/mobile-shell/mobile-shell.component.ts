@@ -40,7 +40,7 @@ import { TranslocoModule } from '@jsverse/transloco';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  selector: 'app-mobile-shell',
+  selector: 'mobile-shell',
   templateUrl: './mobile-shell.component.html',
   imports: [MobileChatPaneComponent, TranslocoModule, UiHandCardsIconComponent],
 })
@@ -241,6 +241,8 @@ export class MobileShellComponent {
         return 'roomSettings';
       case 'images':
         return 'fileStorage';
+      case 'models':
+        return 'modelLibrary';
       case 'jukebox':
         return 'jukebox';
       case 'soundSettings':

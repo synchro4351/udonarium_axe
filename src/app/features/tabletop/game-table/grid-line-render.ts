@@ -5,8 +5,8 @@ import {
   hexSpacing,
   hexStartAngle,
   isFlatTopGrid,
-  strokeHexPath,
 } from '@axe/domain/tabletop/hex-geometry';
+import { strokeHexPath } from '@axe/infrastructure/tabletop/hex-canvas';
 
 export class GridLineRender {
   /**
@@ -25,6 +25,15 @@ export class GridLineRender {
     return this.scale === 1 ? tablePx : Math.max(1, Math.ceil(tablePx * this.scale));
   }
 
+  /**
+   * How wide a line of the grid is drawn, in table pixels: a pixel of the board, or as many as come
+   * to a pixel of a canvas scaled down to fewer pixels than the board, where a line a board's pixel
+   * wide would be drawn a fraction of a pixel wide and all but vanish.
+   */
+  private thinnestLinePx(): number {
+    return this.scale < 1 ? 1 / this.scale : 1;
+  }
+
   private makeBrush(
     context: CanvasRenderingContext2D,
     gridSize: number,
@@ -33,7 +42,7 @@ export class GridLineRender {
   ): void {
     context.strokeStyle = gridColor;
     context.fillStyle = gridFontColor;
-    context.lineWidth = 1;
+    context.lineWidth = this.thinnestLinePx();
 
     const fontSize: number = Math.floor(gridSize / 5);
     context.font = `bold ${fontSize}px sans-serif`;
@@ -51,10 +60,10 @@ export class GridLineRender {
   render(
     width: number,
     height: number,
-    gridSize: number = 50,
-    gridType: GridType = GridType.SQUARE,
-    gridColor: string = '#000000e6',
-    gridFontColor: string = gridColor,
+    gridSize: number,
+    gridType: GridType,
+    gridColor: string,
+    gridFontColor: string,
     overTerrain = false,
     offsetTop: number = 0,
     offsetLeft: number = 0,
@@ -93,10 +102,10 @@ export class GridLineRender {
   renderViewport(
     widthPx: number,
     heightPx: number,
-    gridSize: number = 50,
-    gridType: GridType = GridType.SQUARE,
-    gridColor: string = '#000000e6',
-    gridFontColor: string = gridColor,
+    gridSize: number,
+    gridType: GridType,
+    gridColor: string,
+    gridFontColor: string,
     offsetTopPx: number = 0,
     offsetLeftPx: number = 0,
     drawLabels: boolean = true,

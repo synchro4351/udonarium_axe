@@ -27,7 +27,7 @@ const ESCAPED_SPACE = /\\s/g;
  */
 export function readableChatText(message: ChatMessage, hidden: boolean, translate: TranslateFn): string {
   if (hidden) return '';
-  const text = message.isSystemMessage ? decodeI18nMessage(message.text, translate) : (message.text ?? '');
+  const text = decodeI18nMessage(message.text, translate);
   return replaceRubyNotation(
     withoutChatDecoration(vnBodyOf(message.vnEmote, text)),
     (base, reading) => `${base}（${readingOf(reading)}）`

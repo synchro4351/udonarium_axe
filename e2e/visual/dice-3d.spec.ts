@@ -21,7 +21,7 @@ async function chooseStage(page: Page, stage: 'frame' | 'table') {
   await page.getByTestId('dice-stage').selectOption(stage);
   await expect(page.getByTestId('dice-stage')).toHaveValue(stage);
   const settings = page.locator('ui-panel').filter({ has: page.getByTestId('dice-stage') });
-  await settings.locator('.bg-ui-titlebar button', { hasText: 'close' }).dispatchEvent('click');
+  await settings.getByTestId('panel-close').dispatchEvent('click');
   await page.getByRole('button', { name: /メニューを閉じる/ }).click();
 }
 
@@ -87,42 +87,6 @@ async function seedDiceBot(page: Page) {
   });
 }
 
-/**
- * Keeps the dice on the table from fading. The page draws as it would until a frame would draw them
- * fading, a few seconds after they come to rest; every frame from then on is drawn at the moment of
- * the last one that showed them in full, so they lie at rest for as long as the shot takes.
- */
-async function keepFromFading(page: Page) {
-  await page.evaluate(() => {
-    const overlay = document.querySelector('[data-testid="table-dice-overlay"]');
-    const requestFrame = window.requestAnimationFrame.bind(window);
-    const drawImage = CanvasRenderingContext2D.prototype.drawImage;
-    const kept = { at: 0, inFull: 0, held: -1, redrawn: false };
-    Object.assign(window, { diceKept: kept });
-    window.requestAnimationFrame = (callback) =>
-      requestFrame((now) => {
-        kept.at = kept.held < 0 ? now : kept.held;
-        callback(kept.at);
-      });
-    CanvasRenderingContext2D.prototype.drawImage = function (this: CanvasRenderingContext2D, ...args: unknown[]) {
-      if (this.canvas === overlay && this.globalAlpha < 1 && kept.held < 0) {
-        kept.held = kept.inFull;
-      } else if (this.canvas === overlay) {
-        kept.inFull = kept.at;
-        kept.redrawn ||= kept.held >= 0;
-      }
-      return Reflect.apply(drawImage, this, args);
-    } as typeof drawImage;
-  });
-}
-
-/** Waits until the dice on the table have come to rest and are kept there in full. */
-async function keptAtRest(page: Page) {
-  await page.waitForFunction(() => (window as unknown as { diceKept: { redrawn: boolean } }).diceKept.redrawn, null, {
-    timeout: 30_000,
-  });
-}
-
 /*
  * Each scene first throws a die it does not shoot. Starting the dice engine draws on the page's
  * randomness, in a quiet moment that could come before the roll or between the roll and its
@@ -145,24 +109,75 @@ test('the dice of a chat roll come to rest in the frame of its answer', async ({
   const stage = stages.last();
   await expect(stage).toHaveAttribute('data-state', 'settled', { timeout: 30_000 });
   await atRest(stage.locator('canvas'));
-  await expect(stage).toHaveScreenshot('dice-3d-frame.png', { maxDiffPixels: 40 });
+  await expect(stage).toHaveScreenshot('dice-3d-frame.png');
 });
 
-test('the dice of a chat roll come to rest on the table', async ({ page }) => {
+/**
+ * Writes a roll and sends it in the same moment as the dice bot and the page's randomness are
+ * started over, with no frame between: the table drawn on a canvas makes its parts afresh as it
+ * draws, and each takes a number from the page's randomness, so a frame drawn in between would
+ * change the roll's identifier, and with it how its dice are thrown.
+ */
+async function rollSeededAtOnce(page: Page, command: string) {
+  await waitChatEditor(page);
+  await chatInput(page).fill(command);
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  await page.evaluate(() => {
+    (globalThis as unknown as { Opal: { Random: { $srand(seed: number): void } } }).Opal.Random.$srand(0x2f6e2b1);
+    (window as unknown as { reseedRandom(seed: number): void }).reseedRandom(0x2f6e2b1);
+    document.querySelector<HTMLButtonElement>('chat-input button[aria-label="送信"]')!.click();
+  });
+}
+
+/** Has the chat speak as a piece, so a roll's dice are thrown in front of it, out in the open, rather than in the middle of the screen. */
+async function speakAs(page: Page, name: string) {
+  const from = page.locator('chat-window .chat-select--from');
+  const search = from.locator('input[role="combobox"]');
+  await search.fill(name);
+  await expect(page.locator('.ng-dropdown-panel').getByRole('option', { name, exact: true })).toBeVisible();
+  await search.press('Enter');
+  await expect(from.locator('.ng-value-label')).toHaveText(name);
+}
+
+/** How many rolls have dice in the scene of the table drawn on a canvas. */
+function diceInScene(page: Page): Promise<number> {
+  return page.evaluate(() => window.__axeTable?.sceneStats()?.dice ?? 0);
+}
+
+/**
+ * Holds the moment the page draws at once the dice of a roll in the scene of a canvas table have all
+ * come to rest, and keeps them from fading, so they lie at rest for as long as the shot takes
+ * however long the page went without a frame on the way there, as it can when tests run side by side.
+ */
+async function holdDiceInScene(page: Page) {
+  await page.evaluate(() => {
+    const scene = window.__axeTable;
+    scene.keepDiceResting(true);
+    const requestFrame = window.requestAnimationFrame.bind(window);
+    const kept = { held: -1 };
+    Object.assign(window, { diceKept: kept });
+    window.requestAnimationFrame = (callback) =>
+      requestFrame((now) => {
+        if (kept.held < 0 && scene.diceResting()) kept.held = now;
+        callback(kept.held >= 0 ? kept.held : now);
+      });
+  });
+}
+
+test('the dice of a chat roll come to rest in the scene of a table drawn on a canvas', async ({ page }) => {
   test.setTimeout(120_000);
   await prepare(page);
   await chooseStage(page, 'table');
-  const overlay = page.getByTestId('table-dice-overlay');
+  await speakAs(page, '魔法使い');
   await roll(page, '1d6');
-  await expect.poll(() => diceOn(overlay), { timeout: 30_000 }).not.toBe('');
-  await expect.poll(() => overlay.evaluate((canvas: HTMLCanvasElement) => canvas.width), { timeout: 30_000 }).toBe(1);
-
-  await keepFromFading(page);
-  await rollSeeded(page, '2d6+1d20');
-  // The dice come down in the middle of the screen, under the windows, which also tell the time.
+  await expect.poll(() => diceInScene(page), { timeout: 30_000 }).toBe(1);
+  await expect.poll(() => diceInScene(page), { timeout: 30_000 }).toBe(0);
+  await holdDiceInScene(page);
+  await rollSeededAtOnce(page, '2d6+1d20');
   await closePanels(page);
-
-  await keptAtRest(page);
+  await page.waitForFunction(() => (window as unknown as { diceKept: { held: number } }).diceKept.held >= 0, null, {
+    timeout: 30_000,
+  });
   await page.mouse.move(1279, 799);
-  await expect(page).toHaveScreenshot('dice-3d-table.png', { maxDiffPixels: 60 });
+  await expect(page).toHaveScreenshot('dice-3d-table.png', { timeout: 30_000 });
 });

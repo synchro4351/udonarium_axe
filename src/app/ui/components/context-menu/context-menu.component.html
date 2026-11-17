@@ -105,35 +105,21 @@
         </div>
       }
       <ul class="m-0 list-none px-0" [class.py-0.5]="!detachedItems()">
-        @if (title !== indexTitle) {
-          @for (action of actions; track $index; let first = $first) {
-            @if (detachedItems() && !first) {
-              <li
-                data-context-menu-item-gap
-                class="pointer-events-none block shrink-0 bg-transparent"
-                [style.height.px]="2"
-                aria-hidden="true"
-              ></li>
-            }
-            <ng-container
-              *ngTemplateOutlet="action?.type === 'separator' ? separator : actionMenu; context: { action: action }"
-            ></ng-container>
+        @for (action of actions; track $index; let first = $first) {
+          @if (detachedItems() && !first) {
+            <li
+              data-context-menu-item-gap
+              class="pointer-events-none block shrink-0 bg-transparent"
+              [style.height.px]="2"
+              aria-hidden="true"
+            ></li>
           }
-        }
-        @if (title === indexTitle) {
-          @for (action of actions; track $index; let first = $first) {
-            @if (detachedItems() && !first) {
-              <li
-                data-context-menu-item-gap
-                class="pointer-events-none block shrink-0 bg-transparent"
-                [style.height.px]="2"
-                aria-hidden="true"
-              ></li>
-            }
-            <ng-container
-              *ngTemplateOutlet="action?.type === 'separator' ? separator : indexMenu; context: { action: action }"
-            ></ng-container>
-          }
+          <ng-container
+            *ngTemplateOutlet="
+              action?.type === 'separator' ? separator : title === indexTitle ? indexMenu : actionMenu;
+              context: { action: action }
+            "
+          ></ng-container>
         }
       </ul>
     </div>
@@ -160,7 +146,7 @@
     [class.border-solid]="detachedItems()"
     [class.hover:bg-ui-menu-hover]="!detachedItems()"
     [class.mx-1]="!detachedItems()"
-    (click)="indexAction(action.line, action.id)"
+    (click)="indexAction(action)"
   >
     <div class="inline-block">{{ action.line }}:{{ action.name }}</div>
   </li>
@@ -169,34 +155,41 @@
 <ng-template #actionMenu let-action="action">
   <li
     data-context-menu-item
-    class="rounded-ui-sm text-ui-text hover:text-ui-accent relative my-0 cursor-default px-5 py-1.25 text-[calc(12px*var(--menu-font-scale,1))] transition-colors"
+    class="rounded-ui-sm text-ui-text relative my-0 cursor-default px-5 py-1.25 text-[calc(12px*var(--menu-font-scale,1))] transition-colors"
     [class.context-menu-detached-item]="detachedItems()"
     [class.border-ui-border-menu]="detachedItems()"
     [class.bg-ui-menu]="detachedItems()"
     [class.border]="detachedItems()"
     [class.border-solid]="detachedItems()"
-    [class.hover:bg-ui-menu-hover]="!detachedItems()"
+    [class.hover:text-ui-accent]="action.enabled !== false"
+    [class.hover:bg-ui-menu-hover]="!detachedItems() && action.enabled !== false"
     [class.mx-1]="!detachedItems()"
-    [class.opacity-50]="action.enabled === false"
     [attr.aria-disabled]="action.enabled === false ? true : null"
     (click)="doAction(action, row)"
     (mouseenter)="showSubMenu(action, false, row)"
     #row
   >
+    @let presentation = actionPresentation(action);
     <div class="inline-flex items-center gap-1">
-      @if (action.name && action.name.indexOf('☑') === 0) {
-        <input class="m-0 shrink-0 align-middle" type="checkbox" [disabled]="action.disabled" checked />
+      @if (presentation.kind === 'checkbox') {
+        <input
+          class="m-0 shrink-0 align-middle"
+          type="checkbox"
+          [disabled]="action.enabled === false"
+          [checked]="presentation.checked"
+        />
       }
-      @if (action.name && action.name.indexOf('☐') === 0) {
-        <input class="m-0 shrink-0 align-middle" type="checkbox" [disabled]="action.disabled" />
+      @if (presentation.kind === 'radio') {
+        <input
+          class="m-0 shrink-0 align-middle"
+          type="radio"
+          [disabled]="action.enabled === false"
+          [checked]="presentation.checked"
+        />
       }
-      @if (action.name && action.name.indexOf('◉') === 0) {
-        <input class="m-0 shrink-0 align-middle" type="radio" [disabled]="action.disabled" checked />
-      }
-      @if (action.name && action.name.indexOf('○') === 0) {
-        <input class="m-0 shrink-0 align-middle" type="radio" [disabled]="action.disabled" />
-      }
-      <span>{{ action.name.replace('☑', '').replace('☐', '').replace('◉', '').replace('○', '') }}</span>
+      <span [class.opacity-50]="action.enabled === false">{{
+        presentation.kind === 'selected' ? '✔ ' + presentation.label : presentation.label
+      }}</span>
     </div>
     @if (action.subActions) {
       <div class="absolute top-0.5 right-px bottom-0 inline-block">

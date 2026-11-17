@@ -1,4 +1,5 @@
 import { toHalfWidth } from '@axe/core/util/string-util';
+import { isAimedAtStatus } from '@axe/domain/character/aimed-at-buff';
 import {
   buffCommandKind,
   halfWidthBuffCommand,
@@ -7,6 +8,8 @@ import {
   removedBuffName,
   splitBuffRounds,
 } from '@axe/domain/character/buff-command';
+import { isBuffEffectTimingField, resolveBuffEffectTiming } from '@axe/domain/character/buff-timing';
+import { countDefaults, type DefaultPick, holdsItemNamed } from '@axe/domain/character/default-value';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { findStatusAilment } from '@axe/domain/character/status-ailment';
 import { StatusAilmentCatalog } from '@axe/domain/character/status-ailment-catalog';
@@ -21,7 +24,12 @@ import type { ReferenceSite } from '@axe/domain/chat/chat-reference';
 import { stampOf } from '@axe/domain/chat/stamp-catalog';
 import { isTargetNumberReference } from '@axe/domain/chat/target-number';
 import type { ChatSyntaxScan, SyntaxSpan, TextRange } from '@axe/domain/chat-syntax/chat-syntax';
-import { hasSecretEditMark, resourceCommandParts, resourceCommandSites } from '@axe/domain/data/resource-command-words';
+import {
+  hasSecretEditMark,
+  readDefaultResetCommand,
+  resourceCommandParts,
+  resourceCommandSites,
+} from '@axe/domain/data/resource-command-words';
 import { parseResourceEditOption, readModifierLayout } from '@axe/domain/data/resource-edit-helpers';
 import { readNamedResourceSlot } from '@axe/domain/data/resource-slot';
 import {
@@ -32,6 +40,7 @@ import {
   type RollCheck,
   rollLimitBreaches,
 } from '@axe/domain/dice/dice-roll-line';
+import type { TurnChatCommand, TurnChatRefusal } from '@axe/domain/tabletop/turn-chat-command';
 
 /** How much a finding matters: it will not work, it may not work as meant, or it is worth knowing. */
 export type ChatDiagnosticSeverity = 'error' | 'warning' | 'info';
@@ -63,7 +72,36 @@ export const CHAT_LINT_CODES = [
   'buff.missingStatus',
   'buff.notFound',
   'buff.roundsDefault',
+  'buff.badEffectTiming',
+  'buff.idleEffectTiming',
   'sweep.gmOnly',
+  'reset.gmOnly',
+  'reset.noDefaults',
+  'reset.shadowsBuff',
+  'turn.take',
+  'turn.end',
+  'turn.wait',
+  'turn.stepIn',
+  'turn.back',
+  'turn.roundStart',
+  'turn.roundNext',
+  'turn.roundBack',
+  'turn.roundReset',
+  'turn.no.watching',
+  'turn.no.noPiece',
+  'turn.no.fixedOrder',
+  'turn.no.notUnderWay',
+  'turn.no.notInOrder',
+  'turn.no.acted',
+  'turn.no.otherSide',
+  'turn.no.alreadyUp',
+  'turn.no.waiting',
+  'turn.no.nobodyUp',
+  'turn.no.cannotWait',
+  'turn.no.notWaiting',
+  'turn.no.nothingToUndo',
+  'turn.no.underWay',
+  'turn.no.notStarted',
   'portrait.unknown',
   'portrait.lostByTarget',
   'cutIn.secret',
@@ -143,6 +181,19 @@ export interface ChatLintContext {
    * to be sent now, in the palette's own box among them, is not.
    */
   readonly sentLater?: boolean;
+  /**
+   * The pieces on the table, which a reset of the whole table reaches; what such a reset would find
+   * there is not checked where this is not told.
+   */
+  piecesOnTable?(): readonly GameCharacter[];
+  /** The name a piece is told by in what is found; its own where this is not told. */
+  nameOf?(piece: GameCharacter): string;
+  /**
+   * Why a round command said now would move nothing, as the seat may not use it or the round does
+   * not stand where it applies; null where it would be carried out, as it is taken to be where this
+   * is not told.
+   */
+  turnCommandRefusal?(command: TurnChatCommand): TurnChatRefusal | null;
 }
 
 /**
@@ -186,7 +237,8 @@ function decorationHidesCommand(text: string): boolean {
 /**
  * Checks one message. A text written to be sent later, as a palette's lines are, is aimed at the
  * targets and the pieces an effect plays on as each line is sent, so nothing in it that turns on
- * the pieces picked out now is found at fault where none are.
+ * the pieces picked out now is found at fault where none are, nor is a round command for where the
+ * round stands now. What follows a round command is rolled as the line of its own it is said as.
  */
 function lintMessage(
   text: string,
@@ -201,8 +253,11 @@ function lintMessage(
   const aimsThrough = (site: ReferenceSite) =>
     textTargetsCharacter(speakerFilled(text.slice(site.from - message.from, site.to - message.from)));
   const later = context.sentLater === true;
+  const nameOf = (piece: GameCharacter) => context.nameOf?.(piece) ?? piece.name;
   const add = (span: TextRange, severity: ChatDiagnosticSeverity, code: ChatLintCode, extra = {}) =>
     found.push({ from: span.from, to: span.to, severity, code, ...extra });
+  const round = spans.find((span) => span.kind === 'turn');
+  const said = round?.kind === 'turn' ? round.rest : message;
   const portrait = spans.find((span) => span.kind === 'portrait');
   const portraitFound = portrait?.kind === 'portrait' && portraitResolves(portrait.command, context);
   let effectsStopped = false;
@@ -212,8 +267,17 @@ function lintMessage(
   for (const span of spans) {
     switch (span.kind) {
       case 'roll':
-        if (!(later && noTarget)) lintRoll(text, message, span, context, add);
+        if (!(later && noTarget)) {
+          const rolled = text.slice(span.message.from - message.from, span.message.to - message.from);
+          lintRoll(rolled, span.message, span, context, add);
+        }
         break;
+      case 'turn': {
+        const refusal = later ? null : (context.turnCommandRefusal?.(span.command) ?? null);
+        if (refusal) add(span, 'error', `turn.no.${refusal}`);
+        else add(span, 'info', `turn.${span.command}`);
+        break;
+      }
       case 'reference':
         if (noTarget && (span.site.targeted || aimsThrough(span.site))) {
           if (!later) add(span, 'error', 'target.none');
@@ -248,12 +312,22 @@ function lintMessage(
           if (!later) add(span, 'error', 'target.none');
         } else if (context.keptOffTable) add(span, 'warning', 'edit.keptOffTable');
         else if (!span.targeted && !context.speaker) add(span, 'warning', 'edit.noSpeaker');
-        else if (span.kind === 'resource') lintResource(span.command, span, piecesFor(span.targeted, context), add);
-        else lintBuff(span.command, span, piecesFor(span.targeted, context), add);
+        else if (span.kind === 'resource')
+          lintResource(span.command, span, piecesFor(span.targeted, context), add, nameOf);
+        else lintBuff(span.command, span, piecesFor(span.targeted, context), add, nameOf);
         break;
       case 'sweep':
         if (context.keptOffTable) add(span, 'warning', 'edit.keptOffTable');
         else if (!context.isGameMaster) add(span, 'error', 'sweep.gmOnly');
+        break;
+      case 'reset':
+        if (span.targeted && noTarget) {
+          if (!later) add(span, 'error', 'target.none');
+        } else if (context.keptOffTable) add(span, 'warning', 'edit.keptOffTable');
+        else if (span.reach === 'table' && !context.isGameMaster)
+          add(span, 'error', span.takes === 'both' ? 'reset.gmOnly' : 'sweep.gmOnly');
+        else if (span.reach === 'piece' && !span.targeted && !context.speaker) add(span, 'warning', 'edit.noSpeaker');
+        else lintReset(span, context, add, nameOf);
         break;
       case 'portrait':
         if (targeting) add(span, 'warning', 'portrait.lostByTarget');
@@ -263,7 +337,7 @@ function lintMessage(
         if (portraitFound || !context.isChatCutIn(span.name)) break;
         if (context.keptOffTable) add(span, 'warning', 'edit.keptOffTable');
         else if (targeting) add(span, 'warning', 'cutIn.lostByTarget', { params: { name: span.name } });
-        else if (hasSecretEditMark(text) || context.secretRoll?.(message)) {
+        else if (hasSecretEditMark(text) || context.secretRoll?.(said)) {
           add(span, 'info', 'cutIn.secret', { params: { name: span.name } });
         }
         break;
@@ -385,7 +459,13 @@ function holdsReference(command: string): boolean {
  * Checks a `:` command the way it is read into an edit, in the same order, for each piece it is aimed
  * at. The status and the amount of one holding a reference are read only once it is filled in.
  */
-function lintResource(command: string, span: TextRange, pieces: readonly GameCharacter[], add: Report): void {
+function lintResource(
+  command: string,
+  span: TextRange,
+  pieces: readonly GameCharacter[],
+  add: Report,
+  nameOf: (piece: GameCharacter) => string
+): void {
   const parts = resourceCommandParts(command);
   if (!parts) return add(span, 'error', 'res.noOperator');
   if (parts.operator !== '>' && parts.amount === '') return add(span, 'error', 'res.noAmount');
@@ -396,7 +476,7 @@ function lintResource(command: string, span: TextRange, pieces: readonly GameCha
   );
   if (missing.length > 0) {
     return add(span, 'error', 'res.unknownStatus', {
-      params: { name, piece: missing.map((piece) => piece.name).join('・') },
+      params: { name, piece: missing.map(nameOf).join('・') },
     });
   }
   if (parts.operator !== '>' && parseResourceEditOption(parts.amount).isErr) add(span, 'error', 'res.badOption');
@@ -406,7 +486,13 @@ function lintResource(command: string, span: TextRange, pieces: readonly GameCha
  * Checks a `&` command the way laying it would go, for each piece it is aimed at. The buff and the
  * statuses one holding a reference names are read only once it is filled in.
  */
-function lintBuff(source: string, span: TextRange, pieces: readonly GameCharacter[], add: Report): void {
+function lintBuff(
+  source: string,
+  span: TextRange,
+  pieces: readonly GameCharacter[],
+  add: Report,
+  nameOf: (piece: GameCharacter) => string
+): void {
   const { command } = readBuffStacking(halfWidthBuffCommand(source));
   const kind = buffCommandKind(command);
   if (holdsReference(command) && (kind === 'remove' || kind === 'calculated')) return;
@@ -414,7 +500,7 @@ function lintBuff(source: string, span: TextRange, pieces: readonly GameCharacte
     const name = removedBuffName(command);
     const without = pieces.filter((piece) => piece.buffs.find(name) == null);
     if (without.length > 0) {
-      add(span, 'warning', 'buff.notFound', { params: { name, piece: without.map((piece) => piece.name).join('・') } });
+      add(span, 'warning', 'buff.notFound', { params: { name, piece: without.map(nameOf).join('・') } });
     }
     return;
   }
@@ -423,10 +509,13 @@ function lintBuff(source: string, span: TextRange, pieces: readonly GameCharacte
     if (read.name.length < 1) return add(span, 'error', 'buff.noName');
     if (!read.requests) return add(span, 'error', 'buff.unreadable');
     for (const request of read.requests) {
+      if (isAimedAtStatus(request.target)) continue;
       if (pieces.some((piece) => piece.status.getValue(request.target, request.slot) == null)) {
         add(span, 'warning', 'buff.missingStatus', { params: { name: request.target } });
       }
     }
+    const movesAtCounts = read.requests.some((request) => request.step !== undefined);
+    lintEffectTiming(read.rest, movesAtCounts, span, add);
     return;
   }
   if (kind === 'plain') {
@@ -434,7 +523,64 @@ function lintBuff(source: string, span: TextRange, pieces: readonly GameCharacte
     const named = findStatusAilment(StatusAilmentCatalog.instance.ailments, parts[0]);
     const { rounds } = splitBuffRounds(parts.slice(2));
     if (!named && rounds && Number.isNaN(parseInt(rounds))) add(span, 'info', 'buff.roundsDefault');
+    lintEffectTiming(parts.slice(2), named != null, span, add);
   }
+}
+
+type ResetSpan = Extract<SyntaxSpan, { kind: 'reset' }>;
+
+/** The name a reset written as a buff command or a sweep would once have taken a buff off by. */
+function nameShadowedBy(span: ResetSpan): string {
+  if (span.reach === 'table') return span.command.match(/^[sSｓＳ]?[&＆]{2}(.+)[-－]$/)?.[1].trim() ?? '';
+  return removedBuffName(readBuffStacking(halfWidthBuffCommand(span.command)).command);
+}
+
+/**
+ * Checks a reset against the pieces it reaches: the speaker's, those aimed at, or those on the
+ * table where they are told. A buff that goes by the very name the command is written with can no
+ * longer be taken off by it, and values go back only where an item keeps a default: an item named
+ * that a piece has not is found as for any change of one, and where nothing asked for keeps a default
+ * the command changes no value.
+ */
+function lintReset(
+  span: ResetSpan,
+  context: ChatLintContext,
+  add: Report,
+  nameOf: (piece: GameCharacter) => string
+): void {
+  const pieces = span.reach === 'table' ? context.piecesOnTable?.() : piecesFor(span.targeted, context);
+  if (!pieces || pieces.length < 1) return;
+  if (span.takes !== 'values') {
+    const name = nameShadowedBy(span);
+    if (name.length > 0 && pieces.some((piece) => piece.buffs.find(name) != null)) {
+      add(span, 'info', 'reset.shadowsBuff', { params: { name } });
+    }
+  }
+  if (span.takes === 'buffs' || holdsReference(span.command)) return;
+  const pick: DefaultPick = (span.takes === 'values' ? readDefaultResetCommand(span.command) : null) ?? { kind: 'all' };
+  if (pick.kind === 'item') {
+    const missing = pieces.filter((piece) => !holdsItemNamed(piece, pick.name));
+    if (missing.length > 0) {
+      return add(span, 'error', 'res.unknownStatus', {
+        params: { name: pick.name, piece: missing.map(nameOf).join('・') },
+      });
+    }
+  }
+  if (pieces.every((piece) => countDefaults(piece, pick) < 1)) {
+    add(span, span.takes === 'both' ? 'info' : 'warning', 'reset.noDefaults');
+  }
+}
+
+/**
+ * Checks the moment a buff's effect is told to move at, `発生:手番終了`: one that cannot be read is
+ * left out as the buff is laid, and one on a buff that moves nothing at every count has nothing to
+ * time.
+ */
+function lintEffectTiming(fields: readonly string[], movesAtCounts: boolean, span: TextRange, add: Report): void {
+  const written = fields.filter((field) => isBuffEffectTimingField(field));
+  if (written.length < 1) return;
+  if (written.some((field) => resolveBuffEffectTiming(field) === null)) add(span, 'error', 'buff.badEffectTiming');
+  else if (!movesAtCounts) add(span, 'info', 'buff.idleEffectTiming');
 }
 
 /** Whether an `@name` no portrait answers plays the sound of the cut-in of that name instead, as it is meant to. */

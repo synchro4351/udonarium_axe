@@ -221,7 +221,10 @@ describe('CardGameService', () => {
       expect(card.owner).toBe('');
       expect(card.lastHandGiverUserId).toBe('me');
       expect(sendSystemNotice).toHaveBeenCalledOnce();
-      expect(sendSystemNotice.mock.calls[0][1]).toBe('わたし が あいて にカードを 1 枚渡しました');
+      // Sent as a key each reader puts in their own language, as official notices are.
+      expect(sendSystemNotice.mock.calls[0][1]).toBe(
+        '@i18n:feature.card.message.gaveCard:{"from":"わたし","to":"あいて"}'
+      );
     });
 
     it('drops a peek on the card as it leaves the table', () => {

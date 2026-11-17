@@ -1,16 +1,30 @@
 import { inject, Injectable } from '@angular/core';
+import { PieceNameService } from '@axe/application/character/piece-name.service';
 import { CharacterDiceService } from '@axe/application/dice/character-dice.service';
 import { DiceRollService } from '@axe/application/dice/dice-roll.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerCoordinate } from '@axe/application/input/pointer-device.service';
 import { MultipartGroupService } from '@axe/application/tabletop/multipart-group.service';
-import { ContextMenuService } from '@axe/application/ui/context-menu.service';
+import { TabletopService } from '@axe/application/tabletop/tabletop.service';
+import { VisionService } from '@axe/application/tabletop/vision.service';
+import {
+  ContextMenuAction,
+  ContextMenuRadialGroup,
+  ContextMenuService,
+} from '@axe/application/ui/context-menu.service';
 import { tryBuildMultiSelectionContextMenu } from '@axe/application/ui/multi-selection-context-menu';
 import { SelectionSignalService } from '@axe/application/ui/selection-signal.service';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DiceSymbol } from '@axe/domain/dice/dice-symbol';
+import { multiAngleFontScaleFactor } from '@axe/domain/tabletop/multi-angle-font-scale';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
+
+/** A piece's menu as its builder hands it over: the plain list, and the groups the rotating menu shows. */
+export interface PieceMenuModel {
+  readonly actions: ContextMenuAction[];
+  readonly radialGroups: ContextMenuRadialGroup[];
+}
 
 /**
  * Where a right-click on something on the board arrives.
@@ -27,6 +41,9 @@ export class PieceContextMenuService {
   private readonly characterDice = inject(CharacterDiceService);
   private readonly multipartGroups = inject(MultipartGroupService);
   private readonly t = inject(TRANSLATE_FN);
+  private readonly names = inject(PieceNameService);
+  private readonly vision = inject(VisionService);
+  private readonly tabletopService = inject(TabletopService);
 
   /** True when the bulk menu was opened. The caller stops there. */
   openForSelection(self: TabletopObject, gridSize: number, position: PointerCoordinate): boolean {
@@ -39,7 +56,8 @@ export class PieceContextMenuService {
       rollDice: (dice) => this.diceRollService.roll(dice),
       diceOwners: this.objectStore
         .getObjects<GameCharacter>(GameCharacter)
-        .filter((character) => character.isVisibleOnTable)
+        .filter((character) => character.isVisibleOnTable && this.vision.isTokenVisible(character))
+        .filter((character) => !this.names.isKept(character))
         .map((character) => ({ identifier: character.identifier, name: character.name })),
       storeDice: (dice, ownerIdentifier) => this.storeDice(dice, ownerIdentifier),
       linkCharacters: (characters) => this.multipartGroups.link(characters),
@@ -49,6 +67,27 @@ export class PieceContextMenuService {
 
     this.contextMenuService.open(position, multi, this.t('feature.tabletop.selection.title'));
     return true;
+  }
+
+  /**
+   * Opens a piece's own menu at a place on the screen: in the flat view with a rotating style chosen,
+   * as the rotating menu the seat asked for, and otherwise as the plain list.
+   */
+  openPieceMenu(position: PointerCoordinate, menu: PieceMenuModel, title: string): void {
+    const display = this.tabletopService.display();
+    if (this.tabletopService.mode2d() && display.tabletopMenuStyle !== 'standard') {
+      this.contextMenuService.openRadial(
+        position,
+        menu.actions,
+        menu.radialGroups,
+        title,
+        display.tabletopMenuStyle === 'radial',
+        display.radialMenuRotationSpeed,
+        multiAngleFontScaleFactor(display.multiAngleFontScale)
+      );
+      return;
+    }
+    this.contextMenuService.open(position, menu.actions, title);
   }
 
   private storeDice(dice: DiceSymbol[], ownerIdentifier: string): void {

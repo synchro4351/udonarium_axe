@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChatLintService } from '@axe/application/chat/chat-lint.service';
+import { DisclosureService } from '@axe/application/permission/disclosure.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { TabletopDisplayService } from '@axe/application/tabletop/tabletop-display.service';
 import { VisionService } from '@axe/application/tabletop/vision.service';
@@ -12,6 +13,7 @@ import { localDispatch } from '@axe/core/network/network-messaging';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
+import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { OPEN_STAMP_RULES, withStampsAllowed, withStampUseOn } from '@axe/domain/chat/stamp-rules';
 import { DataElement } from '@axe/domain/data/data-element';
 import { DiceStage } from '@axe/domain/dice/dice-3d/dice-stage';
@@ -19,10 +21,10 @@ import { DiceBot } from '@axe/domain/dice/dice-bot';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
+import { ChatColorSettingComponent } from '@axe/features/chat/chat-color-setting/chat-color-setting.component';
 import { ChatComposeService } from '@axe/features/chat/chat-compose.service';
 import { CHAT_EDITOR_LOADER, type ChatEditorModule } from '@axe/features/chat/chat-editor/chat-editor-loader';
 import { ChatInputComponent } from '@axe/features/chat/chat-input/chat-input.component';
-import type { ChatSyntaxWriter } from '@axe/features/chat/chat-input/chat-syntax-items';
 import { StampPickerService } from '@axe/features/chat/stamp/stamp-picker.service';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -45,7 +47,7 @@ describe('ChatInputComponent', () => {
 
   beforeEach(async () => {
     PeerCursor.createMyCursor();
-    TestBed.configureTestingModule({
+    await TestBed.configureTestingModule({
       imports: [ChatInputComponent],
       providers: [...TEST_PROVIDERS],
     }).compileComponents();
@@ -241,6 +243,30 @@ describe('ChatInputComponent', () => {
   });
 
   describe('the characters on offer', () => {
+    it('leaves out of a chat palette’s list a piece whose contents this seat may not view, as the chat keeps it', () => {
+      const open = speaker('勇者');
+      const kept = speaker('秘密の魔物');
+      vi.spyOn(TestBed.inject(DisclosureService), 'canView').mockImplementation((character) => character !== kept);
+
+      expect(component.gameCharacters()).toContain(kept);
+      fixture.componentRef.setInput('onlyCharacters', true);
+      expect(component.gameCharacters()).toContain(open);
+      expect(component.gameCharacters()).not.toContain(kept);
+      open.destroy();
+      kept.destroy();
+    });
+
+    it('keeps in a chat palette’s list the piece it speaks as, once that is kept from view since', () => {
+      const kept = speaker('秘密の魔物');
+      fixture.componentRef.setInput('onlyCharacters', true);
+      component.sendFrom = kept.identifier;
+      vi.spyOn(TestBed.inject(DisclosureService), 'canView').mockReturnValue(false);
+      TestBed.inject(ObjectChangeService).notifyChanged(kept.identifier);
+
+      expect(component.gameCharacters()).toContain(kept);
+      kept.destroy();
+    });
+
     it('leaves out a piece on the table this seat cannot see, but keeps the one it speaks as', () => {
       const seen = speaker('勇者');
       seen.setLocation('table');
@@ -321,48 +347,29 @@ describe('ChatInputComponent', () => {
         ink.style.backgroundColor
       );
     });
-  });
 
-  it('puts a secret roll’s mark after the count of repeats the roll starts with', async () => {
-    fixture.componentRef.setInput('canSpeak', true);
-    fixture.detectChanges();
-    component.text = '3 2D6';
-    fixture.detectChanges();
-    await fixture.whenStable();
+    it('opens the colour settings from the row under the colours of the colour button', () => {
+      fixture.detectChanges();
+      const panel = find('[data-testid="chat-input-colors"]') as HTMLElement;
+      panel.showPopover = () => undefined;
+      panel.hidePopover = () => undefined;
+      const open = vi.spyOn(TestBed.inject(PanelService), 'open').mockImplementation(() => ({}) as never);
+      (find('[data-testid="chat-input-color"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
 
-    (component as unknown as { syntaxWriter: ChatSyntaxWriter }).syntaxWriter.prefix('S', 'roll');
+      [...panel.querySelectorAll('button')].find((button) => button.textContent?.includes('色設定'))!.click();
 
-    expect(component.text).toBe('3 S2D6');
-  });
+      expect(open).toHaveBeenCalledWith(ChatColorSettingComponent, expect.objectContaining({ title: '色設定' }));
+    });
 
-  it('writes a change of a status as a word of its own after the words before the caret', async () => {
-    fixture.componentRef.setInput('canSpeak', true);
-    fixture.detectChanges();
-    component.text = 'hello';
-    fixture.detectChanges();
-    await fixture.whenStable();
-    const box = (fixture.nativeElement as HTMLElement).querySelector('textarea')!;
-    box.setSelectionRange(5, 5);
+    it('speaks to everyone until a seat is picked to whisper to', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
 
-    (component as unknown as { syntaxWriter: ChatSyntaxWriter }).syntaxWriter.word(':HP-1', { from: 4, to: 5 });
-
-    expect(component.text).toBe('hello :HP-1');
-    expect([box.selectionStart, box.selectionEnd]).toEqual([10, 11]);
-  });
-
-  it('leaves the caret where it stood before a secret roll’s mark put in after it', async () => {
-    fixture.componentRef.setInput('canSpeak', true);
-    fixture.detectChanges();
-    component.text = '3 2D6';
-    fixture.detectChanges();
-    await fixture.whenStable();
-    const box = (fixture.nativeElement as HTMLElement).querySelector('textarea')!;
-    box.setSelectionRange(0, 0);
-
-    (component as unknown as { syntaxWriter: ChatSyntaxWriter }).syntaxWriter.prefix('S', 'roll');
-
-    expect(component.text).toBe('3 S2D6');
-    expect([box.selectionStart, box.selectionEnd]).toEqual([0, 0]);
+      expect(component.sendTo).toBe('');
+      expect(find('ng-select[name="send-to"] .ng-value-label')?.textContent?.trim()).toBe('全員');
+    });
   });
 
   it('checks a line against the room’s default dice bot as the room changes it', () => {
@@ -400,6 +407,20 @@ describe('ChatInputComponent', () => {
       fixture.detectChanges();
 
       expect(textBox().getAttribute('rows')).toBe('1');
+    });
+
+    it('holds a line picked into it until the box is pressed or written in, not as it is merely focused', () => {
+      fixture.componentRef.setInput('dense', true);
+      fixture.detectChanges();
+      fixture.componentRef.setInput('text', '2d6+2 回避');
+      fixture.detectChanges();
+      const held = () => component.putIn();
+
+      expect(held()).toBe(true);
+      textBox().dispatchEvent(new FocusEvent('focus'));
+      expect(held()).toBe(true);
+      textBox().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      expect(held()).toBe(false);
     });
 
     it('says what the panel asks for in the empty box, in place of its keys', () => {
@@ -635,6 +656,131 @@ describe('ChatInputComponent', () => {
       expect(box.value).toBe('');
     });
 
+    describe('a line holding the number to beat', () => {
+      let tab: ChatTab;
+
+      beforeEach(() => {
+        tab = new ChatTab();
+        tab.initialize();
+        ObjectStore.instance.add(tab);
+        for (const [at, text] of [
+          [1001, 'DiceBot : (2D6+8) → 7[3,4]+8 → 15'],
+          [1011, 'DiceBot : (1D6) → 3'],
+        ] as const) {
+          tab.addMessage({
+            from: 'System-BCDice',
+            originFrom: 'gm',
+            name: '<BCDice：ゴブリン>',
+            text,
+            tag: 'system',
+            timestamp: at,
+          });
+        }
+        fixture.componentRef.setInput('chatTabidentifier', tab.identifier);
+      });
+
+      afterEach(() => {
+        tab.destroy();
+      });
+
+      const bar = () =>
+        fixture.nativeElement.querySelector('[data-testid="chat-input-target-number"]') as HTMLElement | null;
+      const choicesOf = (select: HTMLSelectElement) =>
+        Array.from(select.options).map((option) => option.textContent?.trim());
+
+      it('shows the number it is filled in with and where it came from, with the answers that may be picked', () => {
+        component.text = '2d6>={目標値}';
+        fixture.detectChanges();
+
+        const select = bar()!.querySelector('select')!;
+        expect(choicesOf(select)).toEqual([
+          '自動: 3（直前の結果: ゴブリン 1D6）',
+          '3（ゴブリン 1D6）',
+          '15（ゴブリン 2D6+8）',
+        ]);
+
+        component.text = '2d6>=12';
+        fixture.detectChanges();
+        expect(bar()).toBeNull();
+      });
+
+      it('keeps the room of the bar, faded, while the line holds none, for a palette using it', () => {
+        const idle = () => fixture.nativeElement.querySelector('[data-testid="chat-input-target-number-idle"]');
+        component.text = '2d6>=12';
+        fixture.detectChanges();
+        expect(idle()).toBeNull();
+
+        fixture.componentRef.setInput('keepsTargetNumberPlace', true);
+        fixture.detectChanges();
+        expect(idle()).not.toBeNull();
+        expect(bar()).toBeNull();
+
+        component.text = '2d6>={目標値}';
+        fixture.detectChanges();
+        expect(idle()).toBeNull();
+        expect(bar()).not.toBeNull();
+      });
+
+      it("takes the tab's own number to beat off from the bar, for a seat that may set it", async () => {
+        PeerCursor.myCursor.role = PeerRole.Player;
+        tab.pinnedTargetNumber = tab.chatMessages[0].identifier;
+        component.text = '2d6>={目標値}';
+        fixture.detectChanges();
+        await vi.waitFor(() => {
+          fixture.detectChanges();
+          expect(bar()!.querySelector('[data-testid="chat-input-target-number-unpin"]')).not.toBeNull();
+        });
+
+        (bar()!.querySelector('[data-testid="chat-input-target-number-unpin"]') as HTMLButtonElement).click();
+
+        expect(tab.pinnedTargetNumber).toBe('');
+        PeerCursor.myCursor.role = PeerRole.Guest;
+        tab.pinnedTargetNumber = tab.chatMessages[0].identifier;
+        TestBed.inject(ObjectChangeService).notifyChanged(PeerCursor.myCursor.identifier);
+        await vi.waitFor(() => {
+          fixture.detectChanges();
+          expect(choicesOf(bar()!.querySelector('select')!)[0]).toContain('固定した結果');
+        });
+        expect(bar()!.querySelector('[data-testid="chat-input-target-number-unpin"]')).toBeNull();
+      });
+
+      it('goes back to the box once an answer is picked, so that Enter sends the line', () => {
+        document.body.appendChild(fixture.nativeElement);
+        try {
+          component.text = '2d6>={目標値}';
+          fixture.detectChanges();
+          const select = bar()!.querySelector('select')!;
+          select.focus();
+          select.selectedIndex = 1;
+          select.dispatchEvent(new Event('change'));
+
+          expect(document.activeElement).toBe(fixture.nativeElement.querySelector('[data-chat-input]'));
+        } finally {
+          fixture.nativeElement.remove();
+        }
+      });
+
+      it('sends the answer picked for that one line, and fills the next one in with the one found', async () => {
+        component.text = '2d6>={目標値}';
+        fixture.detectChanges();
+        const select = bar()!.querySelector('select')!;
+        select.selectedIndex = 2;
+        select.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+        const outgoing = sent();
+
+        component.sendChat(null);
+
+        expect((await outgoing).targetNumber).toBe(15);
+        component.text = '2d6>={目標値}';
+        fixture.detectChanges();
+        expect(bar()!.querySelector('select')!.selectedIndex).toBe(0);
+        const next = sent();
+        component.sendChat(null);
+        expect('targetNumber' in (await next)).toBe(false);
+      });
+    });
+
     it('hands the line to the dice bot, which decides whether it must wait for the system', async () => {
       fixture.detectChanges();
       component.text = 'こんにちは';
@@ -827,7 +973,9 @@ describe('ChatInputComponent', () => {
       fixture.detectChanges();
       const picked = vi.spyOn(TestBed.inject(StampPickerService), 'toggle');
       const outgoing = sent();
-      (component as unknown as { openStamps(anchor: Element): void }).openStamps(document.body);
+      (fixture.nativeElement as HTMLElement)
+        .querySelector<HTMLButtonElement>('[data-testid="chat-input-stamp"]')!
+        .click();
 
       picked.mock.calls[0][2]('image:https://cdn.example.com/pkg@1.0/a.png');
 

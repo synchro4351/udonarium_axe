@@ -3,7 +3,11 @@ import { By } from '@angular/platform-browser';
 import { ChatSpeakerService } from '@axe/application/chat/chat-speaker.service';
 import { EffectLibraryService } from '@axe/application/effect/effect-library.service';
 import { HotbarStoreService } from '@axe/application/hotbar/hotbar-store.service';
+import { LanguageService } from '@axe/application/i18n/language.service';
+import { RolePermissionService } from '@axe/application/permission/role-permission.service';
+import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { PanelService } from '@axe/application/ui/panel.service';
+import { AudioStorage } from '@axe/core/storage/audio-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { EffectPreset } from '@axe/domain/effect/effect-preset';
@@ -14,6 +18,7 @@ import { HOTBAR_SLOT_KINDS } from '@axe/domain/hotbar/hotbar-slot-kind';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { BoardScene } from '@axe/domain/scene/board-scene';
+import { EffectPreviewComponent } from '@axe/features/effect/effect-preview/effect-preview.component';
 import { HotbarSlotEditorComponent } from '@axe/features/hotbar/hotbar-editor/hotbar-slot-editor.component';
 import { HotbarRunnerService } from '@axe/features/hotbar/hotbar-runner.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
@@ -61,6 +66,22 @@ describe('HotbarSlotEditorComponent', () => {
       (option) => option.value
     );
   }
+
+  it("sorts the sounds on offer by their names as the reader's language orders them", () => {
+    vi.spyOn(TestBed.inject(AudioStorage), 'audios', 'get').mockReturnValue([
+      { identifier: 'second', name: 'b.mp3' },
+      { identifier: 'first', name: 'a.mp3' },
+    ] as never);
+    vi.spyOn(TestBed.inject(LanguageService), 'currentLang').mockReturnValue('en');
+    const compare = vi.spyOn(String.prototype, 'localeCompare');
+    TestBed.inject(ObjectChangeService).fileVersion.update((version) => version + 1);
+
+    const choices = (component as unknown as { choices(): { value: string }[] }).choices();
+
+    expect(choices.map((choice) => choice.value)).toEqual(['first', 'second']);
+    expect(compare.mock.calls.every(([, locale]) => locale === 'en')).toBe(true);
+    expect(compare).toHaveBeenCalled();
+  });
 
   it('offers the game master every kind a slot can be', async () => {
     PeerCursor.myCursor.role = PeerRole.GameMaster;
@@ -131,6 +152,36 @@ describe('HotbarSlotEditorComponent', () => {
       expect(component.draft().payload).toEqual({ kind: 'menu', command: 'jukebox' });
       expect(component.draft().value).toBe('');
     });
+  });
+
+  it('lists the hidden piece a slot already acts as under the label, and no other hidden one', () => {
+    vi.spyOn(TestBed.inject(RolePermissionService), 'canSeeHidden').mockReturnValue(false);
+    const villain = GameCharacter.create('黒幕', 1, '');
+    villain.hideName = true;
+    const shade = GameCharacter.create('影', 1, '');
+    shade.hideName = true;
+    try {
+      component.setFrom(
+        { page: 1, slotIndex: 3 },
+        { ...emptyHotbarSlotDraft('prefill'), characterIdentifier: villain.identifier, characterName: '黒幕' }
+      );
+      fixture.detectChanges();
+
+      const actors = (component as unknown as { actors: () => { value: string; name: string }[] }).actors();
+      expect(actors.find((actor) => actor.value === villain.identifier)?.name).toBe('？？？');
+      expect(actors.some((actor) => actor.value === shade.identifier)).toBe(false);
+      expect(actors.some((actor) => actor.name === '黒幕')).toBe(false);
+
+      // Set to nobody and back within the editor, the hidden piece stays on offer and keeps its name.
+      (component as unknown as { setActor: (identifier: string) => void }).setActor('');
+      const again = (component as unknown as { actors: () => { value: string }[] }).actors();
+      expect(again.some((actor) => actor.value === villain.identifier)).toBe(true);
+      (component as unknown as { setActor: (identifier: string) => void }).setActor(villain.identifier);
+      expect((component as unknown as { draft: () => { characterName: string } }).draft().characterName).toBe('黒幕');
+    } finally {
+      villain.destroy();
+      shade.destroy();
+    }
   });
 
   it('opens on the settings the slot already holds', () => {
@@ -512,17 +563,24 @@ describe('HotbarSlotEditorComponent', () => {
       fixture.detectChanges();
       const preview = () => root().querySelector('[data-testid="hotbar-editor-effect-preview"]');
 
+      const previewed = () => {
+        fixture.detectChanges();
+        return (
+          fixture.debugElement.query(By.directive(EffectPreviewComponent)).componentInstance as EffectPreviewComponent
+        ).preset();
+      };
+
       expect(preview()).toBeNull();
 
       click('hotbar-editor-effect-' + '氷結');
 
       expect(preview()).not.toBeNull();
       expect(preview()!.querySelector('[data-testid="effect-preview-stage"]')).not.toBeNull();
-      expect(component['chosenEffect']()).toBe(presets[1]);
+      expect(previewed()).toBe(presets[1]);
 
       click('hotbar-editor-effect-' + '爆炎');
 
-      expect(component['chosenEffect']()).toBe(presets[0]);
+      expect(previewed()).toBe(presets[0]);
     });
 
     it('shows no effect playing for a slot of another kind', () => {

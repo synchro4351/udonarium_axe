@@ -4,6 +4,7 @@ import { sampleCurvePoints } from '@axe/domain/map-editor/curve-geometry';
 import type { EditorTool, LineKind, ShapeGeneratorKind } from '@axe/domain/map-editor/editor-tool';
 import { cellCenter, pointToCell } from '@axe/domain/map-editor/grid-cells';
 import { SceneHistory } from '@axe/domain/map-editor/history';
+import { dabRelief, ReliefBrush, reliefChunksOf } from '@axe/domain/map-editor/relief';
 import {
   CellLayer,
   createLayer,
@@ -18,6 +19,7 @@ import {
   MapLayer,
   MapScene,
   newId,
+  ReliefLayer,
   rememberPaintedRoles,
   ShapeItem,
   ShapeKind,
@@ -73,6 +75,7 @@ import {
   MapFunctionRole,
 } from '@axe/domain/tabletop/function-paint';
 import { GridType } from '@axe/domain/tabletop/game-table';
+import { groundSurfaceOf } from '@axe/domain/tabletop/ground/ground-surface';
 
 export interface Selection {
   layerId: string;
@@ -83,7 +86,11 @@ export interface Selection {
 export class MapEditorState {
   private scene: MapScene = createScene();
   private history = new SceneHistory(this.scene);
-  private layerCounter = 0;
+  /**
+   * What a layer made for new work is called, by its kind and, for a function layer, its role: the
+   * panel names them in the reader's language. The count of such layers follows the name.
+   */
+  layerNameOf: (kind: LayerKind, role?: MapFunctionRole) => string = (kind, role) => role ?? kind;
 
   private readonly tick = signal(0);
   readonly sceneTick = this.tick.asReadonly();
@@ -129,6 +136,10 @@ export class MapEditorState {
 
   readonly eraserSize = signal(16);
 
+  /** How the relief brush works the ground: what it does, how far it reaches and how hard, in cells, and what it paints. */
+  readonly reliefBrush = signal<ReliefBrush>({ kind: 'raise', radius: 2, strength: 0.25, layer: 'grass' });
+  private reliefLevel = 0;
+
   readonly fontSize = signal(20);
   readonly textColor = signal('#1a1a1a');
   readonly textBold = signal(false);
@@ -162,12 +173,6 @@ export class MapEditorState {
     this.canUndo.set(this.history.canUndo());
     this.canRedo.set(this.history.canRedo());
   }
-
-  /**
-   * Marks the start of a stroke or drag; it does nothing, since the step is recorded when the
-   * gesture ends.
-   */
-  beginGesture(): void {}
 
   /**
    * Records the scene as it stands as one undoable step, dropping anything that could have been
@@ -285,7 +290,7 @@ export class MapEditorState {
    * Takes a layer in hand, and the brush that painted it with it.
    *
    * Choosing a layer of functions is choosing to work on what it does, so the tool that works
-   * on it is put in hand as well. Without that the properties on show are some other tool's,
+   * on it is put in hand as well, and so is the relief brush for a layer of relief. Without that the properties on show are some other tool's,
    * and a patch that was painted with settings of its own looks like one that cannot be
    * changed at all.
    */
@@ -297,6 +302,7 @@ export class MapEditorState {
       this.functionSpec.set({ ...chosen.spec });
       if (this.tool() !== 'functionPaint' && this.tool() !== 'functionErase') this.tool.set('functionPaint');
     }
+    if (chosen && chosen.kind === 'relief') this.tool.set('relief');
     this.bump();
   }
 
@@ -314,9 +320,19 @@ export class MapEditorState {
     }
   }
 
-  private autoLayerName(kind: LayerKind): string {
-    this.layerCounter += 1;
-    return kind + ' ' + this.layerCounter;
+  /**
+   * The name of a layer made for new work: what it is, and a count past the layers of the kind there
+   * are, raised further where a layer already goes by that name, as one may once another is deleted.
+   */
+  private autoLayerName(kind: LayerKind, role?: MapFunctionRole): string {
+    const alike = this.scene.layers.filter(
+      (layer) => layer.kind === kind && (role === undefined || (layer.kind === 'function' && layer.role === role))
+    );
+    const taken = new Set(this.scene.layers.map((layer) => layer.name));
+    const label = this.layerNameOf(kind, role);
+    let count = alike.length + 1;
+    while (taken.has(`${label} ${count}`)) count += 1;
+    return `${label} ${count}`;
   }
 
   /**
@@ -377,7 +393,7 @@ export class MapEditorState {
       if (lookKey(layer.spec) === look) return layer;
     }
 
-    const created = createLayer('function', this.autoLayerName('function')) as FunctionLayer;
+    const created = createLayer('function', this.autoLayerName('function', role)) as FunctionLayer;
     created.role = role;
     created.spec = { ...this.functionSpec() };
     addLayer(this.scene, created);
@@ -407,6 +423,27 @@ export class MapEditorState {
     );
     if (layers.length < 1) return;
     for (const layer of layers) eraseFunctionCell(layer, col, row);
+    this.bump();
+  }
+
+  /**
+   * Starts a stroke of the relief brush at a point of the scene, in pixels, on the relief layer for
+   * new work: flattening levels that layer to the height it stood at here. Recorded when the gesture
+   * ends.
+   */
+  beginReliefStroke(x: number, y: number): void {
+    const layer = this.ensureLayerFor('relief') as ReliefLayer;
+    const cellPx = this.scene.cellPx;
+    this.reliefLevel = groundSurfaceOf(reliefChunksOf(layer)).heightAt(x / cellPx, y / cellPx);
+    this.dabReliefAt(x, y);
+  }
+
+  /** Lays a dab of the stroke under way at a point of the scene, in pixels. */
+  dabReliefAt(x: number, y: number): void {
+    const layer = this.ensureLayerFor('relief') as ReliefLayer;
+    const { kind, radius, strength, layer: paint } = this.reliefBrush();
+    const cellPx = this.scene.cellPx;
+    dabRelief(layer, { kind, x: x / cellPx, y: y / cellPx, radius, strength, layer: paint, level: this.reliefLevel });
     this.bump();
   }
 
@@ -467,16 +504,19 @@ export class MapEditorState {
     return created;
   }
 
-  /** Adds an empty layer on top and makes it active, as one undoable step. */
-  addEmptyLayer(kind: LayerKind, name: string): MapLayer {
+  /**
+   * Adds an empty layer on top and makes it active, as one undoable step. Left unnamed, it is named
+   * as a layer made for new work is: after its kind, with a count no other layer goes by.
+   */
+  addEmptyLayer(kind: LayerKind, name: string = this.autoLayerName(kind)): MapLayer {
     const created = createLayer(kind, name);
     this.applyCommitted((scene) => addLayer(scene, created));
     this.activeLayerId.set(created.id);
     return created;
   }
 
-  /** Starts a layer for a role by hand, wearing the brush that is in hand. */
-  addEmptyFunctionLayer(role: MapFunctionRole, name: string): FunctionLayer {
+  /** Starts a layer for a role by hand, wearing the brush that is in hand; left unnamed, named after the role. */
+  addEmptyFunctionLayer(role: MapFunctionRole, name: string = this.autoLayerName('function', role)): FunctionLayer {
     const created = createLayer('function', name) as FunctionLayer;
     created.role = role;
     created.spec = { ...this.functionSpec() };
@@ -696,9 +736,11 @@ export class MapEditorState {
 
   /**
    * The selected item together with its layer, or null when nothing is selected or the item is
-   * gone.
+   * gone. It follows the scene as well as the selection, so a view that reads it is drawn again when
+   * the item is changed or undone.
    */
   selectedItem(): { layer: MapLayer; item: ShapeItem | StampItem | TextItem | ImageItem | FreehandStroke } | null {
+    this.tick();
     const sel = this.selection();
     if (!sel) return null;
     const layer = this.findLayerById(sel.layerId);
@@ -724,6 +766,24 @@ export class MapEditorState {
       return item ? { layer, item } : null;
     }
     return null;
+  }
+
+  /** The selected stamp, or null when what is selected is not a stamp. */
+  selectedStamp(): StampItem | null {
+    const selected = this.selectedItem();
+    return selected?.layer.kind === 'stamp' ? (selected.item as StampItem) : null;
+  }
+
+  /** The selected image, or null when what is selected is not an image. */
+  selectedImage(): ImageItem | null {
+    const selected = this.selectedItem();
+    return selected?.layer.kind === 'image' ? (selected.item as ImageItem) : null;
+  }
+
+  /** The selected freehand stroke, or null when what is selected is not one. */
+  selectedFreehand(): FreehandStroke | null {
+    const selected = this.selectedItem();
+    return selected?.layer.kind === 'freehand' ? (selected.item as FreehandStroke) : null;
   }
 
   /**

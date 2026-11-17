@@ -1,4 +1,5 @@
 import { Logger } from '@axe/core/logging/logger';
+import { readBackendUrl } from '@axe/core/network/backend-url';
 import {
   AssetAccess,
   Connection,
@@ -8,6 +9,7 @@ import {
 } from '@axe/core/network/connection';
 import { IPeerContext, PeerContext } from '@axe/core/network/peer-context';
 import { PEER_RECONNECT_BACKOFF_MS, PeerReconnectScheduler } from '@axe/core/network/peer-reconnect-scheduler';
+import { peerStatsUpdated$ } from '@axe/core/network/peer-stats-events';
 import { IRoomInfo } from '@axe/core/network/room-info';
 import { IdleWatch } from '@axe/core/network/server/idle-watch';
 import { LinkHeartbeat, SOCKET_OPEN } from '@axe/core/network/server/link-heartbeat';
@@ -45,8 +47,11 @@ import {
   inviteRequest,
   isRetryableError,
   Member,
+  PONG,
   readAssetUploadPolicy,
   readServerMessage,
+  SeenMessage,
+  seenRequest,
   ServerMessage,
   ServerRole,
   WelcomeMessage,
@@ -162,6 +167,10 @@ export class ServerConnection implements Connection {
   get keptRole(): ServerRole | undefined {
     return this.keptServerRole ?? undefined;
   }
+  /** How long the room server took to answer the last ping, in milliseconds; 0 before any answer on this link. */
+  get roundTripMs(): number {
+    return this.heartbeat.roundTripMs;
+  }
 
   private baseUrl = '';
   private me: PeerContext = PeerContext.parse('???');
@@ -187,6 +196,10 @@ export class ServerConnection implements Connection {
   private clockOffset = 0;
   private retriedUnauthorized = false;
   private inviteWaiters: InviteWaiter[] = [];
+  /** When the room server last heard from each of the others, by this clock, as it last answered seen. */
+  private readonly heard = new Map<string, number>();
+  /** When the room server last answered seen, by this clock, or null before it has. */
+  private heardAnsweredAt: number | null = null;
 
   private socket: WebSocket | null = null;
   private welcomed = false;
@@ -249,20 +262,34 @@ export class ServerConnection implements Connection {
 
   /** Takes the room server's address from the app config's backend url. */
   configure(config: Record<string, unknown>): void {
-    const url = (config['backend'] as { url?: unknown } | undefined)?.url;
-    this.baseUrl = typeof url === 'string' ? url : '';
+    this.baseUrl = readBackendUrl(config);
   }
 
   /** Opens a session in no room. Nothing connects; the lobby lists the rooms over HTTP. */
   openStandby(userId?: string): void {
     this.stopped = false;
-    void PeerContext.create(userId ?? PeerContext.generateUserId()).then((peer) => {
-      if (this.stopped) return;
-      this.me = peer;
-      this.accountSeat = false;
-      peer.isOpen = true;
-      this.callback.onOpen?.(peer);
-    });
+    pageActivity.watch();
+    void this.standBy(userId ?? PeerContext.generateUserId());
+  }
+
+  private async standBy(userId: string): Promise<void> {
+    const peer = await this.makePeer(() => PeerContext.create(userId));
+    if (!peer || this.stopped) return;
+    this.me = peer;
+    this.accountSeat = false;
+    peer.isOpen = true;
+    this.callback.onOpen?.(peer);
+  }
+
+  /** The peer made, or null once the session has been ended for its failing to be made. */
+  private async makePeer(make: () => Promise<PeerContext>): Promise<PeerContext | null> {
+    try {
+      return await make();
+    } catch (reason) {
+      const error = reason instanceof Error ? reason : new Error(String(reason));
+      if (!this.stopped) this.fail(error.name, `the peer could not be made: ${error.message}`);
+      return null;
+    }
   }
 
   /** Gives the connection the login to say hello with; without one every seat is a guest's. */
@@ -295,8 +322,10 @@ export class ServerConnection implements Connection {
       if (!this.stopped) this.fail(isBanned(reason) ? BANNED : SERVER_UNREACHABLE, 'the login could not be refreshed');
       return;
     }
-    const peer = await PeerContext.createRoom(credentials?.userId ?? this.guestUserId(userId), roomId, roomName, '');
-    if (this.stopped) return;
+    const peer = await this.makePeer(() =>
+      PeerContext.createRoom(credentials?.userId ?? this.guestUserId(userId), roomId, roomName, '')
+    );
+    if (!peer || this.stopped) return;
     peer.password = password;
     this.me = peer;
     this.accountSeat = credentials != null;
@@ -324,6 +353,8 @@ export class ServerConnection implements Connection {
     this.teardown();
     this.me.isOpen = false;
     this.members.clear();
+    this.heard.clear();
+    this.heardAnsweredAt = null;
     this.authority = null;
     this.rejectInviteWaiters('the connection closed');
   }
@@ -516,8 +547,17 @@ export class ServerConnection implements Connection {
     };
     socket.onmessage = (event: MessageEvent) => {
       if (socket !== this.socket) return;
-      this.heartbeat.heard();
-      if (typeof event.data !== 'string') this.receive(new Uint8Array(event.data as ArrayBuffer));
+      if (typeof event.data !== 'string') {
+        this.heartbeat.heard();
+        this.receive(new Uint8Array(event.data as ArrayBuffer));
+        return;
+      }
+      if (event.data !== PONG) {
+        this.heartbeat.heard();
+        return;
+      }
+      this.heartbeat.answered();
+      peerStatsUpdated$.emit();
     };
     socket.onclose = (event: CloseEvent) => {
       if (socket !== this.socket) return;
@@ -608,10 +648,24 @@ export class ServerConnection implements Connection {
         this.assetTokenRenewal.take(message.assetToken, message.expiresAt);
         this.takeRole(message.role, message.keptRole);
         return;
+      case 'seen':
+        this.takeSeen(message);
+        return;
       case 'error':
         this.refusal = message.code;
         return;
     }
+  }
+
+  /** Keeps when the server last heard from each of the others, as a while before now by this clock. */
+  private takeSeen(message: SeenMessage): void {
+    const now = Date.now();
+    this.heardAnsweredAt = now;
+    this.heard.clear();
+    for (const member of message.members) {
+      this.heard.set(member.peerId, now - Math.max(0, message.serverTime - member.heardAt));
+    }
+    peerStatsUpdated$.emit();
   }
 
   private welcome(message: WelcomeMessage): void {
@@ -714,6 +768,7 @@ export class ServerConnection implements Connection {
     const peer = this.members.get(peerId);
     if (!peer) return;
     this.members.delete(peerId);
+    this.heard.delete(peerId);
     peer.isOpen = false;
     this.callback.onDisconnect?.(peer);
   }
@@ -796,33 +851,8 @@ export class ServerConnection implements Connection {
     this.accessTokenRenewal.stop();
     this.assetTokenRenewal.stop();
     this.idleWatch.stop();
-    // What was still gathering to go out goes with the link, but for the requests kept for later,
-    // those already on their way out ahead of the rest.
-    this.keepRequests(this.unwritten);
-    this.unwritten = [];
-    this.stopPacing();
-    this.keepRequests(this.outbound);
-    this.dropQueued();
-    // The server asked the seat back on another link. It comes straight back, and nobody is told it
-    // went: the welcome sets the members right.
-    if (askedBack && !this.stopped && this.refusal == null) {
-      if (wasWelcomed) {
-        this.comingBack = true;
-        this.connectSocket();
-        return;
-      }
-      // Asked back before its first welcome, as while the room changes hands, a seat coming in tries
-      // again after the usual wait. One that was coming back unseen is told of the drop below, as
-      // after any link that failed.
-      // A seat not yet let in keeps to the short run of tries: the long one is for getting back in.
-      if (
-        !this.everWelcomed &&
-        this.reconnectScheduler.attemptOf(SOCKET_KEY) < PEER_RECONNECT_BACKOFF_MS.length &&
-        this.reconnectScheduler.schedule(SOCKET_KEY, () => this.connectSocket()) != null
-      ) {
-        return;
-      }
-    }
+    this.keepUnsent();
+    if (askedBack && this.tryComingBack(wasWelcomed)) return;
     const wasComingBack = this.comingBack;
     this.comingBack = false;
     if ((wasWelcomed || wasComingBack) && this.authority) {
@@ -831,7 +861,50 @@ export class ServerConnection implements Connection {
     }
     for (const peerId of [...this.members.keys()]) this.removeMember(peerId);
     if (this.stopped) return;
+    this.decideAfterDrop();
+  }
 
+  /**
+   * Lets what was still gathering to go out go with the link, but for the requests kept for later,
+   * those already on their way out ahead of the rest.
+   */
+  private keepUnsent(): void {
+    this.keepRequests(this.unwritten);
+    this.unwritten = [];
+    this.stopPacing();
+    this.keepRequests(this.outbound);
+    this.dropQueued();
+  }
+
+  /**
+   * Whether a seat the server asked back on another link is on its way back, so that nobody is told
+   * it went. One that was in the room comes straight back: the welcome sets the members right. Asked
+   * back before its first welcome, as while the room changes hands, a seat coming in tries again
+   * after the usual wait. One that was coming back unseen, one stopped and one refused are told of
+   * the drop instead, as after any link that failed.
+   */
+  private tryComingBack(wasWelcomed: boolean): boolean {
+    if (this.stopped || this.refusal != null) return false;
+    if (wasWelcomed) {
+      this.comingBack = true;
+      this.connectSocket();
+      return true;
+    }
+    // A seat not yet let in keeps to the short run of tries: the long one is for getting back in (tyoitashi).
+    return (
+      !this.everWelcomed &&
+      this.reconnectScheduler.attemptOf(SOCKET_KEY) < PEER_RECONNECT_BACKOFF_MS.length &&
+      this.reconnectScheduler.schedule(SOCKET_KEY, () => this.connectSocket()) != null
+    );
+  }
+
+  /**
+   * What follows a link that dropped, for a seat not stopped: it leaves for the page left alone,
+   * tries the login again for a token turned down, ends the session for a refusal it cannot try
+   * again after or for a server never reached, and otherwise tries the link again, ending the
+   * session where no try is left.
+   */
+  private decideAfterDrop(): void {
     const refusal = this.refusal;
     this.refusal = null;
     if (refusal === IDLE) {
@@ -1038,6 +1111,26 @@ export class ServerConnection implements Connection {
         if (socket != null && socket === this.socket && socket.readyState === SOCKET_OPEN) socket.send(frame);
       })
       .catch((e) => Logger.warn('[ServerConnection] a send failed', e));
+  }
+
+  /** Asks the server for its pings more often while somebody looks at how the link is doing, or as before. */
+  watchLink(closely: boolean): void {
+    this.heartbeat.watch(closely);
+  }
+
+  /** Asks the server when it last heard from each of the others, once the seat is in the room. */
+  askSeen(): void {
+    if (this.welcomed) this.post(seenRequest());
+  }
+
+  /** When the server last heard from that member, by this clock, or null before it has said. */
+  heardAt(peerId: string): number | null {
+    return this.heard.get(peerId) ?? null;
+  }
+
+  /** When the server last said when it heard from the others, by this clock, or null before it has. */
+  get seenAnsweredAt(): number | null {
+    return this.heardAnsweredAt;
   }
 
   /**

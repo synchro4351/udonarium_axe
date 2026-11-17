@@ -17,6 +17,7 @@ import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { canRoleViewTab } from '@axe/domain/chat/chat-tab-permission';
 import { RUBY_ALIGNS, RUBY_SHOWS, RUBY_SIZES, RUBY_SPACINGS, RubyDisplay } from '@axe/domain/chat/ruby-display';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import type { MenuSurface } from '@axe/domain/ui/menu-command';
 import { ChatSoundEventHandlerService } from '@axe/features/chat/chat-sound-event-handler.service';
 import { SystemAvatarMenuService } from '@axe/features/chat/system-avatar-menu.service';
 import { RoomPanelService } from '@axe/features/panels/room-panel.service';
@@ -180,7 +181,7 @@ export class ChatMessageSettingComponent {
    * here.
    */
   get chatTabList(): ChatTabList {
-    return this.objectStore.get<ChatTabList>('ChatTabList')!;
+    return ChatTabList.instance;
   }
 
   /**
@@ -269,6 +270,13 @@ export class ChatMessageSettingComponent {
     this.roomPanels.open('soundSettings');
   }
 
+  /** Opens the menu editor on the chat tools, the row of buttons the pointer resting on a line brings out. */
+  openChatTools(): void {
+    this.roomPanels.open<{ surface: { set(surface: MenuSurface): void } }>('menuEditor', {}, (panel) =>
+      panel.surface.set('chatTools')
+    );
+  }
+
   /** Shows or hides portraits on one tab. Does nothing for a tab that is gone. */
   setPortraitOfTab(identifier: string, shown: boolean): void {
     const tab = this.objectStore.get<ChatTab>(identifier);
@@ -286,30 +294,11 @@ export class ChatMessageSettingComponent {
     this.uiSignalService.notifyChatRedraw();
   }
 
-  /** Redraws the chat after the compact display is changed. */
-  changeSimpleDisp() {
-    this.uiSignalService.notifyChatRedraw();
-  }
-
-  /** Redraws the chat once the box for showing times in the compact display is clicked. */
-  changeDispFlagTime() {
-    this.uiSignalService.notifyChatRedraw();
-  }
-
-  /** Redraws the chat once the box for showing IDs in the compact display is clicked. */
-  changeDispFlagUserId() {
-    this.uiSignalService.notifyChatRedraw();
-  }
-
   /**
-   * Answers a click on the box for showing portraits inside the window. The box writes the setting
-   * itself, so there is nothing more to do.
+   * Redraws the chat once a box of the compact display, for showing times or IDs, is clicked. The
+   * box writes the setting itself.
    */
-  changePortraitInWindow() {}
-
-  /**
-   * Answers a click on the box for keeping portraits outside the window. The box writes the setting
-   * itself, so there is nothing more to do.
-   */
-  changeKeepPortraitOutWindow() {}
+  redrawChat(): void {
+    this.uiSignalService.notifyChatRedraw();
+  }
 }

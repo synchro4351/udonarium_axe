@@ -4,7 +4,7 @@ import { ServerAuthService } from '@axe/application/lobby/server-auth.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { ConfirmService } from '@axe/application/ui/confirm.service';
 import { ModalService } from '@axe/application/ui/modal.service';
-import { Network } from '@axe/core/index';
+import { Network } from '@axe/core/network/network';
 import { localDispatch } from '@axe/core/network/network-messaging';
 import { PeerContext } from '@axe/core/network/peer-context';
 import { IRoomInfo } from '@axe/core/network/room-info';
@@ -16,6 +16,7 @@ import { LobbyComponent } from '@axe/features/lobby/lobby/lobby.component';
 import { NetworkReachService } from '@axe/features/lobby/network-reach.service';
 import { RoomDeletionService } from '@axe/features/lobby/room-deletion.service';
 import { RoomJoinService } from '@axe/features/lobby/room-join.service';
+import { RoomSettingComponent } from '@axe/features/lobby/room-setting/room-setting.component';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
 describe('LobbyComponent', () => {
@@ -50,8 +51,8 @@ describe('LobbyComponent', () => {
     beforeEach(() => {
       originalMyCursor = PeerCursor.myCursor;
       PeerCursor.myCursor = { peerId: '', reConnectPass: '' } as unknown as PeerCursor;
-      openSpy = vi.spyOn(Network, 'open').mockImplementation(() => {});
-      vi.spyOn(Network, 'peerContext', 'get').mockReturnValue({ userId: 'test-user' } as PeerContext);
+      openSpy = vi.spyOn(Network.instance, 'open').mockImplementation(() => {});
+      vi.spyOn(Network.instance, 'peerContext', 'get').mockReturnValue({ userId: 'test-user' } as PeerContext);
     });
 
     afterEach(() => {
@@ -112,7 +113,7 @@ describe('LobbyComponent', () => {
       Object.defineProperty(ctx, 'hasPassword', { get: () => true });
       vi.spyOn(ctx, 'verifyPassword').mockResolvedValue(true);
       PeerCursor.myCursor.reConnectPass = 'kept';
-      const peers = vi.spyOn(Network, 'peerIds', 'get').mockReturnValue([]);
+      const peers = vi.spyOn(Network.instance, 'peerIds', 'get').mockReturnValue([]);
       vi.spyOn(TestBed.inject(ModalService), 'open').mockImplementation(async () => {
         peers.mockReturnValue(['joined-meanwhile']);
         return 'typed';
@@ -140,7 +141,7 @@ describe('LobbyComponent', () => {
     afterEach(() => vi.restoreAllMocks());
 
     it('shows a room a server reports by its count, with no peers to count', async () => {
-      vi.spyOn(Network, 'transport', 'get').mockReturnValue('server');
+      vi.spyOn(Network.instance, 'transport', 'get').mockReturnValue('server');
       const serverRoom: IRoomInfo = {
         id: 'Ab3',
         name: '月夜の卓',
@@ -150,7 +151,7 @@ describe('LobbyComponent', () => {
         roomKey: '0123456789abcdef0123456789abcdef',
         filterByPassword: () => [],
       };
-      vi.spyOn(Network, 'listAllRooms').mockResolvedValue([serverRoom]);
+      vi.spyOn(Network.instance, 'listAllRooms').mockResolvedValue([serverRoom]);
 
       await component.reload();
       fixture.detectChanges();
@@ -163,7 +164,7 @@ describe('LobbyComponent', () => {
   });
 
   it('says the server cannot be reached, and to reload the page, once reaching it is given up', async () => {
-    const list = vi.spyOn(Network, 'listAllRooms').mockResolvedValue([]);
+    const list = vi.spyOn(Network.instance, 'listAllRooms').mockResolvedValue([]);
     TestBed.inject(NetworkReachService).giveUp();
 
     await component.reload();
@@ -192,8 +193,8 @@ describe('LobbyComponent', () => {
   });
 
   it('says the server is not reached yet, rather than that there are no rooms, while the connection is still coming', async () => {
-    vi.spyOn(Network, 'isOpen', 'get').mockReturnValue(false);
-    const list = vi.spyOn(Network, 'listAllRooms').mockResolvedValue([]);
+    vi.spyOn(Network.instance, 'isOpen', 'get').mockReturnValue(false);
+    const list = vi.spyOn(Network.instance, 'listAllRooms').mockResolvedValue([]);
 
     await component.reload();
 
@@ -204,7 +205,7 @@ describe('LobbyComponent', () => {
   });
 
   it('says the server is not reached yet as it opens before the connection is', () => {
-    vi.spyOn(Network, 'isOpen', 'get').mockReturnValue(false);
+    vi.spyOn(Network.instance, 'isOpen', 'get').mockReturnValue(false);
 
     const opened = TestBed.createComponent(LobbyComponent);
     opened.detectChanges();
@@ -212,6 +213,19 @@ describe('LobbyComponent', () => {
     expect(opened.componentInstance.help()).toBe(
       'まだサーバーにつながっていません。しばらく待ってから「一覧を更新」を押してください。'
     );
+  });
+
+  it('opens the form for a new room from its button, even before the server is reached', async () => {
+    vi.spyOn(Network.instance, 'isOpen', 'get').mockReturnValue(false);
+    const open = vi.spyOn(TestBed.inject(ModalService), 'open').mockResolvedValue(true);
+    fixture.detectChanges();
+
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('[data-testid="lobby-create-room"]')!
+      .click();
+    await fixture.whenStable();
+
+    expect(open).toHaveBeenCalledWith(RoomSettingComponent, expect.anything());
   });
 
   describe('signal-driven CD', () => {
@@ -236,7 +250,7 @@ describe('LobbyComponent', () => {
   });
 
   it('offers a way out of the room among peers too, where reloading an invitation goes back in', () => {
-    vi.spyOn(Network, 'peerIds', 'get').mockReturnValue(['a']);
+    vi.spyOn(Network.instance, 'peerIds', 'get').mockReturnValue(['a']);
     TestBed.inject(ObjectChangeService).networkVersion.update((v) => v + 1);
     fixture.detectChanges();
 
@@ -259,7 +273,7 @@ describe('LobbyComponent', () => {
     beforeEach(() => {
       originalMyCursor = PeerCursor.myCursor;
       PeerCursor.myCursor = { peerId: '', reConnectPass: '' } as unknown as PeerCursor;
-      vi.spyOn(Network, 'transport', 'get').mockReturnValue('server');
+      vi.spyOn(Network.instance, 'transport', 'get').mockReturnValue('server');
     });
 
     afterEach(() => {
@@ -269,9 +283,9 @@ describe('LobbyComponent', () => {
 
     it('lets a seat in a room go to no other, which would carry this table there, however few are in', () => {
       const where = vi
-        .spyOn(Network, 'peerContext', 'get')
+        .spyOn(Network.instance, 'peerContext', 'get')
         .mockReturnValue({ isRoom: true, roomName: '' } as PeerContext);
-      vi.spyOn(Network, 'peerIds', 'get').mockReturnValue([]);
+      vi.spyOn(Network.instance, 'peerIds', 'get').mockReturnValue([]);
       const bump = () => TestBed.inject(ObjectChangeService).networkVersion.update((v) => v + 1);
       fixture = TestBed.createComponent(LobbyComponent);
       component = fixture.componentInstance;
@@ -290,10 +304,10 @@ describe('LobbyComponent', () => {
 
     it('stays open as the seat goes into the same room again, as on a logout here, and closes for another', async () => {
       const where = vi
-        .spyOn(Network, 'peerContext', 'get')
+        .spyOn(Network.instance, 'peerContext', 'get')
         .mockReturnValue({ isRoom: true, roomId: 'Ab3', roomName: '' } as PeerContext);
-      vi.spyOn(Network, 'isOpen', 'get').mockReturnValue(true);
-      vi.spyOn(Network, 'listAllRooms').mockResolvedValue([]);
+      vi.spyOn(Network.instance, 'isOpen', 'get').mockReturnValue(true);
+      vi.spyOn(Network.instance, 'listAllRooms').mockResolvedValue([]);
       TestBed.inject(ObjectChangeService);
       const resolve = vi.spyOn(TestBed.inject(ModalService), 'resolve').mockImplementation(() => {});
       fixture.destroy();
@@ -310,12 +324,12 @@ describe('LobbyComponent', () => {
     });
 
     it('closes once the join it was opened during goes through', async () => {
-      vi.spyOn(Network, 'peerContext', 'get').mockReturnValue({
+      vi.spyOn(Network.instance, 'peerContext', 'get').mockReturnValue({
         isRoom: true,
         roomId: 'Ab3',
         roomName: '',
       } as PeerContext);
-      const open = vi.spyOn(Network, 'isOpen', 'get').mockReturnValue(false);
+      const open = vi.spyOn(Network.instance, 'isOpen', 'get').mockReturnValue(false);
       TestBed.inject(ObjectChangeService);
       const resolve = vi.spyOn(TestBed.inject(ModalService), 'resolve').mockImplementation(() => {});
       fixture.destroy();
@@ -330,7 +344,7 @@ describe('LobbyComponent', () => {
 
     it('joins nothing when the seat came into a room while the password was asked for', async () => {
       const where = vi
-        .spyOn(Network, 'peerContext', 'get')
+        .spyOn(Network.instance, 'peerContext', 'get')
         .mockReturnValue({ isRoom: false, roomName: '' } as PeerContext);
       vi.spyOn(TestBed.inject(ModalService), 'open').mockImplementation(async () => {
         where.mockReturnValue({ isRoom: true, roomName: '' } as PeerContext);
@@ -414,8 +428,8 @@ describe('LobbyComponent', () => {
       it('lists the room first and marks it', async () => {
         keepLastRoom(room.roomKey!, 'kept-pw');
         const other: IRoomInfo = { ...room, id: 'Aa1', name: 'あ', roomKey: 'e'.repeat(32) };
-        vi.spyOn(Network, 'listAllRooms').mockResolvedValue([other, room]);
-        vi.spyOn(Network, 'isOpen', 'get').mockReturnValue(true);
+        vi.spyOn(Network.instance, 'listAllRooms').mockResolvedValue([other, room]);
+        vi.spyOn(Network.instance, 'isOpen', 'get').mockReturnValue(true);
 
         await component.reload();
         fixture.detectChanges();
@@ -458,7 +472,7 @@ describe('LobbyComponent', () => {
     });
 
     it('says so when no room server is configured', async () => {
-      vi.spyOn(Network, 'listAllRooms').mockRejectedValue(new ServerRoomApiError(0, 'no-backend'));
+      vi.spyOn(Network.instance, 'listAllRooms').mockRejectedValue(new ServerRoomApiError(0, 'no-backend'));
 
       await component.reload();
 
@@ -466,7 +480,7 @@ describe('LobbyComponent', () => {
     });
 
     it('says the room server’s operator blocked this connection, rather than that the list failed', async () => {
-      vi.spyOn(Network, 'listAllRooms').mockRejectedValue(new ServerRoomApiError(403, 'banned'));
+      vi.spyOn(Network.instance, 'listAllRooms').mockRejectedValue(new ServerRoomApiError(403, 'banned'));
 
       await component.reload();
 
@@ -475,7 +489,7 @@ describe('LobbyComponent', () => {
     });
 
     it('keeps the operator’s contact the ban came with, and lets it go on the next look', async () => {
-      const listed = vi.spyOn(Network, 'listAllRooms');
+      const listed = vi.spyOn(Network.instance, 'listAllRooms');
       listed.mockRejectedValueOnce(new ServerRoomApiError(403, 'banned', 'https://example.com/contact'));
       await component.reload();
       expect(component.helpContact()).toBe('https://example.com/contact');
@@ -509,8 +523,10 @@ describe('LobbyComponent', () => {
     let listAllRooms: ReturnType<typeof vi.spyOn>;
 
     beforeEach(async () => {
-      vi.spyOn(Network, 'transport', 'get').mockReturnValue('server');
-      listAllRooms = vi.spyOn(Network, 'listAllRooms').mockResolvedValue([roomOf('aaa', true), roomOf('bbb', false)]);
+      vi.spyOn(Network.instance, 'transport', 'get').mockReturnValue('server');
+      listAllRooms = vi
+        .spyOn(Network.instance, 'listAllRooms')
+        .mockResolvedValue([roomOf('aaa', true), roomOf('bbb', false)]);
       await component.reload();
       fixture.detectChanges();
     });
@@ -563,8 +579,8 @@ describe('LobbyComponent', () => {
       (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid="lobby-create-room"]');
 
     beforeEach(() => {
-      vi.spyOn(Network, 'transport', 'get').mockReturnValue('server');
-      vi.spyOn(Network, 'listAllRooms').mockResolvedValue([]);
+      vi.spyOn(Network.instance, 'transport', 'get').mockReturnValue('server');
+      vi.spyOn(Network.instance, 'listAllRooms').mockResolvedValue([]);
     });
 
     afterEach(() => {

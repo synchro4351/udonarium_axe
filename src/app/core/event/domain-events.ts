@@ -5,7 +5,11 @@ import { ArchiveEntries } from '@axe/core/storage/room-archive';
 
 export interface SendMessageEvent {
   messageIdentifier: string;
-  messageTarget: { text: string; object: { name: string } | null } | null;
+  messageTarget: {
+    text: string;
+    object: { name: string; identifier?: string; hideName?: boolean } | null;
+    together?: readonly string[];
+  } | null;
 }
 
 export interface DiceTableMessageEvent {
@@ -62,7 +66,12 @@ export interface FinishVoteEvent {
 }
 
 export interface AlarmTimeUpEvent {
-  text: string;
+  /** How many seconds the alarm ran. */
+  seconds: number;
+  /** Who the alarm was for, as the words it was set with. */
+  target: string;
+  /** The alarm's title. */
+  title: string;
 }
 
 export interface AlarmPopEvent {
@@ -95,7 +104,7 @@ export interface CcfoliaRoomDroppedEvent {
 /** A file a load left out for being larger than its kind may be, with the limit it went over. */
 export interface FileTooLarge {
   name: string;
-  kind: 'image' | 'audio';
+  kind: 'image' | 'audio' | 'model';
   limitBytes: number;
   /**
    * The picture itself, for one dropped or chosen on its own rather than found inside an archive,
@@ -146,6 +155,20 @@ export interface EffectCastEvent {
   cast: unknown;
 }
 
+export interface StatusAilmentPlantedEvent {
+  /** The piece the state was put on. */
+  characterIdentifier: string;
+  /** What the state is called. */
+  name: string;
+}
+
+export interface ResetCarriedOutEvent {
+  /** The chat line that reports the reset, which is where taking it back is offered. */
+  messageIdentifier: string;
+  /** What the reset did, piece by piece, as the domain recorded it; read by whoever keeps it. */
+  record: unknown;
+}
+
 export interface BattleCutInEvent {
   /** The exchange to play, as it came over the network and before it is read. */
   scene: unknown;
@@ -173,6 +196,9 @@ export const diceBotCatalog$ = new EventChannel<void>();
 export const diceBotUnreachable$ = new EventChannel<DiceBotUnreachableEvent>();
 export const serverRollUnanswered$ = new EventChannel<ServerRollUnansweredEvent>();
 export const resourceChange$ = new EventChannel<ResourceChangeEvent>();
+/** A state was put on a piece from this device. Only the device that put it on hears of it. */
+export const statusAilmentPlanted$ = new EventChannel<StatusAilmentPlantedEvent>();
+export const resetCarriedOut$ = new EventChannel<ResetCarriedOutEvent>();
 
 export const selectGameTable$ = new EventChannel<SelectGameTableEvent>();
 export const updateAudioResource$ = new EventChannel<void>();
@@ -216,6 +242,21 @@ export function emitDiceTableMessage(event: DiceTableMessageEvent) {
 /** Announces on this device that a chat line was sent, so resource edit commands in it can run. */
 export function emitResourceEditMessage(event: ResourceEditMessageEvent) {
   resourceEditMessage$.emit(event);
+}
+/**
+ * Announces on this device that it put a state on a piece. Nothing is sent to the room: the state
+ * itself is synced as a buff, and whatever answers this does so once, from the device that put it on.
+ */
+export function emitStatusAilmentPlanted(event: StatusAilmentPlantedEvent) {
+  statusAilmentPlanted$.emit(event);
+}
+/**
+ * Announces on this device that it cleared pieces of their buffs or put their values back to their
+ * defaults, with what that did. Nothing is sent to the room: the record is this device's alone, kept
+ * so the one who did it may take it back.
+ */
+export function emitResetCarriedOut(event: ResetCarriedOutEvent) {
+  resetCarriedOut$.emit(event);
 }
 /** Makes the given table the one on view; the table selecter records it, which syncs to the room. */
 export function emitSelectGameTable(event: SelectGameTableEvent) {

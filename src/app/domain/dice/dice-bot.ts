@@ -22,6 +22,7 @@ import { objectAdded$ } from '@axe/core/sync/object-event-extension';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { PromiseQueue } from '@axe/core/util/promise-queue';
 import { toHalfWidth } from '@axe/core/util/string-util';
+import { saidNameOf } from '@axe/domain/character/hidden-name';
 import { answerColorsOf } from '@axe/domain/chat/chat-color';
 import { ChatMessage, ChatMessageContext, ChatMessageTargetContext } from '@axe/domain/chat/chat-message';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
@@ -36,7 +37,7 @@ import {
   secretRollMatch,
 } from '@axe/domain/dice/dice-roll-line';
 import { DiceTable } from '@axe/domain/dice/dice-table';
-import { rollTargetSuffix } from '@axe/domain/dice/roll-target-suffix';
+import { rollTargetSuffix, rollTogetherSuffix } from '@axe/domain/dice/roll-target-suffix';
 import { ServerRollRequests } from '@axe/domain/dice/server-roll-requests';
 import { GameSystemInfo } from 'bcdice/lib/bcdice/game_system_list.json';
 import GameSystemClass from 'bcdice/lib/game_system';
@@ -56,7 +57,8 @@ function resultMessageContextOf(
   originalMessage: ChatMessage,
   text: string,
   isSecret: boolean,
-  dicebot: string
+  dicebot: string,
+  rolledAt = ''
 ): ChatMessageContext {
   const context: ChatMessageContext = {
     identifier: '',
@@ -76,10 +78,11 @@ function resultMessageContextOf(
 
   if (originalMessage.to != null && 0 < originalMessage.to.length) {
     context.to = originalMessage.to;
-    if (originalMessage.to.indexOf(originalMessage.from) < 0) {
+    if (!originalMessage.to.includes(originalMessage.from)) {
       context.to += ` ${originalMessage.from}`;
     }
   }
+  if (rolledAt.length > 0) context.rolledAt = rolledAt;
   return context;
 }
 
@@ -524,9 +527,10 @@ export class DiceBot extends GameObject {
       // A room server rolls the dice itself, so that nobody can change what they showed; a line too
       // long for it to take is rolled here, as without one, and so is a line said to a table cut off
       // from the room, as while a replay's board is shown, where the server's answer would never come.
+      const aimedAt = rolledAtSuffixOf(data.messageTarget);
+      const rolledAt = rolledAtOf(data.messageTarget);
       if (getAuthorityPeerId() && !isNetworkIsolated() && text.length <= MAX_ROLL_COMMAND_LENGTH) {
-        const target = data.messageTarget?.object;
-        this.askServerToRoll(text, gameSystem.ID, chatMessage, target ? rollTargetSuffix(target.name) : undefined);
+        this.askServerToRoll(text, gameSystem.ID, chatMessage, aimedAt, rolledAt);
         return;
       }
 
@@ -539,15 +543,7 @@ export class DiceBot extends GameObject {
         return;
       }
 
-      if (data.messageTarget) {
-        if (data.messageTarget.object) {
-          this.sendResultMessage(rollResult, chatMessage, ` [${data.messageTarget.object.name}]`);
-        } else {
-          this.sendResultMessage(rollResult, chatMessage);
-        }
-      } else {
-        this.sendResultMessage(rollResult, chatMessage);
-      }
+      this.sendResultMessage(rollResult, chatMessage, aimedAt, rolledAt);
     } catch (e) {
       Logger.error('[DiceBot] ダイスコマンド処理エラー', e);
     }
@@ -563,13 +559,13 @@ export class DiceBot extends GameObject {
     const splitText = text.split(/\s/);
 
     const diceTable = this.getDiceTables();
-    if (!diceTable || splitText.length == 0) {
+    if (!diceTable || splitText.length === 0) {
       return;
     }
 
     let rollTable: DiceTable | null = null;
     for (const table of diceTable) {
-      if (table.command == splitText[0]) {
+      if (table.command === splitText[0]) {
         rollTable = table;
       }
     }
@@ -606,7 +602,7 @@ export class DiceBot extends GameObject {
         const tablePalette = rollTable.diceTablePalette!.getPalette();
         for (const entry of tablePalette) {
           const splitOneTable = entry.split(/[:：,，\s]/);
-          if (splitOneTable[0] == rolledDiceNum[0]) {
+          if (splitOneTable[0] === rolledDiceNum[0]) {
             tableAns = entry.replace(/\\n/g, '\n');
           }
         }
@@ -630,7 +626,12 @@ export class DiceBot extends GameObject {
     );
   }
 
-  private sendResultMessage(rollResult: DiceRollResult, originalMessage: ChatMessage, multiTargetOption?: string) {
+  private sendResultMessage(
+    rollResult: DiceRollResult,
+    originalMessage: ChatMessage,
+    multiTargetOption?: string,
+    rolledAt = ''
+  ) {
     let result: string = rollResult.result;
     if (result.length < 1) {
       return;
@@ -645,7 +646,8 @@ export class DiceBot extends GameObject {
       originalMessage,
       multiTargetOption ? `${result}${multiTargetOption}` : result,
       rollResult.isSecret,
-      encodeDiceRollDetail(rollResult.detail ?? null)
+      encodeDiceRollDetail(rollResult.detail ?? null),
+      rolledAt
     );
     const chatTab = ObjectStore.instance.get<ChatTab>(originalMessage.tabIdentifier);
     if (chatTab) {
@@ -662,11 +664,17 @@ export class DiceBot extends GameObject {
    * here, but left for the server to fill in and say; once it arrives, it is treated as a roll made
    * here, rolling its dice sound and its dice.
    */
-  private askServerToRoll(command: string, gameSystem: string, originalMessage: ChatMessage, suffix?: string) {
+  private askServerToRoll(
+    command: string,
+    gameSystem: string,
+    originalMessage: ChatMessage,
+    suffix?: string,
+    rolledAt = ''
+  ) {
     const chatTab = ObjectStore.instance.get<ChatTab>(originalMessage.tabIdentifier);
     if (!getAuthorityPeerId() || !(chatTab instanceof ChatTab)) return;
 
-    const answer = chatTab.createMessage(resultMessageContextOf(originalMessage, '', false, ''));
+    const answer = chatTab.createMessage(resultMessageContextOf(originalMessage, '', false, '', rolledAt));
     const asked = this.answersAsked;
     this.answersAsked = {
       source: originalMessage.identifier,
@@ -692,4 +700,21 @@ export class DiceBot extends GameObject {
     this.cleanups = [];
     this.serverRolls.clear();
   }
+}
+
+/** The piece a roll is made at alone, by its identifier; empty for one made at nobody or at everyone at once. */
+function rolledAtOf(target: SendMessageEvent['messageTarget'] | undefined): string {
+  if (target?.together && target.together.length > 0) return '';
+  return target?.object?.identifier ?? '';
+}
+
+/**
+ * Who a roll is made at, as written after its answer, with or without a room server: the target's
+ * name as the room is told it (see `saidNameOf`), or as many of the names of everyone a line is aimed
+ * at all at once as a server takes, each with no brackets that would end the list early; none for a
+ * roll made at nobody.
+ */
+function rolledAtSuffixOf(target: SendMessageEvent['messageTarget'] | undefined): string | undefined {
+  if (target?.together && target.together.length > 0) return rollTogetherSuffix(target.together);
+  return target?.object ? rollTargetSuffix(saidNameOf(target.object)) : undefined;
 }

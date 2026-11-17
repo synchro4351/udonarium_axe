@@ -2,13 +2,16 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { GameClockService } from '@axe/application/game-clock/game-clock.service';
+import { LanguageService } from '@axe/application/i18n/language.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ImageService } from '@axe/application/storage/image.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { trackEvery } from '@axe/application/sync/track-every';
 import { BoardSceneService } from '@axe/application/tabletop/board-scene.service';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { debounce } from '@axe/core/util/debounce';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import {
   type AmbienceKind,
@@ -32,6 +35,7 @@ import {
   scenePartsOf,
   scenePeriodOf,
   scenePictureIn,
+  sceneSkyKindOf,
   sceneToggleOf,
   type SceneWallSide,
   sceneWallsShownOf,
@@ -39,6 +43,7 @@ import {
 } from '@axe/domain/scene/board-scene-parts';
 import { GameTable } from '@axe/domain/tabletop/game-table';
 import { foregroundFitOf, foregroundOpacityOf, TABLE_FOREGROUND_FITS } from '@axe/domain/tabletop/table-foreground';
+import { TABLE_SKY_KINDS, tableSkyKindOf } from '@axe/domain/tabletop/table-sky';
 import { ChatLineEditorComponent } from '@axe/features/chat/chat-line-editor/chat-line-editor.component';
 import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
 import { NgSelectWindowDirective } from '@axe/ui/directives/ng-select-window.directive';
@@ -47,14 +52,17 @@ import { TranslocoModule } from '@jsverse/transloco';
 import { NgSelectModule } from '@ng-select/ng-select';
 
 /** The fields a scene names a picture in. */
-type PictureField =
-  | 'floorImageIdentifier'
-  | 'backgroundImageIdentifier'
-  | 'foregroundImageIdentifier'
-  | 'northWallImageIdentifier'
-  | 'eastWallImageIdentifier'
-  | 'southWallImageIdentifier'
-  | 'westWallImageIdentifier';
+const PICTURE_FIELDS = [
+  'floorImageIdentifier',
+  'backgroundImageIdentifier',
+  'foregroundImageIdentifier',
+  'northWallImageIdentifier',
+  'eastWallImageIdentifier',
+  'southWallImageIdentifier',
+  'westWallImageIdentifier',
+] as const;
+
+type PictureField = (typeof PICTURE_FIELDS)[number];
 
 /** How long after the last key the words of a scene are shared with the room. */
 const WRITE_DELAY_MS = 400;
@@ -71,6 +79,7 @@ const SWITCHED_PARTS: readonly BoardScenePart[] = [
   'table',
   'floor',
   'background',
+  'sky',
   'walls',
   'foreground',
   'weather',
@@ -89,7 +98,7 @@ const SWITCHED_PARTS: readonly BoardScenePart[] = [
  */
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
-  selector: 'app-scene-editor',
+  selector: 'scene-editor',
   templateUrl: './scene-editor.component.html',
   imports: [
     ChatLineEditorComponent,
@@ -110,6 +119,7 @@ export class SceneEditorComponent {
   private readonly scenes = inject(BoardSceneService);
   private readonly clock = inject(GameClockService);
   private readonly t = inject(TRANSLATE_FN);
+  private readonly language = inject(LanguageService);
 
   readonly scene = input.required<BoardScene>();
   readonly canEdit = input(false);
@@ -118,7 +128,8 @@ export class SceneEditorComponent {
   /** The table as it stands is to be written over the scene. */
   readonly overwrite = output<void>();
 
-  private pendingText: { scene: BoardScene; words: string; timer: ReturnType<typeof setTimeout> } | null = null;
+  private pendingText: { scene: BoardScene; words: string } | null = null;
+  private readonly writeTextSoon = debounce(() => this.flushText(), WRITE_DELAY_MS);
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.flushText());
@@ -128,6 +139,7 @@ export class SceneEditorComponent {
   protected readonly wallSides = SCENE_WALL_SIDES;
   protected readonly wallPictureField = WALL_PICTURE_FIELD;
   protected readonly foregroundFits = TABLE_FOREGROUND_FITS;
+  protected readonly skyKinds = TABLE_SKY_KINDS;
   protected readonly weatherKinds = SKY_AMBIENCE_KINDS;
   protected readonly noPicture = SCENE_NO_PICTURE;
 
@@ -247,13 +259,21 @@ export class SceneEditorComponent {
     if (table instanceof GameTable) this.write({ tableIdentifier: table.identifier, tableName: table.name });
   }
 
+  private readonly pictures = computed(() => {
+    this.objectChange.fileVersion();
+    const scene = this.current();
+    const shown = {} as Record<PictureField, { url: string } | null>;
+    for (const field of PICTURE_FIELDS) {
+      const picture = scenePictureIn(scene[field]);
+      const image = picture ? this.imageService.getEmptyOr(picture) : null;
+      shown[field] = image ? { url: image.isEmpty ? '' : image.url } : null;
+    }
+    return shown;
+  });
+
   /** What a scene puts in a picture's place, as shown: null for none taken away, else the picture. */
   protected pictureOf(field: PictureField): { url: string } | null {
-    this.objectChange.fileVersion();
-    const picture = scenePictureIn(this.current()[field]);
-    if (!picture) return null;
-    const image = this.imageService.getEmptyOr(picture);
-    return image.isEmpty ? { url: '' } : { url: image.url };
+    return this.pictures()[field];
   }
 
   /** Opens the image picker for a picture of the scene; the empty picture chosen takes the picture away. */
@@ -269,40 +289,47 @@ export class SceneEditorComponent {
     this.write({ [field]: SCENE_NO_PICTURE });
   }
 
-  protected backgroundFilter(): string {
-    return `${this.current().backgroundFilter ?? ''}` || 'none';
-  }
+  protected readonly backgroundFilter = computed(() => `${this.current().backgroundFilter ?? ''}` || 'none');
+
+  private readonly wallsShown = computed(() => sceneWallsShownOf(this.current().wallsShown));
 
   protected wallShown(side: SceneWallSide): boolean {
-    return sceneWallsShownOf(this.current().wallsShown)[side] === true;
+    return this.wallsShown()[side] === true;
   }
 
   protected setWallShown(side: SceneWallSide, shown: boolean): void {
-    this.write({ wallsShown: JSON.stringify({ ...sceneWallsShownOf(this.current().wallsShown), [side]: shown }) });
+    this.write({ wallsShown: JSON.stringify({ ...sceneWallsShownOf(this.scene().wallsShown), [side]: shown }) });
   }
 
-  protected foregroundOpacity(): number {
-    return Math.round(foregroundOpacityOf(this.current().foregroundOpacity) * 100);
-  }
+  protected readonly foregroundOpacity = computed(() =>
+    Math.round(foregroundOpacityOf(this.current().foregroundOpacity) * 100)
+  );
 
   protected setForegroundOpacity(percent: number): void {
     this.write({ foregroundOpacity: `${foregroundOpacityOf(Number(percent) / 100)}` });
   }
 
-  protected foregroundFit(): string {
-    return foregroundFitOf(this.current().foregroundFit);
-  }
+  protected readonly foregroundFit = computed<string>(() => foregroundFitOf(this.current().foregroundFit));
 
-  protected weather(): { kind: string; color: string; density: number } {
-    return sceneWeatherOf(this.current().weather) ?? { kind: '', color: '', density: DEFAULT_AMBIENCE_DENSITY };
+  protected readonly weather = computed(() => this.weatherOf(this.current()));
+
+  private weatherOf(scene: BoardScene): { kind: string; color: string; density: number } {
+    return sceneWeatherOf(scene.weather) ?? { kind: '', color: '', density: DEFAULT_AMBIENCE_DENSITY };
   }
 
   protected setWeather(change: Partial<{ kind: string; color: string; density: number }>): void {
-    this.write({ weather: JSON.stringify({ ...this.weather(), ...change }) });
+    this.write({ weather: JSON.stringify({ ...this.weatherOf(this.scene()), ...change }) });
   }
 
   protected weatherKindLabel(kind: AmbienceKind): string {
     return this.t(`feature.ambience.kind.${kind}`);
+  }
+
+  /** The sky the scene puts past the board, as the table's settings name it: empty for the background picture. */
+  protected readonly skyKind = computed<string>(() => sceneSkyKindOf(this.current().skyKind) ?? '');
+
+  protected setSkyKind(kind: string): void {
+    this.write({ skyKind: tableSkyKindOf(kind) || SCENE_NO_PICTURE });
   }
 
   protected toggleOf(part: 'darkness' | 'fog'): string {
@@ -324,7 +351,7 @@ export class SceneEditorComponent {
   }
 
   /** The playlist the scene plays, found as putting the scene on finds it, or null for none chosen. */
-  protected bgmPlaylist(): string | null {
+  protected readonly bgmPlaylist = computed<string | null>(() => {
     const scene = this.current();
     const found = findByReference(
       this.playlists(),
@@ -332,7 +359,7 @@ export class SceneEditorComponent {
       `${scene.bgmPlaylistName ?? ''}`
     );
     return found?.thing.identifier ?? null;
-  }
+  });
 
   protected setBgmPlaylist(identifier: string): void {
     const playlist = this.playlists().find((candidate) => candidate.identifier === identifier);
@@ -346,9 +373,7 @@ export class SceneEditorComponent {
     this.write({ cutInIdentifiers: encodeCutInIdentifiers(identifiers) });
   }
 
-  protected period(): number | null {
-    return scenePeriodOf(this.current().clockPeriod);
-  }
+  protected readonly period = computed<number | null>(() => scenePeriodOf(this.current().clockPeriod));
 
   protected setPeriod(period: number): void {
     this.write({ clockPeriod: `${period}` });
@@ -358,15 +383,15 @@ export class SceneEditorComponent {
   protected writeTextLater(scene: BoardScene, words: string): void {
     if (!this.canEdit()) return;
     if (this.pendingText && this.pendingText.scene !== scene) this.flushText();
-    if (this.pendingText) clearTimeout(this.pendingText.timer);
-    this.pendingText = { scene, words, timer: setTimeout(() => this.flushText(), WRITE_DELAY_MS) };
+    this.pendingText = { scene, words };
+    this.writeTextSoon();
   }
 
   /** Shares words still waiting to be, as before the scene is put on, copied or written over. */
   flushText(): void {
+    this.writeTextSoon.cancel();
     const pending = this.pendingText;
     if (!pending) return;
-    clearTimeout(pending.timer);
     this.pendingText = null;
     if (this.canEdit() && pending.scene.text !== pending.words) pending.scene.writeText(pending.words);
   }
@@ -379,10 +404,10 @@ export class SceneEditorComponent {
 
   private soundsTagged(keep: (tag: string) => boolean): { identifier: string; name: string }[] {
     this.objectChange.fileVersion();
-    this.objectChange.collectionOf('audio-tag')();
+    trackEvery(this.objectChange, 'audio-tag');
     return this.audioStorage.audios
       .filter((audio) => !audio.isHidden && keep(AudioTag.get(audio.identifier)?.tag ?? 'BGM'))
       .map((audio) => ({ identifier: audio.identifier, name: soundFileName(audio.name) }))
-      .sort((left, right) => left.name.localeCompare(right.name, 'ja'));
+      .sort((left, right) => left.name.localeCompare(right.name, this.language.currentLang()));
   }
 }

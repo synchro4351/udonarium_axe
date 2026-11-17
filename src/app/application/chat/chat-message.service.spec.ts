@@ -125,6 +125,36 @@ describe('ChatMessageService', () => {
       expect(ChatTabList.instance.chatTabs.map((tab) => tab.chatMessages.length)).toEqual(before);
     });
 
+    it('can still be written for this seat alone where the room sends its kind nowhere', () => {
+      const cursor = PeerCursor.myCursor;
+      PeerCursor.myCursor = { userId: 'me', identifier: 'seat' } as PeerCursor;
+      try {
+        route('round', NOTICE_OFF);
+
+        const told = service.tellSelfSystemNotice('round', 'バフを解除しました。')!;
+
+        expect(ChatTabList.instance.chatTabs[0].chatMessages).toContain(told);
+        expect([told.from, told.to, told.isSystemToPL]).toEqual(['me', 'me', true]);
+        expect([told.isDisplayableTo('me'), told.isDisplayableTo('another')]).toEqual([true, false]);
+      } finally {
+        PeerCursor.myCursor = cursor;
+      }
+    });
+
+    it('is written for nobody where this seat has no cursor to address it to', () => {
+      const cursor = PeerCursor.myCursor;
+      PeerCursor.myCursor = null!;
+      try {
+        const before = ChatTabList.instance.chatTabs.map((tab) => tab.chatMessages.length);
+
+        expect(service.tellSelfSystemNotice('round', 'バフを解除しました。')).toBeNull();
+
+        expect(ChatTabList.instance.chatTabs.map((tab) => tab.chatMessages.length)).toEqual(before);
+      } finally {
+        PeerCursor.myCursor = cursor;
+      }
+    });
+
     it('goes where its kind always went once the tab chosen for it is gone', () => {
       route('round', 'a-tab-since-deleted');
 
@@ -258,6 +288,41 @@ describe('ChatMessageService', () => {
       expect(message).toBeNull();
       expect(tab.chatMessages).toEqual([]);
     });
+  });
+
+  it('names a line said as a piece whose name is hidden by the label', () => {
+    const service = TestBed.inject(ChatMessageService);
+    PeerCursor.createMyCursor();
+    const tab = new ChatTab();
+    tab.initialize();
+    ObjectStore.instance.add(tab);
+    const villain = GameCharacter.create('黒幕', 1, '');
+    villain.hideName = true;
+    try {
+      const message = service.sendMessage(tab, 'ふふふ', null, villain.identifier);
+
+      expect(message.name).toBe('？？？');
+    } finally {
+      villain.destroy();
+      tab.destroy();
+    }
+  });
+
+  it('marks the lines sent as a game master’s words as such, and no line sent after', () => {
+    const service = TestBed.inject(ChatMessageService);
+    PeerCursor.createMyCursor();
+    const tab = new ChatTab();
+    tab.initialize();
+    ObjectStore.instance.add(tab);
+    try {
+      const switchLine = service.asMastersWords(() => service.sendAsNamed(tab, '解錠：目標値13', null, '宝箱'));
+      const afterwards = service.sendAsNamed(tab, 'ギィ', null, '宝箱');
+
+      expect(switchLine.mastersWords).toBe('1');
+      expect(afterwards.mastersWords ?? '').toBe('');
+    } finally {
+      tab.destroy();
+    }
   });
 
   describe('sending a stamp with words', () => {
@@ -647,6 +712,60 @@ describe('ChatMessageService', () => {
 
       expect(message.text).toBe('2d6+7>=14 抵抗');
       expect(rolled).toEqual(['2d6+7>=14 抵抗']);
+      expect(message.answersTargetNumber).toBe('1');
+    });
+
+    it('fills it in with the number the reader picked instead, in every copy aimed at a target', () => {
+      const rolled: string[] = [];
+      const off = sendMessage$.subscribe((event) => rolled.push(event.messageTarget?.text ?? ''));
+
+      const message = service.sendMessage(
+        chatTab,
+        '2d6+7>={目標値} 抵抗',
+        null,
+        hero.identifier,
+        undefined,
+        0,
+        '',
+        [{ text: '2d6+7>={目標値} 抵抗', object: null }],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        11
+      );
+      off();
+
+      expect(message.text).toBe('2d6+7>=11 抵抗');
+      expect(rolled).toEqual(['2d6+7>=11 抵抗']);
+      expect(message.answersTargetNumber).toBe('1');
+    });
+
+    it('keeps who a line aimed at them all at once was aimed at, and nothing for a line aimed at each in turn', () => {
+      const other = GameCharacter.create('ミナ', 1, '');
+
+      const atOnce = service.sendMessage(chatTab, '2d6+8 [ヒロ、ミナ]', null, hero.identifier, undefined, 0, '', [
+        { text: '2d6+8', object: hero, together: ['ヒロ', 'ミナ'] },
+        { text: '2d6+8', object: other, together: ['ヒロ', 'ミナ'] },
+      ]);
+      const inTurn = service.sendMessage(
+        chatTab,
+        '2d6+8 [ヒロ]\n2d6+8 [ミナ]',
+        null,
+        hero.identifier,
+        undefined,
+        0,
+        '',
+        [
+          { text: '2d6+8', object: hero },
+          { text: '2d6+8', object: other },
+        ]
+      );
+
+      expect(JSON.parse(atOnce.aimedTogether)).toEqual([hero.identifier, other.identifier]);
+      expect(inTurn.aimedTogether ?? '').toBe('');
     });
 
     it('fills it in for a line said under a name of its own, from a roll by somebody else', () => {
@@ -660,7 +779,9 @@ describe('ChatMessageService', () => {
         timestamp: 1101,
       });
 
-      expect(service.sendAsNamed(chatTab, '2d6>={目標値} 扉の抵抗', null, '扉').text).toBe('2d6>=15 扉の抵抗');
+      const said = service.sendAsNamed(chatTab, '2d6>={目標値} 扉の抵抗', null, '扉');
+      expect(said.text).toBe('2d6>=15 扉の抵抗');
+      expect(said.answersTargetNumber).toBe('1');
     });
 
     it('leaves it as typed where nothing has been rolled to beat', () => {
@@ -675,7 +796,10 @@ describe('ChatMessageService', () => {
       });
       chatTab.addMessage({ from: 'me', sendFrom: other.identifier, name: 'ミナ', text: '2d6', timestamp: 1099 });
 
-      expect(service.sendMessage(chatTab, '2d6>={目標値}', null, other.identifier).text).toBe('2d6>={目標値}');
+      const said = service.sendMessage(chatTab, '2d6>={目標値}', null, other.identifier);
+      expect(said.text).toBe('2d6>={目標値}');
+      expect(said.answersTargetNumber).toBe('');
+      expect(service.sendMessage(chatTab, '2d6+7 攻撃', null, hero.identifier).answersTargetNumber).toBe('');
     });
   });
 
@@ -849,6 +973,7 @@ describe('ChatMessageService', () => {
           none,
           none,
           none,
+          none,
           whole
         );
 
@@ -999,13 +1124,60 @@ describe('ChatMessageService', () => {
         other.destroy();
       });
 
-      it('reads no resource edit out of the line, but does among peers', () => {
+      it('reads no resource edit out of the line', () => {
         speak(':HP-3');
         expect(resourceEdits).toEqual([]);
+      });
 
+      it.each(['&*-', '&*バフ-', '&*デバフ-', 't&*-', 't&*debuff-', '&&*-', '&&*バフ-', 's&*-'])(
+        'reads no clearing of buffs out of the line %s, on a room server or among peers',
+        (line) => {
+          speak(line);
+          vi.spyOn(Network.instance, 'authorityPeerId', 'get').mockReturnValue(null);
+          speak(line);
+          expect(resourceEdits).toEqual([]);
+
+          PeerCursor.myCursor.role = PeerRole.Player;
+          const again = speak(line);
+          expect(resourceEdits).toEqual([again.identifier]);
+        }
+      );
+
+      it.each([
+        ':*=既定',
+        ':HP=default',
+        ':HP^=既定',
+        't:*=既定',
+        '&リセット-',
+        't&reset-',
+        '&&リセット-',
+        's&リセット-',
+      ])(
+        'reads no putting back of values out of the line %s, on a room server or among peers (acceptance 15)',
+        (line) => {
+          speak(line);
+          vi.spyOn(Network.instance, 'authorityPeerId', 'get').mockReturnValue(null);
+          speak(line);
+          expect(resourceEdits).toEqual([]);
+
+          PeerCursor.myCursor.role = PeerRole.Player;
+          const again = speak(line);
+          expect(resourceEdits).toEqual([again.identifier]);
+        }
+      );
+
+      it('changes no piece among peers either, where a guest may change none by its sheet', () => {
         vi.spyOn(Network.instance, 'authorityPeerId', 'get').mockReturnValue(null);
+
         const message = speak(':HP-3 @笑顔');
-        expect(resourceEdits).toEqual([message.identifier]);
+
+        expect(resourceEdits).toEqual([]);
+        expect(message.imageIdentifier).toBe('img-1');
+        expect(character.selectedPortraitIndex).toBe(0);
+
+        PeerCursor.myCursor.role = PeerRole.Player;
+        const again = speak(':HP-3 @笑顔');
+        expect(resourceEdits).toEqual([again.identifier]);
         expect(character.selectedPortraitIndex).toBe(1);
       });
     });

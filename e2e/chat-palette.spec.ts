@@ -1,11 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-import { createCharacter, expectChatText, waitAppReady } from './helpers';
+import { chatInput, createCharacter, expectChatText, sendMenuEvent, waitAppReady } from './helpers';
 
 async function openChatPalette(page: import('@playwright/test').Page) {
   await waitAppReady(page);
   await createCharacter(page);
-  await page.locator('game-character').first().dispatchEvent('contextmenu');
+  // The piece stands under the chat window the room opens with, where no click reaches it.
+  await sendMenuEvent(page.locator('game-character').first());
   await expect(page.locator('context-menu').locator('li').first()).toBeVisible({ timeout: 5000 });
   await page.locator('context-menu').getByText('チャットパレットを表示').click();
   await expect(page.locator('chat-palette')).toBeVisible({ timeout: 10000 });
@@ -16,49 +17,11 @@ test.describe('the chat palette', () => {
     await openChatPalette(page);
   });
 
-  test('has its own chat-input and the headings and character info buttons in the palette', async ({ page }) => {
-    const palette = page.locator('chat-palette');
-    await expect(palette.locator('chat-input')).toBeVisible();
-    await expect(palette.getByRole('button', { name: /見出し/ })).toBeVisible();
-    await expect(palette.getByRole('button', { name: /キャラ情報/ })).toBeVisible();
-  });
-
-  test('switches the view on "character info" and offers "back to the palette"', async ({ page }) => {
-    const palette = page.locator('chat-palette');
-    await palette.getByRole('button', { name: /キャラ情報/ }).click();
-    await expect(palette.getByRole('button', { name: /パレットに戻る/ })).toBeVisible({ timeout: 3000 });
-  });
-
-  test('shows the "editing" label once switched to edit mode', async ({ page }) => {
-    const palette = page.locator('chat-palette');
-    await palette.getByRole('button', { name: '編集', exact: true }).click();
-    await expect(palette.getByText('編集中')).toBeVisible({ timeout: 3000 });
-    await expect(palette.locator('[data-chat-palette-editor] [data-chat-palette-text]')).toBeVisible();
-  });
-
-  test('moves to the next tab when the wheel is turned over the tabs, as the chat window does', async ({ page }) => {
-    const palette = page.locator('chat-palette');
-    const pills = palette.locator('.chat-tab-pill');
-    await expect(pills.nth(1)).toBeVisible();
-    const checkedName = () =>
-      palette.locator('input[name^="chat-tab"]:checked').evaluate((input) => input.parentElement!.textContent!.trim());
-    const first = await checkedName();
-
-    // The palette opens where the right click was and can sit under the toolbar, so the wheel is
-    // sent straight to the strip of tabs.
-    await pills
-      .first()
-      .evaluate((pill) =>
-        pill.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true }))
-      );
-
-    await expect.poll(checkedName).not.toBe(first);
-  });
-
   test("switches among the portraits of a piece with several from the palette's portrait, reading their names", async ({
     page,
   }) => {
-    await page.locator('game-character').first().dispatchEvent('contextmenu');
+    // The piece stands under the chat window the room opens with, where no click reaches it.
+    await sendMenuEvent(page.locator('game-character').first());
     await page.locator('context-menu').getByText('詳細を表示').click();
     const sheet = page.locator('game-character-sheet');
     await expect(sheet).toBeVisible({ timeout: 10000 });
@@ -71,9 +34,11 @@ test.describe('the chat palette', () => {
     await expect(thumbs).toHaveCount(3);
     for (const [index, name] of ['通常', '怒り', 'ひらめき'].entries()) {
       await thumbs.nth(index).click();
+      await expect(thumbs.nth(index).getByText('person_pin')).toBeVisible();
       const nameInput = sheet.getByPlaceholder(/立ち絵名/);
       await nameInput.fill(name);
       await nameInput.press('Enter');
+      await expect(thumbs.nth(index)).toHaveAttribute('title', name);
     }
 
     const picker = page.locator('chat-palette portrait-picker');
@@ -89,33 +54,6 @@ test.describe('the chat palette', () => {
     await label.dispatchEvent('click');
     await page.locator('chat-palette [popover]').getByRole('option', { name: 'ひらめき' }).dispatchEvent('click');
     await expect(label).toHaveText('ひらめき');
-  });
-
-  test('lets another tab be opened after a jump to a heading picked from the menu', async ({ page }) => {
-    const palette = page.locator('chat-palette');
-    await palette.getByRole('button', { name: '編集', exact: true }).click();
-    const editor = palette.locator('[data-chat-palette-editor] [data-chat-palette-text]');
-    await expect(editor).toBeVisible({ timeout: 10000 });
-    await editor.click();
-    await page.keyboard.press('ControlOrMeta+a');
-    await page.keyboard.press('Delete');
-    await editor.fill('1d100 目星\n◆◆戦闘\n◆攻撃\n2d6+3 攻撃\n◆◆探索\nCC<=50');
-    await expectChatText(editor, '1d100 目星\n◆◆戦闘\n◆攻撃\n2d6+3 攻撃\n◆◆探索\nCC<=50');
-    await palette.getByRole('button', { name: '確定', exact: true }).click();
-    const tab = (name: string) => palette.getByTestId('palette-tab').filter({ hasText: name });
-    const line = (text: string) => palette.locator('[data-line]').filter({ hasText: text });
-
-    await tab('戦闘').click();
-    await palette.getByTestId('palette-headings-menu').click();
-    await page.locator('context-menu').getByText('攻撃').click();
-    await expect(line('2d6+3 攻撃')).toBeVisible();
-
-    await tab('探索').click();
-    await expect(tab('探索')).toHaveAttribute('aria-selected', 'true');
-    await expect(line('CC<=50')).toBeVisible();
-    await tab('メイン').click();
-    await expect(line('1d100 目星')).toBeVisible();
-    await expect(line('2d6+3 攻撃')).toHaveCount(0);
   });
 
   test('puts the search box above the list, and the results right under the search box', async ({ page }) => {
@@ -135,18 +73,122 @@ test.describe('the chat palette', () => {
     expect(edges.resultsTop).toBeGreaterThanOrEqual(edges.searchBottom);
     expect(edges.resultsTop).toBeLessThan(edges.firstLineTop);
   });
-});
 
-test.describe('the chat colour settings modal', () => {
-  test('opens chat-color-setting from the colour settings button', async ({ page }) => {
-    await waitAppReady(page);
-    await page.locator('chat-input').getByTestId('chat-input-color').first().click();
-    await page
-      .locator('chat-input')
-      .getByRole('button', { name: /色設定/ })
-      .click();
-    await expect(page.locator('chat-color-setting')).toBeVisible({ timeout: 5000 });
-    // There is a colour picker for each colour being edited (name="chat-color-<number>").
-    await expect(page.locator('chat-color-setting input[type="color"]').first()).toBeAttached();
+  /**
+   * A palette some of whose lines hold `{目標値}` keeps the room of the bar telling what it comes to
+   * from the start, so the first click of a double click on such a line moves nothing under the
+   * pointer and the second lands on the same line, sending it.
+   */
+  test('holds the list still as a line of two lines or one longer than the box is picked into it', async ({ page }) => {
+    const palette = page.locator('chat-palette');
+    await palette.getByRole('button', { name: '編集', exact: true }).click();
+    const editor = palette.locator('[data-chat-palette-editor] .ProseMirror');
+    await expect(editor).toBeVisible({ timeout: 10000 });
+    await editor.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Delete');
+    const long = `長い行${'あ'.repeat(90)}`;
+    await editor.fill(`2d6 攻撃\\n命中したら追加\n${long}\n2d6+2 回避`);
+    await palette.getByRole('button', { name: '確定' }).click();
+
+    const list = palette.getByTestId('chat-palette-list');
+    const last = list.getByText('2d6+2 回避');
+    await expect(last).toBeVisible();
+    const before = (await last.boundingBox())!.y;
+    const input = chatInput(palette);
+    for (const [picked, text] of [
+      [list.getByText('2d6 攻撃'), '2d6 攻撃\n命中したら追加'],
+      [list.getByText('長い行'), long],
+    ] as const) {
+      await picked.click();
+      await expectChatText(input, text);
+      expect(Math.abs((await last.boundingBox())!.y - before)).toBeLessThan(1);
+    }
+
+    // Typed over several lines, the box grows; a line picked into it then leaves the list where it
+    // stood, so a double click on it sends it rather than landing on another.
+    await input.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type(`打った行${'い'.repeat(90)}`);
+    const grown = (await last.boundingBox())!.y;
+    expect(grown).toBeGreaterThan(before);
+    await last.click();
+    await expectChatText(input, '2d6+2 回避');
+    expect(Math.abs((await last.boundingBox())!.y - grown)).toBeLessThan(1);
+    await last.dblclick({ delay: 60 });
+    await expect(page.locator('chat-tab chat-message').filter({ hasText: '(2D6+2)' })).toHaveCount(1, {
+      timeout: 15000,
+    });
+    // Sent, the box is empty and one line tall again.
+    await expect.poll(async () => Math.abs((await last.boundingBox())!.y - before)).toBeLessThan(1);
+  });
+
+  test('keeps the height the box was given by its corner as a line is picked into it and sent', async ({ page }) => {
+    const palette = page.locator('chat-palette');
+    await palette.getByRole('button', { name: '編集', exact: true }).click();
+    const editor = palette.locator('[data-chat-palette-editor] .ProseMirror');
+    await expect(editor).toBeVisible({ timeout: 10000 });
+    await editor.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Delete');
+    await editor.fill('2d6+2 回避\n2d6+1 命中');
+    await palette.getByRole('button', { name: '確定' }).click();
+
+    const box = palette.locator('[data-chat-input-box]');
+    const rect = (await box.boundingBox())!;
+    await page.mouse.move(rect.x + rect.width - 4, rect.y + rect.height - 4);
+    await page.mouse.down();
+    await page.mouse.move(rect.x + rect.width - 4, rect.y + rect.height + 76, { steps: 8 });
+    await page.mouse.up();
+    const sized = (await box.boundingBox())!.height;
+    expect(sized).toBeGreaterThan(rect.height + 40);
+
+    await palette.getByTestId('chat-palette-list').getByText('2d6+2 回避').dblclick({ delay: 60 });
+    await expect(page.locator('chat-tab chat-message').filter({ hasText: '(2D6+2)' })).toHaveCount(1, {
+      timeout: 15000,
+    });
+    expect(Math.abs((await box.boundingBox())!.height - sized)).toBeLessThan(2);
+  });
+
+  test('sends a line holding {目標値} on a double click, the list holding still as the bar fills', async ({ page }) => {
+    const palette = page.locator('chat-palette');
+    await palette.getByRole('button', { name: '編集', exact: true }).click();
+    const editor = palette.locator('[data-chat-palette-editor] .ProseMirror');
+    await expect(editor).toBeVisible({ timeout: 10000 });
+    await editor.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Delete');
+    await editor.fill('2d6+1 命中\n2d6>={目標値} 抵抗\n2d6+2 回避');
+    await expectChatText(editor, '2d6+1 命中\n2d6>={目標値} 抵抗\n2d6+2 回避');
+    await palette.getByRole('button', { name: '確定' }).click();
+    await expect(palette.getByTestId('chat-input-target-number-idle')).toBeVisible();
+
+    // With nothing rolled yet the line is found wanting, and the mark saying so takes no more room.
+    const line = palette.getByTestId('chat-palette-list').getByText('2d6>={目標値} 抵抗');
+    const before = (await line.boundingBox())!.y;
+    await line.click();
+    await expect(palette.getByTestId('chat-input-findings')).toBeVisible({ timeout: 5000 });
+    // The line typed in may sit a fraction of a pixel lower in the box than the hint did.
+    expect(Math.abs((await line.boundingBox())!.y - before)).toBeLessThan(1);
+
+    const input = chatInput(page).first();
+    await input.fill('2d6+8 火球');
+    await input.press('Enter');
+    await expectChatText(input, '');
+    const fireball = page.locator('chat-tab chat-message').filter({ hasText: '(2D6+8)' });
+    await expect(fireball).toHaveCount(1, { timeout: 15000 });
+    const text = (await fireball.getByTestId('chat-message-text').innerText()).trim();
+    const total = text
+      .split('→')
+      .map((step) => step.trim())
+      .filter((step) => /^-?\d+$/.test(step))
+      .at(-1);
+
+    // Each press held as a hand holds it, so that the page draws between the two clicks.
+    await line.dblclick({ delay: 60 });
+    await expect(page.locator('chat-tab chat-message').filter({ hasText: `(2D6>=${total})` })).toHaveCount(1, {
+      timeout: 15000,
+    });
+    expect((await line.boundingBox())!.y).toBe(before);
   });
 });

@@ -1,4 +1,3 @@
-import { NgStyle } from '@angular/common';
 import {
   afterNextRender,
   ChangeDetectionStrategy,
@@ -8,96 +7,154 @@ import {
   ElementRef,
   inject,
   input,
+  OutputRefSubscription,
   signal,
   viewChild,
 } from '@angular/core';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
-import { CoordinateService } from '@axe/application/input/coordinate.service';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { GameObjectInventoryService } from '@axe/application/inventory/game-object-inventory.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
-import { EngagementZoneService } from '@axe/application/tabletop/engagement-zone.service';
+import { PiecePicturesService } from '@axe/application/tabletop/piece-pictures.service';
 import { PieceTargetService } from '@axe/application/tabletop/piece-target.service';
+import { StandingGroundService } from '@axe/application/tabletop/standing-ground.service';
+import { TablePickService } from '@axe/application/tabletop/table-pick.service';
+import { TablePiecesService } from '@axe/application/tabletop/table-pieces.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
-import { VisionService } from '@axe/application/tabletop/vision.service';
-import { ContextMenuService } from '@axe/application/ui/context-menu.service';
+import { TransientPlacementService } from '@axe/application/tabletop/transient-placement.service';
 import { PanelOption, PanelService } from '@axe/application/ui/panel.service';
 import { PieceContextMenuService } from '@axe/application/ui/piece-context-menu.service';
-import { sheetPanelBox } from '@axe/application/ui/sheet-panel';
-import { sheetPanelTitle } from '@axe/application/ui/sheet-panel';
-import { UiSignalService } from '@axe/application/ui/ui-signal.service';
+import { panelOptionAt, type PointerPanelBox, sheetPanelBox, sheetPanelTitle } from '@axe/application/ui/sheet-panel';
 import { isInStore, ObjectStore } from '@axe/core/sync/object-store';
 import { PERF_RANGE_RENDER, perfCounters } from '@axe/core/util/perf-counters';
-import { GameCharacter } from '@axe/domain/character/game-character';
+import { collectDataElements } from '@axe/domain/data/data-element-tree';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
-import { cellPatternBoundingBox, parseCellPattern } from '@axe/domain/tabletop/cell-pattern';
 import { GameTable } from '@axe/domain/tabletop/game-table';
 import { isHexGrid } from '@axe/domain/tabletop/hex-geometry';
 import { squareCentreAt } from '@axe/domain/tabletop/move/move-grid';
-import { multiAngleFontScaleFactor } from '@axe/domain/tabletop/multi-angle-font-scale';
 import { RangeArea } from '@axe/domain/tabletop/range';
-import { rangeCovers } from '@axe/domain/tabletop/range-coverage';
+import { ROTATABLE_RANGE_TYPES, SINGLE_GRAB_RANGE_TYPES } from '@axe/domain/tabletop/range-coverage';
 import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
 import { ObjectPanelService } from '@axe/features/panels/object-panel.service';
 import { CreateObjectMenuService } from '@axe/features/tabletop/create-menu/create-object-menu.service';
 import { buildRangeContextMenuModel } from '@axe/features/tabletop/range/range-context-menu';
 import { halfCellSnapOf } from '@axe/features/tabletop/range/range-snap';
+import { PictureRegion } from '@axe/infrastructure/image/element-picture';
 import {
   initialRangeClip,
   paintRange,
   RangeClip,
+  rangeClipOutline,
   rangeClipPathCss,
   rangeQuadrantCells,
+  regionWithinOutline,
+  usableOutline,
 } from '@axe/infrastructure/tabletop/range/range-paint';
+import { AltitudeGuideComponent, altitudeGuideOf } from '@axe/ui/components/altitude-guide/altitude-guide.component';
 import { MovableOption } from '@axe/ui/directives/movable.directive';
 import { MovableDirective } from '@axe/ui/directives/movable.directive';
 import { RotableOption } from '@axe/ui/directives/rotable.directive';
 import { RotableDirective } from '@axe/ui/directives/rotable.directive';
 import { SelectableDirective } from '@axe/ui/directives/selectable.directive';
 import { TooltipDirective } from '@axe/ui/directives/tooltip.directive';
+import { HudPlaceDirective } from '@axe/ui/tabletop/hud-place.directive';
+import { pictureForCanvas } from '@axe/ui/tabletop/picture-for-canvas';
 import { setupInputHandler, setupMovableRotableForPiece } from '@axe/ui/tabletop/setup-tabletop-piece';
-import { translateZCss, Z_OFFSET_RANGE_PX } from '@axe/ui/tabletop/z-offset';
+
+/** The panel for choosing the character a range follows, opened by the pointer. */
+const FOLLOW_PANEL: PointerPanelBox = { width: 350, height: 200, reachLeft: 250, reachUp: 175 };
 
 @Component({
   selector: 'range',
   templateUrl: './range.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MovableDirective, TooltipDirective, RotableDirective, SelectableDirective, NgStyle],
+  imports: [
+    AltitudeGuideComponent,
+    HudPlaceDirective,
+    MovableDirective,
+    TooltipDirective,
+    RotableDirective,
+    SelectableDirective,
+  ],
   host: {
+    class: 'group',
+    '[attr.data-object-id]': 'range().identifier',
     '(dragstart)': 'onDragstart($event)',
     '(contextmenu)': 'onContextMenu($event)',
   },
 })
 export class RangeComponent {
   private readonly createMenu = inject(CreateObjectMenuService);
-  private readonly contextMenuService = inject(ContextMenuService);
   private readonly pieceContextMenu = inject(PieceContextMenuService);
   private readonly elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly panelService = inject(PanelService);
   private readonly objectPanels = inject(ObjectPanelService);
   private readonly pointerDeviceService = inject(PointerDeviceService);
-  private readonly coordinateService = inject(CoordinateService);
+  private readonly tablePick = inject(TablePickService);
   protected readonly tabletopService = inject(TabletopService);
   private readonly objectStore = inject(ObjectStore);
   private readonly inventoryService = inject(GameObjectInventoryService);
-  private readonly uiSignalService = inject(UiSignalService);
   private readonly objectChange = inject(ObjectChangeService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly translateFn = inject(TRANSLATE_FN);
-  private readonly zones = inject(EngagementZoneService);
-  private readonly vision = inject(VisionService);
   private readonly pieceTarget = inject(PieceTargetService);
 
   readonly range = input.required<RangeArea>();
 
   readonly gridCanvas = viewChild<ElementRef<HTMLCanvasElement>>('gridCanvas');
   readonly rangeCanvas = viewChild<ElementRef<HTMLCanvasElement>>('rangeCanvas');
+  private readonly cells = viewChild<ElementRef<HTMLElement>>('cells');
+
+  private readonly pieces = inject(TablePiecesService);
+  private readonly pictures = inject(PiecePicturesService);
+  private readonly standing = inject(StandingGroundService);
+  private readonly transient = inject(TransientPlacementService);
+
+  /**
+   * What the box the pointer rests on over the range's picture is cut to, as CSS: the shape the range
+   * is painted as, noted first of what is painted, in the picture's pixels, so the pointer rests on the
+   * range only over its shape; nothing for a range of its own cells, which the whole picture serves.
+   */
+  readonly pointerClipPath = computed<string | null>(() => {
+    const range = this.range();
+    const shape = this.pictures.pictureOf(range.identifier)?.pickAreas?.[0];
+    if (!shape || shape.length < 3 || range.type === 'CUSTOM') return null;
+    const px = (value: number) => `${Math.round(value * 100) / 100}px`;
+    return `polygon(${shape.map((point) => `${px(point.x)} ${px(point.y)}`).join(', ')})`;
+  });
+
+  /** What the cells are cut to now: as they were last painted, or by the range's type before the first paint. */
+  private clip(): RangeClip {
+    return this.painted() ?? initialRangeClip(this.range().type);
+  }
 
   readonly clipPath = computed<string>(() => {
     this._clipVersion();
-    const range = this.range();
-    return rangeClipPathCss(this.painted() ?? initialRangeClip(range.type), range, this.squarePx);
+    return rangeClipPathCss(this.clip(), this.range(), this.squarePx);
   });
+
+  /**
+   * The outline the cells are cut to, as {@link clipPath} cuts them, in the pixels of the box they are
+   * cut in; null where it cannot be told, as for a length that is no number, which pictures and picks
+   * the whole of the canvases as before.
+   */
+  private clipOutline(): { x: number; y: number }[] | null {
+    return usableOutline(rangeClipOutline(this.clip(), this.range(), this.squarePx));
+  }
+
+  /**
+   * Where the range is painted, as polygons in the pixels of the box its cells are cut in: its shape
+   * and each cell filled, as last painted, which a press must land in to take it; before the first
+   * paint, or where nothing that can be told was painted, what the cells are cut to.
+   */
+  private paintedAreas(): { x: number; y: number }[][] | null {
+    const painted = (this.painted()?.painted ?? [])
+      .map((area) => usableOutline(area))
+      .filter((area): area is { x: number; y: number }[] => area !== null);
+    if (painted.length > 0) return painted;
+    const outline = this.clipOutline();
+    return outline ? [outline] : null;
+  }
 
   /** What the canvases were last painted to be cut to, or nothing before the first paint. */
   private readonly painted = signal<RangeClip | null>(null);
@@ -164,7 +221,7 @@ export class RangeComponent {
     this.rangeVersion();
     const range = this.range();
     if (range.type === 'CUSTOM') return range.isRotatable === true;
-    return ['LINE', 'CORN', 'SQUARE', 'RHOMBUS', 'TRIANGLE', 'PENTAGON', 'HEXAGON'].includes(range.type);
+    return ROTATABLE_RANGE_TYPES.includes(range.type);
   });
 
   readonly isCustomRangeType = computed(() => {
@@ -174,12 +231,38 @@ export class RangeComponent {
 
   readonly usesSingleRotateGrab = computed(() => {
     this.rangeVersion();
-    return ['SQUARE', 'RHOMBUS', 'TRIANGLE', 'PENTAGON', 'HEXAGON', 'CUSTOM'].includes(this.range().type);
+    return SINGLE_GRAB_RANGE_TYPES.includes(this.range().type);
   });
 
   readonly rotateGrabDistancePx = computed(() => Math.max(1, this.length()) * this.tabletopService.squarePx());
 
   readonly singleRotateGrabX = 0;
+
+  /** The point the range turns about over a table drawn on a canvas: its own point, at its height. */
+  readonly turnPoint = computed(() => {
+    const range = this.range();
+    this.rangeVersion();
+    const foot = this.pieces.footOf(range);
+    return { ...foot, height: foot.height + this.altitude() * this.gridSize };
+  });
+
+  /**
+   * Where the range's handle stands over a table drawn on a canvas: off its point, turned as it is,
+   * and on the ground there where the range lies on the ground, as the range follows the raised ground.
+   */
+  readonly grabPoint = computed(() => {
+    const range = this.range();
+    const about = this.turnPoint();
+    const across = this.usesSingleRotateGrab() ? this.singleRotateGrabX : this.rotateGrabDistancePx();
+    const down = this.usesSingleRotateGrab() ? this.singleRotateGrabY() : 0;
+    const turn = (range.rotate * Math.PI) / 180;
+    const x = about.x + across * Math.cos(turn) - down * Math.sin(turn);
+    const y = about.y + across * Math.sin(turn) + down * Math.cos(turn);
+    const placedZ = this.transient.placed().get(range.identifier)?.z ?? range.posZ;
+    const onGround = about.surface === 'floor' && Math.abs(placedZ) < 1;
+    const height = onGround ? this.standing.heightPxAt(x, y) + this.altitude() * this.gridSize : about.height;
+    return { ...about, x, y, height };
+  });
 
   readonly singleRotateGrabY = computed(() => -Math.max(1, this.length()) * this.tabletopService.squarePx());
 
@@ -188,21 +271,18 @@ export class RangeComponent {
     return this.range().altitude;
   });
 
-  readonly isFollowed = computed(() => {
-    this.rangeVersion();
-    return this.objectStore.get(this.range().followingCharacterIdentifier) != null;
-  });
-  readonly followingCharacter = computed(() => {
-    this.rangeVersion();
-    const obj = this.objectStore.get(this.range().followingCharacterIdentifier);
-    return obj instanceof GameCharacter ? obj : null;
-  });
-  readonly elevation = this.altitude;
-  readonly textShadowCss = '0px 0px 2px #fff, 0px 0px 2px #fff, 0px 0px 2px #fff';
-
   readonly isAltitudeIndicate = computed(() => {
     this.rangeVersion();
     return this.range().isAltitudeIndicate;
+  });
+
+  /**
+   * The guide from the height the range floats at down to the face under its point, or up to one
+   * sunk under it. Nothing for a range within half a cell of the face, or one set not to show it.
+   */
+  protected readonly altitudeGuide = computed(() => {
+    if (!this.isAltitudeIndicate()) return null;
+    return altitudeGuideOf(this.pieces.footOf(this.range()), this.altitude(), this.gridSize);
   });
 
   private readonly _clipVersion = signal(0);
@@ -219,10 +299,6 @@ export class RangeComponent {
   get gridSize(): number {
     return this.tabletopService.gridSize();
   }
-  math = Math;
-
-  viewRotateX = 50;
-  readonly viewRotateZ = this.uiSignalService.tableViewRotationZ;
 
   readonly movableOption = signal<MovableOption>({});
   readonly rotableOption = signal<RotableOption>({});
@@ -235,7 +311,12 @@ export class RangeComponent {
       () => {
         if (!this._initialized) return [];
         const range = this.range();
-        return [...this.watchedIds(), range.followingCharacterIdentifier, this.currentTable.identifier];
+        return [
+          range.identifier,
+          ...collectDataElements(range.rootDataElement).map((element) => element.identifier),
+          range.followingCharacterIdentifier,
+          this.currentTable.identifier,
+        ];
       },
       (e) => {
         if (!this._initialized) return;
@@ -245,10 +326,27 @@ export class RangeComponent {
       },
       this.destroyRef
     );
+    pictureForCanvas({
+      identifier: () => this.range().identifier,
+      element: () => this.cells()?.nativeElement,
+      pictured: () => true,
+      follows: () => {
+        this.rangeVersion();
+        this.clipPath();
+        this.opacity();
+      },
+      region: (cells) => {
+        const canvases = [this.gridCanvas(), this.rangeCanvas()].map((canvas) => canvas?.nativeElement);
+        if (!canvases[0] || !canvases[1]) return null;
+        const covering = regionCovering(canvases.map((canvas) => boxWithin(canvas!, cells)));
+        const outline = this.clipOutline();
+        return (outline && regionWithinOutline(covering, outline)) ?? covering;
+      },
+      pickAreas: () => this.paintedAreas(),
+    });
     setupMovableRotableForPiece(this, {
       target: this.range,
       collideLayers: ['terrain'],
-      transformCssOffset: translateZCss(Z_OFFSET_RANGE_PX),
       snapToSquare: (range, at) =>
         squareCentreAt(this.currentTable, at) ??
         halfCellSnapOf(at, this.gridSize, {
@@ -260,11 +358,15 @@ export class RangeComponent {
         const snapXY = isHexGrid(this.currentTable.gridType) ? 0 : half;
         return { x: snapXY, y: snapXY };
       },
+      footprint: () => ({ width: this.gridSize, height: this.gridSize }),
+      freeOfGrid: (range) => range.placesFreely,
+      turnsAbout: () => this.turnPoint(),
     });
     afterNextRender(() => {
       this._initialized = true;
       this.setRange();
     });
+    this.destroyRef.onDestroy(() => this.editorSaved?.unsubscribe());
   }
 
   private readonly inputRef = setupInputHandler({
@@ -301,9 +403,9 @@ export class RangeComponent {
     if (!this.pointerDeviceService.isAllowedToOpenContextMenu) return;
     const menuPosition = this.pointerDeviceService.pointers[0];
     if (this.pieceContextMenu.openForSelection(this.range(), this.gridSize, menuPosition)) return;
-    const objectPosition = this.coordinateService.calcTabletopLocalCoordinate();
+    const objectPosition = this.tablePick.landingAtPointer();
     const menu = buildRangeContextMenuModel(
-      this.range()!,
+      this.range(),
       this.gridSize,
       objectPosition,
       this.objectStore,
@@ -315,53 +417,21 @@ export class RangeComponent {
       (r) => this.openCellEditor(r),
       (r) => this.targetInside(r)
     );
-    const display = this.tabletopService.display();
-    if (this.tabletopService.mode2d() && display.tabletopMenuStyle !== 'standard') {
-      this.contextMenuService.openRadial(
-        menuPosition,
-        menu.actions,
-        menu.radialGroups,
-        this.name(),
-        display.tabletopMenuStyle === 'radial',
-        display.radialMenuRotationSpeed,
-        multiAngleFontScaleFactor(display.multiAngleFontScale)
-      );
-      return;
-    }
-    this.contextMenuService.open(menuPosition, menu.actions, this.name());
+    this.pieceContextMenu.openPieceMenu(menuPosition, menu, this.name());
   }
 
-  /**
-   * Aims at every piece the range takes in that the reader can see, and at nothing else. A piece in an
-   * engagement zone is taken in where the range takes in the zone's centre; a piece taken out of the
-   * fight is not taken in at all.
-   */
+  /** Aims at every piece the range takes in, counted in the table's squares, and at nothing else. */
   targetInside(range: RangeArea): void {
-    const shape = {
-      type: range.type,
-      length: range.length,
-      width: range.width,
-      rotate: range.rotate,
-      origin: { x: range.location.x, y: range.location.y },
-    };
-    const reading = this.zones.reading();
-    const inside = this.objectStore
-      .getObjects<GameCharacter>(GameCharacter)
-      .filter((piece) => piece.isVisibleOnTable && piece.offField !== '1' && this.vision.isTokenVisible(piece))
-      .filter((piece) => rangeCovers(shape, this.squarePx, reading.pointOf(piece)) === true);
-    this.pieceTarget.setOnly(inside);
+    this.pieceTarget.targetInsideRange(range, this.squarePx);
   }
 
   /** Opens the panel for choosing a character for the range to follow, from the follow menu entry. */
   dockingWindowOpen() {
     const coordinate = this.pointerDeviceService.pointers[0];
     const option: PanelOption = {
-      left: coordinate.x - 250,
-      top: coordinate.y - 175,
-      width: 350,
-      height: 200,
+      title: this.translateFn('feature.tabletop.panel.rangeFollow'),
+      ...panelOptionAt(coordinate, FOLLOW_PANEL),
     };
-    option.title = this.translateFn('feature.tabletop.panel.rangeFollow');
     const range = this.range();
     this.panelService.openLazy(
       () =>
@@ -407,27 +477,25 @@ export class RangeComponent {
       rangeColor: range.rangeColor,
       isRotatable: range.isRotatable,
     });
-    editor.saved.subscribe((result) => {
+    this.editorSaved?.unsubscribe();
+    this.editorSaved = editor.saved.subscribe((result) => {
       range.cellPattern = result.cellPattern;
       range.customGridType = result.gridType;
       range.gridColor = result.gridColor;
       range.rangeColor = result.rangeColor;
       range.isRotatable = result.isRotatable;
       if (result.name) range.name = result.name;
-      this.syncLengthWidthToPattern(range);
+      range.fitToPattern();
       this.objectChange.notifyChanged(range.identifier);
       this.setRange();
     });
   }
 
-  private syncLengthWidthToPattern(range: RangeArea): void {
-    const cells = parseCellPattern(range.cellPattern);
-    const bb = cellPatternBoundingBox(cells);
-    const lengthEl = range.commonDataElement?.getFirstElementByName('length');
-    const widthEl = range.commonDataElement?.getFirstElementByName('width');
-    if (lengthEl) lengthEl.value = Math.max(1, bb.height);
-    if (widthEl) widthEl.value = Math.max(1, bb.width);
-  }
+  /**
+   * What the shape editor last opened says on saving, let go of with the range, so an editor
+   * outliving it paints nothing on canvases that are gone.
+   */
+  private editorSaved: OutputRefSubscription | null = null;
 
   private showDetail(gameObject: RangeArea) {
     const title = sheetPanelTitle(this.translateFn('feature.tabletop.panel.range'), gameObject.name);
@@ -451,4 +519,24 @@ export class RangeComponent {
     );
     this._clipVersion.update((v) => v + 1);
   }
+}
+
+/** Where an element lies within an ancestor laid out round it, in the ancestor's own pixels. */
+function boxWithin(element: HTMLElement, ancestor: HTMLElement): PictureRegion {
+  let left = 0;
+  let top = 0;
+  for (let at: HTMLElement | null = element; at && at !== ancestor; at = at.offsetParent as HTMLElement | null) {
+    left += at.offsetLeft;
+    top += at.offsetTop;
+  }
+  return { left, top, width: element.offsetWidth, height: element.offsetHeight };
+}
+
+/** The smallest box round all the boxes given. */
+function regionCovering(boxes: readonly PictureRegion[]): PictureRegion {
+  const left = Math.min(...boxes.map((box) => box.left));
+  const top = Math.min(...boxes.map((box) => box.top));
+  const right = Math.max(...boxes.map((box) => box.left + box.width));
+  const bottom = Math.max(...boxes.map((box) => box.top + box.height));
+  return { left, top, width: right - left, height: bottom - top };
 }

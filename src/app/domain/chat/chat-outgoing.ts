@@ -36,6 +36,8 @@ export interface ChatOutgoing {
    * absent for a line of words.
    */
   stamp?: OutgoingStamp;
+  /** The number the reader picked to fill a `{目標値}` in the line with; absent to fill it with the one found. */
+  targetNumber?: number;
   /** Who the line is said as, where not the piece it is sent from. */
   speakAs?: ChatSpeakAs;
 }
@@ -71,6 +73,7 @@ export interface ChatOutgoingDraft {
   toTicker: boolean;
   stamp?: OutgoingStamp;
   speakAs?: ChatSpeakAs;
+  targetNumber?: number;
 }
 
 /**
@@ -95,6 +98,7 @@ export function composeChatOutgoing(draft: ChatOutgoingDraft): ChatOutgoing {
     toTicker: draft.toTicker,
     ...(draft.stamp ? { stamp: draft.stamp } : {}),
     ...(draft.speakAs ? { speakAs: draft.speakAs } : {}),
+    ...(draft.targetNumber != null ? { targetNumber: draft.targetNumber } : {}),
   };
 }
 

@@ -1,10 +1,13 @@
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
 import { SyncObject, SyncVar } from '@axe/core/sync/decorator';
+import { GameObject } from '@axe/core/sync/game-object';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { clamp } from '@axe/core/util/clamp';
 import { generateUuid } from '@axe/core/util/uuid';
 import { BuffManager } from '@axe/domain/character/buff-manager';
 import { CharacterTemplateFactory } from '@axe/domain/character/character-template-factory';
+import { saidNameOf } from '@axe/domain/character/hidden-name';
 import { shownImageIdentifier } from '@axe/domain/character/shown-image';
 import { StatusAccessor } from '@axe/domain/character/status-accessor';
 import { BuffPalette, ChatPalette, SubPalette } from '@axe/domain/chat/chat-palette';
@@ -20,6 +23,7 @@ import {
 } from '@axe/domain/data/data-element';
 import { migrateLegacyBustPortraitFits } from '@axe/domain/media/cut-in-portrait-fit';
 import { OwnedTabletopObject } from '@axe/domain/tabletop/owned-tabletop-object';
+import { isPartOf } from '@axe/domain/tabletop/ride/ride-rules';
 import { moveToBottommost, moveToTopmost } from '@axe/domain/tabletop/tabletop-object-util';
 import {
   asVisionShape,
@@ -44,6 +48,39 @@ import {
 
 /** The name the memo kept with a piece goes by, as another fork names it. */
 const INNER_NOTE_NAME = 'inner-note';
+
+/**
+ * How wide a cell of the table being viewed is, in table pixels: read off the room's table selecter
+ * and the table it names, or the first table where it names none, as the selecter reads it, by their
+ * identifiers and names, without the classes, which would make the piece depend on the table and the
+ * table, through its lights, on the piece. 50 where there is no table yet.
+ */
+function viewedCellPx(): number {
+  const selecter = ObjectStore.instance.get('TableSelecter') as { viewTableIdentifier?: unknown } | null;
+  const named = ObjectStore.instance.get(`${selecter?.viewTableIdentifier ?? ''}`) as { gridSize?: unknown } | null;
+  const table = named ?? (ObjectStore.instance.getObjects('game-table')[0] as { gridSize?: unknown } | undefined);
+  const cell = Number(table?.gridSize);
+  return cell > 0 ? cell : 50;
+}
+
+/** How far a piece's middle is from its corner, in table pixels, across and down alike. */
+function middleOffsetPx(piece: GameCharacter, cellPx: number): number {
+  const size = Number(piece.size);
+  return ((size > 0 ? size : 0) * cellPx) / 2;
+}
+
+/** Stands a part on its body, middle on middle, as a move of the body stands its parts. */
+function standOnBody(part: GameCharacter, body: GameCharacter): void {
+  const cellPx = viewedCellPx();
+  const offset = middleOffsetPx(body, cellPx) - middleOffsetPx(part, cellPx);
+  part.location.x = body.location.x + offset;
+  part.location.y = body.location.y + offset;
+}
+
+/** The name of the sheet section that holds where a character's portrait stands. */
+export const PORTRAIT_POSITION_SECTION = '立ち絵位置';
+/** The name of the sheet section that holds which of a character's pictures its piece shows. */
+export const KOMA_IMAGE_SECTION = 'コマ画像';
 
 @SyncObject('character')
 export class GameCharacter extends OwnedTabletopObject {
@@ -122,8 +159,26 @@ export class GameCharacter extends OwnedTabletopObject {
   @SyncVar() grabbedBy: string = '';
   /** The mount the piece rides, as its identifier, or empty: it stands on that mount and goes where it goes. */
   @SyncVar() ridingOn: string = '';
-  /** Where the piece rides its mount: empty in front, `passenger` behind, `cargo` carried as a load. */
+  /**
+   * Where the piece rides its mount: empty in front, `passenger` behind, `cargo` carried as a load,
+   * or `part` where it is a part of the piece it rides, as a head is of a creature of many parts.
+   */
   @SyncVar() rideSeat: string = '';
+  /**
+   * For a part, where its own picture is laid over its body's, as `partLayerOf` reads it: empty for
+   * none. The body is drawn with the picture of each of its parts laid over its own, but a lost one.
+   */
+  @SyncVar() partLayer: string = '';
+  /**
+   * For a part, the piece of its body's picture it stands for, as `partMaskOf` reads it: empty for
+   * none. A lost part's piece is cut out of the body's picture.
+   */
+  @SyncVar() partMask: string = '';
+  /**
+   * For a part, the faces of its body's model it stands for, as `keptPartFaces` keeps them with the
+   * model they were picked on: empty for none. A lost part's faces are left out of the body's model.
+   */
+  @SyncVar() partFaces: string = '';
   /** `1` while the piece is a mount others may ride; empty otherwise. */
   @SyncVar() mountable: string = '';
   /** `1` where a mount takes a second rider behind the one in front; empty otherwise. */
@@ -167,13 +222,26 @@ export class GameCharacter extends OwnedTabletopObject {
    * or anything but a positive number, keeps the picture's own proportions.
    */
   @SyncVar() komaImageWidth: number = 0;
+  /**
+   * The 3D model the piece is drawn as on a table drawn on a canvas, in place of its picture, by the
+   * identifier it is kept under; empty for none. Read it, with the four after it, through
+   * `pieceModelOf`, as a peer that has never heard of models sends none of the five.
+   */
+  @SyncVar() modelIdentifier: string = '';
+  /** How many times larger than the piece's footprint its model is drawn; empty for the footprint itself. */
+  @SyncVar() modelScale: string = '';
+  /** How far its model is turned from the way the piece faces, in degrees clockwise; empty for not at all. */
+  @SyncVar() modelTurn: string = '';
+  /** The motion its model plays standing still, by name; empty for the model's own. */
+  @SyncVar() modelIdle: string = '';
+  /** The motion its model plays walking, by name; empty for the model's own. */
+  @SyncVar() modelWalk: string = '';
 
   @SyncVar() chatColorCode: string[] = [...DEFAULT_CHAT_COLOR_CODES];
   /** The bubble each colour is shown on, per theme. An empty entry is worked out instead. */
   @SyncVar() chatBubbleLight: string[] = [...DEFAULT_CHAT_BUBBLE_CODES];
   @SyncVar() chatBubbleDark: string[] = [...DEFAULT_CHAT_BUBBLE_CODES];
   @SyncVar() overViewDataTags: string[] = [];
-  @SyncVar() syncDummyCounter: number = 0;
   /**
    * How each of the character's portraits sits in a cut-in's portrait slot, as
    * `cut-in-portrait-fit.ts` writes it. Empty leaves every portrait to the cut-in's own framing.
@@ -233,7 +301,7 @@ export class GameCharacter extends OwnedTabletopObject {
     this.addExtendData();
     const element = this.detailDataElement?.getFirstElementByName('POS');
     if (!element) return;
-    element.currentValue = Math.max(0, Math.min(VN_PORTRAIT_SLOT_COUNT - 1, Math.round(pos)));
+    element.currentValue = clamp(Math.round(pos), 0, VN_PORTRAIT_SLOT_COUNT - 1);
     this.update();
   }
 
@@ -406,6 +474,68 @@ export class GameCharacter extends OwnedTabletopObject {
     return this.getElement('buff');
   }
 
+  /** Whether the piece is written down as a part of another, wherever that one is. */
+  get isWrittenAsPart(): boolean {
+    return isPartOf({ id: this.identifier, ridingOn: this.ridingOn, rideSeat: this.rideSeat });
+  }
+
+  /**
+   * The pieces written down as parts of this one that stand in the same place as it, the table, an
+   * inventory, the graveyard or out of sight: those that go with it as one piece. None for a part.
+   */
+  partsAlong(): GameCharacter[] {
+    if (this.isWrittenAsPart) return [];
+    const here = this.location.name;
+    return ObjectStore.instance
+      .getObjects(GameCharacter)
+      .filter(
+        (piece) =>
+          piece !== this && piece.ridingOn === this.identifier && piece.isWrittenAsPart && piece.location.name === here
+      );
+  }
+
+  /**
+   * Moves the piece to a named place, and its parts that stood where it stood with it, so a creature
+   * of many parts leaves the table, is put away or out of sight, and comes back, whole. A part that
+   * comes to where its body stands, along with it or on its own, is stood on its body, middle on
+   * middle, and so is one that came to the table ahead of it, unless held fast where it stands. All of
+   * it is told together, so every seat has the parts where the body is drawn, rather than where they
+   * were left.
+   */
+  override setLocation(location: string): void {
+    GameObject.batch(() => {
+      const moves = location !== this.location.name;
+      const parts = moves ? this.partsAlong() : [];
+      if (moves && this.isWrittenAsPart) {
+        const body = ObjectStore.instance.get(this.ridingOn);
+        if (body instanceof GameCharacter && body.location.name === location) standOnBody(this, body);
+      }
+      super.setLocation(location);
+      for (const part of parts) part.setLocation(location);
+      if (!moves || this.isWrittenAsPart || location !== 'table') return;
+      for (const part of this.partsAlong()) {
+        if (parts.includes(part) || part.heldFast === '1') continue;
+        standOnBody(part, this);
+        part.update();
+      }
+    });
+  }
+
+  /** Takes the piece out of the room, and its parts that stood where it stood with it. */
+  override destroy(): void {
+    const parts = this.partsAlong();
+    super.destroy();
+    for (const part of parts) part.destroy();
+  }
+
+  /**
+   * Sends the chat colours on to the room after one of them was written in place. The three lists
+   * are changed slot by slot rather than assigned, which on its own sends nothing.
+   */
+  touchChatColors(): void {
+    this.update();
+  }
+
   /** Raises the piece above the other pieces it overlaps on the table. */
   toTopmost() {
     moveToTopmost(this);
@@ -450,7 +580,7 @@ export class GameCharacter extends OwnedTabletopObject {
    * and cached.
    */
   get status(): StatusAccessor {
-    return (this._status ??= new StatusAccessor(this.detailDataElement ?? null, () => this.name));
+    return (this._status ??= new StatusAccessor(this.detailDataElement ?? null, () => saidNameOf(this)));
   }
 
   /**
@@ -525,67 +655,39 @@ export class GameCharacter extends OwnedTabletopObject {
     const detail = this.detailDataElement;
     if (!detail) return;
 
-    const portraitPosEl = detail.getElementsByName('立ち絵位置');
-    if (portraitPosEl.length == 0) {
-      const testElement: DataElement = this.createDetailSectionElement('立ち絵位置', `立ち絵位置${this.identifier}`);
-      const groupElement: DataElement = this.createDetailGroupElement('基本', `立ち絵位置基本${this.identifier}`);
-      detail.appendChild(testElement);
-      testElement.appendChild(groupElement);
-      groupElement.appendChild(
-        DataElement.create(
-          'POS',
-          11,
-          {
-            [DataElementAttribute.ROLE]: DataElementRole.FIELD,
-            type: DataElementType.NUMBER_RESOURCE,
-            currentValue: '0',
-          },
-          `POS_${this.identifier}`
-        )
-      );
-    }
-
-    const iconNum = detail.getElementsByName('コマ画像');
-    if (iconNum.length == 0) {
-      const elementKoma: DataElement = this.createDetailSectionElement('コマ画像', `コマ画像${this.identifier}`);
-      const groupElement: DataElement = this.createDetailGroupElement('基本', `コマ画像基本${this.identifier}`);
-      detail.appendChild(elementKoma);
-
-      //puts the piece picture in after the portrait
-      const portraitPosEls = detail.getElementsByName('立ち絵位置');
-      if (portraitPosEls.length != 0) {
-        const parentElement = portraitPosEls[0].parent;
-        if (!parentElement) return;
-        const index: number = parentElement.children.indexOf(portraitPosEls[0]);
-        if (index < parentElement.children.length - 1) {
-          const nextElement = parentElement.children[index + 1];
-
-          parentElement.insertBefore(elementKoma, nextElement);
-        }
-      }
-      elementKoma.appendChild(groupElement);
-      groupElement.appendChild(
-        DataElement.create(
-          'ICON',
-          (this.imageDataElement?.children.length ?? 1) - 1,
-          {
-            [DataElementAttribute.ROLE]: DataElementRole.FIELD,
-            type: DataElementType.NUMBER_RESOURCE,
-            currentValue: 0,
-          },
-          `ICON_${this.identifier}`
-        )
-      );
-    }
+    this.ensureDetailSection(detail, PORTRAIT_POSITION_SECTION, null, () =>
+      DataElement.create(
+        'POS',
+        11,
+        {
+          [DataElementAttribute.ROLE]: DataElementRole.FIELD,
+          type: DataElementType.NUMBER_RESOURCE,
+          currentValue: '0',
+        },
+        `POS_${this.identifier}`
+      )
+    );
+    this.ensureDetailSection(detail, KOMA_IMAGE_SECTION, PORTRAIT_POSITION_SECTION, () =>
+      DataElement.create(
+        'ICON',
+        (this.imageDataElement?.children.length ?? 1) - 1,
+        {
+          [DataElementAttribute.ROLE]: DataElementRole.FIELD,
+          type: DataElementType.NUMBER_RESOURCE,
+          currentValue: 0,
+        },
+        `ICON_${this.identifier}`
+      )
+    );
 
     const buff = this.buffDataElement;
     if (!buff) return;
     const isbuff = buff.getElementsByName('バフ/デバフ');
-    if (isbuff.length == 0) {
+    if (isbuff.length === 0) {
       const buffElement: DataElement = DataElement.create('バフ/デバフ', '', {}, `バフ/デバフ${this.identifier}`);
       buff.appendChild(buffElement);
     }
-    if (this.remoteController == null) {
+    if (this.remoteController === null) {
       const controller: BuffPalette = new BuffPalette(`RemotController_${this.identifier}`);
       controller.setPalette(`コントローラ入力例：
 マッスルベアー DB+2 3
@@ -683,6 +785,29 @@ export class GameCharacter extends OwnedTabletopObject {
     return child.fieldRole === DataElementRole.FIELD || child.children.length === 0;
   }
 
+  /**
+   * Adds a section of this name to the detail, holding one group `基本` with the field `makeField`
+   * makes, unless the detail already has a section of that name. The section goes at the end, or
+   * right after the first section named `after` when there is one.
+   */
+  private ensureDetailSection(
+    detail: DataElement,
+    name: string,
+    after: string | null,
+    makeField: () => DataElement
+  ): void {
+    if (detail.getElementsByName(name).length > 0) return;
+    const section = this.createDetailSectionElement(name, `${name}${this.identifier}`);
+    const group = this.createDetailGroupElement('基本', `${name}基本${this.identifier}`);
+    detail.appendChild(section);
+    const previous = after ? detail.getElementsByName(after)[0] : undefined;
+    const parent = previous?.parent;
+    const next = parent ? parent.children[parent.children.indexOf(previous) + 1] : undefined;
+    if (parent && next) parent.insertBefore(section, next);
+    section.appendChild(group);
+    group.appendChild(makeField());
+  }
+
   private createDetailSectionElement(name: string, identifier?: string): DataElement {
     return DataElement.create(
       name,
@@ -734,7 +859,7 @@ export class GameCharacter extends OwnedTabletopObject {
     let res = cloneObject.name.match(reg);
 
     let cloneNumber: number;
-    if (res != null && res.length == 3) {
+    if (res !== null && res.length === 3) {
       objectname = res[1];
       cloneNumber = parseInt(res[2]) + 1;
     } else {
@@ -744,10 +869,10 @@ export class GameCharacter extends OwnedTabletopObject {
 
     const list = ObjectStore.instance.getObjects(GameCharacter);
     for (const character of list) {
-      if (character.location.name == 'graveyard') continue;
+      if (character.location.name === 'graveyard') continue;
 
       res = character.name.match(reg);
-      if (res != null && res.length == 3 && res[1] == objectname) {
+      if (res !== null && res.length === 3 && res[1] === objectname) {
         const numberChk = parseInt(res[2]) + 1;
         if (cloneNumber <= numberChk) {
           cloneNumber = numberChk;

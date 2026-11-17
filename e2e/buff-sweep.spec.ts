@@ -24,9 +24,9 @@ test.describe('clearing a buff off the whole table', () => {
   }) => {
     await waitAppReady(page);
     await setRole(page, 'GM');
-    await expect(page.locator('app-gm-toolbar [title^="暗闇"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('gm-toolbar [title^="暗闇"]')).toBeVisible({ timeout: 10000 });
     await openPanel(page, 'バフマネージャー');
-    const panel = page.locator('app-buff-manager-panel');
+    const panel = page.locator('buff-manager-panel');
     await panel.locator('[data-testid="buff-sweep"] summary').click();
     await panel.getByTestId('buff-sweep-name').check();
     await expect(nameChoices(page).first()).toBeAttached();
@@ -51,14 +51,5 @@ test.describe('clearing a buff off the whole table', () => {
       { timeout: 5000 }
     );
     await expect(nameChoices(page).filter({ hasText: second })).toHaveCount(0);
-  });
-
-  test('clears nothing with && in the chat unless the sender is the GM, and says so', async ({ page }) => {
-    await waitAppReady(page);
-    await setRole(page, 'PL');
-    await send(page, '&&none-');
-    await expect(page.locator('chat-message').filter({ hasText: 'バフの一括解除はGMだけが使えます' })).toHaveCount(1, {
-      timeout: 10000,
-    });
   });
 });

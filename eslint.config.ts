@@ -1,5 +1,6 @@
 import eslint from '@eslint/js';
 import angular from 'angular-eslint';
+import type { Linter } from 'eslint';
 import { defineConfig } from 'eslint/config';
 import betterTailwindcss from 'eslint-plugin-better-tailwindcss';
 import prettierPlugin from 'eslint-plugin-prettier/recommended';
@@ -106,9 +107,13 @@ const FEATURE_DEPENDENCIES: Record<string, readonly string[]> = {
 
 /* Angular builds the services, components, directives and pipes, so they take the app's singletons
    through inject() (bridged in composition/class-provider.ts) rather than reading them off the class.
-   The synced singletons (Config, ChatTabList, DataSummarySetting, TurnState) are left out on purpose:
-   their `instance` answers for whichever object stands in the room at the time, which an injected
-   copy would not follow. */
+   The two IndexedDB stores bridged there are not listed: they are provided under the abstract
+   `RoomSnapshotStore` and `ReplayLogStore`, and nothing built by Angular reads their own `instance`.
+   The synced singletons (SYNCED_SINGLETONS below) are left out on purpose: their `instance` answers
+   for whichever object stands in the room at the time, which an injected copy would not follow, so
+   inject() of one is reported instead. Network is left out as well: it is reached mostly through its
+   statics (`Network.peerId`, `Network.transport`), which an injected copy does not carry, so its
+   `instance` is read beside them. */
 const PROCESS_SINGLETONS = [
   'AssetHttpStore',
   'AudioSharingSystem',
@@ -116,10 +121,14 @@ const PROCESS_SINGLETONS = [
   'FileArchiver',
   'ImageSharingSystem',
   'ImageStorage',
+  'ModelSharingSystem',
+  'ModelStorage',
   'ObjectFactory',
   'ObjectSerializer',
   'ObjectStore',
   'ObjectSynchronizer',
+  'SkinImageStore',
+  'StartRoomStore',
   'VideoEncoderGateway',
 ];
 
@@ -142,6 +151,19 @@ function assertNoCycle(dependencies: Record<string, readonly string[]>): void {
 }
 assertNoCycle(FEATURE_DEPENDENCIES);
 
+/* The room's synced singletons, read through `instance` everywhere and never provided for inject(). */
+const SYNCED_SINGLETONS = [
+  'ChatTabList',
+  'Config',
+  'DataSummarySetting',
+  'StatusAilmentCatalog',
+  'TableSelecter',
+  'TurnState',
+];
+const NO_SYNCED_SINGLETON_INJECT = {
+  selector: `CallExpression[callee.name='inject'][arguments.0.name=/^(${SYNCED_SINGLETONS.join('|')})$/]`,
+  message: '部屋に同期される単一物は`inject()`で受けず`.instance`で読む（部屋の物が差し替わっても今の物を引く）',
+};
 const NO_SINGLETON_INSTANCE = {
   selector: `MemberExpression[object.name=/^(${PROCESS_SINGLETONS.join('|')})$/][property.name='instance']`,
   message:
@@ -153,7 +175,7 @@ const ANGULAR_CLASS_FILES = '*.{service,component,directive,pipe}.ts';
    its source instead (`\x2F` is a slash, which an esquery regex may not hold). panels opens every
    feature's panel lazily by design, and is left out of this. A later block overrides the same rule,
    so the Angular-built classes of a feature get both selectors in one block. */
-const FEATURE_RULES = Object.entries(FEATURE_DEPENDENCIES).flatMap(([feature, allowed]) => {
+const FEATURE_RULES = Object.entries(FEATURE_DEPENDENCIES).flatMap(([feature, allowed]): Linter.Config[] => {
   const reachable = [feature, 'panels', ...allowed].join('|');
   const lazyImports =
     feature === 'panels'
@@ -181,13 +203,13 @@ const FEATURE_RULES = Object.entries(FEATURE_DEPENDENCIES).flatMap(([feature, al
             ],
           },
         ],
-        'no-restricted-syntax': ['error', ...lazyImports],
+        'no-restricted-syntax': ['error', ...lazyImports, NO_SYNCED_SINGLETON_INJECT],
       },
     },
     {
       files: [`src/app/features/${feature}/**/${ANGULAR_CLASS_FILES}`],
       ignores: [`src/app/features/${feature}/**/*.spec.ts`],
-      rules: { 'no-restricted-syntax': ['error', ...lazyImports, NO_SINGLETON_INSTANCE] },
+      rules: { 'no-restricted-syntax': ['error', ...lazyImports, NO_SINGLETON_INSTANCE, NO_SYNCED_SINGLETON_INJECT] },
     },
   ];
 });
@@ -209,6 +231,7 @@ export default defineConfig([
       '@angular-eslint/no-input-rename': 'off',
       '@angular-eslint/no-output-rename': 'off',
       'no-irregular-whitespace': ['error', { skipStrings: true, skipTemplates: true, skipComments: true }],
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
       '@typescript-eslint/no-unused-vars': 'off',
       'no-restricted-imports': ['error', { patterns: [NO_RELATIVE_IMPORT] }],
       'unused-imports/no-unused-imports': 'warn',
@@ -261,9 +284,14 @@ export default defineConfig([
     },
   },
   {
-    files: [`src/app/{application,ui}/**/${ANGULAR_CLASS_FILES}`],
+    files: ['src/app/{application,ui,composition}/**/*.ts', 'src/app/*.ts'],
     ignores: ['src/app/**/*.spec.ts'],
-    rules: { 'no-restricted-syntax': ['error', NO_SINGLETON_INSTANCE] },
+    rules: { 'no-restricted-syntax': ['error', NO_SYNCED_SINGLETON_INJECT] },
+  },
+  {
+    files: [`src/app/{application,ui,composition}/**/${ANGULAR_CLASS_FILES}`],
+    ignores: ['src/app/**/*.spec.ts'],
+    rules: { 'no-restricted-syntax': ['error', NO_SINGLETON_INSTANCE, NO_SYNCED_SINGLETON_INJECT] },
   },
   ...FEATURE_RULES,
   /* composition root: may depend on every layer (features included).
@@ -331,9 +359,7 @@ export default defineConfig([
       },
     },
   },
-  /* Relative imports are allowed under the e2e/ directory (e2e has no path aliases set up, and the
-     Playwright config refers to a tsconfig of its own, so there is no need to keep it apart from
-     src). */
+  /* Relative imports are allowed under the e2e/ directory: e2e has no path aliases set up. */
   {
     files: ['e2e/**/*.ts'],
     rules: {
