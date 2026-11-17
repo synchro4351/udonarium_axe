@@ -22,6 +22,7 @@ import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { DataElement } from '@axe/domain/data/data-element';
 import { Jukebox } from '@axe/domain/media/jukebox';
+import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
@@ -803,6 +804,32 @@ describe('StartRoomService', () => {
       expect(ObjectStore.instance.get('MainTab')).toBeNull();
       expect(ObjectStore.instance.get('testCharacter_1')).toBeNull();
       expect(sample).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('making the table yield to the room joined', () => {
+    beforeEach(() => {
+      if (!PeerCursor.myCursor) PeerCursor.createMyCursor();
+      for (let i = 0; i < 5; i++) Config.instance.update();
+    });
+
+    it("puts every object of the table but the seat's own back to no changes, so the room's own wins", () => {
+      const cursorVersion = PeerCursor.myCursor.majorVersion;
+      expect(Config.instance.majorVersion).toBeGreaterThan(0);
+
+      service.putAwayForJoin();
+
+      expect(Config.instance.majorVersion).toBe(0);
+      expect(PeerCursor.myCursor.majorVersion).toBe(cursorVersion);
+    });
+
+    it('leaves a table already shared with a room as it is', () => {
+      vi.spyOn(Network, 'peerContexts', 'get').mockReturnValue([{ peerId: 'someone' }] as never);
+      const version = Config.instance.majorVersion;
+
+      service.putAwayForJoin();
+
+      expect(Config.instance.majorVersion).toBe(version);
     });
   });
 });

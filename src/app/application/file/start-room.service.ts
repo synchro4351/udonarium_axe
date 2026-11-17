@@ -213,6 +213,7 @@ export class StartRoomService {
       .map((identifier) => this.objectStore.get(identifier))
       .filter((object): object is GameObject => object !== null);
     if (held.length > 0) this.setAside = [...(this.setAside ?? []), ...takeOutQuietly(held)];
+    this.yieldTableForJoin();
     let over = false;
     return (joined) => {
       if (over) return;
@@ -228,6 +229,25 @@ export class StartRoomService {
         this.letGo();
       } else this.comeBackIfOutside();
     };
+  }
+
+  /**
+   * Makes what is left of the table this seat set out alone yield to the room it is going into
+   * (tyoitashi). Every seat sets out the room's settings and table under the same names, and the room
+   * joined takes whatever of this seat's has seen more changes than its own: the settings of a room
+   * read from a file, with few changes behind them, lost to a page just opened, and the room went back
+   * to the page's settings. Every object of the table but the seat's own cursor and bar is put back to
+   * no changes at all, so the room's own always wins; what the room does not hold still goes in with
+   * the seat. Only the count changes, so nothing is told to anybody, and a seat already sharing its
+   * table is left alone.
+   */
+  private yieldTableForJoin(): void {
+    if (!hasTableToItself()) return;
+    for (const object of this.objectStore.getObjects<GameObject>()) {
+      if (this.objectStore.get(object.identifier) !== object || isOrSitsUnder(object, isSeatOwnKind)) continue;
+      // Only the count changes, so what a kind does on taking in a change from a peer is not done.
+      GameObject.prototype.apply.call(object, { ...object.toContext(), majorVersion: 0, minorVersion: 0 });
+    }
   }
 
   /**
