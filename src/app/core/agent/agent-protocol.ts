@@ -25,6 +25,10 @@ export const AGENT_TRUSTED_ORIGINS: readonly string[] = [
   'https://axe.xelltis.com',
   'https://trpg.savage-tribe.com',
   'https://trpg2.savage-tribe.com',
+  // tyoitashi's sites, so its bridge needs no --allow-origin for them.
+  'https://udonarium.synwork.work',
+  'https://udonarium-room.synwork.work',
+  'https://udonarium-trial.synwork.work',
   'http://localhost:4200',
   'http://127.0.0.1:4200',
   'http://localhost:4300',

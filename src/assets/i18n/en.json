@@ -245,7 +245,7 @@
       },
       "setup": {
         "heading": "Starting the bridge",
-        "download": "Get axe-mcp.mjs from the releases (Node.js 22 or later is needed).",
+        "download": "Download axe-mcp.mjs, tyoitashi's bridge, from this site (it needs Node.js 22 or later). The official bridge does not connect to this Axe.",
         "key": "To run it on Claude, create an API key in the Claude Console. A key of a workspace with a spending limit is recommended. Never paste the key into chat or this panel.",
         "start": "Start the bridge with the key in an environment variable (macOS and Linux)",
         "powerShell": "In Windows PowerShell",
@@ -289,7 +289,7 @@
       },
       "setup": {
         "heading": "How to connect",
-        "download": "Download axe-mcp.mjs from the release page (it runs on Node.js 22 or later).",
+        "download": "Download axe-mcp.mjs, tyoitashi's bridge, from this site (it needs Node.js 22 or later). The official bridge does not connect to this Axe.",
         "claudeCode": "In Claude Code, run this (with the path where you saved it).",
         "claudeDesktop": "In Claude Desktop, add this to mcpServers in the settings file.",
         "connect": "Start the AI, then press Connect in this panel. In Claude Code, type /mcp__axe__run_session to have it run the session as the GM. In an app that cannot pick prompts, ask the AI to \"read axe://guide/run-session and be the GM\".",
