@@ -118,6 +118,11 @@ describe('LinkHeartbeat', () => {
     expect(heartbeat.roundTripMs).toBe(0);
   });
 
+  it('finds a link gone silent within twenty seconds, however the silence falls', () => {
+    expect(PING_INTERVAL_MS + PONG_TIMEOUT_MS).toBeLessThanOrEqual(20_000);
+    expect(PONG_TIMEOUT_MS).toBeGreaterThan(WATCHED_PING_INTERVAL_MS);
+  });
+
   it('keeps pinging while one ping waits, so one left unanswered ends no link, and times an answer from the last', () => {
     welcomed = true;
     const socket = openSocket();

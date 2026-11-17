@@ -1,15 +1,23 @@
 import { PING } from '@axe/core/network/server/server-protocol';
 
-/** How long a connection waits between asking whether the server is still there. */
-export const PING_INTERVAL_MS = 25_000;
+/**
+ * How long a connection waits between asking whether the server is still there. Short, so a link gone
+ * silent on a weak line is found in seconds rather than half a minute (tyoitashi; 25 s upstream).
+ */
+export const PING_INTERVAL_MS = 10_000;
 /**
  * How long it waits between asking while somebody looks at how the link is doing, to tell how long
  * an answer takes: longer than the 5 seconds a room server passing pings on to another instance waits
  * before it passes on the next, so that none goes unanswered.
  */
 export const WATCHED_PING_INTERVAL_MS = 6_000;
-/** How long it waits for any answer to that before it takes the connection as lost. */
-export const PONG_TIMEOUT_MS = 10_000;
+/**
+ * How long it waits for any answer to that before it takes the connection as lost: longer than the
+ * pings are apart while the link is watched, so one left unanswered is followed by another in time,
+ * and than the 5 seconds a room server passing pings on to another instance may hold one
+ * (tyoitashi; 10 s upstream).
+ */
+export const PONG_TIMEOUT_MS = 8_000;
 /**
  * How long a connection waits to be let into the room after it says hello before it takes the
  * connection as lost: longer than a room server spread over instances looks for the one holding
