@@ -86,6 +86,8 @@ export interface GameCharacterContextMenuCallbacks {
   hand?: { held: boolean; set?: (held: boolean) => void };
   /** Opens a first-person view from the piece. Left out where it may not be viewed from. */
   onViewFirstPerson?: () => void;
+  /** Starts measuring from the piece with the ruler. Left out for a seat that has no ruler, as one watching. */
+  onMeasureFrom?: () => void;
   /** Shares the first-person view with the room. Left out for anyone but the GM. */
   onShareFirstPerson?: () => void;
   /** Stops sharing the first-person view with the room. Left out when another piece is shared. */
@@ -382,6 +384,9 @@ export function buildGameCharacterContextMenuModel(
       name: (char.showVisionRange ? '✔ ' : '') + t('feature.character.contextMenu.showVisionRange'),
       action: () => (char.showVisionRange = !char.showVisionRange),
     },
+    ...(callbacks.onMeasureFrom
+      ? [{ name: t('feature.character.contextMenu.measureFrom'), action: () => callbacks.onMeasureFrom?.() }]
+      : []),
     ...(callbacks.onViewFirstPerson
       ? [{ name: t('feature.character.contextMenu.viewFirstPerson'), action: () => callbacks.onViewFirstPerson?.() }]
       : []),
