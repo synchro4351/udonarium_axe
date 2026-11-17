@@ -432,19 +432,66 @@ describe('NetworkEventHandlerService', () => {
     expect(chatStub.sendSystemNotice.mock.calls[0][1]).toContain('feature.lobby.peerReconnect.failed');
   });
 
-  it('tells the reader alone, naming the room server, when the link to it drops and comes back', () => {
+  it('tells the reader alone, naming the room server, when the link to it stays down a while and comes back', () => {
+    vi.useFakeTimers();
     vi.spyOn(Network, 'peerId', 'get').mockReturnValue('my-seat');
     vi.spyOn(Network, 'authorityPeerId', 'get').mockReturnValue('@authority');
     const shown = vi.spyOn(TestBed.inject(SnackbarService), 'show').mockImplementation(() => {});
 
-    stubChange.peerReconnect$.emit({ peerId: 'my-seat', state: 'retrying' });
-    stubChange.peerReconnect$.emit({ peerId: 'my-seat', state: 'recovered' });
+    try {
+      stubChange.peerReconnect$.emit({ peerId: 'my-seat', state: 'retrying' });
+      expect(shown).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(NetworkEventHandlerService.SERVER_DROP_QUIET_MS);
+      stubChange.peerReconnect$.emit({ peerId: 'my-seat', state: 'recovered' });
 
-    expect(shown.mock.calls.map(([text]) => text)).toEqual([
-      '部屋のサーバーとの接続が切れました。再接続しています…',
-      '部屋のサーバーとの接続を復旧しました。',
-    ]);
-    expect(chatStub.sendSystemNotice).not.toHaveBeenCalled();
+      expect(shown.mock.calls.map(([text]) => text)).toEqual([
+        '部屋のサーバーとの接続が切れました。再接続しています…',
+        '部屋のサーバーとの接続を復旧しました。',
+      ]);
+      expect(chatStub.sendSystemNotice).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('tells nothing of a link to the room server that comes back within seconds, lighting the lamp meanwhile', () => {
+    vi.useFakeTimers();
+    vi.spyOn(Network, 'peerId', 'get').mockReturnValue('my-seat');
+    vi.spyOn(Network, 'authorityPeerId', 'get').mockReturnValue('@authority');
+    const shown = vi.spyOn(TestBed.inject(SnackbarService), 'show').mockImplementation(() => {});
+    const handler = TestBed.inject(NetworkEventHandlerService);
+
+    try {
+      stubChange.peerReconnect$.emit({ peerId: 'my-seat', state: 'retrying' });
+      expect(handler.serverLinkDown()).toBe(true);
+      vi.advanceTimersByTime(3000);
+      stubChange.peerReconnect$.emit({ peerId: 'my-seat', state: 'resumed' });
+      vi.advanceTimersByTime(NetworkEventHandlerService.SERVER_DROP_QUIET_MS);
+
+      expect(handler.serverLinkDown()).toBe(false);
+      expect(shown).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('tells at once of a link to the room server that is given up on', () => {
+    vi.useFakeTimers();
+    vi.spyOn(Network, 'peerId', 'get').mockReturnValue('my-seat');
+    vi.spyOn(Network, 'authorityPeerId', 'get').mockReturnValue('@authority');
+    const shown = vi.spyOn(TestBed.inject(SnackbarService), 'show').mockImplementation(() => {});
+
+    try {
+      stubChange.peerReconnect$.emit({ peerId: 'my-seat', state: 'retrying' });
+      stubChange.peerReconnect$.emit({ peerId: 'my-seat', state: 'failed' });
+      vi.advanceTimersByTime(NetworkEventHandlerService.SERVER_DROP_QUIET_MS);
+
+      expect(shown.mock.calls.map(([text]) => text)).toEqual([
+        '部屋のサーバーとの再接続に失敗しました。復帰しないときは接続情報から再接続してください。',
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows nothing of the link to the room server on a screen made for streaming', () => {
@@ -453,8 +500,14 @@ describe('NetworkEventHandlerService', () => {
     vi.spyOn(TestBed.inject(OverlayModeService), 'active').mockReturnValue(true);
     const shown = vi.spyOn(TestBed.inject(SnackbarService), 'show').mockImplementation(() => {});
 
-    stubChange.peerReconnect$.emit({ peerId: 'my-seat', state: 'retrying' });
-    stubChange.peerReconnect$.emit({ peerId: 'my-seat', state: 'recovered' });
+    vi.useFakeTimers();
+    try {
+      stubChange.peerReconnect$.emit({ peerId: 'my-seat', state: 'retrying' });
+      vi.advanceTimersByTime(NetworkEventHandlerService.SERVER_DROP_QUIET_MS);
+      stubChange.peerReconnect$.emit({ peerId: 'my-seat', state: 'recovered' });
+    } finally {
+      vi.useRealTimers();
+    }
 
     expect(shown).not.toHaveBeenCalled();
     expect(chatStub.sendSystemNotice).not.toHaveBeenCalled();

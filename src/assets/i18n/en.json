@@ -4266,7 +4266,8 @@
         "failed": "Could not reconnect to {{name}}. Reconnect from the connection panel if it does not recover.",
         "serverRetrying": "Lost the connection to the room server. Reconnecting…",
         "serverRecovered": "Restored the connection to the room server.",
-        "serverFailed": "Could not reconnect to the room server. Reconnect from the connection panel if it does not recover."
+        "serverFailed": "Could not reconnect to the room server. Reconnect from the connection panel if it does not recover.",
+        "serverLamp": "Reconnecting to the room server"
       },
       "invite": {
         "joining": "Joining \"{{roomName}}\"…",

@@ -1,4 +1,4 @@
-import { DestroyRef, effect, inject, Injectable, untracked } from '@angular/core';
+import { DestroyRef, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { ChatClockService } from '@axe/application/chat/chat-clock.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { encodeI18nMessage } from '@axe/application/i18n/i18n-message';
@@ -86,6 +86,17 @@ export class NetworkEventHandlerService {
     failed: 'feature.lobby.peerReconnect.serverFailed',
     resumed: '',
   };
+  /**
+   * How long a dropped link to the room server may take to come back before the reader is told
+   * (tyoitashi). A line that drops for a second or two, as a weak one does again and again, comes
+   * back on its own; only the lamp shows it meanwhile.
+   */
+  static readonly SERVER_DROP_QUIET_MS = 10_000;
+  /** Whether the link to the room server is down and being tried again, for the lamp. */
+  readonly serverLinkDown = signal(false);
+  private serverDropNotice: ReturnType<typeof setTimeout> | null = null;
+  /** Whether the reader was told of the drop, so they are told of its end too. */
+  private serverDropTold = false;
   private serverErrorReconnectAttempts = 0;
   private otherErrorReconnectAttempts = 0;
   private serverErrorReconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -99,6 +110,7 @@ export class NetworkEventHandlerService {
 
   constructor() {
     this.destroyRef.onDestroy(() => {
+      if (this.serverDropNotice !== null) clearTimeout(this.serverDropNotice);
       this.assetHttpStore.onUploadsPaused = () => {};
       this.assetHttpStore.onUploadBlocked = () => {};
       this.assetHttpStore.onRoomStorageFull = () => {};
@@ -233,8 +245,7 @@ export class NetworkEventHandlerService {
       // rather than written for the whole room, which a guest may not write to anyway. A screen
       // made for streaming shows none of it.
       if (event.peerId === Network.peerId && Network.authorityPeerId !== null) {
-        const serverKey = NetworkEventHandlerService.SERVER_RECONNECT_MESSAGE_KEYS[event.state];
-        if (serverKey && !this.overlayMode.active()) this.snackbar.show(this.t(serverKey));
+        this.followServerLink(event.state);
         return;
       }
       const key = NetworkEventHandlerService.RECONNECT_MESSAGE_KEYS[event.state];
@@ -252,6 +263,50 @@ export class NetworkEventHandlerService {
       },
       this.destroyRef
     );
+  }
+
+  /**
+   * Follows the link to the room server going and coming back (tyoitashi). A drop is told only once
+   * it has lasted SERVER_DROP_QUIET_MS, and its end only where the drop was told; a link given up
+   * on is told at once. The lamp is lit for as long as the link is being tried again.
+   */
+  private followServerLink(state: PeerReconnectState): void {
+    switch (state) {
+      case 'retrying':
+        this.serverLinkDown.set(true);
+        if (this.serverDropNotice !== null || this.serverDropTold) return;
+        this.serverDropNotice = setTimeout(() => {
+          this.serverDropNotice = null;
+          this.serverDropTold = true;
+          this.tellServerLink('retrying');
+        }, NetworkEventHandlerService.SERVER_DROP_QUIET_MS);
+        return;
+      case 'recovered':
+      case 'resumed': {
+        this.serverLinkDown.set(false);
+        this.cancelServerDropNotice();
+        const told = this.serverDropTold;
+        this.serverDropTold = false;
+        if (told) this.tellServerLink('recovered');
+        return;
+      }
+      case 'failed':
+        this.serverLinkDown.set(false);
+        this.cancelServerDropNotice();
+        this.serverDropTold = false;
+        this.tellServerLink('failed');
+    }
+  }
+
+  private cancelServerDropNotice(): void {
+    if (this.serverDropNotice !== null) clearTimeout(this.serverDropNotice);
+    this.serverDropNotice = null;
+  }
+
+  /** Shows the word of the link to the room server, which is this reader's own; a streaming screen shows none. */
+  private tellServerLink(state: PeerReconnectState): void {
+    const key = NetworkEventHandlerService.SERVER_RECONNECT_MESSAGE_KEYS[state];
+    if (key && !this.overlayMode.active()) this.snackbar.show(this.t(key));
   }
 
   /**

@@ -1,0 +1,10 @@
+@if (down()) {
+  <div
+    class="bg-ui-panel/90 border-ui-border-panel text-ui-muted rounded-ui-sm pointer-events-none absolute top-0.75 right-10 z-9999 flex items-center gap-1.5 border border-solid px-2 py-1 text-[11px] shadow-sm"
+    role="status"
+    data-testid="server-link-lamp"
+  >
+    <span class="size-2 animate-pulse rounded-full bg-amber-400"></span>
+    {{ 'feature.lobby.peerReconnect.serverLamp' | transloco }}
+  </div>
+}
