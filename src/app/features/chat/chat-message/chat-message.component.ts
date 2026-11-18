@@ -271,6 +271,7 @@ export class ChatMessageComponent {
   takeHotbarOffer(): void {
     this.hotbarTaken.show(this.hotbarOffers.take(this.chatMessageInput().hotbarOffer));
   }
+
   /** Whether the line is only emoji, for drawing it larger than ordinary chat text. */
   readonly isLargeEmoji = computed(() => {
     const message = this.chatMessageInput();
