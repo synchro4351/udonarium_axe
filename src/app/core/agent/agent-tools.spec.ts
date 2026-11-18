@@ -49,6 +49,7 @@ describe('AGENT_TOOLS', () => {
       'list_assets',
       'read_scenario_text',
       'wait_for_events',
+      'list_notes',
     ]);
     expect(agentToolOf('send_chat')?.access).toBe('write');
     expect(agentToolOf('play_sound')?.access).toBe('gm');

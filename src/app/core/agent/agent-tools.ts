@@ -1,4 +1,5 @@
 import type { AgentObjectSchema, AgentSchema } from '@axe/core/agent/agent-schema';
+import { BUILD_AGENT_TOOLS } from '@axe/core/agent/agent-tools-build';
 
 /**
  * What a tool needs of the seat it runs on: nothing but to be connected, leave to change the room,
@@ -476,6 +477,7 @@ export const AGENT_TOOLS: readonly AgentToolDefinition[] = [
     description: 'Remove a range from the table (see list_assets with kind ranges).',
     input: input({ range: { type: 'string', description: 'The range, by name or id.', minLength: 1 } }, ['range']),
   },
+  ...BUILD_AGENT_TOOLS,
 ];
 
 /**
