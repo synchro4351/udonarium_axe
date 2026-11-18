@@ -6,7 +6,7 @@ import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
 import { AiGmService } from '@axe/features/ai-gm/ai-gm.service';
 import type { AiGmMode } from '@axe/features/ai-gm/ai-gm-wake';
 import { AiLinkService } from '@axe/features/ai-link/ai-link.service';
-import { AI_LINK_RELEASES_URL } from '@axe/features/ai-link/ai-link-panel/ai-link-panel.component';
+import { aiLinkBridgeUrl } from '@axe/features/ai-link/ai-link-panel/ai-link-panel.component';
 import { TranslocoModule } from '@jsverse/transloco';
 
 /** What the panel says of the game master, by the i18n key under feature.aiGm.state. */
@@ -41,7 +41,7 @@ export class AiGmPanelComponent {
   private readonly permission = inject(RolePermissionService);
   private readonly objectChange = inject(ObjectChangeService);
 
-  protected readonly releasesUrl = AI_LINK_RELEASES_URL;
+  protected readonly releasesUrl = aiLinkBridgeUrl();
   protected readonly efforts: readonly GmEffort[] = ['low', 'medium', 'high'];
   protected readonly modes: readonly AiGmMode[] = ['respond', 'called'];
   /** The word to the game master being written. */

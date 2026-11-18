@@ -245,7 +245,7 @@
       },
       "setup": {
         "heading": "ブリッジの起動のしかた",
-        "download": "リリースからaxe-mcp.mjsを入手します（Node.js 22以降が要ります）。",
+        "download": "このサイトからaxe-mcp.mjs（ちょいたし版のブリッジ）を落とします（Node.js 22以上で動きます）。公式のブリッジとはつながりません。",
         "key": "Claudeで動かすときは、Claude ConsoleでAPIキーを作ります。使用額の上限を付けたワークスペースのキーをおすすめします。キーをチャットやこの画面に貼らないでください。",
         "start": "キーを環境変数に入れてブリッジを起動します（macOSとLinux）",
         "powerShell": "WindowsのPowerShellでは次のとおりです",
@@ -289,7 +289,7 @@
       },
       "setup": {
         "heading": "つなぎ方",
-        "download": "リリースのページからaxe-mcp.mjsを落とします（Node.js 22以上で動きます）。",
+        "download": "このサイトからaxe-mcp.mjs（ちょいたし版のブリッジ）を落とします（Node.js 22以上で動きます）。公式のブリッジとはつながりません。",
         "claudeCode": "Claude Codeでは、次を実行します（パスは落とした場所に書き換えます）。",
         "claudeDesktop": "Claude Desktopでは、設定ファイルのmcpServersに次を足します。",
         "connect": "AIを起動してから、このパネルの［つなぐ］を押します。Claude Codeでは /mcp__axe__run_session と打つと、GMとして動き始めます。プロンプトを選べないアプリでは、AIに「axe://guide/run-sessionを読んでGMをして」と頼みます。",

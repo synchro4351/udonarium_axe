@@ -8,7 +8,16 @@ import { AiLinkService } from '@axe/features/ai-link/ai-link.service';
 import { TranslocoModule } from '@jsverse/transloco';
 
 /** Where the bridge is downloaded from. */
-export const AI_LINK_RELEASES_URL = 'https://github.com/Xelltis/udonarium_axe/releases/latest';
+/**
+ * Where tyoitashi's build of the bridge is put next to the page (tyoitashi). Its tools differ from the
+ * official ones, so the official bridge refuses this Axe, and the bridge is taken from the site itself.
+ */
+export const TYOITASHI_BRIDGE_PATH = 'assets/axe-mcp/axe-mcp.mjs';
+
+/** The address of tyoitashi's bridge on the site the page is served from. */
+export function aiLinkBridgeUrl(): string {
+  return new URL(TYOITASHI_BRIDGE_PATH, document.baseURI).href;
+}
 
 /** What the panel says of where the link stands, by the i18n key under feature.aiLink.state. */
 export type AiLinkStateKey = 'idle' | 'connecting' | 'connected' | 'unreachable' | 'lost' | 'busy' | 'protocol';
@@ -30,7 +39,7 @@ export class AiLinkPanelComponent {
   protected readonly runner = inject(AgentToolRunner);
   private readonly permission = inject(RolePermissionService);
 
-  protected readonly releasesUrl = AI_LINK_RELEASES_URL;
+  protected readonly releasesUrl = aiLinkBridgeUrl();
   /** Which command was copied last, to say so beside it. */
   protected readonly copied = signal<'code' | 'desktop' | null>(null);
 
