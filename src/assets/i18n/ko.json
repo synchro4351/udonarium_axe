@@ -606,7 +606,17 @@
         "load": "핫바 불러오기",
         "undoRead": "불러오기 전 핫바로 되돌리기",
         "showHint": "단축키 설명 표시",
-        "fillFromHere": "핫바에 넣기"
+        "fillFromHere": "핫바에 넣기",
+        "share": "이 페이지를 채팅으로 나누기"
+      },
+      "offer": {
+        "words": "[핫바 템플릿] {{title}} ({{count}}슬롯)",
+        "untitled": "핫바 템플릿",
+        "sharedTitle": "{{name}}의 핫바 {{page}}페이지",
+        "take": "내 핫바에 가져오기",
+        "taken": "{{page}}페이지에 {{count}}슬롯을 넣었습니다",
+        "full": "빈 페이지가 없습니다. 페이지를 하나 비우고 다시 눌러 주세요",
+        "failed": "가져오지 못했습니다"
       },
       "editor": {
         "title": "칸 설정",

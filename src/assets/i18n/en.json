@@ -606,7 +606,17 @@
         "load": "Read a hotbar in",
         "undoRead": "Put back the bar the file replaced",
         "showHint": "Show what the keys do",
-        "fillFromHere": "Put it on the hotbar"
+        "fillFromHere": "Put it on the hotbar",
+        "share": "Share this page in the chat"
+      },
+      "offer": {
+        "words": "[Hotbar template] {{title}} ({{count}} slots)",
+        "untitled": "Hotbar template",
+        "sharedTitle": "{{name}}'s hotbar, page {{page}}",
+        "take": "Add to my hotbar",
+        "taken": "Put {{count}} slots on page {{page}}",
+        "full": "No page is free. Empty a page and press again.",
+        "failed": "Could not add it"
       },
       "editor": {
         "title": "Slot",

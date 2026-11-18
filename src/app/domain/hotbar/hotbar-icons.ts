@@ -1,0 +1,21 @@
+/** The icons a slot may wear, as Material Symbols names, offered by the slot editor and the AI's tools. */
+export const HOTBAR_ICONS: readonly string[] = [
+  'chat_bubble',
+  'casino',
+  'auto_awesome',
+  'radar',
+  'add_circle',
+  'favorite',
+  'bolt',
+  'shield',
+  'local_fire_department',
+  'healing',
+  'volume_up',
+  'slideshow',
+  'person',
+  'article',
+  'my_location',
+  'skip_next',
+  'star',
+  'flag',
+];

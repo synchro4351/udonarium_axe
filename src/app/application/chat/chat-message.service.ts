@@ -328,6 +328,28 @@ export class ChatMessageService {
   }
 
   /**
+   * Hands a page of a hotbar round the tab as a line of its own, from the reader's own
+   * cursor, with `words` saying what it is wherever it cannot be taken: a version that does not know
+   * it, a log. Null where the reader's role may not speak in the tab.
+   */
+  sendHotbarOffer(chatTab: ChatTab, words: string, offer: string): ChatMessage | null {
+    if (!canRoleSpeakTab(chatTab, PeerCursor.myRole)) return null;
+    const sendFrom = PeerCursor.myCursor.identifier;
+    return chatTab.addMessage({
+      from: Network.instance.peerContext.userId,
+      name: this.makeMessageName(sendFrom),
+      imageIdentifier: this.findImageIdentifier(sendFrom, 0),
+      timestamp: this.calcTimeStamp(chatTab),
+      text: words,
+      messColor: resolveMessageColor(undefined, '#000000'),
+      sendFrom,
+      senderRole: PeerCursor.myRole,
+      ...this.speakerMarks(),
+      hotbarOffer: offer,
+    });
+  }
+
+  /**
    * Speaks a line into a tab as a piece or a peer, and tells the dice table and resource edits
    * about it.
    *

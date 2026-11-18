@@ -238,6 +238,35 @@
         </div>
       }
     }
+    @if (hotbarOffer(); as offer) {
+      <div
+        class="border-ui-border-panel bg-ui-elevated mt-1 inline-flex max-w-full flex-col gap-1 rounded-sm border border-solid px-2 py-1 align-top whitespace-normal"
+        data-testid="chat-message-hotbar-offer"
+      >
+        <span class="text-[0.9em] font-bold">{{ offer.title || ('feature.hotbar.offer.untitled' | transloco) }}</span>
+        <span class="flex flex-wrap gap-1">
+          @for (name of offer.names; track $index) {
+            <span class="border-ui-border-panel rounded-sm border border-solid px-1 text-[0.85em]">{{ name }}</span>
+          }
+        </span>
+        <span class="flex flex-wrap items-center gap-1.5">
+          <button type="button" data-testid="hotbar-offer-take" (click)="takeHotbarOffer()">
+            {{ 'feature.hotbar.offer.take' | transloco }}
+          </button>
+          @if (hotbarTaken(); as taken) {
+            <span class="text-ui-dim text-[0.9em]" data-testid="hotbar-offer-taken">
+              @if ('page' in taken) {
+                {{ 'feature.hotbar.offer.taken' | transloco: { page: taken.page + 1, count: taken.slots } }}
+              } @else if (taken.failed === 'full') {
+                {{ 'feature.hotbar.offer.full' | transloco }}
+              } @else {
+                {{ 'feature.hotbar.offer.failed' | transloco }}
+              }
+            </span>
+          }
+        </span>
+      </div>
+    }
     @if (shownAttachments().length > 0) {
       @if (compact) {
         <span class="ml-1.5 inline-flex align-middle">
