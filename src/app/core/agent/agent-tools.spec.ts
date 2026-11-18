@@ -49,7 +49,9 @@ describe('AGENT_TOOLS', () => {
       'list_assets',
       'read_scenario_text',
       'wait_for_events',
+      'list_cards',
     ]);
+    expect(agentToolOf('draw_card')?.access).toBe('write');
     expect(agentToolOf('send_chat')?.access).toBe('write');
     expect(agentToolOf('play_sound')?.access).toBe('gm');
     expect(agentToolOf('no_such_tool')).toBeNull();
