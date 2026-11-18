@@ -2,6 +2,22 @@
 
 [紹介ページ](README.md) · [版ごとの履歴](TYOITASHI_VERSIONS.md)
 
+## 公式がそのままcherry-pickできる枝（r20）
+
+公式Axe v1.80.0（`5b8429b4`）だけを基点にした枝です。ファイル名やコメントに私家版の名前を入れず、公式にある仕組みだけで書いています。どれも単独で取り込めます。
+
+| 枝                                                                                                             | 中身                                                                                                                                                |
+| -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`codex/up-agent-table-tools`](https://github.com/synchro4351/udonarium_axe/tree/codex/up-agent-table-tools)   | AIの道具：行動順を値の大きい順に書き込む、インベントリの並べ替え、アラーム、投票、スタンプの一覧と送信                                              |
+| [`codex/up-agent-build-tools`](https://github.com/synchro4351/udonarium_axe/tree/codex/up-agent-build-tools)   | AIの道具：テーブルを作る、マップマスクを格子に敷く・外す、メモを置く・書き換える                                                                    |
+| [`codex/up-agent-seat-links`](https://github.com/synchro4351/udonarium_axe/tree/codex/up-agent-seat-links)     | 回線が1分戻らない席、10分に4回以上切れる席だけをAIに知らせ、戻ったことも知らせる。手引きに「場面を止めて待つ」を足す                                |
+| [`codex/up-hotbar-offer`](https://github.com/synchro4351/udonarium_axe/tree/codex/up-hotbar-offer)             | ホットバーの1ページをチャットでひな形として配り、各自が空きページに取り込む（ホットバーの右クリックからも配れる）。それを使うAIの道具`offer_hotbar` |
+| [`codex/up-windows-test-paths`](https://github.com/synchro4351/udonarium_axe/tree/codex/up-windows-test-paths) | Windowsで落ちる公式の試験2つ（three-fence、bundled-models）のパスの読み方をそろえる。`codex/up-hotbar-offer`はこの上にあります                      |
+
+ちょいたしの仕組みに乗る枝は、私家版の本流を基点にしています：[`codex/tyo-agent-card-tools`](https://github.com/synchro4351/udonarium_axe/tree/codex/tyo-agent-card-tools)（キャラクターの手札を使うカードの道具）、[`codex/tyo-bridge-site`](https://github.com/synchro4351/udonarium_axe/tree/codex/tyo-bridge-site)（ちょいたし版ブリッジの配布）。
+
+AIの道具を足すと、タブとブリッジが照らし合わせる道具の一覧も変わります。取り込むときは、ブリッジ（`tools/axe-mcp`）も同じコミットから作り直してください。
+
 r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は公式v1.68.0まで取り込んでいます。ここでは元の機能コミットと、その後の統合を示します。公式の構造変更に合わせた調整もあるため、現在の実装は機能を最初に追加したコミットだけでは分かりません。
 
 ## 公式v1.67への追従
@@ -115,19 +131,19 @@ r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は�
 
 以下のコミットは、特記のない限りこのフォークの履歴です。古い機能ブランチを丸ごと最新公式へmergeすることを推奨する表ではありません。
 
-| 変更 | 元コミット・範囲 | 基点と取り込み時の注意 |
-| --- | --- | --- |
-| チャット読み上げ | [cde159ae](https://github.com/synchro4351/udonarium_axe/commit/cde159ae)、[時計差対応 1d52f8ba](https://github.com/synchro4351/udonarium_axe/commit/1d52f8ba)、[自己発言 4d0c50ab](https://github.com/synchro4351/udonarium_axe/commit/4d0c50ab) | 本体はv1.48.0、後続2修正はv1.49.0時点。本体と新着判定・自己発言の修正を一緒に確認。設定は端末ローカル。現在の層構成への調整はv1.57.1統合時にも含まれる |
-| カード文章の縁取り | [dd70db67](https://github.com/synchro4351/udonarium_axe/commit/dd70db67)、[太字・光彩 ba818f32](https://github.com/synchro4351/udonarium_axe/commit/ba818f32) | 旧v1.50系。公式採用済みのカード文章実装を前提にする。縁取り切替による改行位置の変化を抑える |
-| マップマスク文章・縁取り | [ae429977](https://github.com/synchro4351/udonarium_axe/commit/ae429977)、[描画調整 d1805678](https://github.com/synchro4351/udonarium_axe/commit/d1805678) | 旧v1.50系。カード文章との共通処理や後の公式マスク設定UIとの調整を確認。Flyのデータ構造を意識した実装 |
-| 再参加待機・v1.57.1への適応 | [889c0dfd](https://github.com/synchro4351/udonarium_axe/commit/889c0dfd) | 公式85c89f98と旧私家版のmerge。再参加だけの独立コミットではない。SkyWayFacade・RoomJoinService・参加画面の変更を抽出して確認する必要あり。Windows向け検証処理の調整も含む |
-| 未指定マスク文字色を白に | [6ba6751a](https://github.com/synchro4351/udonarium_axe/commit/6ba6751a) | 上記v1.57.1統合版起点。保存済み・明示指定した色は変更しない |
-| カットインのフォント選択 | [14101a33](https://github.com/synchro4351/udonarium_axe/commit/14101a33) | 6ba6751a起点。編集UI・翻訳・テスト。既存のfontFamily文字列を使用し、端末フォントへフォールバックする |
-| YouTube再生操作 | [f45a18c5](https://github.com/synchro4351/udonarium_axe/commit/f45a18c5) | 6ba6751a起点。プレイヤーのサムネイル待機を無効化、クリック遮断を除去、操作欄を表示 |
-| チャット入力後の初回ドラッグ | [0605e7ba](https://github.com/synchro4351/udonarium_axe/commit/0605e7ba) | 14101a33起点。入力要素のblurとwindowのblurを区別。保存・同期の変更なし |
-| YouTube自動再生（r2） | [42bdbd97](https://github.com/synchro4351/udonarium_axe/commit/42bdbd97) | be1fdb8a起点。f45a18c5の再生操作修正を前提とする。開始時にiframe生成・autoplay要求、既存の時刻合わせと操作欄を維持 |
-| ホットバーのエフェクトアイコン（r2） | [2a75e5c2](https://github.com/synchro4351/udonarium_axe/commit/2a75e5c2) | 42bdbd97起点。既存のeffect-shapesのSVGとng-selectを使用。保存値は従来のエフェクト名のまま |
-| 編集可能なカットイン見本3種（r2） | [13e18a3f](https://github.com/synchro4351/udonarium_axe/commit/13e18a3f) | 2a75e5c2の後続。既存のCutIn・シーン・レイヤー・アニメーションプリセットを使用。既存カットインに不干渉、保存・同期形式を追加しない |
+| 変更                                 | 元コミット・範囲                                                                                                                                                                                                                                 | 基点と取り込み時の注意                                                                                                                                                    |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| チャット読み上げ                     | [cde159ae](https://github.com/synchro4351/udonarium_axe/commit/cde159ae)、[時計差対応 1d52f8ba](https://github.com/synchro4351/udonarium_axe/commit/1d52f8ba)、[自己発言 4d0c50ab](https://github.com/synchro4351/udonarium_axe/commit/4d0c50ab) | 本体はv1.48.0、後続2修正はv1.49.0時点。本体と新着判定・自己発言の修正を一緒に確認。設定は端末ローカル。現在の層構成への調整はv1.57.1統合時にも含まれる                    |
+| カード文章の縁取り                   | [dd70db67](https://github.com/synchro4351/udonarium_axe/commit/dd70db67)、[太字・光彩 ba818f32](https://github.com/synchro4351/udonarium_axe/commit/ba818f32)                                                                                    | 旧v1.50系。公式採用済みのカード文章実装を前提にする。縁取り切替による改行位置の変化を抑える                                                                               |
+| マップマスク文章・縁取り             | [ae429977](https://github.com/synchro4351/udonarium_axe/commit/ae429977)、[描画調整 d1805678](https://github.com/synchro4351/udonarium_axe/commit/d1805678)                                                                                      | 旧v1.50系。カード文章との共通処理や後の公式マスク設定UIとの調整を確認。Flyのデータ構造を意識した実装                                                                      |
+| 再参加待機・v1.57.1への適応          | [889c0dfd](https://github.com/synchro4351/udonarium_axe/commit/889c0dfd)                                                                                                                                                                         | 公式85c89f98と旧私家版のmerge。再参加だけの独立コミットではない。SkyWayFacade・RoomJoinService・参加画面の変更を抽出して確認する必要あり。Windows向け検証処理の調整も含む |
+| 未指定マスク文字色を白に             | [6ba6751a](https://github.com/synchro4351/udonarium_axe/commit/6ba6751a)                                                                                                                                                                         | 上記v1.57.1統合版起点。保存済み・明示指定した色は変更しない                                                                                                               |
+| カットインのフォント選択             | [14101a33](https://github.com/synchro4351/udonarium_axe/commit/14101a33)                                                                                                                                                                         | 6ba6751a起点。編集UI・翻訳・テスト。既存のfontFamily文字列を使用し、端末フォントへフォールバックする                                                                      |
+| YouTube再生操作                      | [f45a18c5](https://github.com/synchro4351/udonarium_axe/commit/f45a18c5)                                                                                                                                                                         | 6ba6751a起点。プレイヤーのサムネイル待機を無効化、クリック遮断を除去、操作欄を表示                                                                                        |
+| チャット入力後の初回ドラッグ         | [0605e7ba](https://github.com/synchro4351/udonarium_axe/commit/0605e7ba)                                                                                                                                                                         | 14101a33起点。入力要素のblurとwindowのblurを区別。保存・同期の変更なし                                                                                                    |
+| YouTube自動再生（r2）                | [42bdbd97](https://github.com/synchro4351/udonarium_axe/commit/42bdbd97)                                                                                                                                                                         | be1fdb8a起点。f45a18c5の再生操作修正を前提とする。開始時にiframe生成・autoplay要求、既存の時刻合わせと操作欄を維持                                                        |
+| ホットバーのエフェクトアイコン（r2） | [2a75e5c2](https://github.com/synchro4351/udonarium_axe/commit/2a75e5c2)                                                                                                                                                                         | 42bdbd97起点。既存のeffect-shapesのSVGとng-selectを使用。保存値は従来のエフェクト名のまま                                                                                 |
+| 編集可能なカットイン見本3種（r2）    | [13e18a3f](https://github.com/synchro4351/udonarium_axe/commit/13e18a3f)                                                                                                                                                                         | 2a75e5c2の後続。既存のCutIn・シーン・レイヤー・アニメーションプリセットを使用。既存カットインに不干渉、保存・同期形式を追加しない                                         |
 
 [小改善2件の機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hotbar-effect-icons-and-cutin-presets)は、公式v1.57.1に私家機能を加えた42bdbd97を基点としています。
 
@@ -151,30 +167,31 @@ r5までの比較対象は公式Axe v1.57.1（85c89f98）です。開発版は�
 
 ### 2026-09-26 の追加分（r2）
 
-| 変更 | 本流コミット | 元の機能コミット・依存関係 |
-| --- | --- | --- |
-| カットイン見本の動き・文字表現 | [01bc84ea](https://github.com/synchro4351/udonarium_axe/commit/01bc84ea) | [32be84e0](https://github.com/synchro4351/udonarium_axe/commit/32be84e0)を1c228425起点へ取り込み。既存のシーン・レイヤー・アニメーション表現を使う |
-| 新規カットインの枠なし既定値 | [619902cf](https://github.com/synchro4351/udonarium_axe/commit/619902cf) | [310fba81](https://github.com/synchro4351/udonarium_axe/commit/310fba81)を取り込み。新規作成時だけ変更し、保存済みカットインには影響しない |
-| 手札の初回表示・更新通知・公開方式 | [6c465fbe](https://github.com/synchro4351/udonarium_axe/commit/6c465fbe) | [af1bcd8d](https://github.com/synchro4351/udonarium_axe/commit/af1bcd8d)。1c228425起点。新しい部屋設定は旧セーブでは「参加者が選択」 |
+| 変更                                 | 本流コミット                                                                                                                                                  | 元の機能コミット・依存関係                                                                                                                                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| カットイン見本の動き・文字表現       | [01bc84ea](https://github.com/synchro4351/udonarium_axe/commit/01bc84ea)                                                                                      | [32be84e0](https://github.com/synchro4351/udonarium_axe/commit/32be84e0)を1c228425起点へ取り込み。既存のシーン・レイヤー・アニメーション表現を使う                                                                                 |
+| 新規カットインの枠なし既定値         | [619902cf](https://github.com/synchro4351/udonarium_axe/commit/619902cf)                                                                                      | [310fba81](https://github.com/synchro4351/udonarium_axe/commit/310fba81)を取り込み。新規作成時だけ変更し、保存済みカットインには影響しない                                                                                         |
+| 手札の初回表示・更新通知・公開方式   | [6c465fbe](https://github.com/synchro4351/udonarium_axe/commit/6c465fbe)                                                                                      | [af1bcd8d](https://github.com/synchro4351/udonarium_axe/commit/af1bcd8d)。1c228425起点。新しい部屋設定は旧セーブでは「参加者が選択」                                                                                               |
 | カード編集権限・場と山札から渡す操作 | [bf14331d](https://github.com/synchro4351/udonarium_axe/commit/bf14331d)、[権限テスト 4e1e2715](https://github.com/synchro4351/udonarium_axe/commit/4e1e2715) | [8a3fcd1f](https://github.com/synchro4351/udonarium_axe/commit/8a3fcd1f)、[8b8e51f3](https://github.com/synchro4351/udonarium_axe/commit/8b8e51f3)。前行の手札変更が基点。部屋のカード編集許可は既定オフ、既存の受け渡し許可も適用 |
 
 本流への取り込みでコミットIDが変わった行は、両方を記しました。これらは公式v1.57.1から直接cherry-pickできる独立パッチではなく、上記の私家版コミットを基点とします。公開手札の表示内容、山札内のカード一覧、権限の扱いを公式へ移す場合は、対象版で秘匿と同期を再検証してください。
 
-| 2026-09-26の後続変更 | 本流コミット | 元コミット・取り込み時の注意 |
-| --- | --- | --- |
-| 手札一覧からドラッグで引く | [6d6d083c](https://github.com/synchro4351/udonarium_axe/commit/6d6d083c) | [783ba356](https://github.com/synchro4351/udonarium_axe/commit/783ba356)、基点4e1e2715。従来の専用画面を削除。既存の手札移動・部屋の引く許可を使う。キーボード／クリックで引く代替操作はない |
-| カットイン文字の余分な空白 | [70fc8456](https://github.com/synchro4351/udonarium_axe/commit/70fc8456) | [44a0fdaf](https://github.com/synchro4351/udonarium_axe/commit/44a0fdaf)、基点4e1e2715。共通描画の空白をなくし、自作カットインの明示改行は保持 |
-| 未知の切り抜き名を安全に表示 | [557525ba](https://github.com/synchro4351/udonarium_axe/commit/557525ba) | [908b6a1c](https://github.com/synchro4351/udonarium_axe/commit/908b6a1c)。この版が将来の未知の形状名を受け取っても、切り抜かずに表示する |
-| カットイン見本の演出調整 | [fe0c0c7e](https://github.com/synchro4351/udonarium_axe/commit/fe0c0c7e) | [b2a32ec4](https://github.com/synchro4351/udonarium_axe/commit/b2a32ec4)。花束とハートを各1種に整理し、雨・星・上向き矢印・閃光・帯内の光を調整。矢印は既存形状だけで構成し、新しい保存値を増やさない |
-| 「Level UP」の低い矢印 | [93ce5369](https://github.com/synchro4351/udonarium_axe/commit/93ce5369) | 19a98d7e起点。頭と軸の高さを約半分にし、文字を境目へ置く。既存の作例レイヤー形状を使い、保存済みカットインには影響しない |
-| 手札メニューの独自アイコン | [c617725b](https://github.com/synchro4351/udonarium_axe/commit/c617725b) | 93ce5369起点。添付画像を参考に独自SVGを作成し、PC・モバイルのメニューで使用。保存・同期の変更なし |
+| 2026-09-26の後続変更         | 本流コミット                                                             | 元コミット・取り込み時の注意                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 手札一覧からドラッグで引く   | [6d6d083c](https://github.com/synchro4351/udonarium_axe/commit/6d6d083c) | [783ba356](https://github.com/synchro4351/udonarium_axe/commit/783ba356)、基点4e1e2715。従来の専用画面を削除。既存の手札移動・部屋の引く許可を使う。キーボード／クリックで引く代替操作はない          |
+| カットイン文字の余分な空白   | [70fc8456](https://github.com/synchro4351/udonarium_axe/commit/70fc8456) | [44a0fdaf](https://github.com/synchro4351/udonarium_axe/commit/44a0fdaf)、基点4e1e2715。共通描画の空白をなくし、自作カットインの明示改行は保持                                                        |
+| 未知の切り抜き名を安全に表示 | [557525ba](https://github.com/synchro4351/udonarium_axe/commit/557525ba) | [908b6a1c](https://github.com/synchro4351/udonarium_axe/commit/908b6a1c)。この版が将来の未知の形状名を受け取っても、切り抜かずに表示する                                                              |
+| カットイン見本の演出調整     | [fe0c0c7e](https://github.com/synchro4351/udonarium_axe/commit/fe0c0c7e) | [b2a32ec4](https://github.com/synchro4351/udonarium_axe/commit/b2a32ec4)。花束とハートを各1種に整理し、雨・星・上向き矢印・閃光・帯内の光を調整。矢印は既存形状だけで構成し、新しい保存値を増やさない |
+| 「Level UP」の低い矢印       | [93ce5369](https://github.com/synchro4351/udonarium_axe/commit/93ce5369) | 19a98d7e起点。頭と軸の高さを約半分にし、文字を境目へ置く。既存の作例レイヤー形状を使い、保存済みカットインには影響しない                                                                              |
+| 手札メニューの独自アイコン   | [c617725b](https://github.com/synchro4351/udonarium_axe/commit/c617725b) | 93ce5369起点。添付画像を参考に独自SVGを作成し、PC・モバイルのメニューで使用。保存・同期の変更なし                                                                                                     |
 
 ## r3の追加変更
 
-| 変更 | 本流コミット | 基点と取り込み時の注意 |
-| --- | --- | --- |
+| 変更                               | 本流コミット                                                             | 基点と取り込み時の注意                                                                                                                                                                                                                                                             |
+| ---------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 不在参加者の手札をGMが引き継がせる | [bf66c752](https://github.com/synchro4351/udonarium_axe/commit/bf66c752) | r2固定ソース`6e5668dd`起点。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/orphan-hand-recovery)。既存の手札位置とCard.toHandを使用。カードは伏せて移り、保存・同期形式を追加しない。最新の保存・再読込では複製なし。既存卓へのZIP重ね読み込みは再確認待ち |
-| 自分の手札カードのホバー詳細 | [be02ffce](https://github.com/synchro4351/udonarium_axe/commit/be02ffce) | bf66c752起点。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hand-hover-preview)。場のカードと共通のツールチップを自分の手札へ適用。タッチ・ドラッグ中は抑止。他人の秘匿手札には適用しない。保存・同期形式の変更なし |
+| 自分の手札カードのホバー詳細       | [be02ffce](https://github.com/synchro4351/udonarium_axe/commit/be02ffce) | bf66c752起点。[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/hand-hover-preview)。場のカードと共通のツールチップを自分の手札へ適用。タッチ・ドラッグ中は抑止。他人の秘匿手札には適用しない。保存・同期形式の変更なし                                       |
+
 ## r4の追加変更
 
 発言別リアクション：[8cee77d4](https://github.com/synchro4351/udonarium_axe/commit/8cee77d4)（参加者別の保存・同期）、[45d1561b](https://github.com/synchro4351/udonarium_axe/commit/45d1561b)（HTMLログ）、[c5d53252](https://github.com/synchro4351/udonarium_axe/commit/c5d53252)（選択画面）。r3固定ソース`cf5edecf`起点の[機能ブランチ](https://github.com/synchro4351/udonarium_axe/tree/codex/chat-reactions)。発言ごと・参加者ごとに別の同期オブジェクトを使い、複数人の同時操作で票を上書きしない。従来の保存ZIPは反応なしとして読込。利用者がローカルで基本動作を確認済み。実2端末と弱回線での確認は未実施です。
