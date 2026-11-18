@@ -1,4 +1,5 @@
 import type { AgentObjectSchema, AgentSchema } from '@axe/core/agent/agent-schema';
+import { BUILD_AGENT_TOOLS } from '@axe/core/agent/agent-tools-build';
 import { TABLE_AGENT_TOOLS } from '@axe/core/agent/agent-tools-table';
 
 /**
@@ -478,6 +479,7 @@ export const AGENT_TOOLS: readonly AgentToolDefinition[] = [
     input: input({ range: { type: 'string', description: 'The range, by name or id.', minLength: 1 } }, ['range']),
   },
   ...TABLE_AGENT_TOOLS,
+  ...BUILD_AGENT_TOOLS,
 ];
 
 /**
