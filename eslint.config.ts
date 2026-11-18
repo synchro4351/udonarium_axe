@@ -46,7 +46,7 @@ const FORBID_FOR_UI = {
 /* Imports between features are allowed only along the edges that exist now. A new edge is added here
    on purpose (the aim is not to add more). A lazy import() is an edge as much as a static one. */
 const FEATURE_DEPENDENCIES: Record<string, readonly string[]> = {
-  'agent-tools': ['chat', 'media'],
+  'agent-tools': ['card', 'chat', 'media'],
   'ai-gm': ['ai-link'],
   'ai-link': ['agent-tools'],
   alarm: [],

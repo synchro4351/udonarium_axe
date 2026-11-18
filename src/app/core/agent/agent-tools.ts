@@ -2,6 +2,7 @@ import type { AgentObjectSchema, AgentSchema } from '@axe/core/agent/agent-schem
 import { BUILD_AGENT_TOOLS } from '@axe/core/agent/agent-tools-build';
 import { HOTBAR_AGENT_TOOLS } from '@axe/core/agent/agent-tools-hotbar';
 import { TABLE_AGENT_TOOLS } from '@axe/core/agent/agent-tools-table';
+import { TYOITASHI_CARD_TOOLS } from '@axe/core/agent/tyoitashi-card-tools';
 
 /**
  * What a tool needs of the seat it runs on: nothing but to be connected, leave to change the room,
@@ -482,6 +483,7 @@ export const AGENT_TOOLS: readonly AgentToolDefinition[] = [
   ...TABLE_AGENT_TOOLS,
   ...BUILD_AGENT_TOOLS,
   ...HOTBAR_AGENT_TOOLS,
+  ...TYOITASHI_CARD_TOOLS,
 ];
 
 /**

@@ -3,6 +3,7 @@ import { AgentEventLog } from '@axe/application/agent/agent-event-log.service';
 import { AgentSeatLinkWatch } from '@axe/application/agent/agent-seat-link-watch.service';
 import { AgentToolRunner } from '@axe/application/agent/agent-tool-runner.service';
 import { AgentBuildTools } from '@axe/features/agent-tools/agent-build-tools.service';
+import { AgentCardTools } from '@axe/features/agent-tools/agent-card-tools.service';
 import { AgentChatTools } from '@axe/features/agent-tools/agent-chat-tools.service';
 import { AgentGmTools } from '@axe/features/agent-tools/agent-gm-tools.service';
 import { AgentHotbarTools } from '@axe/features/agent-tools/agent-hotbar-tools.service';
@@ -27,6 +28,7 @@ export class AgentToolsSetup {
   private readonly table = inject(AgentTableTools);
   private readonly build = inject(AgentBuildTools);
   private readonly hotbar = inject(AgentHotbarTools);
+  private readonly cards = inject(AgentCardTools);
   private done = false;
 
   /** Makes every tool runnable, once, and keeps what happens from now. */
@@ -42,6 +44,7 @@ export class AgentToolsSetup {
     this.runner.provide(this.table.handlers);
     this.runner.provide(this.build.handlers);
     this.runner.provide(this.hotbar.handlers);
+    this.runner.provide(this.cards.handlers);
   }
 
   /** Stops keeping what happens. */
