@@ -5,6 +5,7 @@ import { AgentChatTools } from '@axe/features/agent-tools/agent-chat-tools.servi
 import { AgentGmTools } from '@axe/features/agent-tools/agent-gm-tools.service';
 import { AgentPieceTools } from '@axe/features/agent-tools/agent-piece-tools.service';
 import { AgentReadTools } from '@axe/features/agent-tools/agent-read-tools.service';
+import { AgentTableTools } from '@axe/features/agent-tools/agent-table-tools.service';
 
 /**
  * Makes the tools an AI can call runnable, and starts keeping what happens in the room, once a link
@@ -19,6 +20,7 @@ export class AgentToolsSetup {
   private readonly chat = inject(AgentChatTools);
   private readonly pieces = inject(AgentPieceTools);
   private readonly gm = inject(AgentGmTools);
+  private readonly table = inject(AgentTableTools);
   private done = false;
 
   /** Makes every tool runnable, once, and keeps what happens from now. */
@@ -30,6 +32,7 @@ export class AgentToolsSetup {
     this.runner.provide(this.chat.handlers);
     this.runner.provide(this.pieces.handlers);
     this.runner.provide(this.gm.handlers);
+    this.runner.provide(this.table.handlers);
   }
 
   /** Stops keeping what happens. */
