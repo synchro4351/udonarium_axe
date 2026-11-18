@@ -37,6 +37,8 @@ The tools act through the seat you are connected to.
    - Move NPCs with move_piece. Move the turn on with advance_turn when a turn is done.
    - As the game master, set the mood with play_sound, play_cut_in, fire_effect and apply_scene.
 5. Never decide what the players' characters do. Ask them, and wait for their answer with wait_for_events.
+6. seat_link_trouble tells of a player whose connection is down or keeps dropping: say briefly that the table waits for
+   them, hold the scene, and carry on when seat_link_back comes or the others ask to go on.
 
 The chat syntax is at ${CHAT_SYNTAX_GUIDE_URI}.`;
 

@@ -25,7 +25,17 @@ export type AgentEvent =
       readonly altitude: number;
     }
   | { readonly kind: 'table_switched'; readonly table: { readonly id: string; readonly name: string } }
-  | { readonly kind: 'seat_joined' | 'seat_left'; readonly seat: string };
+  | { readonly kind: 'seat_joined' | 'seat_left'; readonly seat: string }
+  // Trouble with a seat's link that someone has to deal with (see AgentSeatLinkWatch).
+  | {
+      readonly kind: 'seat_link_trouble';
+      readonly seat: string;
+      readonly trouble: 'down' | 'unstable';
+      readonly downForSeconds?: number;
+      readonly dropsLast10Minutes: number;
+      readonly longestDownSeconds?: number;
+    }
+  | { readonly kind: 'seat_link_back'; readonly seat: string; readonly downForSeconds: number };
 
 /** What a wait returns: what happened, and the cursor to carry on from. */
 export interface AgentEventBatch {
@@ -176,6 +186,11 @@ export class AgentEventLog {
     const at = Number(seq);
     if (run !== this.run || !Number.isInteger(at) || at < 0 || at > this.seq) return 0;
     return at;
+  }
+
+  /** Tells what something outside the log saw happen, while the log runs. */
+  tell(event: AgentEvent): void {
+    if (this.running()) this.push(event);
   }
 
   private push(event: AgentEvent): void {

@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { AgentEventLog } from '@axe/application/agent/agent-event-log.service';
+import { AgentSeatLinkWatch } from '@axe/application/agent/agent-seat-link-watch.service';
 import { AgentToolRunner } from '@axe/application/agent/agent-tool-runner.service';
 import { AgentBuildTools } from '@axe/features/agent-tools/agent-build-tools.service';
 import { AgentChatTools } from '@axe/features/agent-tools/agent-chat-tools.service';
@@ -17,6 +18,7 @@ import { AgentTableTools } from '@axe/features/agent-tools/agent-table-tools.ser
 export class AgentToolsSetup {
   private readonly runner = inject(AgentToolRunner);
   private readonly events = inject(AgentEventLog);
+  private readonly seatLinks = inject(AgentSeatLinkWatch);
   private readonly read = inject(AgentReadTools);
   private readonly chat = inject(AgentChatTools);
   private readonly pieces = inject(AgentPieceTools);
@@ -28,6 +30,7 @@ export class AgentToolsSetup {
   /** Makes every tool runnable, once, and keeps what happens from now. */
   ensure(): void {
     this.events.start();
+    this.seatLinks.start();
     if (this.done) return;
     this.done = true;
     this.runner.provide(this.read.handlers);
@@ -41,5 +44,6 @@ export class AgentToolsSetup {
   /** Stops keeping what happens. */
   release(): void {
     this.events.stop();
+    this.seatLinks.stop();
   }
 }
