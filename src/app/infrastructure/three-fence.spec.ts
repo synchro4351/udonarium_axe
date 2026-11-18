@@ -23,7 +23,8 @@ const KIT = 'infrastructure/three-kit';
 function sources(dir: string): string[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
+    // Forward slashes on every system, as the folders below are named (Windows joins with a backslash).
+    const path = join(dir, name).replace(/\\/g, '/');
     if (statSync(path).isDirectory()) return sources(path);
     return path.endsWith('.ts') && !path.endsWith('.spec.ts') ? [path] : [];
   });

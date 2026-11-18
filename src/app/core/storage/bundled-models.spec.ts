@@ -47,7 +47,7 @@ describe('bundled map models', () => {
     const hashes = Object.fromEntries(
       files.map((file) => [
         file
-          .split('/')
+          .split(/[\\/]/)
           .pop()!
           .replace(/\.glb$/, ''),
         createHash('sha256').update(readFileSync(file)).digest('hex'),
