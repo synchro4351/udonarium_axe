@@ -14,6 +14,8 @@ export interface HotbarBarMenuCallbacks {
   onTogglePin: () => void;
   onResetPlace: () => void;
   onLoad: () => void;
+  /** Hands the page in view round the chat as a template; left out for an empty page. */
+  onShare?: () => void;
   onUndo?: () => void;
   onUndoRead?: () => void;
   onHide: () => void;
@@ -72,6 +74,9 @@ export function buildHotbarBarContextMenu(
   ];
   actions.push(ContextMenuSeparator);
   actions.push({ name: t('feature.hotbar.menu.load'), action: () => callbacks.onLoad() });
+  if (callbacks.onShare) {
+    actions.push({ name: t('feature.hotbar.menu.share'), action: () => callbacks.onShare?.() });
+  }
   if (callbacks.onUndo || callbacks.onUndoRead) {
     actions.push(ContextMenuSeparator);
   }

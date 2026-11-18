@@ -22,6 +22,7 @@ import { presetGlyphSvg } from '@axe/domain/effect/effect-shapes';
 import { Hotbar } from '@axe/domain/hotbar/hotbar';
 import { hotbarSlotLabel } from '@axe/domain/hotbar/hotbar-appearance';
 import { emptyHotbarSlotDraft, HotbarSlotDraft } from '@axe/domain/hotbar/hotbar-draft';
+import { HOTBAR_ICONS } from '@axe/domain/hotbar/hotbar-icons';
 import {
   EFFECT_MODES,
   encodeHotbarPayload,
@@ -157,26 +158,7 @@ export class HotbarSlotEditorComponent {
   protected readonly turnActions = TURN_ACTIONS;
 
   protected readonly colors = BUFF_COLORS;
-  protected readonly icons = [
-    'chat_bubble',
-    'casino',
-    'auto_awesome',
-    'radar',
-    'add_circle',
-    'favorite',
-    'bolt',
-    'shield',
-    'local_fire_department',
-    'healing',
-    'volume_up',
-    'slideshow',
-    'person',
-    'article',
-    'my_location',
-    'skip_next',
-    'star',
-    'flag',
-  ];
+  protected readonly icons = HOTBAR_ICONS;
 
   /** What a slot of this kind can point at, so nothing has to be typed from memory. */
   protected readonly choices = computed<{ value: string; name: string }[]>(() => {

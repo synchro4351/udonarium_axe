@@ -13,6 +13,7 @@ import { ActiveCharacterService } from '@axe/application/character/active-charac
 import { PieceNameService } from '@axe/application/character/piece-name.service';
 import { ChatSpeakerService } from '@axe/application/chat/chat-speaker.service';
 import { SaveDataService } from '@axe/application/file/save-data.service';
+import { HotbarOfferService } from '@axe/application/hotbar/hotbar-offer.service';
 import { HotbarStoreService } from '@axe/application/hotbar/hotbar-store.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
@@ -98,6 +99,7 @@ export class HotbarBarComponent {
   private readonly contextMenuService = inject(ContextMenuService);
   private readonly hotbarService = inject(HotbarService);
   private readonly hotbarStore = inject(HotbarStoreService);
+  private readonly hotbarOffers = inject(HotbarOfferService);
   private readonly saveDataService = inject(SaveDataService);
   private readonly fileArchiver = inject(FileArchiver);
   private readonly chatSpeaker = inject(ChatSpeakerService);
@@ -322,6 +324,9 @@ export class HotbarBarComponent {
           onTogglePin: () => this.preference.setPinned(!this.preference.pinned()),
           onResetPlace: () => this.resetPlace(),
           onLoad: () => this.pickFile(),
+          onShare: this.hotbar()?.slotsOn(this.preference.page()).length
+            ? () => void this.hotbarOffers.shareShownPage()
+            : undefined,
           onUndo: removed ? () => this.undoRemoved() : undefined,
           onUndoRead: this.hotbar()?.hasDisplaced ? () => this.undoRead() : undefined,
           onHide: () => this.widgets.hotbar.set(false),

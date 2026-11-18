@@ -5,6 +5,7 @@ import { AgentToolRunner } from '@axe/application/agent/agent-tool-runner.servic
 import { AgentBuildTools } from '@axe/features/agent-tools/agent-build-tools.service';
 import { AgentChatTools } from '@axe/features/agent-tools/agent-chat-tools.service';
 import { AgentGmTools } from '@axe/features/agent-tools/agent-gm-tools.service';
+import { AgentHotbarTools } from '@axe/features/agent-tools/agent-hotbar-tools.service';
 import { AgentPieceTools } from '@axe/features/agent-tools/agent-piece-tools.service';
 import { AgentReadTools } from '@axe/features/agent-tools/agent-read-tools.service';
 import { AgentTableTools } from '@axe/features/agent-tools/agent-table-tools.service';
@@ -25,6 +26,7 @@ export class AgentToolsSetup {
   private readonly gm = inject(AgentGmTools);
   private readonly table = inject(AgentTableTools);
   private readonly build = inject(AgentBuildTools);
+  private readonly hotbar = inject(AgentHotbarTools);
   private done = false;
 
   /** Makes every tool runnable, once, and keeps what happens from now. */
@@ -39,6 +41,7 @@ export class AgentToolsSetup {
     this.runner.provide(this.gm.handlers);
     this.runner.provide(this.table.handlers);
     this.runner.provide(this.build.handlers);
+    this.runner.provide(this.hotbar.handlers);
   }
 
   /** Stops keeping what happens. */

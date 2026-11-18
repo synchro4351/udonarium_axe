@@ -21,6 +21,7 @@ import { ChatSpeechService } from '@axe/application/chat/chat-speech.service';
 import { StampPackService } from '@axe/application/chat/stamp-pack.service';
 import { StampRulesService } from '@axe/application/chat/stamp-rules.service';
 import { SystemAvatarKind, SystemAvatarService } from '@axe/application/chat/system-avatar.service';
+import { HotbarOfferService, HotbarTakeResult } from '@axe/application/hotbar/hotbar-offer.service';
 import { decodeI18nMessage } from '@axe/application/i18n/i18n-message';
 import { LanguageService } from '@axe/application/i18n/language.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
@@ -61,6 +62,7 @@ import { IMAGE_STAMP_PREFIX, isPictureStamp, stampOf } from '@axe/domain/chat/st
 import { saidWithStamp } from '@axe/domain/chat/stamp-line';
 import { aimedTogetherIdentifiers, canPinAsTargetNumber, mayPinTargetNumber } from '@axe/domain/chat/target-number';
 import { TOGETHER_SEPARATOR } from '@axe/domain/dice/roll-target-suffix';
+import { parseHotbarOffer } from '@axe/domain/hotbar/hotbar-offer';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { type ChatToolName, chatToolOf, menuCommandOf } from '@axe/domain/ui/menu-command';
@@ -155,6 +157,7 @@ export class ChatMessageComponent {
   private readonly chatMessageService = inject(ChatMessageService);
   private readonly lineEdit = inject(ChatLineEditService);
   private readonly resetUndo = inject(ResetUndoService);
+  private readonly hotbarOffers = inject(HotbarOfferService);
   private readonly pieceReset = inject(PieceResetService);
   private readonly clock = inject(ChatClockService);
   private readonly chatBookmarks = inject(ChatBookmarkService);
@@ -247,6 +250,27 @@ export class ChatMessageComponent {
     return stampId;
   });
 
+  /**
+   * The page of a hotbar the line hands round: its title and the names on its slots, to
+   * show under the words with a button to take it.
+   */
+  protected readonly hotbarOffer = computed(() => {
+    const message = this.chatMessageInput();
+    this.objectChange.versionOf(message.identifier)();
+    const offer = parseHotbarOffer(message.hotbarOffer);
+    if (!offer) return null;
+    return {
+      title: offer.title,
+      names: offer.slots.map((slot) => slot.draft.label || slot.draft.valueName || slot.draft.value || slot.draft.kind),
+    };
+  });
+
+  /** How the last take of the line's hotbar page went, shown for a while beside the button. */
+  readonly hotbarTaken = transientSignal<HotbarTakeResult | null>(null, 6000);
+
+  takeHotbarOffer(): void {
+    this.hotbarTaken.show(this.hotbarOffers.take(this.chatMessageInput().hotbarOffer));
+  }
   /** Whether the line is only emoji, for drawing it larger than ordinary chat text. */
   readonly isLargeEmoji = computed(() => {
     const message = this.chatMessageInput();

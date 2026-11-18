@@ -1,5 +1,6 @@
 import type { AgentObjectSchema, AgentSchema } from '@axe/core/agent/agent-schema';
 import { BUILD_AGENT_TOOLS } from '@axe/core/agent/agent-tools-build';
+import { HOTBAR_AGENT_TOOLS } from '@axe/core/agent/agent-tools-hotbar';
 import { TABLE_AGENT_TOOLS } from '@axe/core/agent/agent-tools-table';
 
 /**
@@ -480,6 +481,7 @@ export const AGENT_TOOLS: readonly AgentToolDefinition[] = [
   },
   ...TABLE_AGENT_TOOLS,
   ...BUILD_AGENT_TOOLS,
+  ...HOTBAR_AGENT_TOOLS,
 ];
 
 /**

@@ -39,6 +39,8 @@ The tools act through the seat you are connected to.
 5. Never decide what the players' characters do. Ask them, and wait for their answer with wait_for_events.
 6. seat_link_trouble tells of a player whose connection is down or keeps dropping: say briefly that the table waits for
    them, hold the scene, and carry on when seat_link_back comes or the others ask to go on.
+7. A hotbar is each player's own: when one asks for a hotbar or a macro, hand a page round with offer_hotbar for them
+   to take onto theirs.
 
 The chat syntax is at ${CHAT_SYNTAX_GUIDE_URI}.`;
 

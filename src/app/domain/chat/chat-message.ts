@@ -68,6 +68,7 @@ export interface ChatMessageContext {
   vnEmote?: string;
   senderRole?: string;
   stamp?: string;
+  hotbarOffer?: string;
   diceLook?: string;
   diceImageIdentifier?: string;
   imageEffects?: string;
@@ -118,6 +119,13 @@ export class ChatMessage extends ObjectNode implements ChatMessageContext {
    * Left without an initialiser, as `vnEmote` is: only a line sent as a stamp writes it.
    */
   @SyncVar() stamp: string;
+  /**
+   * A page of a hotbar handed round with the line, as `encodeHotbarOffer` writes it, for
+   * anyone to take onto their own bar. The words say what it is wherever it cannot be taken.
+   *
+   * Left without an initialiser, as `stamp` is: only a line handing a page round writes it.
+   */
+  @SyncVar() hotbarOffer: string;
   /**
    * What the person speaking was when they said it.
    *
