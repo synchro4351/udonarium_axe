@@ -66,6 +66,7 @@ describe('AgentHotbarTools', () => {
     expect(result).toEqual({ offered: '炎の魔法', slots: 3, tab: 'メイン' });
     const line = lastLine();
     expect(line.text).toContain('炎の魔法');
+    expect(line.isByAi).toBe(true);
 
     const taken = TestBed.inject(HotbarOfferService).take(line.hotbarOffer);
     expect(taken).toEqual({ page: 0, slots: 3 });

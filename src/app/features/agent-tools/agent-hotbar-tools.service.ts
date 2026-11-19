@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import type { AgentHandler } from '@axe/application/agent/agent-tool-runner.service';
+import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { EffectLibraryService } from '@axe/application/effect/effect-library.service';
 import { HotbarOfferService } from '@axe/application/hotbar/hotbar-offer.service';
 import { AgentToolError } from '@axe/core/agent/agent-error';
@@ -23,6 +24,7 @@ type AskedSlot = Readonly<Record<string, unknown>>;
 export class AgentHotbarTools {
   private readonly read = inject(AgentReadTools);
   private readonly offers = inject(HotbarOfferService);
+  private readonly chat = inject(ChatMessageService);
   private readonly effects = inject(EffectLibraryService);
   private readonly audioStorage = inject(AudioStorage);
   private readonly objectStore = inject(ObjectStore);
@@ -45,7 +47,8 @@ export class AgentHotbarTools {
     }));
     const offer: HotbarOffer = { title: textArg(args, 'title').trim(), slots };
     const tab = this.read.tab(textArg(args, 'tab'));
-    if (!this.offers.send(tab, offer)) {
+    // Marked as the AI's, as the chat tool marks the lines it sends.
+    if (!this.chat.asAiWords(() => this.offers.send(tab, offer))) {
       throw new AgentToolError('not_allowed', `This seat may not speak in ${tab.name}.`);
     }
     return { offered: offer.title, slots: slots.length, tab: tab.name };
