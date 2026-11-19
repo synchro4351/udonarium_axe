@@ -7,6 +7,7 @@ import type { AgentScope } from '@axe/core/agent/agent-protocol';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { AiLinkService } from '@axe/features/ai-link/ai-link.service';
 import { AiLinkPanelComponent } from '@axe/features/ai-link/ai-link-panel/ai-link-panel.component';
+import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
 describe('AiLinkPanelComponent', () => {
   let role: PeerRole;
@@ -30,6 +31,7 @@ describe('AiLinkPanelComponent', () => {
     TestBed.configureTestingModule({
       imports: [AiLinkPanelComponent],
       providers: [
+        ...TEST_PROVIDERS,
         { provide: AiLinkService, useValue: link },
         { provide: RolePermissionService, useValue: { role: () => role } },
       ],
@@ -78,6 +80,7 @@ describe('AiLinkPanelComponent', () => {
     TestBed.configureTestingModule({
       imports: [AiLinkPanelComponent],
       providers: [
+        ...TEST_PROVIDERS,
         { provide: AiLinkService, useValue: link },
         { provide: RolePermissionService, useValue: { role: () => role } },
       ],

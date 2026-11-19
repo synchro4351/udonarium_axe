@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { AgentPersonaService } from '@axe/application/agent/agent-persona.service';
 import type { AgentHandler } from '@axe/application/agent/agent-tool-runner.service';
 import { AgentViews } from '@axe/application/agent/agent-views.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
@@ -46,6 +47,7 @@ export class AgentTableTools {
   private readonly stampPacks = inject(StampPackService);
   private readonly stampRules = inject(StampRulesService);
   private readonly t = inject(TRANSLATE_FN);
+  private readonly persona = inject(AgentPersonaService);
 
   readonly handlers: Readonly<Record<string, AgentHandler>> = {
     set_turn_order: (args) => this.setTurnOrder(args),
@@ -209,7 +211,17 @@ export class AgentTableTools {
     const tab = this.read.tab(textArg(args, 'tab'));
     // Marked as the AI's, as the chat tool marks the lines it sends.
     const sent = this.chat.asAiWords(() =>
-      this.chat.sendStamp(tab, stamp.id, stamp.name, PeerCursor.myCursor.identifier)
+      this.chat.sendStamp(
+        tab,
+        stamp.id,
+        stamp.name,
+        PeerCursor.myCursor.identifier,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        this.persona.speakAs()
+      )
     );
     if (!sent) throw new AgentToolError('not_allowed', `The stamp ${stamp.name} cannot be sent here.`);
     return { sent: stamp.name, tab: tab.name };

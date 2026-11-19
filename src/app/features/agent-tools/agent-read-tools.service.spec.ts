@@ -91,7 +91,7 @@ describe('AgentReadTools', () => {
 
   it('describes the room as the seat sees it: the seat, the table and its grid, and the chat tabs', () => {
     expect(call('get_room')).toMatchObject({
-      seat: { name: 'AI GM', role: 'gm', may_change: true },
+      seat: { name: 'AI GM', ai_name: 'AI GM', role: 'gm', may_change: true },
       table: { id: table.identifier, name: '洞窟', grid: 'square', cols: 20, rows: 15, square_length: null },
       chat_tabs: [{ id: main.identifier, name: 'メイン' }],
       turn: { round: 0, current: null },

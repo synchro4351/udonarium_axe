@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { AgentEventLog } from '@axe/application/agent/agent-event-log.service';
+import { AgentPersonaService } from '@axe/application/agent/agent-persona.service';
 import type { AgentHandler } from '@axe/application/agent/agent-tool-runner.service';
 import { type AgentChatLine, AgentViews } from '@axe/application/agent/agent-views.service';
 import { ActiveChatTabService } from '@axe/application/chat/active-chat-tab.service';
@@ -49,6 +50,7 @@ interface Listed {
 @Injectable({ providedIn: 'root' })
 export class AgentReadTools {
   private readonly views = inject(AgentViews);
+  private readonly persona = inject(AgentPersonaService);
   private readonly events = inject(AgentEventLog);
   private readonly tabletop = inject(TabletopService);
   private readonly turns = inject(TurnOrderService);
@@ -126,6 +128,8 @@ export class AgentReadTools {
     return {
       seat: {
         name: PeerCursor.myCursor?.name ?? '',
+        // The name the AI speaks under and the table calls it by (tyoitashi).
+        ai_name: this.persona.name(),
         role,
         may_change: canRoleEdit(role),
       },
