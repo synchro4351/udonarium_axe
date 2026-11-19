@@ -94,6 +94,16 @@
             ></textarea>
             <span class="text-ui-dim text-[0.72em]">{{ 'feature.card.field.textHint' | transloco }}</span>
           </label>
+          <label class="flex flex-col gap-1 text-[0.78em]">
+            <span class="text-ui-muted">{{ 'feature.card.field.backText' | transloco }}</span>
+            <textarea
+              class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm focus:border-ui-accent min-h-14 w-full resize-y border border-solid px-2 py-1 outline-none"
+              data-testid="card-back-text"
+              [value]="cardBackText(c)"
+              (change)="setCardBackText(c, $event)"
+            ></textarea>
+            <span class="text-ui-dim text-[0.72em]">{{ 'feature.card.field.backTextHint' | transloco }}</span>
+          </label>
           <label class="flex items-center gap-2 text-[0.78em]">
             <span class="text-ui-muted">{{ 'feature.card.field.fontSize' | transloco }}</span>
             <input

@@ -1258,6 +1258,8 @@
         "size": "Size",
         "text": "Card text",
         "textHint": "Use |word《reading》 for ruby text and start a line with > for a quotation.",
+        "backText": "Back text",
+        "backTextHint": "Shown to everyone while the card lies face down (the kind of deck, whose it is)",
         "fontSize": "Font size",
         "fontColor": "Font colour"
       },
