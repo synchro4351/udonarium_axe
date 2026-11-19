@@ -256,6 +256,34 @@ export class CardGameService {
     return pairs;
   }
 
+  /**
+   * Puts the whole of a hand out on the table as a deck of its own, face down, beside the discard
+   * stack, and announces it: for a game that ends a round by gathering the hands in, or a player
+   * who wants their hand out of the way. Returns the deck, or null for a hand with no cards.
+   */
+  discardHand(cards: readonly Card[], holderName: string): CardStack | null {
+    if (cards.length < 1) return null;
+    const stack = CardStack.create(this.t('feature.card.handStackName', { name: holderName }));
+    stack.location.name = 'table';
+    stack.location.x = DISCARD_STACK_OFFSET * 2;
+    stack.location.y = DISCARD_STACK_OFFSET;
+    stack.toTopmost();
+    for (const card of cards) {
+      card.faceDown();
+      stack.putOnTop(card);
+    }
+    SoundEffect.play(PresetSound.cardPut);
+    this.chatMessageService.sendSystemNotice(
+      'card',
+      encodeI18nMessage('feature.card.message.discardedHand', {
+        name: PeerCursor.myCursor?.name ?? '',
+        holder: holderName,
+        count: cards.length,
+      })
+    );
+    return stack;
+  }
+
   private rankLabel(card: Card): string {
     const rank = trumpRankOf(card);
     return typeof rank === 'number' ? String(rank) : '?';

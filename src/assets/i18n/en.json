@@ -1245,6 +1245,8 @@
         "giveTo": "Give to",
         "drawFromOther": "Draw from a hand",
         "discardPairs": "Discard pairs",
+        "discardHand": "Put the whole hand out as a deck",
+        "discardHandConfirm": "Put all {{count}} cards of the hand out on the table as a face-down deck?",
         "noPairs": "No matching pair"
       },
       "title": "Card",
@@ -1282,11 +1284,13 @@
       },
       "targetPickingHint": "Click the object to target (Esc to cancel)",
       "discardStackName": "Discards",
+      "handStackName": "{{name}}'s hand",
       "message": {
         "drewFromHand": "{{to}} drew a card from {{from}}",
         "gaveFromHand": "{{from}} gave a card to {{to}}",
         "handedOver": "{{name}} handed {{from}}'s {{count}} cards over to {{to}}",
-        "discardedPairs": "{{name}} discarded pairs of {{ranks}}"
+        "discardedPairs": "{{name}} discarded pairs of {{ranks}}",
+        "discardedHand": "{{name}} put {{holder}}'s {{count}} cards out as a deck"
       },
       "drawPanel": {
         "title": "Draw from a hand",

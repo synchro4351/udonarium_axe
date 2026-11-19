@@ -312,4 +312,25 @@ describe('CardGameService', () => {
       expect(sendSystemNotice).not.toHaveBeenCalled();
     });
   });
+
+  describe('discardHand()', () => {
+    it('puts the whole hand out on the table as a face-down deck of its own, and says so', () => {
+      const cards = [trumpCard('s07'), trumpCard('h07'), trumpCard('c03')];
+      for (const card of cards) card.toHand('me');
+
+      const deck = service.discardHand(service.handCardsOf('me'), 'わたし');
+      if (deck) created.push(deck);
+
+      expect(deck?.cards).toHaveLength(3);
+      expect(deck?.location.name).toBe('table');
+      expect(cards.every((card) => !card.isFront)).toBe(true);
+      expect(service.handCardsOf('me')).toEqual([]);
+      expect(sendSystemNotice).toHaveBeenCalledTimes(1);
+    });
+
+    it('makes no deck of an empty hand', () => {
+      expect(service.discardHand([], 'わたし')).toBeNull();
+      expect(sendSystemNotice).not.toHaveBeenCalled();
+    });
+  });
 });

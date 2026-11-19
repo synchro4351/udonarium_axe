@@ -1245,6 +1245,8 @@
         "giveTo": "渡す相手",
         "drawFromOther": "相手の手札から引く",
         "discardPairs": "ペアを捨てる",
+        "discardHand": "手札を全部、山札にして場に出す",
+        "discardHandConfirm": "手札 {{count}} 枚を全部、裏向きの山札にして場に出しますか？",
         "noPairs": "同じ数字の組がありません"
       },
       "title": "カード",
@@ -1282,11 +1284,13 @@
       },
       "targetPickingHint": "ターゲットにする対象をクリックしてください（Esc で中止）",
       "discardStackName": "捨て札",
+      "handStackName": "{{name}} の手札",
       "message": {
         "drewFromHand": "{{to}} が {{from}} の手札から 1 枚引きました",
         "gaveFromHand": "{{from}} が {{to}} に手札を 1 枚渡しました",
         "handedOver": "{{name}} が {{from}} の手札 {{count}} 枚を {{to}} に引き継ぎました",
-        "discardedPairs": "{{name}} が {{ranks}} のペアを捨てました"
+        "discardedPairs": "{{name}} が {{ranks}} のペアを捨てました",
+        "discardedHand": "{{name}} が {{holder}} の手札 {{count}} 枚を山札にして場に出しました"
       },
       "drawPanel": {
         "title": "相手の手札から引く",
