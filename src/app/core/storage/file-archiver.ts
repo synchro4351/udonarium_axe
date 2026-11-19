@@ -12,6 +12,7 @@ import { isNetworkIsolated } from '@axe/core/network/network-isolation';
 import { AudioStorage } from '@axe/core/storage/audio-storage';
 import * as FileReaderUtil from '@axe/core/storage/file-reader-util';
 import { gltfFactsOf, MAX_MODEL_TRIANGLES } from '@axe/core/storage/gltf-facts';
+import { shrinkImageToBytes } from '@axe/core/storage/image-downscale';
 import type { ImageFile } from '@axe/core/storage/image-file';
 import { imageTypeOf } from '@axe/core/storage/image-sniff';
 import { ImageStorage } from '@axe/core/storage/image-storage';
@@ -324,10 +325,16 @@ export class FileArchiver {
   }
 
   /** The picture as stored, `oversized` for one too large to take in, or null for one the room removed and keeps out. */
-  private async storeImage(file: File): Promise<ImageFile | 'oversized' | null> {
+  private async storeImage(given: File): Promise<ImageFile | 'oversized' | null> {
+    let file = given;
     if (file.size > MAX_LOADED_IMAGE_BYTES) {
-      Logger.warn(`[FileArchiver] ファイルサイズ制限超過: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
-      return 'oversized';
+      // Too heavy to share as it is: scaled down in its own format until it fits, where it can be.
+      const fitted = await shrinkImageToBytes(file, MAX_LOADED_IMAGE_BYTES);
+      if (!fitted) {
+        Logger.warn(`[FileArchiver] ファイルサイズ制限超過: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+        return 'oversized';
+      }
+      file = new File([fitted], file.name, { type: fitted.type });
     }
     return ImageStorage.instance.addAsync(file, { putBack: true });
   }

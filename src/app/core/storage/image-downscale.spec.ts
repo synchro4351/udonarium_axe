@@ -1,4 +1,10 @@
-import { convertBlobToWebP, downscaleImageBlob, isAnimatedPng, squareCropOf } from '@axe/core/storage/image-downscale';
+import {
+  convertBlobToWebP,
+  downscaleImageBlob,
+  isAnimatedPng,
+  shrinkImageToBytes,
+  squareCropOf,
+} from '@axe/core/storage/image-downscale';
 
 describe('downscaleImageBlob', () => {
   it('returns nothing for no bytes', async () => {
@@ -107,5 +113,48 @@ describe('isAnimatedPng', () => {
 
   it('reports none for an empty buffer', () => {
     expect(isAnimatedPng(new ArrayBuffer(0))).toBe(false);
+  });
+});
+
+describe('shrinkImageToBytes', () => {
+  /** A stand-in for drawing through a canvas: the result weighs in proportion to its area. */
+  function resampleBy(weightAt: (scale: number) => number) {
+    return vi.fn(async (blob: Blob, scale: number) => new Blob([new Uint8Array(weightAt(scale))], { type: blob.type }));
+  }
+
+  it('hands back a picture already within the limit as it is', async () => {
+    const blob = new Blob([new Uint8Array(100)], { type: 'image/jpeg' });
+    const resample = resampleBy(() => 0);
+
+    expect(await shrinkImageToBytes(blob, 200, resample)).toBe(blob);
+    expect(resample).not.toHaveBeenCalled();
+  });
+
+  it('scales a heavy picture down in its own format until it fits', async () => {
+    const blob = new Blob([new Uint8Array(8000)], { type: 'image/png' });
+    const resample = resampleBy((scale) => Math.round(8000 * scale * scale * 1.5));
+
+    const fitted = await shrinkImageToBytes(blob, 2000, resample);
+
+    expect(fitted!.size).toBeLessThanOrEqual(2000);
+    expect(fitted!.type).toBe('image/png');
+    expect(resample.mock.calls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('gives up on an animation, a vector, a format a canvas does not write back, or one that never fits', async () => {
+    const heavy = (type: string) => new Blob([new Uint8Array(5000)], { type });
+    const resample = resampleBy(() => 4000);
+
+    expect(await shrinkImageToBytes(heavy('image/gif'), 1000, resample)).toBeNull();
+    expect(await shrinkImageToBytes(heavy('image/svg+xml'), 1000, resample)).toBeNull();
+    expect(await shrinkImageToBytes(heavy('image/bmp'), 1000, resample)).toBeNull();
+    expect(await shrinkImageToBytes(heavy('image/jpeg'), 1000, resample)).toBeNull();
+  });
+
+  it('gives up where the canvas writes another format, keeping the one it came in', async () => {
+    const blob = new Blob([new Uint8Array(5000)], { type: 'image/webp' });
+    const resample = vi.fn(async () => new Blob([new Uint8Array(10)], { type: 'image/png' }));
+
+    expect(await shrinkImageToBytes(blob, 1000, resample)).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { canvasToBlobPreferWebP } from '@axe/core/storage/canvas-blob';
+import { canvasToBlob, canvasToBlobPreferWebP } from '@axe/core/storage/canvas-blob';
 import { loadImage } from '@axe/core/util/load-image';
 export interface DownscaleOptions {
   /**
@@ -174,4 +174,64 @@ export function isAnimatedPng(buffer: ArrayBuffer): boolean {
     offset += 12 + chunkLength;
   }
   return false;
+}
+
+/** The formats a picture keeps when it is scaled down to fit: the ones a canvas writes back the same. */
+const KEPT_FORMATS = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+/** How many times a picture is scaled down further before it is given up as too heavy. */
+const FIT_ATTEMPTS = 6;
+
+/** Draws a picture at a scale of its own size, in its own format, or null where it cannot be. */
+export type ImageResample = (blob: Blob, scale: number) => Promise<Blob | null>;
+
+/**
+ * A picture scaled down, in the format it came in, until it weighs no more than a limit; the
+ * picture itself where it already does, and null where it cannot be brought under: an animation
+ * or a vector, which a canvas would flatten, or a format a canvas does not write back.
+ *
+ * Only the weight decides. The first try aims a little under the limit from how far over it is,
+ * since a picture's weight goes roughly with its area, and each try after that is smaller still.
+ */
+export async function shrinkImageToBytes(
+  blob: Blob,
+  maxBytes: number,
+  resample: ImageResample = resampleAtScale
+): Promise<Blob | null> {
+  if (blob.size <= maxBytes) return blob;
+  if (!KEPT_FORMATS.has(blob.type)) return null;
+  if (blob.type === 'image/png' && isAnimatedPng(await blob.slice(0, 1024).arrayBuffer())) return null;
+  let scale = Math.sqrt(maxBytes / blob.size) * 0.9;
+  for (let attempt = 0; attempt < FIT_ATTEMPTS; attempt++) {
+    const scaled = await resample(blob, scale);
+    if (!scaled || scaled.type !== blob.type) return null;
+    if (scaled.size <= maxBytes) return scaled;
+    scale *= Math.max(0.5, Math.sqrt(maxBytes / scaled.size) * 0.9);
+  }
+  return null;
+}
+
+/** Draws a picture at a scale of its own size through a canvas, written in the format it came in. */
+async function resampleAtScale(blob: Blob, scale: number): Promise<Blob | null> {
+  if (typeof document === 'undefined' || typeof Image === 'undefined' || typeof URL === 'undefined') return null;
+  if (typeof URL.createObjectURL !== 'function') return null;
+  let objectUrl: string | null = null;
+  try {
+    objectUrl = URL.createObjectURL(blob);
+    const img = await loadImage(objectUrl, { timeoutMs: LOAD_TIMEOUT_MS });
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (w <= 0 || h <= 0) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(w * scale));
+    canvas.height = Math.max(1, Math.round(h * scale));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return await canvasToBlob(canvas, blob.type, 0.9);
+  } catch {
+    return null;
+  } finally {
+    if (objectUrl !== null) URL.revokeObjectURL(objectUrl);
+  }
 }
