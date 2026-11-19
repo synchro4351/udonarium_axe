@@ -109,7 +109,13 @@ export const TABLE_AGENT_TOOLS: readonly AgentToolDefinition[] = [
     title: 'List the stamps',
     access: 'read',
     description: 'List the stamps that can be sent: the built-in ones and the room’s own stamp sets, by name and id.',
-    input: input({ name: { type: 'string', description: 'Only those whose name holds this.', maxLength: 40 } }),
+    input: input({
+      name: {
+        type: 'string',
+        description: 'Only those whose name or the words they go by hold this, so 閃き finds ひらめいた!.',
+        maxLength: 40,
+      },
+    }),
   },
   {
     name: 'send_stamp',

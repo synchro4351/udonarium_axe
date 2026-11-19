@@ -13,11 +13,12 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { Alarm } from '@axe/domain/alarm/alarm';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { BUILTIN_STAMPS, stampNameKey } from '@axe/domain/chat/stamp-catalog';
+import { STAMP_WORDS, stampMatchesQuery } from '@axe/domain/chat/stamp-words';
 import { DataElement } from '@axe/domain/data/data-element';
 import { SortOrder } from '@axe/domain/data/data-summary-setting';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { Vote } from '@axe/domain/vote/vote';
-import { filterByName, findOne, numberArg, textArg } from '@axe/features/agent-tools/agent-lookup';
+import { findOne, numberArg, textArg } from '@axe/features/agent-tools/agent-lookup';
 import { AgentReadTools } from '@axe/features/agent-tools/agent-read-tools.service';
 
 /** The sheet item the turn order is written into where the inventory sorts by none. */
@@ -57,9 +58,14 @@ export class AgentTableTools {
     },
     set_alarm: (args) => this.setAlarm(args),
     start_vote: (args) => this.startVote(args),
-    list_stamps: (args) => ({
-      stamps: filterByName(this.stamps(), (stamp) => stamp.name, args['name'], STAMPS_LISTED),
-    }),
+    list_stamps: (args) => {
+      const query = textArg(args, 'name');
+      // Found by the words a stamp goes by as well as its name, as the picker finds them.
+      const fits = this.stamps().filter((stamp) =>
+        stampMatchesQuery([stamp.name, ...(STAMP_WORDS[stamp.id] ?? [])], query)
+      );
+      return { stamps: fits.slice(0, STAMPS_LISTED) };
+    },
     send_stamp: (args) => this.sendStamp(args),
   };
 
