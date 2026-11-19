@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
+import { TabletopActionService } from '@axe/application/tabletop/tabletop-action.service';
 import { AgentToolError } from '@axe/core/agent/agent-error';
 import { Network } from '@axe/core/network/network';
 import { ObjectStore } from '@axe/core/sync/object-store';
@@ -10,7 +11,7 @@ import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
-import { AgentCardTools, playingCardOf } from '@axe/features/agent-tools/agent-card-tools.service';
+import { AgentCardTools } from '@axe/features/agent-tools/agent-card-tools.service';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 
 const signal = new AbortController().signal;
@@ -87,6 +88,23 @@ describe('AgentCardTools', () => {
       expect(one.state).toBe(CardState.BACK);
     }
     expect(deck.cards).toHaveLength(1);
+  });
+
+  it('reads which playing card a card is from the code a new deck keeps in its details', async () => {
+    const deck = TestBed.inject(TabletopActionService).createTrump({ x: 0, y: 0, z: 0 });
+    deck.location.name = 'table';
+    deck.name = '新しいトランプ';
+    created.push(deck);
+    const top = deck.cards[0];
+    expect(top.detailDataElement?.getFirstElementByName('playing_card')?.value).toBe('c1');
+    const front = top.imageDataElement!.getFirstElementByName('front')!;
+    front.value = './elsewhere.webp';
+
+    const drawn = (await call('draw_card', { deck: '新しいトランプ', count: 1 }))['drawn'] as {
+      playing_card?: unknown;
+    }[];
+
+    expect(drawn[0].playing_card).toEqual({ suit: 'clubs', rank: 1 });
   });
 
   it('tells the suit and rank of a bundled playing card it sees, which its name does not', async () => {
@@ -183,11 +201,5 @@ describe('AgentCardTools', () => {
 
   it('says a deck it cannot find is not there', async () => {
     await expect(call('shuffle_deck', { deck: '無い山' })).rejects.toMatchObject({ code: 'not_found' });
-  });
-
-  it('reads no playing card from a picture that is not one of the bundled deck', () => {
-    expect(playingCardOf('./assets/images/trump/s13.webp')).toEqual({ suit: 'spades', rank: 13 });
-    expect(playingCardOf('./front-a.webp')).toBeNull();
-    expect(playingCardOf('./assets/images/trump/blank_card.webp')).toBeNull();
   });
 });
