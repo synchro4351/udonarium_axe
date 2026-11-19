@@ -26,6 +26,12 @@ const CELLS: AgentSchema = { type: 'integer', minimum: 1, maximum: 200 };
 
 const NOTE: AgentSchema = { type: 'string', description: 'A note, by its title or id.', minLength: 1 };
 
+const TABLE: AgentSchema = {
+  type: 'string',
+  description: 'A table, by name or id (see get_room); the one in view where left out.',
+  minLength: 1,
+};
+
 export const BUILD_AGENT_TOOLS: readonly AgentToolDefinition[] = [
   {
     name: 'create_table',
@@ -77,6 +83,7 @@ export const BUILD_AGENT_TOOLS: readonly AgentToolDefinition[] = [
           maximum: 100,
           description: 'How opaque, 0 to 100. 100 where left out.',
         },
+        table: TABLE,
       },
       ['col', 'row', 'width', 'height']
     ),
@@ -95,7 +102,69 @@ export const BUILD_AGENT_TOOLS: readonly AgentToolDefinition[] = [
       width: CELLS,
       height: CELLS,
       name: { type: 'string', description: 'Only the masks whose name starts with this.', maxLength: 60 },
+      table: TABLE,
     }),
+  },
+  {
+    name: 'scratch_masks',
+    title: 'Scratch map masks open',
+    access: 'gm',
+    description:
+      'Scratch open the squares of an area on the map masks of a table, as the scratch of a mask does, so the ' +
+      'players see through those squares while the mask stays; or cover them again with open false. Suits a ' +
+      'mask laid as one piece. Returns how many squares changed.',
+    input: input(
+      {
+        col: COL,
+        row: ROW,
+        width: CELLS,
+        height: CELLS,
+        open: { type: 'boolean', description: 'Open the squares; false covers them again. Open where left out.' },
+        table: TABLE,
+      },
+      ['col', 'row', 'width', 'height']
+    ),
+  },
+  {
+    name: 'remove_table',
+    title: 'Throw a table away',
+    access: 'gm',
+    destructive: true,
+    description: 'Throw away a table that is not in view, with everything on it.',
+    input: input({ table: { ...TABLE, description: 'The table, by name or id.' } }, ['table']),
+  },
+  {
+    name: 'remove_deck',
+    title: 'Throw a deck away',
+    access: 'gm',
+    destructive: true,
+    description: 'Throw away a deck on the table, with the cards in it (see list_assets or the table for its name).',
+    input: input({ deck: { type: 'string', description: 'The deck, by name or id.', minLength: 1 } }, ['deck']),
+  },
+  {
+    name: 'turn_piece',
+    title: 'Turn a piece or lay it down',
+    access: 'write',
+    description:
+      'Turn a piece to face a way, in degrees clockwise from facing up the table, or lay it down on its back and ' +
+      'stand it up again, as its handles on the table do.',
+    input: input(
+      {
+        piece: { type: 'string', description: 'A piece, by name or id.', minLength: 1 },
+        facing: { type: 'number', minimum: -360, maximum: 360, description: 'Degrees clockwise.' },
+        lying: { type: 'boolean', description: 'Lay it down, or stand it up with false.' },
+      },
+      ['piece']
+    ),
+  },
+  {
+    name: 'set_note_visibility',
+    title: 'Show a note or keep it back',
+    access: 'write',
+    description:
+      'Let everyone read a note on the table, or keep it to the game master and its owner, as the menu of a ' +
+      'note does.',
+    input: input({ note: NOTE, visible: { type: 'boolean' } }, ['note', 'visible']),
   },
   {
     name: 'list_notes',

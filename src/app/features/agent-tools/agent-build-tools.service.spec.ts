@@ -3,6 +3,7 @@ import { AgentToolError } from '@axe/core/agent/agent-error';
 import type { IPeerContext } from '@axe/core/network/peer-context';
 import { resetPeerContextProvider, setPeerContextProvider } from '@axe/core/network/peer-context-source';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { GameTable } from '@axe/domain/tabletop/game-table';
@@ -99,5 +100,59 @@ describe('AgentBuildTools', () => {
     const made = ObjectStore.instance.get<GameTable>((result['table'] as { id: string }).id)!;
     expect([made.name, made.width, made.height]).toEqual(['洞窟', 30, 12]);
     expect(TableSelecter.instance.viewTableIdentifier).toBe(table.identifier);
+  });
+
+  it('scratches squares of a mask open and covers them again, leaving the mask', async () => {
+    await call('place_masks', { col: 1, row: 1, width: 4, height: 4, size: 4, name: '霧' });
+    const mask = table.masks[0];
+
+    expect(await call('scratch_masks', { col: 2, row: 2, width: 2, height: 1 })).toEqual({ changed: 2 });
+    expect(mask.scratchedGrids).toBe('1:1,2:1');
+
+    await call('scratch_masks', { col: 2, row: 2, width: 1, height: 1, open: false });
+    expect(mask.scratchedGrids).toBe('2:1');
+    expect(table.masks).toHaveLength(1);
+  });
+
+  it('lays masks on a table not in view when one is named', async () => {
+    const cave = (await call('create_table', { name: '洞窟', width: 10, height: 10 }))['table'] as { id: string };
+
+    await call('place_masks', { col: 1, row: 1, width: 2, height: 1, table: '洞窟' });
+
+    expect(ObjectStore.instance.get<GameTable>(cave.id)!.masks).toHaveLength(2);
+    expect(table.masks).toHaveLength(0);
+  });
+
+  it('throws away a table not in view, but not the one in view', async () => {
+    const cave = (await call('create_table', { name: '洞窟', width: 10, height: 10 }))['table'] as { id: string };
+
+    await expect(call('remove_table', { table: table.name || table.identifier })).rejects.toBeInstanceOf(
+      AgentToolError
+    );
+    await call('remove_table', { table: '洞窟' });
+
+    expect(ObjectStore.instance.get(cave.id)).toBeNull();
+  });
+
+  it('turns a piece and lays it down', async () => {
+    const piece = GameCharacter.create('ゴブリン', 1, '');
+    piece.location.name = 'table';
+
+    expect(await call('turn_piece', { piece: 'ゴブリン', facing: 450, lying: true })).toEqual({
+      piece: 'ゴブリン',
+      facing: 90,
+      lying: true,
+    });
+    expect(piece.roll).toBe(90);
+  });
+
+  it('lets everyone read a note, or keeps it back', async () => {
+    await call('place_note', { title: '手がかり', text: '井戸', hidden: true });
+    const note = ObjectStore.instance.getObjects<TextNote>(TextNote)[0];
+
+    await call('set_note_visibility', { note: '手がかり', visible: true });
+    expect(note.disclosureMode).toBe('all');
+    await call('set_note_visibility', { note: '手がかり', visible: false });
+    expect(note.disclosureMode).toBe('gm');
   });
 });
