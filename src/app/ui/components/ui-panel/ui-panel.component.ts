@@ -32,7 +32,12 @@ import { ViewportService } from '@axe/application/ui/viewport.service';
 import { observeSize } from '@axe/core/util/observe-size';
 import { holdLiveState } from '@axe/ui/components/ui-panel/live-state';
 import { PanelBarButtonComponent } from '@axe/ui/components/ui-panel/panel-bar-button.component';
-import { fullScreenBox, leastSizeCorrection, viewportShift } from '@axe/ui/components/ui-panel/panel-geometry';
+import {
+  fullScreenBox,
+  leastSizeCorrection,
+  shiftClearOfDocks,
+  viewportShift,
+} from '@axe/ui/components/ui-panel/panel-geometry';
 import { PanelTabSlotComponent } from '@axe/ui/components/ui-panel/panel-tab-slot.component';
 import { PanelTabStripComponent } from '@axe/ui/components/ui-panel/panel-tab-strip.component';
 import {
@@ -465,6 +470,16 @@ export class UIPanelComponent implements PanelFrame, PanelDropFrame, PanelDockFr
       },
     });
     afterNextRender({ read: () => this.destroyRef.onDestroy(this.panelDrag.register(this)) });
+    // As a panel is docked or taken off a side, those standing free move clear of it (tyoitashi).
+    effect((onCleanup) => {
+      this.panelDock.insets();
+      if (this.docked() || this.isFullScreen()) return;
+      const pending = afterNextRender(
+        { write: () => this.clampPanelToViewport(this.draggablePanel().nativeElement) },
+        { injector: this.injector }
+      );
+      onCleanup(() => pending.destroy());
+    });
     this.destroyRef.onDestroy(() => this.panelDock.forget(this));
   }
 
@@ -849,7 +864,12 @@ export class UIPanelComponent implements PanelFrame, PanelDropFrame, PanelDockFr
    */
   private clampPanelToViewport(panel: HTMLElement): void {
     const view = panel.ownerDocument.defaultView ?? window;
-    const shift = viewportShift(panel.getBoundingClientRect(), { width: view.innerWidth, height: view.innerHeight });
+    const box = { width: view.innerWidth, height: view.innerHeight };
+    // A panel standing free in the main window keeps clear of the panels docked at its sides too.
+    const shift =
+      view === window && !this.docked()
+        ? shiftClearOfDocks(panel.getBoundingClientRect(), box, this.panelDock.insets())
+        : viewportShift(panel.getBoundingClientRect(), box);
     if (shift.x === 0 && shift.y === 0) return;
     this.left = panel.offsetLeft + shift.x;
     this.top = panel.offsetTop + shift.y;

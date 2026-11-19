@@ -1,4 +1,9 @@
-import { fullScreenBox, leastSizeCorrection, viewportShift } from '@axe/ui/components/ui-panel/panel-geometry';
+import {
+  fullScreenBox,
+  leastSizeCorrection,
+  shiftClearOfDocks,
+  viewportShift,
+} from '@axe/ui/components/ui-panel/panel-geometry';
 
 describe('fullScreenBox()', () => {
   it('fills the window from its corner', () => {
@@ -73,5 +78,29 @@ describe('leastSizeCorrection()', () => {
 
   it('leaves a side it could not read alone', () => {
     expect(leastSizeCorrection({ left: 100, top: 100, width: NaN, height: NaN }, least, view)).toEqual({});
+  });
+});
+
+describe('shiftClearOfDocks', () => {
+  const view = { width: 1000, height: 800 };
+  const rect = (left: number, width: number) => ({
+    left,
+    right: left + width,
+    width,
+    top: 100,
+    bottom: 400,
+    height: 300,
+  });
+
+  it('moves a panel standing under a panel docked on the left out to its edge', () => {
+    expect(shiftClearOfDocks(rect(50, 300), view, { left: 200, right: 0 })).toEqual({ x: 150, y: 0 });
+  });
+
+  it('moves one under a panel docked on the right back in', () => {
+    expect(shiftClearOfDocks(rect(600, 300), view, { left: 0, right: 250 })).toEqual({ x: -150, y: 0 });
+  });
+
+  it('leaves a panel already clear where it is', () => {
+    expect(shiftClearOfDocks(rect(300, 300), view, { left: 200, right: 250 })).toEqual({ x: 0, y: 0 });
   });
 });

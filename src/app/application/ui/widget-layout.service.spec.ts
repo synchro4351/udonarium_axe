@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { PanelDockService } from '@axe/application/ui/panel-dock.service';
 import { parseWidgetLayout, WidgetLayoutService } from '@axe/application/ui/widget-layout.service';
 import { refuseLocalStorage } from '@axe/testing/refused-storage';
 
@@ -84,6 +85,14 @@ describe('WidgetLayoutService', () => {
       left: 40,
       top: 60,
     });
+  });
+
+  it('keeps a widget clear of the panels docked at the sides', () => {
+    TestBed.inject(PanelDockService).insets.set({ left: 300, right: 200 });
+    const service = TestBed.inject(WidgetLayoutService);
+
+    expect(service.keepInView({ left: 40, top: 60 }, 100, 40).left).toBe(308);
+    expect(service.keepInView({ left: 99_999, top: 60 }, 100, 40).left).toBe(window.innerWidth - 200 - 100 - 8);
   });
 
   it('still moves a widget where the browser refuses to keep where it was left', () => {
