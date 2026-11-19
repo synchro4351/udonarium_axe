@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { AgentPersonaService } from '@axe/application/agent/agent-persona.service';
 import type { AgentHandler } from '@axe/application/agent/agent-tool-runner.service';
 import { type AgentChatLine, AgentViews } from '@axe/application/agent/agent-views.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
@@ -41,6 +42,7 @@ function patternOf(system: GameSystemClass): RegExp | null {
 @Injectable({ providedIn: 'root' })
 export class AgentChatTools {
   private readonly read = inject(AgentReadTools);
+  private readonly persona = inject(AgentPersonaService);
   private readonly views = inject(AgentViews);
   private readonly chat = inject(ChatMessageService);
   private readonly chatSend = inject(ChatSendService);
@@ -95,6 +97,8 @@ export class AgentChatTools {
       replyTo: '',
       quoteOf: '',
       toTicker: false,
+      // A line said as no piece goes out under the AI's own name and face (tyoitashi).
+      ...(sendFrom === PeerCursor.myCursor?.identifier ? { speakAs: this.persona.speakAs() } : {}),
     });
 
     const sent: string[] = [];

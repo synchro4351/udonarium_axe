@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { AgentPersonaService } from '@axe/application/agent/agent-persona.service';
 import { AgentViews } from '@axe/application/agent/agent-views.service';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { diceRolled$ } from '@axe/core/event/domain-events';
@@ -88,6 +89,16 @@ describe('AgentChatTools', () => {
     const [line] = said();
     expect(line.isByAi).toBe(true);
     expect(line.toXml()).toContain('via="ai"');
+  });
+
+  it('says a line of its own under the name chosen for the AI, not the seat it shares', async () => {
+    TestBed.inject(AgentPersonaService).setName('AIちゃん');
+
+    const result = await call('send_chat', { text: '呼んだ？' });
+
+    expect(result.lines).toEqual([expect.objectContaining({ text: '呼んだ？', by_ai: true })]);
+    expect(said()[0].name).toBe('AIちゃん');
+    TestBed.inject(AgentPersonaService).setName('');
   });
 
   it('marks nothing said outside a call of the AI', () => {

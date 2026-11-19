@@ -287,6 +287,14 @@
         "clear": "Clear",
         "refused": "Refused"
       },
+      "persona": {
+        "heading": "The AI's name and face",
+        "name": "Name",
+        "face": "Face",
+        "pickFace": "Pick a picture",
+        "clearFace": "Clear",
+        "hint": "What the AI speaks as when it speaks as no piece; the seat's own name where left empty. Give it a name of its own when it shares a seat with a person. Call it by this name and it answers."
+      },
       "setup": {
         "heading": "How to connect",
         "download": "Download axe-mcp.mjs, tyoitashi's bridge, from this site (it needs Node.js 22 or later). The official bridge does not connect to this Axe.",

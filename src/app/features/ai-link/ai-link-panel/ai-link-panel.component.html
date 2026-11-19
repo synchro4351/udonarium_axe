@@ -109,6 +109,38 @@
     }
   </section>
 
+  <section
+    class="border-ui-border-panel bg-ui-surface rounded-ui flex flex-col gap-2 border border-solid p-3"
+    data-testid="ai-link-persona"
+  >
+    <h3 class="m-0 text-[12px] font-semibold">{{ 'feature.aiLink.persona.heading' | transloco }}</h3>
+    <label class="flex items-center gap-2 text-xs">
+      <span class="text-ui-muted shrink-0">{{ 'feature.aiLink.persona.name' | transloco }}</span>
+      <input
+        type="text"
+        maxlength="40"
+        class="bg-ui-input border-ui-border-panel text-ui-text rounded-ui-sm min-w-0 flex-1 border border-solid px-2 py-1"
+        data-testid="ai-link-persona-name"
+        [value]="persona.chosenName()"
+        [placeholder]="persona.name()"
+        (change)="setPersonaName($event)"
+      />
+    </label>
+    <div class="flex items-center gap-2 text-xs">
+      <span class="text-ui-muted shrink-0">{{ 'feature.aiLink.persona.face' | transloco }}</span>
+      @if (personaFaceUrl(); as url) {
+        <img class="size-8 rounded-full object-cover" [src]="url | safe: 'resourceUrl'" alt="" />
+      }
+      <button type="button" data-testid="ai-link-persona-face" (click)="pickPersonaFace()">
+        {{ 'feature.aiLink.persona.pickFace' | transloco }}
+      </button>
+      @if (persona.imageIdentifier()) {
+        <button type="button" (click)="clearPersonaFace()">{{ 'feature.aiLink.persona.clearFace' | transloco }}</button>
+      }
+    </div>
+    <p class="text-ui-dim m-0 text-[11px]">{{ 'feature.aiLink.persona.hint' | transloco }}</p>
+  </section>
+
   <details class="border-ui-border-panel bg-ui-surface rounded-ui border border-solid p-3" data-testid="ai-link-setup">
     <summary class="cursor-pointer text-[12px] font-semibold">{{ 'feature.aiLink.setup.heading' | transloco }}</summary>
     <ol class="m-0 mt-2 flex flex-col gap-2 pl-5 text-xs/relaxed">

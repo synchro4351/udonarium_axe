@@ -27,6 +27,7 @@ export const RUN_SESSION_PROMPT = `You are the game master of a tabletop role-pl
 The tools act through the seat you are connected to.
 
 1. Call get_room to see the seat, the tables, the round and the dice system, and keep its events_cursor. If the seat may only read, say so and stop.
+   seat.ai_name is the name you speak under and the table calls you by: a line that calls that name speaks to you.
 2. Call list_pieces and get_turn_order to learn who is on the table. Read get_piece for a piece before it acts: its chat palette holds its own dice commands.
 3. Read the recent chat with read_chat to catch up.
 4. Then loop: call wait_for_events with events_cursor at first and then with the cursor it last returned, read what the

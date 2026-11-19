@@ -1,10 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { AgentPersonaService } from '@axe/application/agent/agent-persona.service';
 import { AgentToolRunner } from '@axe/application/agent/agent-tool-runner.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
+import { ImageService } from '@axe/application/storage/image.service';
+import { ModalService } from '@axe/application/ui/modal.service';
 import { AGENT_BRIDGE_PORT, AGENT_TRUSTED_ORIGINS, type AgentScope } from '@axe/core/agent/agent-protocol';
 import { agentToolOf } from '@axe/core/agent/agent-tools';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
 import { AiLinkService } from '@axe/features/ai-link/ai-link.service';
+import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
+import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
 
 /** Where the bridge is downloaded from. */
@@ -35,13 +40,44 @@ export type AiLinkStateKey = 'idle' | 'connecting' | 'connected' | 'unreachable'
   selector: 'ai-link-panel',
   templateUrl: './ai-link-panel.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoModule],
+  imports: [SafePipe, TranslocoModule],
   host: { class: 'block h-full' },
 })
 export class AiLinkPanelComponent {
   protected readonly link = inject(AiLinkService);
   protected readonly runner = inject(AgentToolRunner);
   private readonly permission = inject(RolePermissionService);
+  protected readonly persona = inject(AgentPersonaService);
+  private readonly modal = inject(ModalService);
+  private readonly images = inject(ImageService);
+  /** Bumped as the AI's name or face changes, for what shows them to read again. */
+  protected readonly personaVersion = signal(0);
+
+  /** The picture of the AI's face, empty while none is chosen. */
+  protected personaFaceUrl(): string {
+    this.personaVersion();
+    const identifier = this.persona.imageIdentifier();
+    return identifier ? this.images.getSkeletonOr(identifier).url : '';
+  }
+
+  protected setPersonaName(event: Event): void {
+    this.persona.setName((event.target as HTMLInputElement).value);
+    this.personaVersion.update((v) => v + 1);
+  }
+
+  /** Picks a picture from the room's for the AI's face. */
+  protected pickPersonaFace(): void {
+    void this.modal.open<string>(FileSelecterComponent).then((identifier) => {
+      if (!identifier) return;
+      this.persona.setImage(identifier);
+      this.personaVersion.update((v) => v + 1);
+    });
+  }
+
+  protected clearPersonaFace(): void {
+    this.persona.setImage('');
+    this.personaVersion.update((v) => v + 1);
+  }
 
   protected readonly releasesUrl = aiLinkBridgeUrl();
   protected readonly subscriptionGuideUrl = SUBSCRIPTION_GUIDE_URL;

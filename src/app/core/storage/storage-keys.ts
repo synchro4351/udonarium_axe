@@ -6,6 +6,7 @@
  * first written, whatever pattern later ones follow.
  */
 export const STORAGE_KEYS = {
+  agentPersona: 'axe.agent.persona',
   aiGm: 'axe.ai-gm',
   aiLink: 'axe.ai-link',
   ambienceFrameStep: 'ui-ambience-frame-step',
