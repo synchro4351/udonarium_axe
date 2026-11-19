@@ -1492,7 +1492,11 @@
         "cardCount": "{{count}}장",
         "dropHere": "여기에 놓으면 {{name}}에게 건넵니다",
         "drawHere": "여기에 놓으면 내 패에 넣습니다",
-        "noPlayers": "패를 가질 수 있는 참가자가 없습니다"
+        "noPlayers": "패를 가질 수 있는 참가자가 없습니다",
+        "choose": "표시할 사람",
+        "hiddenCount": "{{count}}명 숨김",
+        "showAll": "모두 표시",
+        "keptHidden": "숨겼습니다 (카드를 가지고 있어 표시 중)"
       }
     },
     "textNote": {

@@ -11,7 +11,45 @@
     [class.text-ui-dim]="!allowsDraw()"
     >{{ 'feature.card.handOverview.drawRule' | transloco: { state: allowsDraw() ? 'ON' : 'OFF' } }}</span
   >
+  <button
+    type="button"
+    class="border-ui-border-panel text-ui-dim hover:bg-ui-hover hover:text-ui-text rounded-ui-sm ml-auto cursor-pointer border border-solid bg-transparent px-1.5 py-0.5 text-xs"
+    data-testid="hand-overview-choose"
+    [attr.aria-expanded]="choosingHands()"
+    (click)="choosingHands.set(!choosingHands())"
+  >
+    {{ 'feature.card.handOverview.choose' | transloco }}
+    @if (hiddenHands().size > 0) {
+      （{{ 'feature.card.handOverview.hiddenCount' | transloco: { count: hiddenHands().size } }}）
+    }
+  </button>
 </p>
+@if (choosingHands()) {
+  <div
+    class="border-ui-border-panel bg-ui-elevated rounded-ui mb-2 border border-solid p-2"
+    data-testid="hand-overview-chooser"
+  >
+    @for (section of allSections(); track section.userId) {
+      <label class="flex cursor-pointer items-center gap-2 py-0.5 text-sm">
+        <input
+          type="checkbox"
+          [checked]="!hiddenHands().has(section.userId)"
+          (change)="toggleHandShown(section.userId)"
+          [attr.data-testid]="'hand-overview-show-' + section.userId"
+        />
+        <ng-container [ngTemplateOutlet]="face" [ngTemplateOutletContext]="{ url: section.faceUrl }" />
+        <span class="truncate">{{ section.name || ('feature.card.hand.unnamed' | transloco) }}</span>
+      </label>
+    }
+    <button
+      type="button"
+      class="text-ui-dim hover:text-ui-text mt-1 cursor-pointer border-0 bg-transparent p-0 text-xs underline"
+      (click)="showAllHands()"
+    >
+      {{ 'feature.card.handOverview.showAll' | transloco }}
+    </button>
+  </div>
+}
 @for (section of sections(); track section.userId) {
   @let carrying = dropping() || giving() || tableDropping();
   @let source = carrying && section.userId === giveSource();
@@ -29,10 +67,11 @@
     [class.border-dashed]="target && !active"
     [class.border-ui-accent]="target"
     [class.bg-ui-hover]="active"
-    [class.opacity-50]="source"
+    [class.opacity-50]="source || section.keptHidden"
     [attr.aria-label]="section.name"
   >
     <header class="mb-1 flex items-center gap-2 text-sm">
+      <ng-container [ngTemplateOutlet]="face" [ngTemplateOutletContext]="{ url: section.faceUrl }" />
       <span class="truncate font-bold">{{ section.name || ('feature.card.hand.unnamed' | transloco) }}</span>
       @if (section.isSelf) {
         <span class="text-ui-dim shrink-0 text-xs">{{ 'feature.card.handOverview.you' | transloco }}</span>
@@ -60,6 +99,11 @@
         {{ 'feature.card.handOverview.cardCount' | transloco: { count: section.cards.length } }}
       </span>
     </header>
+    @if (section.keptHidden) {
+      <p class="text-ui-dim m-0 mb-1 text-[11px]" data-testid="hand-overview-kept-hidden">
+        {{ 'feature.card.handOverview.keptHidden' | transloco }}
+      </p>
+    }
     @if (carrying && !source) {
       <p class="text-ui-accent m-0 mb-1 text-[11px] font-bold" data-testid="hand-overview-drop-hint">
         {{ 'feature.card.handOverview.dropHere' | transloco: { name: section.name } }}
@@ -100,3 +144,17 @@
   <p class="text-ui-dim m-0 text-xs">{{ 'feature.card.handOverview.noPlayers' | transloco }}</p>
 }
 <orphan-hand-rescue />
+
+<!-- The face beside a holder's name; a plain circle where there is no picture. -->
+<ng-template #face let-url="url">
+  @if (url) {
+    <img
+      class="size-6 shrink-0 rounded-full object-cover"
+      data-testid="hand-overview-face"
+      [src]="url | safe: 'resourceUrl'"
+      alt=""
+    />
+  } @else {
+    <span class="bg-ui-elevated size-6 shrink-0 rounded-full" aria-hidden="true"></span>
+  }
+</ng-template>
