@@ -14,6 +14,7 @@ import {
 import { OverlayLayers } from '@axe/application/ui/overlay-layers';
 import { PanelFrame, PanelService } from '@axe/application/ui/panel.service';
 import { ViewportService } from '@axe/application/ui/viewport.service';
+import { FileArchiver } from '@axe/core/storage/file-archiver';
 import { AttachedDocuments } from '@axe/domain/ui/attached-documents';
 import { PanelWindowLayerComponent } from '@axe/features/panels/panel-window-layer.component';
 import { windowRendererFactory } from '@axe/features/panels/window-renderer';
@@ -77,6 +78,8 @@ interface OpenWindow {
   watchdog: ReturnType<typeof setInterval>;
   /** Set once the panel has arrived, so an empty layer afterwards means the panel has gone. */
   arrived: boolean;
+  /** Stops taking files dropped on the window. */
+  stopDrops: () => void;
 }
 
 /**
@@ -106,6 +109,8 @@ export class PanelWindowService {
   private readonly rendererFactory = inject(RendererFactory2);
   private readonly viewport = inject(ViewportService);
   private readonly overlays = inject(OverlayLayers);
+  /** Where files dropped on a window go; absent where nothing loads files, as in a test of the windows alone. */
+  private readonly fileArchiver = inject(FileArchiver, { optional: true });
 
   private readonly windows = new Map<string, OpenWindow>();
 
@@ -161,6 +166,8 @@ export class PanelWindowService {
     this.dress(target);
     this.watchSheets();
     AttachedDocuments.attach(target);
+    // Files dropped on the window go in as they would dropped on the table, a sound on a jukebox among them.
+    const stopDrops = this.fileArchiver?.listenForDrops(target) ?? (() => undefined);
 
     // Everything drawn in the window is made by the window's own document. Angular would
     // otherwise make it with the document the application started in and hand it over on the
@@ -190,6 +197,7 @@ export class PanelWindowService {
       injector,
       watchdog,
       arrived: false,
+      stopDrops,
     });
     this.detached.set([...this.windows.keys()]);
     return true;
@@ -273,6 +281,7 @@ export class PanelWindowService {
     }
 
     if (comingHome && held.request.leaving) held.request.leaving();
+    held.stopDrops();
     AttachedDocuments.detach(held.document);
     this.overlays.detach(held.document);
     held.layer.destroy();
