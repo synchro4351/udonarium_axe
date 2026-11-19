@@ -116,6 +116,12 @@
         {{ 'feature.aiLink.setup.download' | transloco }}
         <a class="text-ui-accent" download="axe-mcp.mjs" [href]="releasesUrl">{{ releasesUrl }}</a>
       </li>
+      <li data-testid="ai-link-subscription">
+        {{ 'feature.aiLink.setup.subscription' | transloco }}
+        <a class="text-ui-accent" target="_blank" rel="noopener" [href]="subscriptionGuideUrl">{{
+          'feature.aiLink.setup.subscriptionLink' | transloco
+        }}</a>
+      </li>
       <li class="flex flex-col gap-1">
         <span>{{ 'feature.aiLink.setup.claudeCode' | transloco }}</span>
         <div class="flex items-start gap-1">

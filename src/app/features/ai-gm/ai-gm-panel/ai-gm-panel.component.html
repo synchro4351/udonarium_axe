@@ -302,6 +302,12 @@
         {{ 'feature.aiGm.setup.download' | transloco }}
         <a class="text-ui-accent" download="axe-mcp.mjs" [href]="releasesUrl">{{ releasesUrl }}</a>
       </li>
+      <li data-testid="ai-gm-subscription">
+        {{ 'feature.aiLink.setup.subscription' | transloco }}
+        <a class="text-ui-accent" target="_blank" rel="noopener" [href]="subscriptionGuideUrl">{{
+          'feature.aiLink.setup.subscriptionLink' | transloco
+        }}</a>
+      </li>
       <li>{{ 'feature.aiGm.setup.key' | transloco }}</li>
       <li class="flex flex-col gap-1">
         <span>{{ 'feature.aiGm.setup.start' | transloco }}</span>

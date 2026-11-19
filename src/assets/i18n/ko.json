@@ -290,6 +290,8 @@
       "setup": {
         "heading": "연결 방법",
         "download": "이 사이트에서 axe-mcp.mjs(ちょいたし판 브리지)를 받습니다(Node.js 22 이상 필요). 공식 브리지와는 연결되지 않습니다.",
+        "subscription": "Claude Pro·Max 구독으로 움직일 때는 Claude Code에서 연결합니다.",
+        "subscriptionLink": "순서 보기",
         "claudeCode": "Claude Code에서는 다음을 실행합니다(경로는 내려받은 위치로 바꿉니다).",
         "claudeDesktop": "Claude Desktop에서는 설정 파일의 mcpServers에 다음을 추가합니다.",
         "connect": "AI를 시작한 뒤 이 패널의 [연결]을 누릅니다. Claude Code에서는 /mcp__axe__run_session을 입력하면 GM으로 진행을 시작합니다. 프롬프트를 고를 수 없는 앱에서는 AI에게 \"axe://guide/run-session을 읽고 GM을 해 줘\"라고 부탁합니다.",
