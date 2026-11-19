@@ -216,6 +216,39 @@ export class FileArchiver {
   }
 
   /**
+   * Takes files dropped on another window's page, a panel popped out into a window of its own
+   * among them, as a drop here takes them, but placed nowhere: that window shows a panel, not the
+   * table. A sound dropped on a popped-out jukebox goes into the room's sounds. Returns the way to
+   * stop listening, for when the window goes.
+   */
+  listenForDrops(page: Document): () => void {
+    const body = page.body;
+    const marking = (event: Event) => this.onDragStart(event as DragEvent);
+    const allowing = (event: Event) => event.preventDefault();
+    const dropping = (event: Event) => this.onDropElsewhere(event as DragEvent);
+    body.addEventListener('dragstart', marking, true);
+    body.addEventListener('dragenter', allowing, false);
+    body.addEventListener('dragover', allowing, false);
+    body.addEventListener('drop', dropping, false);
+    return () => {
+      body.removeEventListener('dragstart', marking, true);
+      body.removeEventListener('dragenter', allowing, false);
+      body.removeEventListener('dragover', allowing, false);
+      body.removeEventListener('drop', dropping, false);
+    };
+  }
+
+  private onDropElsewhere(event: DragEvent) {
+    event.preventDefault();
+    if (event.dataTransfer?.types?.includes(INTERNAL_DRAG_TYPE)) return;
+    if (!this.mayLoadDrops()) return;
+    this.reloadCheck?.reloadCheckStart(this.networkService.peerContext?.roomName !== '');
+    const files = event.dataTransfer?.files;
+    if (!files || files.length < 1) return;
+    void this.load(files);
+  }
+
+  /**
    * Loads files as if dropped: images and audio into their stores, XML as room or object data, and
    * zips by loading what is inside.
    *

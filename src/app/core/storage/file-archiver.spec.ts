@@ -188,6 +188,40 @@ describe('FileArchiver', () => {
     });
   });
 
+  describe('a drop on a window of its own', () => {
+    function dropOn(page: Document, files: File[]): void {
+      const event = new Event('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'], files } });
+      page.body.dispatchEvent(event);
+    }
+
+    it('takes a sound dropped on a popped-out panel, and nothing once it stops listening', async () => {
+      const load = vi.spyOn(FileArchiver.instance, 'load').mockResolvedValue({ images: [], audios: [] } as never);
+      const page = document.implementation.createHTMLDocument('panel');
+      const sound = new File([new Uint8Array([1])], 'bgm.mp3', { type: 'audio/mpeg' });
+
+      const stop = FileArchiver.instance.listenForDrops(page);
+      dropOn(page, [sound]);
+      expect(load).toHaveBeenCalledWith([sound]);
+
+      stop();
+      dropOn(page, [sound]);
+      expect(load).toHaveBeenCalledTimes(1);
+    });
+
+    it('takes nothing dropped there while the reader may not bring files in', () => {
+      const load = vi.spyOn(FileArchiver.instance, 'load');
+      FileArchiver.instance.mayLoadDrops = () => false;
+      const page = document.implementation.createHTMLDocument('panel');
+
+      const stop = FileArchiver.instance.listenForDrops(page);
+      dropOn(page, [new File([new Uint8Array([1])], 'bgm.mp3', { type: 'audio/mpeg' })]);
+      stop();
+
+      expect(load).not.toHaveBeenCalled();
+    });
+  });
+
   describe('load', () => {
     it('survives an empty file list', async () => {
       await FileArchiver.instance.load([]);
