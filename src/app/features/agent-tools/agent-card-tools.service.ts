@@ -19,6 +19,27 @@ interface AgentCard {
   readonly name: string | null;
   /** The text written on its face, where the seat sees the face and the card has any. */
   readonly text?: string;
+  /** For one of the bundled playing cards whose face the seat sees: its suit and rank, which its name does not say. */
+  readonly playing_card?: PlayingCard;
+}
+
+/** A bundled playing card: a suit and a rank from 1 (ace) to 13 (king), or a joker. */
+type PlayingCard =
+  { readonly suit: 'clubs' | 'diamonds' | 'hearts' | 'spades'; readonly rank: number } | { readonly joker: true };
+
+const SUITS = { c: 'clubs', d: 'diamonds', h: 'hearts', s: 'spades' } as const;
+
+/**
+ * The playing card a front picture shows, for the bundled deck, whose cards all go by the same name and
+ * tell their suit and rank only in the picture they are drawn with (`trump/c01.webp` is the ace of clubs).
+ */
+export function playingCardOf(front: string): PlayingCard | null {
+  const match = /\/trump\/([cdhsx])(\d{2})\.\w+$/.exec(front);
+  if (!match) return null;
+  const [, suit, number] = match;
+  const rank = Number(number);
+  if (suit === 'x') return { joker: true };
+  return rank >= 1 && rank <= 13 ? { suit: SUITS[suit as keyof typeof SUITS], rank } : null;
 }
 
 /** A hand as this seat is shown it. */
@@ -195,11 +216,14 @@ export class AgentCardTools {
   private cardView(card: Card): AgentCard {
     const sees = card.isVisible || (this.permission.canSeeHidden() && !card.isFaceWithheld);
     const text = sees ? card.faceText : '';
+    const front = card.imageDataElement?.getFirstElementByName('front')?.value;
+    const playing = sees ? playingCardOf(typeof front === 'string' ? front : '') : null;
     return {
       id: card.identifier,
       face: card.isFront ? 'up' : 'down',
       name: sees ? card.name : null,
       ...(text ? { text } : {}),
+      ...(playing ? { playing_card: playing } : {}),
     };
   }
 
