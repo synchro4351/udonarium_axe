@@ -330,7 +330,9 @@ export const AGENT_TOOLS: readonly AgentToolDefinition[] = [
     access: 'write',
     description:
       'Put a new piece on the table in view at a square, with a picture from the images (see list_assets) and ' +
-      'values for its sheet. A piece a game master puts is hidden from players until shown, as by hand.',
+      'values for its sheet. As one put by hand, a piece a game master puts keeps its sheet and numbers to the game ' +
+      'master; the piece itself is seen on the table unless hidden puts it in stealth, where only the game master, ' +
+      'its owner and its party see it. set_piece_hidden shows it later.',
     input: input(
       {
         name: { type: 'string', minLength: 1, maxLength: 100 },
@@ -339,6 +341,7 @@ export const AGENT_TOOLS: readonly AgentToolDefinition[] = [
         image: { type: 'string', description: 'An image, by name or id.' },
         size: { type: 'number', description: 'How many squares wide, 1 if left out.', minimum: 0.5, maximum: 20 },
         npc: { type: 'boolean', description: 'Whether it is a non-player character.' },
+        hidden: { type: 'boolean', description: 'Put it in stealth, out of the players’ sight, as it is put.' },
         values: {
           type: 'array',
           description: 'Values to write on its sheet, by item name.',
@@ -348,6 +351,15 @@ export const AGENT_TOOLS: readonly AgentToolDefinition[] = [
       },
       ['name', 'col', 'row']
     ),
+  },
+  {
+    name: 'set_piece_hidden',
+    title: 'Hide a piece or show it',
+    access: 'write',
+    description:
+      'Put a piece in stealth, where only the game master, its owner and its party see it, or bring it out for ' +
+      'everyone to see, as the menu of a piece does. The game master may for any piece, a player for their own.',
+    input: input({ piece: PIECE, hidden: { type: 'boolean' } }, ['piece', 'hidden']),
   },
   {
     name: 'remove_piece',

@@ -219,6 +219,32 @@ describe('AgentPieceTools', () => {
     });
   });
 
+  it('puts a piece the game master asks to hide in stealth, and shows it again', async () => {
+    const made = (await call('create_piece', { name: '伏兵', col: 2, row: 2, hidden: true })) as Record<
+      string,
+      unknown
+    >;
+
+    expect(made['hidden']).toBe(true);
+    const piece = views.visiblePieces().find((each) => each.name === '伏兵')!;
+    expect(piece.stealth).toBe('1');
+
+    await call('set_piece_hidden', { piece: '伏兵', hidden: false });
+    expect(piece.stealth).toBe('');
+  });
+
+  it("refuses to hide a player's piece that is not the seat's own", async () => {
+    PeerCursor.myCursor.role = PeerRole.Player;
+    const other = pieceAt('他人のコマ', 1, 1);
+    other.owner = 'someone-else';
+    other.update();
+
+    await expect(call('set_piece_hidden', { piece: '他人のコマ', hidden: true })).rejects.toBeInstanceOf(
+      AgentToolError
+    );
+    expect(other.stealth).toBe('');
+  });
+
   it('takes a piece off the table into the shared inventory', async () => {
     const goblin = pieceAt('ゴブリン', 1, 1);
 
