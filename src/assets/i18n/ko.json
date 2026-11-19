@@ -286,6 +286,12 @@
         "clear": "지우기",
         "refused": "거부함"
       },
+      "activity": {
+        "idle": "AI가 멈춰 있습니다",
+        "waiting": "AI가 방의 상황을 기다리고 있습니다",
+        "thinking": "AI가 생각 중…",
+        "working": "AI가 조작 중…"
+      },
       "setup": {
         "heading": "연결 방법",
         "download": "릴리스 페이지에서 axe-mcp.mjs를 내려받습니다(Node.js 22 이상에서 동작합니다).",

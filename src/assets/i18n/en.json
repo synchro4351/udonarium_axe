@@ -286,6 +286,12 @@
         "clear": "Clear",
         "refused": "Refused"
       },
+      "activity": {
+        "idle": "The AI is resting",
+        "waiting": "The AI is waiting for the room",
+        "thinking": "The AI is thinking…",
+        "working": "The AI is at work…"
+      },
       "setup": {
         "heading": "How to connect",
         "download": "Download axe-mcp.mjs from the release page (it runs on Node.js 22 or later).",

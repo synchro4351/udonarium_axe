@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { AgentEventLog } from '@axe/application/agent/agent-event-log.service';
+import { AgentThinkingSignal } from '@axe/application/agent/agent-thinking-signal.service';
 import { AgentToolRunner } from '@axe/application/agent/agent-tool-runner.service';
 import { AgentChatTools } from '@axe/features/agent-tools/agent-chat-tools.service';
 import { AgentGmTools } from '@axe/features/agent-tools/agent-gm-tools.service';
@@ -15,6 +16,7 @@ import { AgentReadTools } from '@axe/features/agent-tools/agent-read-tools.servi
 export class AgentToolsSetup {
   private readonly runner = inject(AgentToolRunner);
   private readonly events = inject(AgentEventLog);
+  private readonly thinking = inject(AgentThinkingSignal);
   private readonly read = inject(AgentReadTools);
   private readonly chat = inject(AgentChatTools);
   private readonly pieces = inject(AgentPieceTools);
@@ -24,6 +26,7 @@ export class AgentToolsSetup {
   /** Makes every tool runnable, once, and keeps what happens from now. */
   ensure(): void {
     this.events.start();
+    this.thinking.start();
     if (this.done) return;
     this.done = true;
     this.runner.provide(this.read.handlers);
@@ -35,5 +38,6 @@ export class AgentToolsSetup {
   /** Stops keeping what happens. */
   release(): void {
     this.events.stop();
+    this.thinking.stop();
   }
 }

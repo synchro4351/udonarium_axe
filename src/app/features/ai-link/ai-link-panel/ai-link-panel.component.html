@@ -24,6 +24,14 @@
         {{ (linking() ? 'feature.aiLink.disconnect' : 'feature.aiLink.connect') | transloco }}
       </button>
     </div>
+    @if (stateKey() === 'connected') {
+      <p class="text-ui-muted m-0 flex items-center gap-1.5 text-[11px]" data-testid="ai-link-activity">
+        @if (runner.activity() === 'thinking' || runner.activity() === 'working') {
+          <span class="bg-ui-accent block size-1.5 animate-pulse rounded-full" aria-hidden="true"></span>
+        }
+        {{ 'feature.aiLink.activity.' + runner.activity() | transloco }}
+      </p>
+    }
     @if (stateKey() === 'unreachable' || stateKey() === 'lost') {
       <p class="text-ui-dim m-0 text-[11px] leading-relaxed">{{ 'feature.aiLink.waiting' | transloco }}</p>
     }

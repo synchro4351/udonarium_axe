@@ -55,6 +55,14 @@ export function refusalOf(access: AgentAccess, scope: AgentScope, role: PeerRole
  * tool's input is checked against its definition and the seat's leave before it runs, what it throws
  * is turned into an answer, and the calls that change the room are kept for the seat to look over.
  */
+/** What the AI linked to this seat is doing. */
+export type AgentActivity = 'idle' | 'waiting' | 'thinking' | 'working';
+
+/** The tool the AI waits for the room with. */
+const WAIT_TOOL = 'wait_for_events';
+/** How long the AI may go without a call before it counts as idle rather than thinking. */
+export const THINKING_GIVES_UP_MS = 60_000;
+
 @Injectable({ providedIn: 'root' })
 export class AgentToolRunner {
   private readonly permission = inject(RolePermissionService);
@@ -62,6 +70,14 @@ export class AgentToolRunner {
 
   /** The calls that changed, or tried to change, the room, newest first. */
   readonly history = signal<readonly AgentHistoryEntry[]>([]);
+
+  /**
+   * What the AI is doing, as far as the tab can tell from the calls it makes: waiting for something
+   * to happen, using a tool, or thinking between the one call and the next. It is idle again once it
+   * has called nothing for a while, since the tab cannot see it stop.
+   */
+  readonly activity = signal<AgentActivity>('idle');
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Makes tools runnable, each by its name. */
   provide(handlers: Readonly<Record<string, AgentHandler>>): void {
@@ -91,14 +107,30 @@ export class AgentToolRunner {
     else if (!handler)
       outcome = { ok: false, error: { code: 'unknown_tool', message: `${tool} cannot be used here yet.` } };
     else {
+      this.become(tool === WAIT_TOOL ? 'waiting' : 'working');
       try {
         outcome = { ok: true, value: (await handler(args, { signal })) ?? null };
       } catch (error) {
         outcome = outcomeOfError(error);
       }
+      this.become('thinking');
     }
     if (definition.access !== 'read' || refusal) this.remember(tool, args, outcome);
     return outcome;
+  }
+
+  /** Sets what the AI is doing, and how long thinking may last with no call before it counts as idle. */
+  private become(activity: AgentActivity): void {
+    this.activity.set(activity);
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = activity === 'thinking' ? setTimeout(() => this.activity.set('idle'), THINKING_GIVES_UP_MS) : null;
+  }
+
+  /** Sets the AI idle at once, as when the link goes. */
+  rest(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+    this.activity.set('idle');
   }
 
   /** Forgets every call kept. */

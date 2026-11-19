@@ -286,6 +286,12 @@
         "clear": "消す",
         "refused": "断りました"
       },
+      "activity": {
+        "idle": "AIは止まっています",
+        "waiting": "AIは部屋の様子を待っています",
+        "thinking": "AIが考え中…",
+        "working": "AIが操作中…"
+      },
       "setup": {
         "heading": "つなぎ方",
         "download": "リリースのページからaxe-mcp.mjsを落とします（Node.js 22以上で動きます）。",
