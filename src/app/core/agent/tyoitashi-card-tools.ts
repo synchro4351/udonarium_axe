@@ -148,4 +148,19 @@ export const TYOITASHI_CARD_TOOLS: readonly AgentToolDefinition[] = [
     description: 'Shuffle a deck on the table.',
     input: input({ deck: DECK }, ['deck']),
   },
+  {
+    name: 'set_piece_hand',
+    title: 'Give a piece a hand of its own',
+    access: 'write',
+    description:
+      'Give a piece a hand of its own, as the menu of a piece does, so cards can be dealt to it and it shows ' +
+      'among the hands; or take an empty one away with held false. Only its owner and the game master see its cards.',
+    input: input(
+      {
+        piece: { type: 'string', description: 'A piece, by name or id.', minLength: 1 },
+        held: { type: 'boolean', description: 'Give it a hand; false takes an empty one away. A hand where left out.' },
+      },
+      ['piece']
+    ),
+  },
 ];

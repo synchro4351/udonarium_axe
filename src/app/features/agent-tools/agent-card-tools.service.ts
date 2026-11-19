@@ -15,6 +15,7 @@ import {
 } from '@axe/domain/card/playing-card';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { findOne, numberArg, textArg } from '@axe/features/agent-tools/agent-lookup';
+import { AgentReadTools } from '@axe/features/agent-tools/agent-read-tools.service';
 import { CardGameService, CardSeat } from '@axe/features/card/card-game.service';
 
 /** A card as this seat is shown it: its face only where the seat may see it. */
@@ -51,6 +52,7 @@ export class AgentCardTools {
   private readonly objectStore = inject(ObjectStore);
   private readonly tabletop = inject(TabletopService);
   private readonly permission = inject(RolePermissionService);
+  private readonly read = inject(AgentReadTools);
 
   readonly handlers: Readonly<Record<string, AgentHandler>> = {
     list_cards: () => this.list(),
@@ -65,6 +67,18 @@ export class AgentCardTools {
       else card.faceUp();
       SoundEffect.play(PresetSound.cardPick);
       return this.cardView(card);
+    },
+    set_piece_hand: (args) => {
+      const piece = this.read.piece(textArg(args, 'piece'));
+      const held = args['held'] !== false;
+      if (!this.cardGame.canSetHand(piece)) {
+        throw new AgentToolError('not_allowed', `This seat may not give ${piece.name} a hand.`);
+      }
+      const changed = this.cardGame.setHand(piece, held);
+      if (!held && !changed && this.cardGame.hasHand(piece)) {
+        throw new AgentToolError('failed', `${piece.name} still holds cards, so its hand stays.`);
+      }
+      return { piece: piece.name, hand: this.cardGame.hasHand(piece) };
     },
     shuffle_deck: (args) => {
       const deck = this.deck(textArg(args, 'deck'));
