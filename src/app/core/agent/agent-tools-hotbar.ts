@@ -46,7 +46,7 @@ const SLOT: AgentSchema = input(
       enum: [...OFFER_SLOT_KINDS],
       description:
         'chat: says `text` as the character the player speaks as (dice, palette references and 《effect》 work as ' +
-        'in the chat box); prefill: writes `text` into the chat box for the player to finish; effect: casts the ' +
+        'in the chat box, but a line rolls only its first dice, so give each roll a slot of its own); prefill: writes `text` into the chat box for the player to finish; effect: casts the ' +
         'effect `name` from the piece; sound: plays the sound effect `name` for everyone; cut_in: plays the cut-in ' +
         '`name`; turn: moves the turn (`turn`); sheet: opens the character sheet; group: runs the slots in `steps` ' +
         'one after another.',
