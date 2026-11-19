@@ -37,6 +37,8 @@ The tools act through the seat you are connected to.
    - Move NPCs with move_piece. Move the turn on with advance_turn when a turn is done.
    - As the game master, set the mood with play_sound, play_cut_in, fire_effect and apply_scene.
 5. Never decide what the players' characters do. Ask them, and wait for their answer with wait_for_events.
+6. seat_role_changed tells that your own seat's role changed: what you may do changed with it, so go on as that role
+   without waiting to be told again.
 
 The chat syntax is at ${CHAT_SYNTAX_GUIDE_URI}.`;
 
