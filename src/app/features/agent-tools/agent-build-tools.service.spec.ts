@@ -78,12 +78,19 @@ describe('AgentBuildTools', () => {
     const note = ObjectStore.instance.getObjects<TextNote>(TextNote)[0];
     expect(note.title).toBe('手がかり');
     expect(note.isFormatted).toBe(true);
+    expect(note.disclosureMode).toBe('all');
 
     await call('edit_note', { note: '手がかり', append: '- 鍵は井戸の底' });
 
     expect(note.text).toBe('# 分かったこと\n- 鍵は井戸の底');
     const listed = (await call('list_notes'))['notes'] as { title: string }[];
     expect(listed.map((one) => one.title)).toEqual(['手がかり']);
+  });
+
+  it('keeps a note back to the game master only when asked to', async () => {
+    await call('place_note', { title: '秘密', text: '黒幕は村長', hidden: true });
+
+    expect(ObjectStore.instance.getObjects<TextNote>(TextNote)[0].disclosureMode).toBe('gm');
   });
 
   it('makes a table of the size asked, not switched to', async () => {
