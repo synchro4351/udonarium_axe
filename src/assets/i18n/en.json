@@ -8268,7 +8268,9 @@
       "picture": "Stamp",
       "standIn": "[{{words}}]",
       "unnamedPack": "(unnamed)",
-      "manage": "Manage stamp sets"
+      "manage": "Manage stamp sets",
+      "search": "Search stamps (e.g. idea)",
+      "searchNone": "Nothing found. Try another word"
     }
   },
   "error": {}
