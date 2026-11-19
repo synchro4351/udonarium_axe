@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import type { AgentHandler } from '@axe/application/agent/agent-tool-runner.service';
 import { AgentViews } from '@axe/application/agent/agent-views.service';
+import { StealthService } from '@axe/application/character/stealth.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { PieceStepService } from '@axe/application/tabletop/piece-step.service';
 import { PieceTargetService } from '@axe/application/tabletop/piece-target.service';
@@ -39,6 +40,7 @@ export class AgentPieceTools {
   private readonly targets = inject(PieceTargetService);
   private readonly turns = inject(TurnOrderService);
   private readonly permission = inject(RolePermissionService);
+  private readonly stealth = inject(StealthService);
 
   readonly handlers: Readonly<Record<string, AgentHandler>> = {
     move_piece: (args) => this.move(this.read.piece(textArg(args, 'piece')), args),
@@ -65,6 +67,11 @@ export class AgentPieceTools {
     },
     advance_turn: (args) => this.advanceTurn(textArg(args, 'action'), textArg(args, 'piece')),
     create_piece: (args) => this.create(args),
+    set_piece_hidden: (args) => {
+      const piece = this.read.piece(textArg(args, 'piece'));
+      this.hide(piece, args['hidden'] === true);
+      return this.views.piece(piece);
+    },
     remove_piece: (args) => {
       const piece = this.read.piece(textArg(args, 'piece'));
       const name = this.views.nameOf(piece);
@@ -199,6 +206,15 @@ export class AgentPieceTools {
     return this.read.handlers['get_turn_order']({}, { signal: new AbortController().signal });
   }
 
+  /** Puts a piece in stealth or brings it out, as the menu of a piece does, for a seat that may. */
+  private hide(piece: GameCharacter, hidden: boolean): void {
+    if (!this.stealth.mayToggle(piece)) {
+      throw new AgentToolError('not_allowed', `This seat may not hide or show ${this.views.nameOf(piece)}.`);
+    }
+    this.stealth.set(piece, hidden);
+    piece.update();
+  }
+
   private async create(args: Readonly<Record<string, unknown>>): Promise<unknown> {
     const table = this.tabletop.currentTable;
     const cell = this.cellAt(args);
@@ -221,6 +237,7 @@ export class AgentPieceTools {
     );
     if (typeof args['size'] === 'number') piece.size = args['size'];
     if (typeof args['npc'] === 'boolean') piece.isNpc = args['npc'];
+    if (args['hidden'] === true) this.hide(piece, true);
     const unknown: string[] = [];
     for (const { name, value } of (args['values'] as { name: string; value: string }[] | undefined) ?? []) {
       const item = piece.detailDataElement ? DataElement.findElementByReference(piece.detailDataElement, name) : null;
