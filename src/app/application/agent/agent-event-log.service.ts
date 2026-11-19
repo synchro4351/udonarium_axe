@@ -7,6 +7,7 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import type { PeerRole } from '@axe/domain/peer/peer-role';
 
 /** Something that happened in the room, as the AI is told it. */
 export type AgentEvent =
@@ -35,7 +36,9 @@ export type AgentEvent =
       readonly dropsLast10Minutes: number;
       readonly longestDownSeconds?: number;
     }
-  | { readonly kind: 'seat_link_back'; readonly seat: string; readonly downForSeconds: number };
+  | { readonly kind: 'seat_link_back'; readonly seat: string; readonly downForSeconds: number }
+  /** This seat's own role changed, and with it what the AI may do here. */
+  | { readonly kind: 'seat_role_changed'; readonly role: PeerRole };
 
 /** What a wait returns: what happened, and the cursor to carry on from. */
 export interface AgentEventBatch {
@@ -77,6 +80,8 @@ export class AgentEventLog {
   private readonly settling = new Map<string, ReturnType<typeof setTimeout>>();
   private known = new Map<string, Known>();
   private seats = new Map<string, string>();
+  /** This seat's own role, as last told. */
+  private role: PeerRole = PeerCursor.myRole;
   private stops: (() => void)[] = [];
   private seq = 0;
   /** What this run of the log is told apart by in its cursors, so that a cursor from before a restart is known. */
@@ -125,6 +130,7 @@ export class AgentEventLog {
     this.run = Date.now().toString(36);
     this.known = new Map(this.views.visiblePieces().map((piece) => [piece.identifier, this.knownOf(piece)]));
     this.seats = this.seatNames();
+    this.role = PeerCursor.myRole;
     const progress = this.turns.progress();
     this.turnKey = `${progress.round}|${progress.phase}|${progress.currentIdentifier}`;
     this.tableId = this.tabletop.currentTable.identifier;
@@ -261,6 +267,9 @@ export class AgentEventLog {
     for (const [id, name] of now) if (!this.seats.has(id)) this.push({ kind: 'seat_joined', seat: name });
     for (const [id, name] of this.seats) if (!now.has(id)) this.push({ kind: 'seat_left', seat: name });
     this.seats = now;
+    const role = PeerCursor.myRole;
+    if (role !== this.role) this.push({ kind: 'seat_role_changed', role });
+    this.role = role;
   }
 
   private seatNames(): Map<string, string> {

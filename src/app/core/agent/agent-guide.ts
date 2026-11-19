@@ -41,6 +41,8 @@ The tools act through the seat you are connected to.
    them, hold the scene, and carry on when seat_link_back comes or the others ask to go on.
 7. A hotbar is each player's own: when one asks for a hotbar or a macro, hand a page round with offer_hotbar for them
    to take onto theirs.
+8. seat_role_changed tells that your own seat's role changed: what you may do changed with it, so go on as that role
+   without waiting to be told again.
 
 The chat syntax is at ${CHAT_SYNTAX_GUIDE_URI}.`;
 
