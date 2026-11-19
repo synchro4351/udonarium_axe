@@ -19,7 +19,7 @@
  * imports only for a spec that builds a TestBed module, the providers every module is given, adds
  * every spec that names TestBed, as setup tells such a spec by that word.
  */
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -164,16 +164,31 @@ function importedFrom(roots, imports) {
   return reached;
 }
 
+/**
+ * Windows takes a command line of at most 32,767 characters; past it the run cannot even start. A
+ * list of specs that long is most of the suite, so the whole suite is run instead.
+ */
+const MAX_WINDOWS_COMMAND_CHARS = 30_000;
+
 function run(args) {
-  const result = spawnSync('npx', ['vitest', 'run', ...args], {
+  const files = args.filter((arg) => !arg.startsWith('-'));
+  const tooLong = process.platform === 'win32' && args.join(' ').length > MAX_WINDOWS_COMMAND_CHARS;
+  if (tooLong) console.log(`[vitest-related] ${files.length} spec(s) make too long a command here; running them all`);
+  const runArgs = tooLong ? args.filter((arg) => arg.startsWith('-')) : args;
+  const result = spawnSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', ...runArgs], {
     stdio: 'inherit',
-    shell: process.platform === 'win32',
   });
+  if (result.error) console.error(`[vitest-related] ${result.error.message}`);
   process.exit(result.status ?? 1);
 }
 
 const { setupFiles, configs } = runnerInputs();
-const stagedPaths = process.argv.slice(2).map((f) => posix.normalize(f.replaceAll('\\', '/')));
+// Read the index once rather than letting the hook split a long filename list into commands.
+// Each split command could otherwise run the entire suite again after a large upstream merge.
+const inputPaths = process.argv.includes('--staged')
+  ? execFileSync('git', ['diff', '--cached', '--name-only', '-z'], { encoding: 'utf-8' }).split('\0').filter(Boolean)
+  : process.argv.slice(2);
+const stagedPaths = inputPaths.map((f) => posix.normalize(f.replaceAll('\\', '/')));
 
 const stagedConfig = stagedPaths.find((file) => configs.has(file));
 if (stagedConfig !== undefined) {
