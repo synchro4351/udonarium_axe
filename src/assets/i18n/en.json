@@ -290,6 +290,8 @@
       "setup": {
         "heading": "How to connect",
         "download": "Download axe-mcp.mjs, tyoitashi's bridge, from this site (it needs Node.js 22 or later). The official bridge does not connect to this Axe.",
+        "subscription": "On a Claude Pro or Max plan, connect from Claude Code instead.",
+        "subscriptionLink": "See the steps",
         "claudeCode": "In Claude Code, run this (with the path where you saved it).",
         "claudeDesktop": "In Claude Desktop, add this to mcpServers in the settings file.",
         "connect": "Start the AI, then press Connect in this panel. In Claude Code, type /mcp__axe__run_session to have it run the session as the GM. In an app that cannot pick prompts, ask the AI to \"read axe://guide/run-session and be the GM\".",

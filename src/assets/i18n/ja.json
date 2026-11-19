@@ -290,6 +290,8 @@
       "setup": {
         "heading": "つなぎ方",
         "download": "このサイトからaxe-mcp.mjs（ちょいたし版のブリッジ）を落とします（Node.js 22以上で動きます）。公式のブリッジとはつながりません。",
+        "subscription": "Claude Pro・Maxのサブスクで動かすときは、Claude Codeからつなぎます。",
+        "subscriptionLink": "手順を見る",
         "claudeCode": "Claude Codeでは、次を実行します（パスは落とした場所に書き換えます）。",
         "claudeDesktop": "Claude Desktopでは、設定ファイルのmcpServersに次を足します。",
         "connect": "AIを起動してから、このパネルの［つなぐ］を押します。Claude Codeでは /mcp__axe__run_session と打つと、GMとして動き始めます。プロンプトを選べないアプリでは、AIに「axe://guide/run-sessionを読んでGMをして」と頼みます。",

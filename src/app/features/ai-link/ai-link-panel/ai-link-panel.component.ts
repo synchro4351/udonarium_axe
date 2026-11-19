@@ -15,6 +15,10 @@ import { TranslocoModule } from '@jsverse/transloco';
 export const TYOITASHI_BRIDGE_PATH = 'assets/axe-mcp/axe-mcp.mjs';
 
 /** The address of tyoitashi's bridge on the site the page is served from. */
+/** The steps for running the AI on a Claude Pro or Max plan through Claude Code (tyoitashi), as the fork shows them. */
+export const SUBSCRIPTION_GUIDE_URL =
+  'https://github.com/synchro4351/udonarium_axe/blob/codex/synwork-integration/docs/TYOITASHI_AI_GM_SUBSCRIPTION.md';
+
 export function aiLinkBridgeUrl(): string {
   return new URL(TYOITASHI_BRIDGE_PATH, document.baseURI).href;
 }
@@ -40,6 +44,7 @@ export class AiLinkPanelComponent {
   private readonly permission = inject(RolePermissionService);
 
   protected readonly releasesUrl = aiLinkBridgeUrl();
+  protected readonly subscriptionGuideUrl = SUBSCRIPTION_GUIDE_URL;
   /** Which command was copied last, to say so beside it. */
   protected readonly copied = signal<'code' | 'desktop' | null>(null);
 
