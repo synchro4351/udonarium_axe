@@ -7,6 +7,7 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card, CardState } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
 import { handLocationOf } from '@axe/domain/card/hand-location';
+import { GameCharacter } from '@axe/domain/character/game-character';
 import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
@@ -201,5 +202,18 @@ describe('AgentCardTools', () => {
 
   it('says a deck it cannot find is not there', async () => {
     await expect(call('shuffle_deck', { deck: '無い山' })).rejects.toMatchObject({ code: 'not_found' });
+  });
+
+  it('gives a piece a hand of its own, and takes an empty one away again', async () => {
+    const hero = GameCharacter.create('ゆうしゃ', 1, '');
+    hero.location.name = 'table';
+    hero.owner = PeerCursor.myCursor.userId;
+    created.push(hero);
+
+    expect(await call('set_piece_hand', { piece: 'ゆうしゃ' })).toEqual({ piece: 'ゆうしゃ', hand: true });
+    expect(await call('set_piece_hand', { piece: 'ゆうしゃ', held: false })).toEqual({
+      piece: 'ゆうしゃ',
+      hand: false,
+    });
   });
 });
