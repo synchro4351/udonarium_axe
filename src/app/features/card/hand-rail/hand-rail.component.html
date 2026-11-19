@@ -36,6 +36,16 @@
           </button>
         }
         <button
+          class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5.5 transform-none items-center justify-center border-none bg-transparent px-1 py-0.5 leading-none shadow-none transition-colors outline-none hover:border-transparent hover:shadow-none disabled:cursor-default disabled:opacity-40"
+          data-testid="hand-discard-all"
+          [title]="'feature.card.hand.discardHand' | transloco"
+          [attr.aria-label]="'feature.card.hand.discardHand' | transloco"
+          [disabled]="cards().length < 1"
+          (click)="discardHand()"
+        >
+          <i class="material-icons text-[14px]!">move_to_inbox</i>
+        </button>
+        <button
           class="rounded-ui-sm text-ui-dim hover:bg-ui-hover hover:text-ui-text m-0 inline-flex h-5.5 transform-none items-center justify-center border-none bg-transparent px-1 py-0.5 leading-none shadow-none transition-colors outline-none hover:border-transparent hover:shadow-none"
           [title]="'feature.gmTools.npcBar.close' | transloco"
           (click)="close()"

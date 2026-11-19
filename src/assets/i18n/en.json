@@ -1394,7 +1394,9 @@
         "receivedCard": "{{card}} was received from {{name}}",
         "everyone": "All",
         "drawForbidden": "This room does not allow drawing from other hands",
-        "giveForbidden": "This room does not allow giving cards"
+        "giveForbidden": "This room does not allow giving cards",
+        "discardHand": "Put the whole hand out as a deck",
+        "discardHandConfirm": "Put all {{count}} cards of the hand out on the table as a face-down deck?"
       },
       "title": "Card",
       "settingTitle": "Card settings",
@@ -1435,13 +1437,15 @@
       },
       "targetPickingHint": "Click the object to target (Esc to cancel)",
       "discardStackName": "Discards",
+      "handStackName": "{{name}}'s hand",
       "message": {
         "drewFromHand": "{{to}} drew a card from {{from}}",
         "gaveFromHand": "{{from}} gave a card to {{to}}",
         "handedOver": "{{name}} handed {{from}}'s {{count}} cards over to {{to}}",
         "discardedPairs": "{{name}} discarded pairs of {{ranks}}",
         "gaveCard": "{{from}} gave a card to {{to}}",
-        "rescuedOrphanHand": "{{gm}} moved the {{count}} cards left by an absent participant ({{from}}) to {{to}}"
+        "rescuedOrphanHand": "{{gm}} moved the {{count}} cards left by an absent participant ({{from}}) to {{to}}",
+        "discardedHand": "{{name}} put {{holder}}'s {{count}} cards out as a deck"
       },
       "drawPanel": {
         "title": "Draw from a hand",

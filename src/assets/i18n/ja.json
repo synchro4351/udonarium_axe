@@ -1394,7 +1394,9 @@
         "receivedCard": "{{name}} から「{{card}}」を受け取りました",
         "everyone": "全員",
         "drawForbidden": "この部屋では他の人の手札から引けません",
-        "giveForbidden": "この部屋ではカードを渡せません"
+        "giveForbidden": "この部屋ではカードを渡せません",
+        "discardHand": "手札を全部、山札にして場に出す",
+        "discardHandConfirm": "手札 {{count}} 枚を全部、裏向きの山札にして場に出しますか？"
       },
       "title": "カード",
       "settingTitle": "カード設定",
@@ -1435,13 +1437,15 @@
       },
       "targetPickingHint": "ターゲットにする対象をクリックしてください（Esc で中止）",
       "discardStackName": "捨て札",
+      "handStackName": "{{name}} の手札",
       "message": {
         "drewFromHand": "{{to}} が {{from}} の手札から 1 枚引きました",
         "gaveFromHand": "{{from}} が {{to}} に手札を 1 枚渡しました",
         "handedOver": "{{name}} が {{from}} の手札 {{count}} 枚を {{to}} に引き継ぎました",
         "discardedPairs": "{{name}} が {{ranks}} のペアを捨てました",
         "gaveCard": "{{from}} が {{to}} にカードを 1 枚渡しました",
-        "rescuedOrphanHand": "{{gm}} が不在の参加者（{{from}}）の手札 {{count}} 枚を {{to}} に移しました"
+        "rescuedOrphanHand": "{{gm}} が不在の参加者（{{from}}）の手札 {{count}} 枚を {{to}} に移しました",
+        "discardedHand": "{{name}} が {{holder}} の手札 {{count}} 枚を山札にして場に出しました"
       },
       "drawPanel": {
         "title": "相手の手札から引く",

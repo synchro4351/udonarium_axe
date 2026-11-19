@@ -18,6 +18,7 @@ import { ObjectChangeService } from '@axe/application/sync/object-change.service
 import { TableFocusService } from '@axe/application/tabletop/table-focus.service';
 import { TablePickService } from '@axe/application/tabletop/table-pick.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
+import { ConfirmService } from '@axe/application/ui/confirm.service';
 import { ContextMenuAction, ContextMenuService } from '@axe/application/ui/context-menu.service';
 import { MobileLayoutService } from '@axe/application/ui/mobile-layout.service';
 import { PanelService } from '@axe/application/ui/panel.service';
@@ -99,6 +100,7 @@ export class HandRailComponent {
   private readonly contextMenu = inject(ContextMenuService);
   private readonly objectPanels = inject(ObjectPanelService);
   protected readonly autoSort = signal(storedAutoSort());
+  private readonly confirm = inject(ConfirmService);
 
   private dragPending: { card: Card; startX: number; startY: number; dragging: boolean } | null = null;
   private activePointerId: number | null = null;
@@ -409,6 +411,17 @@ export class HandRailComponent {
         ...spotBeside(anchor, HAND_OVERVIEW_SIZE, viewport),
       }
     );
+  }
+
+  /** Puts the whole hand out on the table as a deck, once the reader says so. */
+  protected async discardHand(): Promise<void> {
+    const cards = this.cards();
+    if (cards.length < 1) return;
+    // The hand on the rail may be a character's (tyoitashi), whose deck goes by the character's name.
+    const holder =
+      this.cardGame.heldHands().find((seat) => seat.userId === this.holder())?.name ?? PeerCursor.myCursor?.name ?? '';
+    if (!(await this.confirm.ask(this.t('feature.card.hand.discardHandConfirm', { count: cards.length })))) return;
+    this.cardGame.discardHand(cards, holder);
   }
 
   protected discardPairs(): void {
