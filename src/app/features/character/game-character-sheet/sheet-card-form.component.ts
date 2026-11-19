@@ -150,6 +150,18 @@ export class SheetCardFormComponent {
     if (pending && this.canEdit() && this.canReadCardFace(pending.card)) pending.card.faceText = pending.value;
   }
 
+  /** The text on the card's back, which everyone reads. */
+  cardBackText(c: Card): string {
+    this.objectChange.versionOf(c.identifier)();
+    return c.backText;
+  }
+
+  /** Writes the text typed into the card's back field once it is left, for whoever may edit the card's words. */
+  setCardBackText(c: Card, event: Event): void {
+    if (!this.canReadCardFace(c)) return;
+    c.backText = (event.target as HTMLTextAreaElement).value;
+  }
+
   /** The font size of the card's face text, or the default for a user who may not read it. */
   cardOwnFaceFontSize(c: Card): number {
     this.objectChange.versionOf(c.identifier)();

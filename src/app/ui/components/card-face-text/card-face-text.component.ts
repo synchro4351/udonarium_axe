@@ -23,8 +23,10 @@ export class CardFaceTextComponent {
     return card;
   }
 
+  /** The words over the side the card shows: its back text while it lies face down, else its face text to whoever sees the face. */
   readonly visibleText = computed(() => {
     const card = this.trackCardFace();
+    if (!card.isFront && card.backText.length > 0) return card.backText;
     return card.isVisible ? card.faceText : '';
   });
   readonly isFormatted = computed(() => this.trackCardFace().faceTextFormat === 'formatted');

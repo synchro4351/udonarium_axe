@@ -237,7 +237,7 @@ export class CardComponent {
     const card = this.card();
     this.objectChange.versionOf(card.identifier)();
     this.objectChange.networkVersion();
-    return card.isVisible && card.faceText.length > 0;
+    return (card.isVisible && card.faceText.length > 0) || (!card.isFront && card.backText.length > 0);
   });
   private readonly pictured = viewChild<ElementRef<HTMLElement>>('pictured');
 

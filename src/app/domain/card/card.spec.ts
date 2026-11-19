@@ -103,6 +103,14 @@ describe('Card', () => {
       expect(backElement!.value).toBe('back.png');
     });
   });
+  it('keeps the text over its back apart from the face text, empty for a card made before it', () => {
+    const card = Card.create('Card', 'front.png', 'back.png');
+    expect(card.backText).toBe('');
+    card.backText = '武器カード';
+    expect(card.backText).toBe('武器カード');
+    expect(card.faceText).toBe('');
+    card.destroy();
+  });
 
   describe('face text compatibility', () => {
     it('reads text and font size from a Fly-compatible card XML', () => {

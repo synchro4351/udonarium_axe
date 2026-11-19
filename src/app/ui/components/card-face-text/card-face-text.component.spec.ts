@@ -29,6 +29,20 @@ describe('CardFaceTextComponent', () => {
     vi.restoreAllMocks();
   });
 
+  it("shows a face-down card's back text to everyone, and its face text once it is turned up", () => {
+    card.faceText = '炎の剣';
+    card.backText = '武器カード';
+    card.state = CardState.BACK;
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('武器カード');
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('炎の剣');
+
+    card.state = CardState.FRONT;
+    objectChange.notifyChanged(card.identifier);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('炎の剣');
+  });
+
   it('renders escaped and decorated text on a visible card', () => {
     card.faceText = '<script>alert(1)</script>\n|剣《つるぎ》';
     fixture.detectChanges();

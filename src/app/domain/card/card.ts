@@ -76,6 +76,19 @@ export class Card extends OwnedTabletopObject {
     element?.setTextFormat(format);
   }
   /**
+   * Text drawn over the back, for everyone to read while the card lies face down: what kind of card
+   * it is, or whose deck. Kept apart from the face text, which only those who see the face read.
+   * Cards made before it read as empty.
+   */
+  get backText(): string {
+    return this.getCommonValue('backtext', '');
+  }
+  set backText(value: string) {
+    this.setOrCreateCommonValue('backtext', value, { type: DataElementType.NOTE, currentValue: value });
+    const element = this.commonDataElement?.getFirstElementByName('backtext');
+    if (element && element.currentValue !== value) element.currentValue = value;
+  }
+  /**
    * Font size of the face text, kept between 1 and 120 and rounded to a whole number.
    *
    * A value that is not a number reads and writes as the default size.
