@@ -27,8 +27,10 @@ import { clamp } from '@axe/core/util/clamp';
 import { Card } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
 import { toDeckCardSources } from '@axe/domain/card/deck-builder';
+import { PLAYING_CARD_DETAIL, playingCardCodeOf } from '@axe/domain/card/playing-card';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { Coin } from '@axe/domain/coin/coin';
+import { DataElement } from '@axe/domain/data/data-element';
 import { DiceSymbol, DiceType } from '@axe/domain/dice/dice-symbol';
 import { DisclosureMode } from '@axe/domain/disclosure/disclosure';
 import { type AmbienceKind } from '@axe/domain/effect/ambience/ambience-kind';
@@ -377,6 +379,15 @@ export class TabletopActionService {
         fileUntaggedImage(image.identifier, 'トランプ');
       }
       const card = Card.create(this.t('feature.tabletop.action.defaultCardName'), url, back);
+      // Which card it is, for the AI's card tools, kept where a room server keeps the face (tyoitashi).
+      card.detailDataElement?.appendChild(
+        DataElement.create(
+          PLAYING_CARD_DETAIL,
+          playingCardCodeOf(trump),
+          {},
+          `${PLAYING_CARD_DETAIL}_${card.identifier}`
+        )
+      );
       cardStack.putOnBottom(card);
     }
     return cardStack;

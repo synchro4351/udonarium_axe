@@ -7,6 +7,12 @@ import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
 import { handLocationOf, isHandLocation } from '@axe/domain/card/hand-location';
+import {
+  PLAYING_CARD_DETAIL,
+  type PlayingCard,
+  playingCardOfCode,
+  playingCardOfPicture,
+} from '@axe/domain/card/playing-card';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { findOne, numberArg, textArg } from '@axe/features/agent-tools/agent-lookup';
 import { CardGameService, CardSeat } from '@axe/features/card/card-game.service';
@@ -21,25 +27,6 @@ interface AgentCard {
   readonly text?: string;
   /** For one of the bundled playing cards whose face the seat sees: its suit and rank, which its name does not say. */
   readonly playing_card?: PlayingCard;
-}
-
-/** A bundled playing card: a suit and a rank from 1 (ace) to 13 (king), or a joker. */
-type PlayingCard =
-  { readonly suit: 'clubs' | 'diamonds' | 'hearts' | 'spades'; readonly rank: number } | { readonly joker: true };
-
-const SUITS = { c: 'clubs', d: 'diamonds', h: 'hearts', s: 'spades' } as const;
-
-/**
- * The playing card a front picture shows, for the bundled deck, whose cards all go by the same name and
- * tell their suit and rank only in the picture they are drawn with (`trump/c01.webp` is the ace of clubs).
- */
-export function playingCardOf(front: string): PlayingCard | null {
-  const match = /\/trump\/([cdhsx])(\d{2})\.\w+$/.exec(front);
-  if (!match) return null;
-  const [, suit, number] = match;
-  const rank = Number(number);
-  if (suit === 'x') return { joker: true };
-  return rank >= 1 && rank <= 13 ? { suit: SUITS[suit as keyof typeof SUITS], rank } : null;
 }
 
 /** A hand as this seat is shown it. */
@@ -216,8 +203,7 @@ export class AgentCardTools {
   private cardView(card: Card): AgentCard {
     const sees = card.isVisible || (this.permission.canSeeHidden() && !card.isFaceWithheld);
     const text = sees ? card.faceText : '';
-    const front = card.imageDataElement?.getFirstElementByName('front')?.value;
-    const playing = sees ? playingCardOf(typeof front === 'string' ? front : '') : null;
+    const playing = sees ? this.playingCard(card) : null;
     return {
       id: card.identifier,
       face: card.isFront ? 'up' : 'down',
@@ -225,6 +211,14 @@ export class AgentCardTools {
       ...(text ? { text } : {}),
       ...(playing ? { playing_card: playing } : {}),
     };
+  }
+
+  /** Which bundled playing card a card is, by the code it keeps, or for an older deck by its picture. */
+  private playingCard(card: Card): PlayingCard | null {
+    const code = card.detailDataElement?.getFirstElementByName(PLAYING_CARD_DETAIL)?.value;
+    if (typeof code === 'string' && code) return playingCardOfCode(code);
+    const front = card.imageDataElement?.getFirstElementByName('front')?.value;
+    return playingCardOfPicture(typeof front === 'string' ? front : '');
   }
 
   private decks(): CardStack[] {
