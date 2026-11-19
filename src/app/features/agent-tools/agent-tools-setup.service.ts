@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { AgentEventLog } from '@axe/application/agent/agent-event-log.service';
 import { AgentSeatLinkWatch } from '@axe/application/agent/agent-seat-link-watch.service';
+import { AgentThinkingSignal } from '@axe/application/agent/agent-thinking-signal.service';
 import { AgentToolRunner } from '@axe/application/agent/agent-tool-runner.service';
 import { AgentBuildTools } from '@axe/features/agent-tools/agent-build-tools.service';
 import { AgentCardTools } from '@axe/features/agent-tools/agent-card-tools.service';
@@ -21,6 +22,7 @@ export class AgentToolsSetup {
   private readonly runner = inject(AgentToolRunner);
   private readonly events = inject(AgentEventLog);
   private readonly seatLinks = inject(AgentSeatLinkWatch);
+  private readonly thinking = inject(AgentThinkingSignal);
   private readonly read = inject(AgentReadTools);
   private readonly chat = inject(AgentChatTools);
   private readonly pieces = inject(AgentPieceTools);
@@ -35,6 +37,7 @@ export class AgentToolsSetup {
   ensure(): void {
     this.events.start();
     this.seatLinks.start();
+    this.thinking.start();
     if (this.done) return;
     this.done = true;
     this.runner.provide(this.read.handlers);
@@ -51,5 +54,6 @@ export class AgentToolsSetup {
   release(): void {
     this.events.stop();
     this.seatLinks.stop();
+    this.thinking.stop();
   }
 }
