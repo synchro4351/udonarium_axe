@@ -36,6 +36,8 @@ export class WidgetPlaceDirective {
     effect((onCleanup) => {
       if (!this.enabled()) return;
       const name = this.name();
+      // Placed again as a panel is docked or taken off a side, so the widget keeps clear of it.
+      this.layout.dockInsets();
       const pending = afterNextRender(
         () => {
           placeWidget(this.layout, name, this.element, () => this.fallback()(this.element));

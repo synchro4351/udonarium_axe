@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
+import { PanelDockService } from '@axe/application/ui/panel-dock.service';
 import { readLocal, writeLocal } from '@axe/core/storage/local-preference';
 import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
 import { clamp } from '@axe/core/util/clamp';
@@ -37,6 +38,13 @@ export function parseWidgetLayout(raw: string | null): WidgetLayout {
 
 @Injectable({ providedIn: 'root' })
 export class WidgetLayoutService {
+  private readonly panelDock = inject(PanelDockService);
+
+  /** How much of each side the panels docked there take, which widgets keep clear of. */
+  dockInsets(): { readonly left: number; readonly right: number } {
+    return this.panelDock.insets();
+  }
+
   private layout: Record<string, WidgetSpot> = { ...parseWidgetLayout(readLocal(STORAGE_KEYS.widgetLayout)) };
 
   /** Where a widget was last left, or null if it has never been moved. */
@@ -67,8 +75,11 @@ export class WidgetLayoutService {
    */
   keepInView(spot: WidgetSpot, width: number, height: number): WidgetSpot {
     const margin = 8;
+    // Clear of the panels docked at the sides as well, as a window made narrower is (tyoitashi).
+    const { left: leftDock, right: rightDock } = this.dockInsets();
+    const least = margin + leftDock;
     return {
-      left: clamp(spot.left, margin, Math.max(margin, window.innerWidth - width - margin)),
+      left: clamp(spot.left, least, Math.max(least, window.innerWidth - rightDock - width - margin)),
       top: clamp(spot.top, margin, Math.max(margin, window.innerHeight - height - margin)),
     };
   }

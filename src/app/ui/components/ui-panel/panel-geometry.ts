@@ -52,6 +52,21 @@ export function viewportShift(rect: ScreenRect, view: ViewSize): { x: number; y:
 }
 
 /**
+ * How far to move a panel to keep it inside the window and clear of the panels docked against its
+ * sides (tyoitashi): the window counted as narrower by what they take, as a screen made narrower is.
+ */
+export function shiftClearOfDocks(
+  rect: ScreenRect,
+  view: ViewSize,
+  insets: { readonly left: number; readonly right: number }
+): { x: number; y: number } {
+  const left = Math.max(0, insets.left);
+  const width = Math.max(0, view.width - left - Math.max(0, insets.right));
+  const moved = { ...rect, left: rect.left - left, right: rect.right - left };
+  return viewportShift(moved, { width, height: view.height });
+}
+
+/**
  * What to write on a panel to keep it at least as large as its content needs and inside the
  * window: a side that is too short is grown to the least, and a corner the least size would push
  * over the window's edge is pulled back, though never past the window's own corner. Nothing for
