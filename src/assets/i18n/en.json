@@ -1492,7 +1492,11 @@
         "cardCount": "{{count}} cards",
         "dropHere": "Release to give to {{name}}",
         "drawHere": "Release to take it into your hand",
-        "noPlayers": "Nobody can hold cards"
+        "noPlayers": "Nobody can hold cards",
+        "choose": "Who to show",
+        "hiddenCount": "{{count}} hidden",
+        "showAll": "Show everyone",
+        "keptHidden": "Hidden by you (shown while holding cards)"
       }
     },
     "textNote": {

@@ -1492,7 +1492,11 @@
         "cardCount": "{{count}} 枚",
         "dropHere": "ここで離すと {{name}} に渡します",
         "drawHere": "ここで離すと自分の手札に加えます",
-        "noPlayers": "手札を持てる参加者がいません"
+        "noPlayers": "手札を持てる参加者がいません",
+        "choose": "表示する人",
+        "hiddenCount": "{{count}}人を非表示",
+        "showAll": "すべて表示する",
+        "keptHidden": "非表示にしています（カードを持っているので表示中）"
       }
     },
     "textNote": {

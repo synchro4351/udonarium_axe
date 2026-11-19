@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
 import { ImageService } from '@axe/application/storage/image.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
@@ -8,6 +9,7 @@ import { GameCharacter } from '@axe/domain/character/game-character';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
 import { CardGameService } from '@axe/features/card/card-game.service';
+import { readHiddenHands, writeHiddenHands } from '@axe/features/card/hand-draw/hand-overview-filter';
 import { OrphanHandRescueComponent } from '@axe/features/card/hand-draw/orphan-hand-rescue.component';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
 import { HandDragService } from '@axe/features/card/hand-rail/hand-drag.service';
@@ -29,6 +31,10 @@ export interface HandOverviewSection {
   characterIdentifier?: string;
   handPublic: boolean;
   cards: Card[];
+  /** The face shown beside the name: the participant's picture, or the character's. */
+  faceUrl: string;
+  /** Chosen out of the list by this reader, but shown all the same while it holds cards. */
+  keptHidden: boolean;
 }
 
 /** How far the pointer must travel before pressing a card turns into drawing it. */
@@ -39,7 +45,7 @@ const DRAW_DRAG_THRESHOLD_PX = 6;
   selector: 'hand-overview-panel',
   templateUrl: './hand-overview-panel.component.html',
   host: { class: 'text-ui-text block h-full overflow-y-auto p-3' },
-  imports: [CardFacePreviewComponent, OrphanHandRescueComponent, SafePipe, TranslocoModule],
+  imports: [CardFacePreviewComponent, NgTemplateOutlet, OrphanHandRescueComponent, SafePipe, TranslocoModule],
 })
 export class HandOverviewPanelComponent {
   private readonly objectStore = inject(ObjectStore);
@@ -85,11 +91,42 @@ export class HandOverviewPanelComponent {
     });
   }
 
+  /** The hands this reader chose to keep out of the list, kept in this browser. */
+  protected readonly hiddenHands = signal<ReadonlySet<string>>(readHiddenHands());
+  /** Whether the list of whom to show is open. */
+  protected readonly choosingHands = signal(false);
+
+  /**
+   * The hands shown: those not chosen out, and those chosen out that hold cards all the same, so a
+   * card is never lost from sight; these are drawn faint.
+   */
+  readonly sections = computed<HandOverviewSection[]>(() => {
+    const hidden = this.hiddenHands();
+    return this.allSections()
+      .map((section) => ({ ...section, keptHidden: hidden.has(section.userId) }))
+      .filter((section) => !section.keptHidden || section.cards.length > 0);
+  });
+
+  /** Shows a hand in the list or keeps it out, and remembers the choice in this browser. */
+  protected toggleHandShown(userId: string): void {
+    const next = new Set(this.hiddenHands());
+    if (next.has(userId)) next.delete(userId);
+    else next.add(userId);
+    this.hiddenHands.set(next);
+    writeHiddenHands(next);
+  }
+
+  /** Shows every hand again. */
+  protected showAllHands(): void {
+    this.hiddenHands.set(new Set());
+    writeHiddenHands(new Set());
+  }
+
   /**
    * Every participant who may hold cards, then each character with a hand of its own, each
    * with their hand as everyone else sees it: fronts only while that hand is public.
    */
-  readonly sections = computed<HandOverviewSection[]>(() => {
+  readonly allSections = computed<HandOverviewSection[]>(() => {
     this.objectChange.collectionOf(Card.aliasName)();
     this.objectChange.collectionOf(PeerCursor.aliasName)();
     this.objectChange.collectionOf(GameCharacter.aliasName)();
@@ -114,8 +151,20 @@ export class HandOverviewPanelComponent {
       characterIdentifier: seat.characterIdentifier,
       handPublic: this.cardGame.handPublicOf(seat.userId),
       cards: this.cardGame.handCardsOf(seat.userId),
+      faceUrl: this.faceUrlOf(seat),
+      keptHidden: false,
     }));
   });
+
+  /** The picture of whoever holds a hand: a character's piece, as on the table, or the participant's own. */
+  private faceUrlOf(seat: { userId: string; characterIdentifier?: string }): string {
+    this.objectChange.fileVersion();
+    if (seat.characterIdentifier) {
+      const piece = this.objectStore.get(seat.characterIdentifier);
+      return piece instanceof GameCharacter ? (piece.imageFile?.url ?? '') : '';
+    }
+    return PeerCursor.findByUserId(seat.userId)?.image?.url ?? '';
+  }
 
   /** The hand the card being dragged out of the rail came from, which takes no card back. */
   protected readonly draggedFrom = computed(() => {

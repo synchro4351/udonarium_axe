@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ChatMessageService } from '@axe/application/chat/chat-message.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
 import { Network } from '@axe/core/network/network';
+import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { Card } from '@axe/domain/card/card';
 import { handHolderForCharacter } from '@axe/domain/card/character-hands';
@@ -59,6 +60,7 @@ describe('HandOverviewPanelComponent', () => {
   });
 
   afterEach(() => {
+    localStorage.removeItem(STORAGE_KEYS.handOverviewHidden);
     fixture?.destroy();
     TestBed.inject(HandDragService).end();
     Config.instance.allowsHandGive = true;
@@ -83,6 +85,53 @@ describe('HandOverviewPanelComponent', () => {
     expect(sections.find((section) => section.userId === 'other')?.cards).toHaveLength(1);
     expect(sections.find((section) => section.userId === 'empty')?.cards).toHaveLength(0);
     expect(sections.find((section) => section.userId === 'me')?.isSelf).toBe(true);
+  });
+
+  it('keeps a hand this reader chose out of the list, and shows it faint while it holds cards', () => {
+    peer('other', 'あいて');
+    peer('empty', 'てふだなし');
+    card('s01', 'other');
+    fixture.detectChanges();
+
+    component['toggleHandShown']('empty');
+    component['toggleHandShown']('other');
+    fixture.detectChanges();
+
+    expect(
+      component
+        .sections()
+        .map((section) => section.userId)
+        .sort()
+    ).toEqual(['me', 'other']);
+    expect(component.sections().find((section) => section.userId === 'other')?.keptHidden).toBe(true);
+    expect(sectionOf('other').querySelector('[data-testid="hand-overview-kept-hidden"]')).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.handOverviewHidden)!)).toEqual(['empty', 'other']);
+
+    component['showAllHands']();
+    expect(component.sections()).toHaveLength(3);
+    expect(localStorage.getItem(STORAGE_KEYS.handOverviewHidden)).toBeNull();
+  });
+
+  it('remembers in this browser which hands were chosen out', () => {
+    localStorage.setItem(STORAGE_KEYS.handOverviewHidden, JSON.stringify(['empty']));
+    fixture.destroy();
+    fixture = TestBed.createComponent(HandOverviewPanelComponent);
+    component = fixture.componentInstance;
+    peer('empty', 'てふだなし');
+    fixture.detectChanges();
+
+    expect(component.sections().map((section) => section.userId)).toEqual(['me']);
+  });
+
+  it("puts a character's picture beside its hand", () => {
+    const hero = GameCharacter.create('ゆうしゃ', 1, './assets/images/mon_052.gif');
+    hero.location.name = 'table';
+    created.push(hero);
+    card('s02', handHolderForCharacter(hero));
+    fixture.detectChanges();
+
+    const section = component.sections().find((one) => one.characterIdentifier === hero.identifier);
+    expect(section?.faceUrl).toBe(hero.imageFile?.url ?? '');
   });
 
   it('shows fronts only for public hands and backs for private ones', () => {
