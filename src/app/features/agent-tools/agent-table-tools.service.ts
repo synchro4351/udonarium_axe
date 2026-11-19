@@ -201,7 +201,10 @@ export class AgentTableTools {
       'stamp'
     );
     const tab = this.read.tab(textArg(args, 'tab'));
-    const sent = this.chat.sendStamp(tab, stamp.id, stamp.name, PeerCursor.myCursor.identifier);
+    // Marked as the AI's, as the chat tool marks the lines it sends.
+    const sent = this.chat.asAiWords(() =>
+      this.chat.sendStamp(tab, stamp.id, stamp.name, PeerCursor.myCursor.identifier)
+    );
     if (!sent) throw new AgentToolError('not_allowed', `The stamp ${stamp.name} cannot be sent here.`);
     return { sent: stamp.name, tab: tab.name };
   }

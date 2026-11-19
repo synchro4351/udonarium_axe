@@ -144,4 +144,11 @@ describe('AgentTableTools', () => {
 
     expect(sent.mock.calls[0][1]).toBe(BUILTIN_STAMPS[0].id);
   });
+
+  it("marks the stamp it sends as the AI's, as the lines it says are", async () => {
+    await call('send_stamp', { stamp: BUILTIN_STAMPS[0].id });
+
+    const line = ObjectStore.instance.getObjects<ChatMessage>(ChatMessage).find((one) => one.sentStamp)!;
+    expect(line.isByAi).toBe(true);
+  });
 });
