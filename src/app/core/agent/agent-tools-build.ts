@@ -110,7 +110,8 @@ export const BUILD_AGENT_TOOLS: readonly AgentToolDefinition[] = [
     access: 'write',
     description:
       'Put a note on the table in view, at a square: a handout, a list of what is known, a progress chart. ' +
-      'Formatted notes draw # headings, - lists and > quotes. One the game master puts starts hidden from the players.',
+      'Formatted notes draw # headings, - lists and > quotes. Everyone may read it unless hidden keeps it to the ' +
+      'game master and its owner.',
     input: input(
       {
         title: { type: 'string', minLength: 1, maxLength: 100 },
@@ -120,6 +121,7 @@ export const BUILD_AGENT_TOOLS: readonly AgentToolDefinition[] = [
         width: { type: 'integer', minimum: 1, maximum: 24 },
         height: { type: 'integer', minimum: 1, maximum: 24 },
         formatted: { type: 'boolean' },
+        hidden: { type: 'boolean', description: 'Keep it to the game master and its owner, as a note put by hand is.' },
       },
       ['title', 'text']
     ),

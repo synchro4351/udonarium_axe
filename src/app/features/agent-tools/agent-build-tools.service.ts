@@ -8,6 +8,7 @@ import { TabletopActionService } from '@axe/application/tabletop/tabletop-action
 import { AgentToolError } from '@axe/core/agent/agent-error';
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ObjectStore } from '@axe/core/sync/object-store';
+import { DisclosureMode } from '@axe/domain/disclosure/disclosure';
 import { ImageTag } from '@axe/domain/media/image-tag';
 import { GameTable } from '@axe/domain/tabletop/game-table';
 import { GameTableMask } from '@axe/domain/tabletop/game-table-mask';
@@ -141,6 +142,9 @@ export class AgentBuildTools {
     if (typeof args['width'] === 'number') this.writeCommon(note, 'width', Math.floor(args['width']));
     if (typeof args['height'] === 'number') this.writeCommon(note, 'height', Math.floor(args['height']));
     if (args['formatted'] === true) note.isFormatted = true;
+    // A note the AI puts is for the table to read, unless it is asked to keep it back.
+    if (args['hidden'] !== true) note.disclosureMode = DisclosureMode.All;
+    note.update();
     return this.noteView(note);
   }
 
