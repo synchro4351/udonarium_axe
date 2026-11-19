@@ -7841,7 +7841,9 @@
       "picture": "スタンプ",
       "standIn": "［{{words}}］",
       "unnamedPack": "（名前なし）",
-      "manage": "スタンプのセットを管理"
+      "manage": "スタンプのセットを管理",
+      "search": "スタンプを探す（例：ひらめき）",
+      "searchNone": "見つかりません。ほかの言い方で探してください"
     }
   },
   "error": {}

@@ -1,3 +1,14 @@
+<div class="border-ui-border-separator shrink-0 border-b border-solid p-1">
+  <input
+    type="search"
+    class="rounded-ui-sm border-ui-border-panel bg-ui-input text-ui-text w-full border border-solid px-2 py-0.5 text-xs"
+    data-testid="stamp-picker-search"
+    [placeholder]="'ui.stamp.search' | transloco"
+    [attr.aria-label]="'ui.stamp.search' | transloco"
+    [value]="query()"
+    (input)="search($any($event.target).value)"
+  />
+</div>
 <div class="border-ui-border-separator flex shrink-0 flex-col gap-0.5 border-b border-solid p-1" role="tablist">
   @for (row of tabRows(); track $index) {
     <div class="flex flex-wrap items-center gap-0.5" [attr.data-testid]="'stamp-picker-tab-row-' + $index">
@@ -58,5 +69,11 @@
     >
       <ui-stamp [stampId]="id" [size]="large() ? 68 : 44" [named]="true" />
     </button>
+  } @empty {
+    @if (query().trim()) {
+      <p class="text-ui-dim col-span-full m-0 p-2 text-xs" data-testid="stamp-picker-none">
+        {{ 'ui.stamp.searchNone' | transloco }}
+      </p>
+    }
   }
 </div>

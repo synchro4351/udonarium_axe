@@ -24,6 +24,22 @@ describe('StampPickerComponent', () => {
   beforeEach(() => localStorage.removeItem(STORAGE_KEYS.recentStamps));
   afterEach(() => localStorage.removeItem(STORAGE_KEYS.recentStamps));
 
+  it('finds stamps across every tab by their words, and says so when none fit', () => {
+    const root = open();
+    const box = root.querySelector('[data-testid="stamp-picker-search"]') as HTMLInputElement;
+
+    box.value = '閃き';
+    box.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(choices(root)).toEqual(['sfx:idea', 'explore:idea']);
+
+    box.value = 'これに合うスタンプはない';
+    box.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(choices(root)).toEqual([]);
+    expect(root.querySelector('[data-testid="stamp-picker-none"]')).not.toBeNull();
+  });
+
   it('opens on the sound effects for somebody who has picked nothing yet, with a tab for each family', () => {
     const root = open();
 

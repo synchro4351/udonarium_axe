@@ -3,14 +3,24 @@ import {
   Component,
   computed,
   ElementRef,
+  inject,
   input,
   output,
   signal,
   viewChild,
 } from '@angular/core';
+import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { readLocal, writeLocal } from '@axe/core/storage/local-preference';
 import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
-import { isArtStampFamily, STAMP_FAMILIES, StampFamily, stampOf, stampsOfFamily } from '@axe/domain/chat/stamp-catalog';
+import {
+  isArtStampFamily,
+  STAMP_FAMILIES,
+  StampFamily,
+  stampNameKey,
+  stampOf,
+  stampsOfFamily,
+} from '@axe/domain/chat/stamp-catalog';
+import { STAMP_WORDS, stampMatchesQuery } from '@axe/domain/chat/stamp-words';
 import { StampComponent } from '@axe/ui/components/stamp/stamp.component';
 import { TranslocoModule } from '@jsverse/transloco';
 
@@ -22,7 +32,8 @@ type StampTab = 'recent' | StampFamily | `pack:${string}`;
 export interface StampPickerPack {
   readonly identifier: string;
   readonly name: string;
-  readonly stamps: readonly { readonly stampId: string }[];
+  /** Its stamps, each with the name it may be searched by, where it has one. */
+  readonly stamps: readonly { readonly stampId: string; readonly name?: string }[];
 }
 
 /** Whether a tab holds pictures: one of the character's families, or one of the room's sets. */
@@ -82,6 +93,10 @@ export class StampPickerComponent {
   readonly manage = output<void>();
 
   private readonly recent = signal<readonly string[]>(readRecent());
+  private readonly t = inject(TRANSLATE_FN);
+
+  /** What is being searched for; while it holds anything, every tab's stamps that fit are offered at once. */
+  protected readonly query = signal('');
 
   protected readonly tabRows = computed<readonly (readonly StampTab[])[]>(() => {
     const tabs = (
@@ -99,13 +114,52 @@ export class StampPickerComponent {
     return offered.includes(chosen) ? chosen : (offered[0] ?? chosen);
   });
 
-  protected readonly stamps = computed<readonly string[]>(() => this.offeredIn(this.tab()));
+  protected readonly stamps = computed<readonly string[]>(() =>
+    this.query().trim() ? this.found() : this.offeredIn(this.tab())
+  );
+
+  /**
+   * Every tab's stamps whose name or words hold what is searched for, each once: those the app comes
+   * with by their names and the words they are found by (`STAMP_WORDS`), a room's by the names given.
+   */
+  private readonly found = computed<readonly string[]>(() => {
+    const query = this.query();
+    const tabs = this.tabRows()
+      .flat()
+      .filter((tab) => tab !== 'recent');
+    const seen = new Set<string>();
+    const fits: string[] = [];
+    for (const tab of tabs) {
+      for (const id of this.offeredIn(tab)) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        if (stampMatchesQuery(this.namesOf(id, tab), query)) fits.push(id);
+      }
+    }
+    return fits;
+  });
 
   /** Whether the stamps of the open tab are pictures, which are offered larger. */
-  protected readonly large = computed(() => isPictureTab(this.tab()));
+  protected readonly large = computed(() => !this.query().trim() && isPictureTab(this.tab()));
 
   /** Whether the open tab is laid out in narrow cells, which only the round seals fit. */
-  protected readonly narrow = computed(() => this.tab() === 'seal');
+  protected readonly narrow = computed(() => !this.query().trim() && this.tab() === 'seal');
+
+  /** The names and words a stamp may be found by. */
+  private namesOf(id: string, tab: StampTab): string[] {
+    const ref = stampOf(id);
+    if (ref?.kind === 'builtin') return [this.t(stampNameKey(ref.stamp)), ...(STAMP_WORDS[id] ?? [])];
+    const pack = this.packs().find((each) => `pack:${each.identifier}` === tab);
+    const name = pack?.stamps.find((stamp) => stamp.stampId === id)?.name ?? '';
+    return name ? [name] : [];
+  }
+
+  /** Searches as the reader types. */
+  protected search(text: string): void {
+    this.query.set(text);
+    const list = this.list()?.nativeElement;
+    if (list) list.scrollTop = 0;
+  }
 
   private readonly list = viewChild<ElementRef<HTMLElement>>('list');
 

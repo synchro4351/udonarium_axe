@@ -7843,7 +7843,9 @@
       "picture": "스탬프",
       "standIn": "[{{words}}]",
       "unnamedPack": "(이름 없음)",
-      "manage": "스탬프 세트 관리"
+      "manage": "스탬프 세트 관리",
+      "search": "스탬프 찾기 (예: 아이디어)",
+      "searchNone": "찾지 못했습니다. 다른 말로 찾아 보세요"
     }
   }
 }
