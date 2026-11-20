@@ -47,7 +47,6 @@ const FORBID_FOR_UI = {
    on purpose (the aim is not to add more). A lazy import() is an edge as much as a static one. */
 const FEATURE_DEPENDENCIES: Record<string, readonly string[]> = {
   'agent-tools': ['card', 'chat', 'media'],
-  'ai-gm': ['ai-link'],
   'ai-link': ['agent-tools'],
   alarm: [],
   'battle-cut-in': ['effect'],

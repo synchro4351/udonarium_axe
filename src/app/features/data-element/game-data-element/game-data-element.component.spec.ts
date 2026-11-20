@@ -1,5 +1,4 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ResourceSliderService } from '@axe/application/character/resource-slider.service';
 import { EffectLibraryService } from '@axe/application/effect/effect-library.service';
 import { EffectTargetingService } from '@axe/application/effect/effect-targeting.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
@@ -18,6 +17,7 @@ import {
   DataElementViewMode,
 } from '@axe/domain/data/data-element';
 import { DataSummarySetting } from '@axe/domain/data/data-summary-setting';
+import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
 import { IN_DATA_ELEMENT_SHEET } from '@axe/features/data-element/game-data-element/data-element-sheet-host';
@@ -921,7 +921,7 @@ describe('GameDataElementComponent', () => {
       expect(group.viewMode).toBe(DataElementViewMode.NORMAL);
     });
 
-    it('lays the child groups out as rows while reading, and not while editing', () => {
+    it('draws the child groups as a table while reading and editing, and as rows once switched to editing them as rows', () => {
       const section = DataElement.create('戦闘特技', '', {
         role: DataElementRole.SECTION,
         viewMode: DataElementViewMode.TABLE,
@@ -947,6 +947,12 @@ describe('GameDataElementComponent', () => {
       expect(table?.textContent).toContain('オーバークリエイト');
 
       fixture.componentRef.setInput('isEdit', true);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.elm-view-table')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('[data-testid="table-edit-columns"]')).toBeTruthy();
+
+      fixture.componentInstance.runAction('editAsRows');
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('.elm-view-table')).toBeNull();
@@ -1623,8 +1629,8 @@ describe('GameDataElementComponent', () => {
     });
 
     describe('where the room gives every resource one', () => {
-      beforeEach(() => TestBed.inject(ResourceSliderService).setRoomDefault(true));
-      afterEach(() => TestBed.inject(ResourceSliderService).setRoomDefault(false));
+      beforeEach(() => (Config.instance.resourceSliderByDefault = true));
+      afterEach(() => (Config.instance.resourceSliderByDefault = false));
 
       it('is drawn for a resource that says nothing of its own', () => {
         show(resourceField());

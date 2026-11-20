@@ -14,6 +14,7 @@ import { TablePiecesService } from '@axe/application/tabletop/table-pieces.servi
 import { TableVeilService } from '@axe/application/tabletop/table-veil.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { TransientPlacementService } from '@axe/application/tabletop/transient-placement.service';
+import { VisionService } from '@axe/application/tabletop/vision.service';
 import { BUNDLED_PIECE_MODELS } from '@axe/core/storage/bundled-models';
 import { ModelStorage } from '@axe/core/storage/model-storage';
 import { STORAGE_KEYS } from '@axe/core/storage/storage-keys';
@@ -31,9 +32,11 @@ import { Config } from '@axe/domain/peer/config';
 import { DEFAULT_TABLE_CAMERA_VIEW } from '@axe/domain/tabletop/camera/table-camera';
 import { cellCenterOf, cellGridOf, cellIndexOf } from '@axe/domain/tabletop/fog/cell-grid';
 import { GameTable, GridType } from '@axe/domain/tabletop/game-table';
+import { TableAmbience } from '@axe/domain/tabletop/table-ambience';
 import { TableSelecter } from '@axe/domain/tabletop/table-selecter';
 import { DoorStyle, Terrain } from '@axe/domain/tabletop/terrain';
 import type { SceneLight } from '@axe/domain/tabletop/vision-scene';
+import type { WaterSpout } from '@axe/domain/tabletop/water/water-falls';
 import { type SkyDome, skyDomeAt } from '@axe/domain/tabletop/world/sky-dome';
 import { type SkyLight, skyLightAt } from '@axe/domain/tabletop/world/sky-light';
 import type { TableWorldSprite } from '@axe/domain/tabletop/world/table-sprites';
@@ -72,12 +75,15 @@ class FakeEngine implements Table3dEngine {
   effectFrames: EffectFrame[] = [];
   glows: (Table3dVeil | null)[] = [];
   fogAirSheets: (readonly Table3dFogAirSheet[])[] = [];
+  spoutsHeard: (spouts: readonly WaterSpout[]) => void = () => undefined;
+  modelMotions: boolean[] = [];
   weathers: (Table3dWeatherFall | null)[] = [];
   diceThrows: (readonly Table3dDiceThrow[])[] = [];
   domes: (SkyDome | null)[] = [];
   qualities: Table3dQualityPlan[] = [];
   moving: boolean | 'slowly' = false;
   advanced = 0;
+  advancedTo: number[] = [];
   flickeredAt: number[] = [];
   drawn = 0;
   disposed = false;
@@ -134,6 +140,14 @@ class FakeEngine implements Table3dEngine {
     this.fogAirSheets.push(sheets);
   }
 
+  setModelMotion(moving: boolean): void {
+    this.modelMotions.push(moving);
+  }
+
+  onSpouts(heard: (spouts: readonly WaterSpout[]) => void): void {
+    this.spoutsHeard = heard;
+  }
+
   setWeather(weather: Table3dWeatherFall | null): void {
     this.weathers.push(weather);
   }
@@ -173,7 +187,10 @@ class FakeEngine implements Table3dEngine {
     this.changed = true;
   }
 
+  /** How many times the light of the sky was handed over, the same light again included. */
+  skyLightsTold = 0;
   setSkyLight(light: SkyLight): void {
+    this.skyLightsTold++;
     if (JSON.stringify(light) === JSON.stringify(this.skies.at(-1))) return;
     this.skies.push(light);
     this.changed = true;
@@ -183,7 +200,8 @@ class FakeEngine implements Table3dEngine {
     this.sizes.push([width, height]);
   }
 
-  advance(): boolean | 'slowly' {
+  advance(timeMs: number): boolean | 'slowly' {
+    this.advancedTo.push(timeMs);
     this.advanced++;
     return this.moving;
   }
@@ -387,6 +405,91 @@ describe('Table3dService', () => {
     await scene.whenIdle();
 
     expect(engines[0].readiesFirst).toEqual([false]);
+  });
+
+  it('draws what moves by itself where it stands at the moment it is held at, and by the clock again once let go', async () => {
+    const scene = service();
+    scene.attach(document.createElement('canvas'));
+    await scene.whenIdle();
+    TestBed.tick();
+    await scene.whenIdle();
+    const engine = engines[0];
+    scene.holdMotion(true);
+
+    scene.holdSceneAt(5000);
+    TestBed.inject(TableCameraService).showView({ ...DEFAULT_TABLE_CAMERA_VIEW, rotateZ: 40 });
+    TestBed.tick();
+    expect(scene.drawDueNow()).toBe(true);
+    expect(engine.advancedTo.at(-1)).toBe(5000);
+
+    scene.holdSceneAt(null);
+    TestBed.inject(TableCameraService).showView({ ...DEFAULT_TABLE_CAMERA_VIEW, rotateZ: 60 });
+    TestBed.tick();
+    expect(scene.drawDueNow()).toBe(true);
+    expect(engine.advancedTo.at(-1)).not.toBe(5000);
+  });
+
+  it('pours water from the spouts the engine tells of, down to the floor of a table with no water on it', async () => {
+    const scene = service();
+    const table = new GameTable();
+    table.initialize();
+    TableSelecter.instance.viewTableIdentifier = table.identifier;
+    scene.attach(document.createElement('canvas'));
+    await scene.whenIdle();
+    TestBed.tick();
+    expect(scene.world().water.falls.points.length).toBe(0);
+
+    engines[0].spoutsHeard([{ key: 'pipe:0', x: 125, y: 100, mouthPx: 60, outX: 0, outY: 1, widthPx: 12 }]);
+    await Promise.resolve();
+    TestBed.tick();
+
+    const water = engines[0].worlds.at(-1)!.water;
+    expect(water.falls.points.length / 3).toBe(4 * 6);
+    expect(Math.max(...[...water.falls.points].filter((_, index) => index % 3 === 2))).toBe(60);
+    expect(water.splashes.points.length).toBeGreaterThan(0);
+
+    engines[0].spoutsHeard([]);
+    await Promise.resolve();
+    TestBed.tick();
+
+    expect(engines[0].worlds.at(-1)!.water.falls.points.length).toBe(0);
+  });
+
+  it('lands the water of a spout on the top of a block under it, and on the floor again once the block is moved away', async () => {
+    const scene = service();
+    const table = new GameTable();
+    table.initialize();
+    TableSelecter.instance.viewTableIdentifier = table.identifier;
+    const block = Terrain.create('台', 1, 1, 0.5, '', '');
+    block.location = { name: 'table', x: 100, y: 100 };
+    table.appendChild(block);
+    scene.attach(document.createElement('canvas'));
+    await scene.whenIdle();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    TestBed.tick();
+    const lowestOf = () =>
+      Math.min(...[...engines[0].worlds.at(-1)!.water.falls.points].filter((_, index) => index % 3 === 2));
+
+    engines[0].spoutsHeard([{ key: 'pipe:0', x: 125, y: 100, mouthPx: 60, outX: 0, outY: 1, widthPx: 12 }]);
+    await Promise.resolve();
+    TestBed.tick();
+    expect(lowestOf()).toBe(25);
+
+    block.location = { name: 'table', x: 300, y: 300 };
+    block.update();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    TestBed.tick();
+    expect(lowestOf()).toBe(0);
+
+    // A block moved where no water lands leaves the water as it was worked out, not laid again.
+    const waterOf = () => (scene as unknown as { water: () => unknown }).water();
+    const laid = waterOf();
+    block.location = { name: 'table', x: 400, y: 350 };
+    block.update();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    TestBed.tick();
+    expect(waterOf()).toBe(laid);
+    table.destroy();
   });
 
   it('draws the scene and the camera on the frame after it is given a canvas, and once only', async () => {
@@ -1010,6 +1113,30 @@ describe('Table3dService', () => {
     }
   });
 
+  it('draws no face of a block this seat is not shown, whatever keeps it from the seat', () => {
+    const scene = service();
+    const table = new GameTable();
+    table.initialize();
+    TableSelecter.instance.viewTableIdentifier = table.identifier;
+    const wall = Terrain.create('壁', 1, 1, 2, 'wall-picture', 'floor-picture');
+    table.appendChild(wall);
+    const shown = vi.spyOn(TestBed.inject(TablePiecesService), 'isBlockShown').mockReturnValue(false);
+    const wallFaces = () => scene.world().walls.filter((face) => face.id.startsWith(wall.identifier));
+
+    try {
+      expect(wallFaces()).toEqual([]);
+
+      shown.mockReturnValue(true);
+      TestBed.inject(ObjectChangeService).notifyChanged(wall.identifier);
+
+      expect(wallFaces().length).toBeGreaterThan(0);
+    } finally {
+      vi.restoreAllMocks();
+      wall.destroy();
+      table.destroy();
+    }
+  });
+
   it('draws a block given a model held here as the model, in place of its faces', async () => {
     const scene = service();
     vi.spyOn(TestBed.inject(ModelStorage), 'get').mockReturnValue({ isReady: true, url: 'blob:tree' } as never);
@@ -1034,6 +1161,51 @@ describe('Table3dService', () => {
     ]);
     expect([...world.walls, ...world.caps].filter((face) => face.id.startsWith(block.identifier))).toEqual([]);
     table.destroy();
+  });
+
+  it('hands a block drawn as a model the current of the water flowing under it, and none to one on dry ground', async () => {
+    const scene = service();
+    vi.spyOn(TestBed.inject(ModelStorage), 'get').mockImplementation(
+      (identifier: string) => ({ isReady: true, url: `blob:${identifier}` }) as never
+    );
+    const table = new GameTable();
+    table.initialize();
+    TableSelecter.instance.viewTableIdentifier = table.identifier;
+    const stream = TableAmbience.create('小川', 'water', 1, 4);
+    stream.location = { name: 'table', x: 100, y: 0 };
+    stream.surfaceHeight = 0.5;
+    stream.flowSpeed = 0.5;
+    stream.flowDirection = 180;
+    table.appendChild(stream);
+    const mill = Terrain.create('水車小屋', 3, 2, 3, '', '');
+    mill.location = { name: 'table', x: 0, y: 50 };
+    mill.modelIdentifier = 'watermill';
+    mill.blocksClimb = true;
+    const tower = Terrain.create('風車', 1, 1, 3, '', '');
+    tower.location = { name: 'table', x: 250, y: 250 };
+    tower.modelIdentifier = 'windmill';
+    table.appendChild(mill);
+    table.appendChild(tower);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const currentOf = (block: Terrain) =>
+      scene.world().models.find((model) => model.owner === block.identifier)!.current;
+
+    try {
+      expect(currentOf(mill)).toEqual({ towardX: 0, towardY: 1, surfacePx: 25 });
+      expect(currentOf(tower)).toBeUndefined();
+
+      stream.flowDirection = 0;
+      TestBed.inject(ObjectChangeService).notifyChanged(stream.identifier);
+
+      expect(currentOf(mill)).toEqual({ towardX: 0, towardY: -1, surfacePx: 25 });
+
+      vi.spyOn(TestBed.inject(VisionService), 'isHiddenByFog').mockReturnValue(true);
+      stream.flowDirection = 180;
+      TestBed.inject(ObjectChangeService).notifyChanged(stream.identifier);
+      expect(currentOf(mill)).toEqual({ towardX: 0, towardY: 1, surfacePx: 25 });
+    } finally {
+      table.destroy();
+    }
   });
 
   it('tells a block drawn as a joined wall the arms it reaches out to the walls and the door beside it with', async () => {
@@ -1243,6 +1415,25 @@ describe('Table3dService', () => {
     expect(125 + open.door!.shiftX).toBeCloseTo(100 + 25 * Math.cos((95 * Math.PI) / 180), 6);
     expect(155 + open.door!.shiftY).toBeCloseTo(155 + 25 * Math.sin((95 * Math.PI) / 180), 6);
     table.destroy();
+  });
+
+  it('lights the scene again only as its sky or its hour changes, not as anything else of the table does', async () => {
+    const scene = service();
+    scene.attach(document.createElement('canvas'));
+    await scene.whenIdle();
+    TestBed.tick();
+    await scene.whenIdle();
+    const engine = engines[0];
+    const table = TestBed.inject(TabletopService).currentTable;
+    const told = engine.skyLightsTold;
+    const color = table.gridColor;
+
+    table.gridColor = '#123456';
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    TestBed.tick();
+
+    expect(engine.skyLightsTold).toBe(told);
+    table.gridColor = color;
   });
 
   it('draws a sky past the board only on a table that asks for one, as it is at the hour the clock tells', async () => {

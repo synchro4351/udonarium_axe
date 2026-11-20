@@ -10,6 +10,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { CardGameService } from '@axe/application/card/card-game.service';
 import { HandRailService } from '@axe/application/card/hand-rail.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import type { PointerCoordinate } from '@axe/application/input/pointer-device.service';
@@ -35,7 +36,6 @@ import { GameCharacter } from '@axe/domain/character/game-character';
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
-import { CardGameService } from '@axe/features/card/card-game.service';
 import { elementsAt } from '@axe/features/card/hand-rail/elements-at';
 import {
   buildHandCardContextMenu,

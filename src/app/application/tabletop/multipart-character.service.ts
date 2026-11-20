@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { ImageTagLockService } from '@axe/application/file/image-tag-lock.service';
 import { DisclosureService } from '@axe/application/permission/disclosure.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
@@ -21,6 +22,7 @@ const MAX_GROUP_NAME_LENGTH = 80;
 export class MultipartCharacterService {
   private readonly images = inject(ImageStorage);
   private readonly roles = inject(RolePermissionService);
+  private readonly tagLock = inject(ImageTagLockService);
   private readonly disclosure = inject(DisclosureService);
   private readonly tabletop = inject(TabletopService);
   private readonly actions = inject(TabletopActionService);
@@ -32,7 +34,7 @@ export class MultipartCharacterService {
       this.roles.canEditTabletop() &&
       !!image &&
       image.state >= ImageState.COMPLETE &&
-      canBrowseImage(ImageTag.get(identifier) ?? null, this.roles.canSeeHidden())
+      canBrowseImage(ImageTag.get(identifier) ?? null, this.tagLock.sight())
     );
   }
 

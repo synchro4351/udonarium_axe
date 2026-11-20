@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { AgentPersonaService } from '@axe/application/agent/agent-persona.service';
 import { AgentToolRunner } from '@axe/application/agent/agent-tool-runner.service';
+import { type AiLinkTab, AiLinkViewService } from '@axe/application/agent/ai-link-view.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ImageService } from '@axe/application/storage/image.service';
 import { ModalService } from '@axe/application/ui/modal.service';
@@ -8,39 +9,25 @@ import { AGENT_BRIDGE_PORT, AGENT_TRUSTED_ORIGINS, type AgentScope } from '@axe/
 import { agentToolOf } from '@axe/core/agent/agent-tools';
 import { canRoleEdit } from '@axe/domain/peer/peer-role';
 import { AiLinkService } from '@axe/features/ai-link/ai-link.service';
+import { aiLinkBridgeUrl, SUBSCRIPTION_GUIDE_URL } from '@axe/features/ai-link/ai-link-releases';
+import { AiGmPanelComponent } from '@axe/features/ai-link/gm/ai-gm-panel/ai-gm-panel.component';
 import { FileSelecterComponent } from '@axe/ui/components/file-selecter/file-selecter.component';
 import { SafePipe } from '@axe/ui/pipes/safe.pipe';
 import { TranslocoModule } from '@jsverse/transloco';
-
-/** Where the bridge is downloaded from. */
-/**
- * Where tyoitashi's build of the bridge is put next to the page (tyoitashi). Its tools differ from the
- * official ones, so the official bridge refuses this Axe, and the bridge is taken from the site itself.
- */
-export const TYOITASHI_BRIDGE_PATH = 'assets/axe-mcp/axe-mcp.mjs';
-
-/** The address of tyoitashi's bridge on the site the page is served from. */
-/** The steps for running the AI on a Claude Pro or Max plan through Claude Code (tyoitashi), as the fork shows them. */
-export const SUBSCRIPTION_GUIDE_URL =
-  'https://github.com/synchro4351/udonarium_axe/blob/codex/synwork-integration/docs/TYOITASHI_AI_GM_SUBSCRIPTION.md';
-
-export function aiLinkBridgeUrl(): string {
-  return new URL(TYOITASHI_BRIDGE_PATH, document.baseURI).href;
-}
 
 /** What the panel says of where the link stands, by the i18n key under feature.aiLink.state. */
 export type AiLinkStateKey = 'idle' | 'connecting' | 'connected' | 'unreachable' | 'lost' | 'busy' | 'protocol';
 
 /**
- * The panel a seat links an AI from: whether it is linked, what it lets the AI do, what the AI has
- * done, and how to set up the bridge the AI is started with, written for this page, and the port it
- * waits on where that is not the usual one.
+ * The panel a seat links an AI from. Whether it is linked stands at the top, over two halves: the
+ * link itself (the port the bridge waits on, what the AI is let do, what it has done, and how to set
+ * up the bridge the AI is started with, written for this page), and having the AI be the game master.
  */
 @Component({
   selector: 'ai-link-panel',
   templateUrl: './ai-link-panel.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SafePipe, TranslocoModule],
+  imports: [SafePipe, TranslocoModule, AiGmPanelComponent],
   host: { class: 'block h-full' },
 })
 export class AiLinkPanelComponent {
@@ -79,8 +66,15 @@ export class AiLinkPanelComponent {
     this.personaVersion.update((v) => v + 1);
   }
 
-  protected readonly releasesUrl = aiLinkBridgeUrl();
   protected readonly subscriptionGuideUrl = SUBSCRIPTION_GUIDE_URL;
+
+  protected readonly view = inject(AiLinkViewService);
+
+  protected readonly tabs: readonly AiLinkTab[] = ['link', 'gm'];
+  protected readonly scopes: readonly AgentScope[] = ['read', 'write'];
+  /** The half of the panel shown. */
+  protected readonly tab = this.view.tab;
+  protected readonly releasesUrl = aiLinkBridgeUrl();
   /** Which command was copied last, to say so beside it. */
   protected readonly copied = signal<'code' | 'desktop' | null>(null);
 

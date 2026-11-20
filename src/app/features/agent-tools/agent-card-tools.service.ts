@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import type { AgentHandler } from '@axe/application/agent/agent-tool-runner.service';
+import { CardGameService, CardSeat } from '@axe/application/card/card-game.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { TabletopService } from '@axe/application/tabletop/tabletop.service';
 import { AgentToolError } from '@axe/core/agent/agent-error';
@@ -16,7 +17,6 @@ import {
 import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
 import { findOne, numberArg, textArg } from '@axe/features/agent-tools/agent-lookup';
 import { AgentReadTools } from '@axe/features/agent-tools/agent-read-tools.service';
-import { CardGameService, CardSeat } from '@axe/features/card/card-game.service';
 
 /** A card as this seat is shown it: its face only where the seat may see it. */
 interface AgentCard {

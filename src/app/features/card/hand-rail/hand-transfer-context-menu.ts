@@ -1,6 +1,6 @@
+import type { CardSeat } from '@axe/application/card/card-game.service';
 import type { TranslateFn } from '@axe/application/i18n/translate.token';
 import type { ContextMenuAction } from '@axe/application/ui/context-menu.service';
-import type { CardSeat } from '@axe/features/card/card-game.service';
 
 /**
  * Recipient choices for giving a card, each named for the hand it goes to, as the hand rail names

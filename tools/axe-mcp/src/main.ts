@@ -6,7 +6,9 @@ import type { GmApi } from './gm/game-master';
 import { GmHost } from './gm/gm-host';
 import { gmModelOffers, namedModel, useGmModels } from './gm/gm-models';
 import { openAiApi } from './gm/openai-api';
+import { TurnDesk } from './gm/turn-desk';
 import { serveMcpOverHttp } from './http';
+import { LocalFiles } from './local-files';
 import { createMcpServer } from './mcp-server';
 import { type BridgeOptions, readOptions, USAGE } from './options';
 import { TabLink } from './tab-link';
@@ -19,6 +21,18 @@ const VERSION = typeof __AXE_VERSION__ === 'string' ? __AXE_VERSION__ : 'dev';
 /** Everything the bridge says goes to standard error: standard output is the MCP channel. */
 function log(line: string): void {
   process.stderr.write(`[axe-mcp] ${line}\n`);
+}
+
+/** The folder the AI may read and write files in, said in the log; null, said why, for one not there. */
+function filesOf(options: BridgeOptions): LocalFiles | null {
+  try {
+    const files = new LocalFiles(options.filesDir);
+    log(`Files the AI reads and saves are kept to ${files.folder}`);
+    return files;
+  } catch {
+    log(`--files-dir names no folder there is: ${options.filesDir}`);
+    return null;
+  }
 }
 
 async function main(): Promise<void> {
@@ -42,7 +56,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  const link = new TabLink({ port: options.port, origins: options.origins, bridge: VERSION, log });
+  const files = filesOf(options);
+  if (!files) process.exit(2);
+  const link = new TabLink({ port: options.port, origins: options.origins, bridge: VERSION, log, files });
+  const desk = new TurnDesk({ link, log });
   const port = await link.listen();
   log(`Axe MCP bridge ${VERSION}: waiting for a tab of Axe at ws://127.0.0.1:${port}${AGENT_BRIDGE_PATH}`);
 
@@ -53,17 +70,21 @@ async function main(): Promise<void> {
       token: options.token,
       version: VERSION,
       log,
+      desk,
     });
   }
 
-  const stop = () => void link.close().then(() => process.exit(0));
+  const stop = () => {
+    desk.close();
+    void link.close().then(() => process.exit(0));
+  };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
 
   if (options.http === null) {
     const transport = new StdioServerTransport();
     transport.onclose = stop;
-    await createMcpServer(link, VERSION).connect(transport);
+    await createMcpServer(link, VERSION, desk).connect(transport);
     // The socket a tab connects on would keep the bridge running after the AI that started it is
     // gone, holding the port from the next one, so it stops once its standard input ends.
     process.stdin.once('end', stop);
@@ -94,6 +115,8 @@ function gameMasterApi(options: BridgeOptions): GmApi {
  */
 async function runGameMaster(options: BridgeOptions): Promise<void> {
   const api = gameMasterApi(options);
+  const files = filesOf(options);
+  if (!files) process.exit(2);
   const link = new TabLink({
     port: options.port,
     origins: options.origins,
@@ -101,6 +124,7 @@ async function runGameMaster(options: BridgeOptions): Promise<void> {
     log,
     mode: 'gm',
     models: gmModelOffers(),
+    files,
   });
   const host = new GmHost({ link, api, log, maxUsd: options.maxUsd, maxTokens: options.maxTokens });
   const port = await link.listen();

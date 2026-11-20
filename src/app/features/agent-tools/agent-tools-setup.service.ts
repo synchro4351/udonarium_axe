@@ -6,8 +6,12 @@ import { AgentToolRunner } from '@axe/application/agent/agent-tool-runner.servic
 import { AgentBuildTools } from '@axe/features/agent-tools/agent-build-tools.service';
 import { AgentCardTools } from '@axe/features/agent-tools/agent-card-tools.service';
 import { AgentChatTools } from '@axe/features/agent-tools/agent-chat-tools.service';
+import { AgentFileTools } from '@axe/features/agent-tools/agent-file-tools.service';
 import { AgentGmTools } from '@axe/features/agent-tools/agent-gm-tools.service';
 import { AgentHotbarTools } from '@axe/features/agent-tools/agent-hotbar-tools.service';
+import { AgentKindTools } from '@axe/features/agent-tools/agent-kind-tools.service';
+import { AgentMapTools } from '@axe/features/agent-tools/agent-map-tools.service';
+import { AgentMusicTools } from '@axe/features/agent-tools/agent-music-tools.service';
 import { AgentPieceTools } from '@axe/features/agent-tools/agent-piece-tools.service';
 import { AgentReadTools } from '@axe/features/agent-tools/agent-read-tools.service';
 import { AgentTableTools } from '@axe/features/agent-tools/agent-table-tools.service';
@@ -31,6 +35,10 @@ export class AgentToolsSetup {
   private readonly build = inject(AgentBuildTools);
   private readonly hotbar = inject(AgentHotbarTools);
   private readonly cards = inject(AgentCardTools);
+  private readonly kinds = inject(AgentKindTools);
+  private readonly music = inject(AgentMusicTools);
+  private readonly files = inject(AgentFileTools);
+  private readonly maps = inject(AgentMapTools);
   private done = false;
 
   /** Makes every tool runnable, once, and keeps what happens from now. */
@@ -48,6 +56,10 @@ export class AgentToolsSetup {
     this.runner.provide(this.build.handlers);
     this.runner.provide(this.hotbar.handlers);
     this.runner.provide(this.cards.handlers);
+    this.runner.provide(this.kinds.handlers);
+    this.runner.provide(this.music.handlers);
+    this.runner.provide(this.files.handlers);
+    this.runner.provide(this.maps.handlers);
   }
 
   /** Stops keeping what happens. */

@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { Network } from '@axe/core/network/network';
 import { GameObject } from '@axe/core/sync/game-object';
-import { objectAdded$, objectRemoved$ } from '@axe/core/sync/object-event-extension';
 import { isInStore, ObjectStore } from '@axe/core/sync/object-store';
+import { objectAdded$, objectRemoved$ } from '@axe/core/sync/object-store-events';
 import { DataElement } from '@axe/domain/data/data-element';
 
 type ObjectStorePrivate = {
@@ -730,5 +730,22 @@ describe('sweeping the record of what was deleted', () => {
 
     expect(sweep).toHaveBeenCalledTimes(1);
     sweep.mockRestore();
+  });
+
+  it('sweeps on the first delete after the record is cleared, without waiting out the second', () => {
+    const store = ObjectStore.instance;
+    const sweep = vi.spyOn(asPrivate(store), 'runGarbageCollection');
+    const before = DataElement.create('gone-before', '', {});
+    before.initialize();
+    store.delete(before, false);
+    sweep.mockClear();
+
+    store.clearDeleteHistory();
+    const after = DataElement.create('gone-after', '', {});
+    after.initialize();
+    store.delete(after, false);
+
+    expect(sweep).toHaveBeenCalledTimes(1);
+    expect(asPrivate(store).garbageSweepCooldown).not.toBeNull();
   });
 });

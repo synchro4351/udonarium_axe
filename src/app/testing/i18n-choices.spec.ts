@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 
+import { MAP_KINDS } from '@axe/application/tabletop/map-generation/map-settings';
 import { CHAT_SOUND_TYPES } from '@axe/domain/chat/chat-sound';
 import { AILMENT_LOOKS } from '@axe/domain/effect/ailment-looks';
 import { AMBIENCE_BRIGHTNESS } from '@axe/domain/effect/ambience/ambience-brightness';
@@ -26,12 +27,14 @@ import {
 import { SWITCH_REFUSALS } from '@axe/domain/tabletop/board-switch/switch-press-rules';
 import {
   DUNGEON_ATMOSPHERE_IDS,
+  DUNGEON_ATMOSPHERES,
   DUNGEON_ENTRANCE_STYLES,
   DUNGEON_ROLE_NAMINGS,
 } from '@axe/domain/tabletop/dungeon/dungeon-atmosphere';
 import { DUNGEON_ROOM_ROLES, FURNISHING_IDS } from '@axe/domain/tabletop/dungeon/dungeon-layout';
 import { FIELD_ATMOSPHERE_IDS, FIELD_PROP_IDS } from '@axe/domain/tabletop/field/field-atmosphere';
 import { TOWN_PIECE_IDS } from '@axe/domain/tabletop/field/field-blocks';
+import { MILL_KINDS } from '@axe/domain/tabletop/field/settlement-layout';
 import { MAP_FUNCTION_ROLES } from '@axe/domain/tabletop/function-paint';
 import { HAZARD_KINDS } from '@axe/domain/tabletop/hazard-presets';
 import { MOVE_MODES } from '@axe/domain/tabletop/move/move-mode';
@@ -47,7 +50,6 @@ import { DEFAULT_MENU_LAYOUTS } from '@axe/domain/ui/builtin-menu-layouts';
 import { MENU_COMMANDS } from '@axe/domain/ui/menu-command';
 import { isMenuGroup } from '@axe/domain/ui/menu-layout';
 import { VIEW_MODES } from '@axe/domain/ui/view-mode';
-import { MAP_KINDS } from '@axe/features/dungeon-generator/dungeon-generator.component';
 import { FIRST_PERSON_FACING_NAMES, FIRST_PERSON_PAD_LABELS } from '@axe/features/first-person/first-person-hud';
 const HOTBAR_FAILURES = ['noCharacter', 'notFound', 'noTab', 'offTable', 'empty', 'notAllowed', 'unavailable'] as const;
 
@@ -70,9 +72,23 @@ const CHOICES: Record<string, readonly string[]> = {
   'feature.tabletop.dungeonGenerator.role.': DUNGEON_ROOM_ROLES,
   'feature.tabletop.dungeonGenerator.field.': FIELD_ATMOSPHERE_IDS,
   'feature.tabletop.dungeonGenerator.prop.': [...FIELD_PROP_IDS, 'building'],
-  'feature.tabletop.dungeonGenerator.piece.': [...FIELD_PROP_IDS, ...TOWN_PIECE_IDS, ...FURNISHING_IDS, 'hiddenDoor'],
+  'feature.tabletop.dungeonGenerator.piece.': [
+    ...FIELD_PROP_IDS,
+    ...TOWN_PIECE_IDS,
+    ...FURNISHING_IDS,
+    ...MILL_KINDS,
+    'hiddenDoor',
+  ],
   ...Object.fromEntries(
-    DUNGEON_ROLE_NAMINGS.map((naming) => [`feature.tabletop.dungeonGenerator.roleIn.${naming}.`, DUNGEON_ROOM_ROLES])
+    DUNGEON_ROLE_NAMINGS.map((naming) => [
+      `feature.tabletop.dungeonGenerator.roleIn.${naming}.`,
+      [
+        ...DUNGEON_ROOM_ROLES,
+        ...DUNGEON_ATMOSPHERE_IDS.map((id) => DUNGEON_ATMOSPHERES[id])
+          .filter((atmosphere) => atmosphere.roleNames === naming)
+          .flatMap((atmosphere) => Object.values(atmosphere.roomSets ?? {}).flat()),
+      ],
+    ])
   ),
   'feature.tabletop.dungeonGenerator.kind.': MAP_KINDS,
   'feature.tabletop.dungeonGenerator.trap.': TRAP_KINDS,

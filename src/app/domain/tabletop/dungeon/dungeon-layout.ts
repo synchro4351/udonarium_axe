@@ -1,4 +1,5 @@
 import { clamp } from '@axe/core/util/clamp';
+import type { GroundRaster } from '@axe/domain/tabletop/ground/ground-raster';
 import { TrapKind } from '@axe/domain/tabletop/trap-presets';
 
 /**
@@ -23,6 +24,8 @@ export const DungeonCell = {
   Corridor: 2,
   Door: 3,
   Hazard: 4,
+  /** Floor under water: a channel down the middle of a passage, or a basin in a room. */
+  Water: 5,
 } as const;
 
 export type DungeonCellValue = (typeof DungeonCell)[keyof typeof DungeonCell];
@@ -62,6 +65,11 @@ export interface DungeonPoint {
 export interface DungeonRoom extends DungeonRect {
   index: number;
   role: DungeonRoomRoleValue;
+  /**
+   * What the room is, of the kinds of room a place keeps for the part it plays: a workshop, an
+   * observatory or a bedroom among a tower's small rooms. Left out where the place keeps one kind.
+   */
+  set?: string;
 }
 
 export interface DungeonDoor extends DungeonPoint {
@@ -101,15 +109,118 @@ export const FURNISHING_IDS = [
   'containerRed',
   'containerBlue',
   'containerGreen',
+  'barrel',
+  'pipe',
+  'pipeValve',
+  'pipeElbow',
+  'pipeEnd',
+  'neonCocktail',
+  'neonDice',
+  'neonHeart',
+  'backBar',
+  'boothSofa',
+  'lowTable',
+  'jukebox',
+  'slotMachine',
+  'arcadeCabinet',
+  'rouletteTable',
+  'vendingMachine',
+  'goodsShelf',
+  'safe',
+  'executiveDesk',
+  'still',
+  'speaker',
+  'aquarium',
+  'plant',
+  'bookshelf',
+  'lectern',
+  'bookPile',
+  'alchemyTable',
+  'cauldron',
+  'potionShelf',
+  'magicCircle',
+  'crystalPedestal',
+  'orrery',
+  'telescope',
+  'canopyBed',
+  'wardrobe',
+  'treasureChest',
+  'candelabra',
+  'gargoyle',
+  'writingDesk',
+  'storageJars',
+  'bed',
+  'tableWood',
+  'chairWood',
+  'cupboard',
+  'fireplace',
+  'anvil',
+  'forge',
+  'weaponRack',
+  'breadOven',
+  'flourSacks',
+  'pew',
+  'altar',
+  'bunkBed',
+  'chestWood',
+  'shelfGoods',
+  'barCounter',
+  'tavernCounter',
 ] as const;
 
 export type FurnishingId = (typeof FURNISHING_IDS)[number];
 
+/**
+ * What water a cell holds: none, the channel of a passage, the basin of a room, or the outfall of a
+ * channel, its last cells before it drains, cut as deep as a basin for the channel to fall into.
+ */
+export const WaterwayKind = {
+  Dry: 0,
+  Channel: 1,
+  Basin: 2,
+  Outfall: 3,
+} as const;
+
+export type WaterwayKindValue = (typeof WaterwayKind)[keyof typeof WaterwayKind];
+
+/**
+ * The water run through a place, cell by cell.
+ *
+ * Every cell that holds any is a water cell of the board; this says which water it is and which
+ * way it runs, which is what the table is given as the water's areas.
+ */
+export interface DungeonWaterway {
+  /** What water each cell holds, as one of {@link WaterwayKind}. */
+  kinds: Uint8Array;
+  /** Which way the water of each cell runs, in degrees clockwise from the top of the board, or -1 where it lies still or there is none. */
+  flow: Int16Array;
+}
+
+/**
+ * Where a pipe comes out of a wall over the water of a basin: the cell against the wall, which the
+ * basin's water is let into under it, and which way it faces, measured away from the wall as a light
+ * on a wall is.
+ */
+export interface DungeonSpout extends DungeonPoint {
+  facing: number;
+}
+
 /** A piece of furniture standing in a room, and the cells it takes. */
 export interface DungeonFurnishing extends DungeonRect {
   piece: FurnishingId;
+  /**
+   * On a board of hexes, the cell a piece of several cells stands its middle on: for one with its back
+   * to a wall, the cell out from the wall, so it reaches no further into the wall than its cells do.
+   * Left out, the cell nearest its middle.
+   */
+  standsOn?: DungeonPoint;
   /** How far it is turned off square, in degrees. */
   spin: number;
+  /**
+   * Which way it faces, for a piece that stands with its back to a wall or lies one way in the middle
+   * of a room: how far its model, made facing south, is turned clockwise. Left out, as made.
+   */
+  facing?: number;
   /** What is stacked on top of it, from the bottom up. */
   stack?: FurnishingId[];
 }
@@ -144,6 +255,17 @@ export interface DungeonLayout {
   furnishings?: DungeonFurnishing[];
   /** What is set on the floor to catch whoever walks on it, where the place is trapped at all. */
   traps?: DungeonTrap[];
+  /** The water run through it, where any is. */
+  waterway?: DungeonWaterway;
+  /** The pipes that pour into its basins, where it has any. */
+  spouts?: DungeonSpout[];
+  /** How high its ground stands over the board, where the water run through it digs into it. */
+  relief?: GroundRaster | null;
+  /**
+   * For a round place, as a tower is, the cells outside it, each as 1: no part of the place at all,
+   * so nothing is built or painted on them. Left out, the place fills the board.
+   */
+  outside?: Uint8Array;
   seed: number;
 }
 
@@ -164,7 +286,7 @@ export function setCell(layout: DungeonLayout, x: number, y: number, value: Dung
   layout.cells[y * layout.width + x] = value;
 }
 
-/** Whether a kind of cell is open ground (room, corridor, door or hazard) rather than rock. */
+/** Whether a kind of cell is open ground (room, corridor, door, hazard or water) rather than rock. */
 export function isOpenCell(value: DungeonCellValue): boolean {
   return value !== DungeonCell.Rock;
 }

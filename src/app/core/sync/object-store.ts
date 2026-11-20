@@ -1,7 +1,7 @@
 import { networkSend, networkSendLatest } from '@axe/core/network/network-messaging';
 import { GameObject, ObjectContext } from '@axe/core/sync/game-object';
-import { objectAdded$, objectRemoved$ } from '@axe/core/sync/object-event-extension';
 import { Type } from '@axe/core/sync/object-factory';
+import { objectAdded$, objectRemoved$ } from '@axe/core/sync/object-store-events';
 
 type ObjectAliasName = string;
 type ObjectIdentifier = string;
@@ -210,10 +210,17 @@ export class ObjectStore {
     this.deletedVersions = new Map(history?.versions);
   }
 
-  /** Forgets all deletions so those identifiers may be added again, as on joining or reconnecting. */
+  /**
+   * Forgets all deletions so those identifiers may be added again, as on joining or reconnecting.
+   *
+   * The wait before the next sweep goes with them, there being nothing left for a sweep to have
+   * just gone over.
+   */
   clearDeleteHistory() {
     this.garbageMap.clear();
     this.deletedVersions.clear();
+    if (this.garbageSweepCooldown !== null) clearTimeout(this.garbageSweepCooldown);
+    this.garbageSweepCooldown = null;
   }
 
   /**

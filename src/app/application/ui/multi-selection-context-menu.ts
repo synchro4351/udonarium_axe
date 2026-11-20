@@ -5,6 +5,8 @@ import { copyBeside } from '@axe/application/ui/tabletop-context-menu-actions';
 import { ObjectStore } from '@axe/core/sync/object-store';
 import { GameCharacter } from '@axe/domain/character/game-character';
 import { DiceSymbol } from '@axe/domain/dice/dice-symbol';
+import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import { canRoleSeeHidden } from '@axe/domain/peer/peer-role';
 import { isLockedInPlace } from '@axe/domain/tabletop/lockable';
 import { TabletopObject } from '@axe/domain/tabletop/tabletop-object';
 import { isWithheldHere } from '@axe/domain/tabletop/withheld';
@@ -28,7 +30,8 @@ export interface MultiSelectionContextDeps {
  * Builds the context menu for several selected pieces at once.
  *
  * It offers copying the unlocked pieces, sending them to the graveyard and clearing the selection.
- * Where the caller supplies the means, it also throws or stores the visible dice among them.
+ * Where the caller supplies the means, it also throws or stores the dice among them whose faces this
+ * seat may read, as {@link DiceSymbol.isOpenTo} says.
  */
 export function buildMultiSelectionContextMenu(
   objects: readonly TabletopObject[],
@@ -38,7 +41,8 @@ export function buildMultiSelectionContextMenu(
     deps;
   const count = objects.length;
   const movable = objects.filter((o) => !isLockedInPlace(o));
-  const dice = objects.filter((o): o is DiceSymbol => o instanceof DiceSymbol && o.isVisible);
+  const seesHidden = canRoleSeeHidden(PeerCursor.myRole);
+  const dice = objects.filter((o): o is DiceSymbol => o instanceof DiceSymbol && o.isOpenTo(seesHidden));
 
   return [
     ...(linkCharacters && objects.length > 1 && objects.every((o) => o instanceof GameCharacter)

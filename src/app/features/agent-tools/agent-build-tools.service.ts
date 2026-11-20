@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import type { AgentHandler } from '@axe/application/agent/agent-tool-runner.service';
 import { AgentViews } from '@axe/application/agent/agent-views.service';
+import { ImageTagLockService } from '@axe/application/file/image-tag-lock.service';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { DisclosureService } from '@axe/application/permission/disclosure.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
@@ -32,6 +33,7 @@ export class AgentBuildTools {
   private readonly objectStore = inject(ObjectStore);
   private readonly disclosure = inject(DisclosureService);
   private readonly permission = inject(RolePermissionService);
+  private readonly tagLock = inject(ImageTagLockService);
   private readonly t = inject(TRANSLATE_FN);
   private readonly read = inject(AgentReadTools);
   private readonly views = inject(AgentViews);
@@ -260,7 +262,7 @@ export class AgentBuildTools {
 
   private image(reference: string): ImageFile {
     // The pictures this seat may pick, as list_assets lists them.
-    const images = ImageTag.searchImages([], this.permission.canSeeHidden());
+    const images = ImageTag.searchImages([], this.tagLock.sight());
     return findOne(
       images,
       reference,

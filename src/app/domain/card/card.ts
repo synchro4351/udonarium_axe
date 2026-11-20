@@ -46,7 +46,12 @@ export class Card extends OwnedTabletopObject {
 
   /** A card is drawn loose on the table only when it is not inside a card stack, or its stack is gone. */
   override get isVisibleOnTable(): boolean {
-    return this.location.name === 'table' && (!this.parentIsAssigned || this.parentIsDestroyed);
+    return this.location.name === 'table' && this.isLoose;
+  }
+
+  /** Whether the card lies on its own rather than inside a card stack, or its stack is gone. */
+  get isLoose(): boolean {
+    return !this.parentIsAssigned || this.parentIsDestroyed;
   }
 
   /** The card's width on the table, in grid cells; 2 when the card has no size element. */
@@ -177,6 +182,25 @@ export class Card extends OwnedTabletopObject {
    */
   get isVisible(): boolean {
     return this.isPeeking || this.isFront || this.isInMyHand || this.isInCharacterHandISee;
+  }
+
+  /**
+   * Whether a seat may see and change the card's front: its picture, its name, its words and its
+   * data. A seat that sees what is kept back always may. Any other may for a card lying on its own
+   * that shows it the face and that no other seat is peeking at, and never for a card inside a stack,
+   * whose fronts only the game master looks through.
+   */
+  isFrontOpenTo(seesHidden: boolean): boolean {
+    if (seesHidden) return true;
+    return this.isLoose && this.isVisible && !(this.hasOwner && !this.isMine);
+  }
+
+  /**
+   * Whether another seat, connected now, is peeking at the card. That makes the card theirs: nobody
+   * else turns it over, peeks at it or takes it into a hand, the game master no more than anyone.
+   */
+  get isPeekedByAnother(): boolean {
+    return !this.isPeeking && this.ownerIsOnline;
   }
 
   /**

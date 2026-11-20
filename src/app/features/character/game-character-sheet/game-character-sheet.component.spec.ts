@@ -16,6 +16,7 @@ import { Card, CardState } from '@axe/domain/card/card';
 import { CardStack } from '@axe/domain/card/card-stack';
 import { GameCharacter, KOMA_IMAGE_SECTION, PORTRAIT_POSITION_SECTION } from '@axe/domain/character/game-character';
 import { DataElement, DataElementAttribute, DataElementRole } from '@axe/domain/data/data-element';
+import { DiceSymbol, DiceType } from '@axe/domain/dice/dice-symbol';
 import { Config } from '@axe/domain/peer/config';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
 import { PeerRole } from '@axe/domain/peer/peer-role';
@@ -25,6 +26,7 @@ import { TextNote } from '@axe/domain/tabletop/text-note';
 import { GameCharacterSheetComponent } from '@axe/features/character/game-character-sheet/game-character-sheet.component';
 import { SheetCardFormComponent } from '@axe/features/character/game-character-sheet/sheet-card-form.component';
 import { expectClosesForAGuest } from '@axe/testing/closes-for-a-guest';
+import { beMyself } from '@axe/testing/peer-context-stub';
 import { TEST_PROVIDERS } from '@axe/testing/test-providers';
 import type { MockInstance } from 'vitest';
 
@@ -174,8 +176,8 @@ describe('GameCharacterSheetComponent', () => {
         fixture.detectChanges();
         const front = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
           '[data-testid="card-sheet-front-image"]'
-        )!;
-        expect(front.getAttribute('style') ?? '').not.toContain('secret-front');
+        );
+        expect(front?.getAttribute('style') ?? '').not.toContain('secret-front');
       } finally {
         card.destroy();
       }
@@ -252,6 +254,40 @@ describe('GameCharacterSheetComponent', () => {
     await component.saveToXML();
     expect(save).toHaveBeenCalledTimes(1);
     vi.restoreAllMocks();
+  });
+
+  it('saves nothing of a card face down or a die another seat keeps for a player, and saves both for the game master', async () => {
+    beMyself('me');
+    PeerCursor.createMyCursor();
+    PeerCursor.myCursor.userId = 'me';
+    PeerCursor.myCursor.role = PeerRole.Player;
+    const save = vi.spyOn(TestBed.inject(SaveDataService), 'saveGameObjectAsync').mockResolvedValue();
+    const shown = vi.spyOn(TestBed.inject(SnackbarService), 'show').mockImplementation(() => {});
+    const card = Card.create('伏せ札', 'front.png', 'back.png');
+    card.faceDown();
+    const die = DiceSymbol.create('隠しダイス', DiceType.D6, 1);
+    die.owner = 'somebody-else';
+    try {
+      for (const piece of [card, die]) {
+        component.tabletopObject = piece;
+        await component.saveToXML();
+      }
+      expect(save).not.toHaveBeenCalled();
+      expect(shown).toHaveBeenCalledTimes(2);
+
+      PeerCursor.myCursor.role = PeerRole.GameMaster;
+      for (const piece of [card, die]) {
+        const sheet = TestBed.createComponent(GameCharacterSheetComponent).componentInstance;
+        sheet.tabletopObject = piece;
+        await sheet.saveToXML();
+      }
+      expect(save).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.restoreAllMocks();
+      card.destroy();
+      die.destroy();
+      PeerCursor.myCursor = null!;
+    }
   });
 
   it('leaves the sections the portrait panel edits out of the list of details', () => {

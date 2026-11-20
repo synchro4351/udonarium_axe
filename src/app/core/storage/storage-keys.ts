@@ -29,6 +29,7 @@ export const STORAGE_KEYS = {
   effectLibrarySize: 'axe.effect.librarySize',
   firstPersonPiece: 'ui-first-person-piece',
   foregroundSeeThrough: 'axe.foreground.seeThrough',
+  generatedLightMotion: 'axe.generator.lightMotion',
   handOverviewHidden: 'axe.card.handOverviewHidden',
   hotbar: 'ui-hotbar',
   hotbarOwner: 'ui-hotbar-owner',

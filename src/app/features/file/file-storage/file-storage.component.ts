@@ -17,6 +17,7 @@ import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { ReportService } from '@axe/application/moderation/report.service';
 import { RolePermissionService } from '@axe/application/permission/role-permission.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { trackEvery } from '@axe/application/sync/track-every';
 import { MultipartCharacterService } from '@axe/application/tabletop/multipart-character.service';
 import { ModalService } from '@axe/application/ui/modal.service';
 import { PanelService } from '@axe/application/ui/panel.service';
@@ -26,7 +27,7 @@ import { emitSelectFile } from '@axe/core/event/domain-events';
 import { FileArchiver, ImageDropPlace, MAX_LOADED_IMAGE_BYTES } from '@axe/core/storage/file-archiver';
 import { ImageFile } from '@axe/core/storage/image-file';
 import { ImageStorage } from '@axe/core/storage/image-storage';
-import { canBrowseImage, ImageTag, SYSTEM_RESERVED_TAG } from '@axe/domain/media/image-tag';
+import { browsableImageTags, canBrowseImage, ImageTag, SYSTEM_RESERVED_TAG } from '@axe/domain/media/image-tag';
 import { isAccountAvatar } from '@axe/domain/peer/account-avatar';
 import {
   ClipboardImageResult,
@@ -200,7 +201,7 @@ export class FileStorageComponent implements DroppedImageHolder {
   private mayShow(imageFile: ImageFile): boolean {
     if (isAccountAvatar(imageFile.context.identifier)) return false;
     const tag = ImageTag.get(imageFile.context.identifier) ?? null;
-    return canBrowseImage(tag, this.canKeepSecret, this.showSecret(), this.tagLock.hides);
+    return canBrowseImage(tag, this.tagLock.sight(), this.showSecret());
   }
 
   /**
@@ -251,29 +252,17 @@ export class FileStorageComponent implements DroppedImageHolder {
   }
 
   /**
-   * The tags offered above the pictures: untagged first, then all, then each tag a person filed
-   * pictures under, but those someone else keeps from this seat.
+   * The tags offered above the pictures: untagged first, then all, then each tag of a picture listed
+   * here, so none that only the master's kept pictures, the tool's own or a tag someone else keeps
+   * from this seat would name.
    */
   readonly tagList = computed<string[]>(() => {
     this.objectChange.fileVersion();
-    this.objectChange.collectionOf('image-tag')();
+    trackEvery(this.objectChange, 'image-tag');
     this.objectChange.trackMyCursor();
     this.tagLock.track();
-    const tags: string[] = [];
-    for (const imageFile of this.fileStorageService.images) {
-      const identifier = imageFile.context.identifier;
-      const imageTag = ImageTag.get(identifier);
-      if (imageTag) {
-        this.objectChange.versionOf(imageTag.identifier)();
-        const tag = imageTag.tag;
-        if (tag && tag !== SYSTEM_RESERVED_TAG && !this.tagLock.hides(tag)) tags.push(tag);
-      }
-    }
-
-    const tags2: string[] = Array.from(new Set(tags));
-    tags2.unshift(ALL_TAG);
-    tags2.unshift('');
-    return tags2;
+    const images = this.fileStorageService.images.filter((image) => !isAccountAvatar(image.identifier));
+    return ['', ALL_TAG, ...browsableImageTags(images, this.tagLock.sight(), this.showSecret())];
   });
 
   fileStorageService = this.imageStorage;

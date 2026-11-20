@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { BattleLaunchLoaderService } from '@axe/application/battle/battle-launch-loader.service';
+import { CardGameService } from '@axe/application/card/card-game.service';
 import { PieceNameService } from '@axe/application/character/piece-name.service';
 import { PieceResetService } from '@axe/application/character/piece-reset.service';
 import { ResourceSliderService } from '@axe/application/character/resource-slider.service';
@@ -46,7 +47,6 @@ import { GameCharacter } from '@axe/domain/character/game-character';
 import { saidNameOf } from '@axe/domain/character/hidden-name';
 import { isLinkedPart } from '@axe/domain/character/part-group';
 import { multiAngleFontScaleFactor } from '@axe/domain/tabletop/multi-angle-font-scale';
-import { CardGameService } from '@axe/features/card/card-game.service';
 import { buildConditionContextMenu } from '@axe/features/character/game-character/condition-context-menu';
 import {
   buildGameCharacterContextMenuModel,
@@ -181,6 +181,7 @@ export class GameCharacterMenuService {
       gridSize,
       this.inventoryService,
       {
+        disclosure: this.disclosureService,
         onShowDetail: () => this.showDetail(char),
         onShowMemo: () => this.showMemo(char),
         onShowChatPalette: () => this.showChatPalette(char),

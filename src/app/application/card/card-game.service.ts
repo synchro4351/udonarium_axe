@@ -1,0 +1,825 @@
+import { computed, inject, Injectable } from '@angular/core';
+import { CardFlipCutInService } from '@axe/application/card/card-flip-cut-in.service';
+import { ChatMessageService } from '@axe/application/chat/chat-message.service';
+import { encodeI18nMessage } from '@axe/application/i18n/i18n-message';
+import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
+import { DisclosureService } from '@axe/application/permission/disclosure.service';
+import { RolePermissionService } from '@axe/application/permission/role-permission.service';
+import { ObjectChangeService } from '@axe/application/sync/object-change.service';
+import { TabletopService } from '@axe/application/tabletop/tabletop.service';
+import { Network } from '@axe/core/network/network';
+import { getPeerIds } from '@axe/core/network/peer-context-source';
+import { ObjectStore } from '@axe/core/sync/object-store';
+import { clamp } from '@axe/core/util/clamp';
+import { Card, CardState } from '@axe/domain/card/card';
+import { planDeal } from '@axe/domain/card/card-deal';
+import { CardStack } from '@axe/domain/card/card-stack';
+import {
+  brokenCardOffset,
+  drawnCardOffset,
+  splitPileIndexes,
+  splitPileOffset,
+} from '@axe/domain/card/card-stack-spread';
+import { handHolderForCharacter, seesCharacterHand } from '@axe/domain/card/character-hands';
+import { selectHandCardsOf } from '@axe/domain/card/hand-cards';
+import { characterOfHandHolder, handHolderOf } from '@axe/domain/card/hand-location';
+import { appendHandOrderAfter, OrphanHand, selectOrphanHands, shortUserIdOf } from '@axe/domain/card/orphan-hands';
+import { findTrumpPairs, selectExtraJokers, trumpRankOf } from '@axe/domain/card/trump-card';
+import { GameCharacter } from '@axe/domain/character/game-character';
+import { ChatMessage } from '@axe/domain/chat/chat-message';
+import { PresetSound, SoundEffect } from '@axe/domain/media/sound-effect';
+import { Config } from '@axe/domain/peer/config';
+import { PeerCursor } from '@axe/domain/peer/peer-cursor';
+import { canRoleEdit, canRoleSeeHidden, PeerRole } from '@axe/domain/peer/peer-role';
+
+const DISCARD_STACK_OFFSET = 150;
+
+/**
+ * A hand cards can be held in: a participant's, or a character's. `userId` is what the hand is held
+ * under, a user id for a participant and the character's holder for a character.
+ */
+export interface CardSeat {
+  userId: string;
+  name: string;
+  /** The character the hand belongs to; absent for a participant's own hand. */
+  characterIdentifier?: string;
+}
+
+/** How a game master's attempt to hand over an orphaned hand ended; anything but `moved` left every card where it was. */
+export type OrphanHandRescueResult =
+  'moved' | 'notGameMaster' | 'sourcePresent' | 'recipientUnavailable' | 'handChanged';
+
+export interface DealResult {
+  dealt: number;
+  participants: number;
+}
+
+@Injectable({ providedIn: 'root' })
+export class CardGameService {
+  private readonly objectStore = inject(ObjectStore);
+  private readonly chatMessageService = inject(ChatMessageService);
+  private readonly t = inject(TRANSLATE_FN);
+  private readonly objectChange = inject(ObjectChangeService);
+  private readonly permission = inject(RolePermissionService);
+  private readonly disclosure = inject(DisclosureService);
+  private readonly flipCutIn = inject(CardFlipCutInService);
+  private readonly tabletop = inject(TabletopService);
+
+  /**
+   * The name each user last spoke under in chat, for the hands of those who have left. It is looked
+   * for again only as lines are said or taken away, not each time a card moves.
+   */
+  private readonly lastSpokenNames = computed(() => {
+    this.objectChange.collectionOf(ChatMessage.aliasName)();
+    const latest = new Map<string, ChatMessage>();
+    for (const message of this.objectStore.getObjects<ChatMessage>(ChatMessage)) {
+      if (message.isSystem || !message.isDisplayable || (message.name ?? '').length < 1) continue;
+      const before = latest.get(message.from);
+      if (!before || message.timestamp > before.timestamp) latest.set(message.from, message);
+    }
+    return new Map([...latest].map(([userId, message]) => [userId, message.name]));
+  });
+
+  /** Your own user id. Outside a room it is not on the cursor yet, so the peer context answers instead. */
+  myUserId(): string {
+    return PeerCursor.myUserId;
+  }
+
+  /**
+   * Who can hold cards, judged the same way the hand rail judges it: each seat linked now that may
+   * play, once, though a seat that loaded the page again may still have the cursor it left behind.
+   */
+  participants(): CardSeat[] {
+    const seen = new Set<string>();
+    const seats = PeerCursor.linkedCursors()
+      .filter((cursor) => cursor.userId.length > 0 && canRoleEdit(cursor.role))
+      .filter((cursor) => !seen.has(cursor.userId) && Boolean(seen.add(cursor.userId)))
+      .map((cursor) => ({ userId: cursor.userId, name: cursor.name }));
+
+    const myUserId = this.myUserId();
+    if (myUserId.length > 0 && canRoleEdit(PeerCursor.myRole) && !seats.some((seat) => seat.userId === myUserId)) {
+      seats.unshift({ userId: myUserId, name: PeerCursor.myCursor?.name ?? '' });
+    }
+    return seats;
+  }
+
+  /**
+   * Whether this seat may see and change a card's front: its picture, its name, its words and its
+   * data. The game master always may; any other seat as {@link Card.isFrontOpenTo} says, which is
+   * never for a card inside a stack.
+   */
+  canReadFront(card: Card): boolean {
+    return card.isFrontOpenTo(this.permission.canSeeHidden());
+  }
+
+  /** Whether this seat may open a card's sheet: its disclosure lets the seat see it, and so does its front. */
+  canOpenSheet(card: Card): boolean {
+    return this.disclosure.canView(card) && this.canReadFront(card);
+  }
+
+  /**
+   * Whether this seat may turn a card over, peek at it or take it into a hand: a seat that may change
+   * the table, for a card no other seat connected now is peeking at, the game master included.
+   */
+  canHandle(card: Card): boolean {
+    return this.permission.canEditTabletop() && !card.isPeekedByAnother;
+  }
+
+  /**
+   * Turns a card face up for everyone, ending any peek, and plays its sound and the cut-in tied to it.
+   * False, with nothing done, where this seat may not handle the card.
+   */
+  faceUp(card: Card): boolean {
+    if (!this.canHandle(card)) return false;
+    card.faceUp();
+    SoundEffect.play(PresetSound.cardDraw);
+    this.flipCutIn.playFor(card);
+    return true;
+  }
+
+  /**
+   * Turns a card face down, ending any peek, and plays its sound. False, with nothing done, where this
+   * seat may not handle the card.
+   */
+  faceDown(card: Card): boolean {
+    if (!this.canHandle(card)) return false;
+    card.faceDown();
+    SoundEffect.play(PresetSound.cardDraw);
+    return true;
+  }
+
+  /**
+   * Turns a card over as a double tap does: face down when this seat sees its face without peeking at
+   * it, and face up otherwise. False, with nothing done, where this seat may not handle the card.
+   */
+  flip(card: Card): boolean {
+    return card.isVisible && !card.isPeeking ? this.faceDown(card) : this.faceUp(card);
+  }
+
+  /**
+   * Lays a card face down with its face shown to this seat alone, and plays its sound. False, with
+   * nothing done, where this seat may not handle the card or has no user id yet.
+   */
+  peek(card: Card): boolean {
+    const myUserId = this.myUserId();
+    if (myUserId.length < 1 || !this.canHandle(card)) return false;
+    card.state = CardState.BACK;
+    card.owner = myUserId;
+    SoundEffect.play(PresetSound.cardDraw);
+    return true;
+  }
+
+  /**
+   * Takes cards into this seat's hand, leaving out any this seat may not handle, and plays one sound
+   * when it took any. Gives back the cards it took; none while this seat has no user id yet.
+   */
+  takeToHand(cards: readonly Card[]): Card[] {
+    const myUserId = this.myUserId();
+    if (myUserId.length < 1) return [];
+    const taken = cards.filter((card) => this.canHandle(card));
+    for (const card of taken) card.toHand(myUserId);
+    if (taken.length > 0) SoundEffect.play(PresetSound.cardDraw);
+    return taken;
+  }
+
+  /**
+   * Puts loose cards into a stack one after another, each on its top or at its bottom, leaving out any
+   * this seat may not handle, as a card put into a stack is no longer anybody's to peek at. Gives back
+   * the cards it put in.
+   */
+  putIntoStack(stack: CardStack, cards: readonly Card[], at: 'top' | 'bottom'): Card[] {
+    const taken = cards.filter((card) => this.canHandle(card));
+    for (const card of taken) {
+      if (at === 'top') stack.putOnTop(card);
+      else stack.putOnBottom(card);
+    }
+    return taken;
+  }
+
+  /**
+   * Gathers loose cards into a new stack lying where `origin` lies and turned as it is, the first of
+   * them on top, leaving out any this seat may not handle. Null, with no stack made, where this seat
+   * may not handle `origin` itself.
+   */
+  stackUp(origin: Card, cards: readonly Card[]): CardStack | null {
+    if (!this.canHandle(origin)) return null;
+    const stack = CardStack.create(this.t('feature.cardStack.defaultName'));
+    stack.location.x = origin.location.x;
+    stack.location.y = origin.location.y;
+    stack.posZ = origin.posZ;
+    stack.location.name = origin.location.name;
+    stack.rotate = origin.rotate;
+    stack.zindex = origin.zindex;
+    this.putIntoStack(stack, cards, 'bottom');
+    return stack;
+  }
+
+  /**
+   * Takes a card out of a stack, its top card unless another of its cards is given, and lays it beside
+   * the stack: down and to the right, the `index`th card of one draw a step further along. Null where
+   * the stack holds no such card.
+   */
+  drawCard(stack: CardStack, index = 0, chosen?: Card): Card | null {
+    const card = stack.drawCard(chosen ?? stack.topCard);
+    if (!card) return null;
+    stack.update();
+    const offset = drawnCardOffset(index, this.tabletop.gridSize());
+    card.location.x += offset.x;
+    card.location.y += offset.y;
+    card.setLocation(stack.location.name);
+    return card;
+  }
+
+  /**
+   * Draws up to `count` cards off the top of a stack one after another, laid beside it, and gives
+   * them back; as many as the stack holds where it asks for more, and none for a count that is no
+   * whole number of cards.
+   */
+  drawCards(stack: CardStack, count: number): Card[] {
+    const wanted = clamp(Number.isFinite(count) ? Math.floor(count) : 0, 0, stack.cards.length);
+    const cards: Card[] = [];
+    for (let index = 0; index < wanted; index++) {
+      const card = this.drawCard(stack, index);
+      if (!card) break;
+      cards.push(card);
+    }
+    return cards;
+  }
+
+  /** Draws the top card of a stack into this seat's hand. Null, with nothing drawn, while this seat has no user id yet. */
+  drawToHand(stack: CardStack): Card | null {
+    const myUserId = this.myUserId();
+    if (myUserId.length < 1) return null;
+    const card = this.drawCard(stack);
+    card?.toHand(myUserId);
+    return card;
+  }
+
+  /**
+   * Scatters a stack's cards loose where it lay, as they lie, takes the empty stack away and plays the
+   * sound of it. Gives back the cards, the bottom one first.
+   */
+  breakUp(stack: CardStack): Card[] {
+    const cards = stack.drawCardAll().reverse();
+    const gridSize = this.tabletop.gridSize();
+    for (const card of cards) {
+      const offset = brokenCardOffset(gridSize);
+      card.location.x += offset.x;
+      card.location.y += offset.y;
+      card.toTopmost();
+      card.setLocation(stack.location.name);
+    }
+    stack.setLocation('graveyard');
+    stack.destroy();
+    SoundEffect.play(PresetSound.cardShuffle);
+    return cards;
+  }
+
+  /** How many piles a stack is split into: one for each participant, each counted once. */
+  splitSeats(): number {
+    return this.participants().length;
+  }
+
+  /**
+   * Deals a stack's cards in turn into one new stack for each participant, laid beside it, takes it
+   * away and plays the sound of it. Gives back the new stacks; none, with nothing done, where fewer
+   * than two seats play. The cards go into the new stacks before it goes, as a room server takes
+   * away with a stack all it still holds.
+   */
+  split(stack: CardStack): CardStack[] {
+    const count = this.splitSeats();
+    if (count < 2) return [];
+    const gridSize = this.tabletop.gridSize();
+    const piles: CardStack[] = [];
+    for (let i = 0; i < count; i++) {
+      const pile = CardStack.create(stack.name);
+      const offset = splitPileOffset(gridSize);
+      pile.location.x = stack.location.x + offset.x;
+      pile.location.y = stack.location.y + offset.y;
+      pile.posZ = stack.posZ;
+      pile.location.name = stack.location.name;
+      pile.rotate = stack.rotate;
+      pile.toTopmost();
+      piles.push(pile);
+    }
+    const cards = stack.drawCardAll();
+    splitPileIndexes(cards.length, count).forEach((pile, index) => piles[pile].putOnBottom(cards[index]));
+    stack.setLocation('graveyard');
+    stack.destroy();
+    SoundEffect.play(PresetSound.cardDraw);
+    return piles;
+  }
+
+  /** The cards in a hand, a participant's or a character's, in the order they were taken into it. */
+  handCardsOf(holder: string): Card[] {
+    return selectHandCardsOf(this.objectStore.getObjects<Card>(Card), holder);
+  }
+
+  /**
+   * The characters on the table with a hand of their own, each with the hand it holds cards in: one
+   * given a hand, or holding cards already. The rest of the table is left out, so the lists stay
+   * short.
+   */
+  characterSeats(): CardSeat[] {
+    return this.objectStore
+      .getObjects<GameCharacter>(GameCharacter)
+      .filter((character) => character.isVisibleOnTable && this.hasHand(character))
+      .map((character) => ({
+        userId: handHolderForCharacter(character),
+        name: this.characterName(character),
+        characterIdentifier: character.identifier,
+      }));
+  }
+
+  /** Whether the character has a hand of its own: it was given one, or it holds cards. */
+  hasHand(character: GameCharacter): boolean {
+    if (this.config()?.characterHands.includes(character.identifier)) return true;
+    return this.handCardsOf(handHolderForCharacter(character)).length > 0;
+  }
+
+  /** Whether you may give the character a hand or take its empty one away: one you hold for. */
+  canSetHand(character: GameCharacter): boolean {
+    return this.canHoldFor(handHolderForCharacter(character));
+  }
+
+  /**
+   * Gives the character a hand of its own, or takes it away. A hand still holding cards is kept,
+   * as taking it away would leave the cards with nobody to reach them. False when nothing changed.
+   */
+  setHand(character: GameCharacter, held: boolean): boolean {
+    const config = this.config();
+    if (!config || !this.canSetHand(character)) return false;
+    const listed = config.characterHands;
+    if (held) {
+      if (listed.includes(character.identifier)) return false;
+      config.characterHands = [...listed, character.identifier];
+      return true;
+    }
+    if (!listed.includes(character.identifier)) return false;
+    if (this.handCardsOf(handHolderForCharacter(character)).length > 0) return false;
+    config.characterHands = listed.filter((identifier) => identifier !== character.identifier);
+    return true;
+  }
+
+  /** Notes a character's hand as one it has, once a card has gone into it. */
+  private noteHand(holder: string): void {
+    const identifier = characterOfHandHolder(holder);
+    const config = this.config();
+    if (identifier === null || !config || config.characterHands.includes(identifier)) return;
+    config.characterHands = [...config.characterHands, identifier];
+  }
+
+  private config(): Config | null {
+    return Config.instance ?? null;
+  }
+
+  /** A character's name as this seat may read it: none where the piece hides it from those who see no secrets. */
+  private characterName(character: GameCharacter): string {
+    return character.hideName && !canRoleSeeHidden(PeerCursor.myRole) ? '' : character.name;
+  }
+
+  /**
+   * Whether you may play, sort and give from a hand, and take cards into it: your own, and a
+   * character's whose cards you see, which is one you own or, for the game master, any.
+   */
+  canHoldFor(holder: string): boolean {
+    if (!canRoleEdit(PeerCursor.myRole)) return false;
+    const myUserId = this.myUserId();
+    if (myUserId.length < 1) return false;
+    if (holder === myUserId) return true;
+    const character = this.characterOf(holder);
+    if (character === null || !character.isVisibleOnTable) return false;
+    return seesCharacterHand(character, { userId: myUserId, role: PeerCursor.myRole });
+  }
+
+  /**
+   * The hands you hold for, your own first: then each character with a hand that you own, and for
+   * the game master every character with a hand.
+   */
+  heldHands(): CardSeat[] {
+    const myUserId = this.myUserId();
+    if (myUserId.length < 1 || !canRoleEdit(PeerCursor.myRole)) return [];
+    const own: CardSeat = { userId: myUserId, name: PeerCursor.myCursor?.name ?? '' };
+    return [own, ...this.characterSeats().filter((seat) => this.canHoldFor(seat.userId))];
+  }
+
+  /** The character a hand belongs to, or null for a participant's hand or a character gone. */
+  private characterOf(holder: string): GameCharacter | null {
+    const identifier = characterOfHandHolder(holder);
+    if (identifier === null) return null;
+    const character = this.objectStore.get(identifier);
+    return character instanceof GameCharacter ? character : null;
+  }
+
+  /**
+   * What a hand is called in the chat, which everyone reads: the participant's name, or the
+   * character's, and the unnamed label for a character whose name is hidden.
+   */
+  private holderName(holder: string): string {
+    const character = this.characterOf(holder);
+    if (character) return character.hideName ? this.t('feature.card.hand.unnamed') : character.name;
+    if (holder === this.myUserId()) return PeerCursor.myCursor?.name ?? '';
+    return PeerCursor.findByUserId(holder)?.name ?? '';
+  }
+
+  /** The hands a stack can be dealt out to: every participant who holds cards, then each character with a hand. */
+  dealSeats(): CardSeat[] {
+    return [...this.participants(), ...this.characterSeats()];
+  }
+
+  /**
+   * Shuffles a stack and deals all of it evenly into the hands given, every participant's when none
+   * are, announcing the deal in chat.
+   *
+   * Jokers beyond `keepJokerCount` are put back on the bottom of the stack rather than dealt. With
+   * nobody to deal to, a system message says so and nothing moves.
+   */
+  dealAll(cardStack: CardStack, keepJokerCount = 1, holders?: readonly string[]): DealResult {
+    const seats = holders ? this.dealSeats().filter((seat) => holders.includes(seat.userId)) : this.participants();
+    if (seats.length < 1) {
+      this.chatMessageService.sendSystemNotice('card', encodeI18nMessage('feature.cardStack.message.noSeats'));
+      return { dealt: 0, participants: 0 };
+    }
+
+    cardStack.shuffle();
+    const excluded = new Set(selectExtraJokers(cardStack.cards, keepJokerCount).map((card) => card.identifier));
+    const drawn = cardStack.drawCardAll();
+    const cards = drawn.filter((card) => !excluded.has(card.identifier));
+    for (const card of drawn.filter((card) => excluded.has(card.identifier))) cardStack.putOnBottom(card);
+    if (cards.length < 1) return { dealt: 0, participants: seats.length };
+
+    const plan = planDeal(cards.length, seats.length);
+    const baseOrder = Date.now();
+    seats.forEach((seat, seatIndex) => {
+      plan.indexes[seatIndex].forEach((cardIndex, order) => {
+        cards[cardIndex].toHand(seat.userId, baseOrder + order);
+      });
+      this.noteHand(seat.userId);
+    });
+
+    SoundEffect.play(PresetSound.cardDraw);
+    this.chatMessageService.sendSystemNotice(
+      'card',
+      encodeI18nMessage('feature.cardStack.message.dealt', { count: cards.length, players: seats.length })
+    );
+    return { dealt: cards.length, participants: seats.length };
+  }
+
+  /** Whether the room lets a participant take a card from someone else's hand. A room with no config yet allows it. */
+  allowsHandDraw(): boolean {
+    return this.objectStore.get<Config>('Config')?.allowsHandDraw ?? true;
+  }
+
+  /** Whether the room lets a participant give a card from their hand to someone else. A room with no config yet allows it. */
+  allowsHandGive(): boolean {
+    return this.objectStore.get<Config>('Config')?.allowsHandGive ?? true;
+  }
+
+  /**
+   * Room rules override a participant's own public-hand choice without changing their cursor. A
+   * character's hand has a switch of its own, which its owner and the GM work.
+   */
+  handPublicOf(holder: string): boolean {
+    const config = this.objectStore.get<Config>('Config');
+    const mode = config?.handVisibilityMode ?? 'choice';
+    if (mode !== 'choice') return mode === 'public';
+    const identifier = characterOfHandHolder(holder);
+    if (identifier !== null) return config?.publicCharacterHands.includes(identifier) ?? false;
+    return PeerCursor.findByUserId(holder)?.handPublic ?? false;
+  }
+
+  /**
+   * Shows a hand face up to everyone or hides it again: your own, or a character's you hold for.
+   * False when the room decides instead, or the hand is not yours to change.
+   */
+  setHandPublic(holder: string, shown: boolean): boolean {
+    const config = this.config();
+    if ((config?.handVisibilityMode ?? 'choice') !== 'choice' || !this.canHoldFor(holder)) return false;
+    const identifier = characterOfHandHolder(holder);
+    if (identifier === null) {
+      const cursor = PeerCursor.myCursor;
+      if (!cursor || cursor.handPublic === shown) return false;
+      cursor.handPublic = shown;
+      return true;
+    }
+    if (!config) return false;
+    const listed = config.publicCharacterHands;
+    if (listed.includes(identifier) === shown) return false;
+    config.publicCharacterHands = shown ? [...listed, identifier] : listed.filter((id) => id !== identifier);
+    return true;
+  }
+
+  /** Card property edits are GM-only until the room explicitly permits players. Guests never edit. */
+  canEditCards(): boolean {
+    if (PeerCursor.myRole === PeerRole.GameMaster) return true;
+    return (
+      PeerCursor.myRole === PeerRole.Player && (this.objectStore.get<Config>('Config')?.allowPlayerCardEdit ?? false)
+    );
+  }
+
+  /**
+   * Whether this user may open the editor of this particular card.
+   *
+   * Besides the room permission, a player must be able to see the card's front, so the editor never
+   * shows the face of a card lying face down, sitting in another hand, or peeked at by someone else.
+   */
+  canEditCard(card: Card): boolean {
+    if (!this.canEditCards()) return false;
+    if (canRoleSeeHidden(PeerCursor.myRole)) return true;
+    return !(card.hasOwner && !card.isMine) && card.isVisible;
+  }
+
+  /**
+   * Whether you may give cards from this hand: your own, or a character's you own. The game master
+   * holds every character's hand but gives only from the ones they own, as anyone else does.
+   */
+  canGiveFrom(holder: string): boolean {
+    const myUserId = this.myUserId();
+    if (myUserId.length < 1 || !canRoleEdit(PeerCursor.myRole)) return false;
+    if (holder === myUserId) return true;
+    const character = this.characterOf(holder);
+    return character !== null && character.isVisibleOnTable && character.owner === myUserId;
+  }
+
+  /** Whether this user may send cards to other hands at all: they can hold cards and the room allows giving. */
+  canGiveCards(): boolean {
+    return this.myUserId().length > 0 && canRoleEdit(PeerCursor.myRole) && this.allowsHandGive();
+  }
+
+  /**
+   * The hands a card can be given to: every participant who holds cards and every character on the
+   * table, except the hand it is given from, which is yours unless said otherwise.
+   */
+  giveRecipients(fromHolder: string = this.myUserId()): CardSeat[] {
+    return [...this.participants(), ...this.characterSeats()].filter((seat) => seat.userId !== fromHolder);
+  }
+
+  /**
+   * Takes a card from someone else's hand into your own and says so in chat.
+   *
+   * False, with nothing moved, while you have no user id or may not hold cards, when the card is in
+   * no other hand, when the room forbids drawing from hands, or when the holder is no longer in the
+   * room: an orphaned hand is only for the game master to hand over.
+   */
+  drawFromHand(card: Card, fromName: string, intoHolder: string = this.myUserId()): boolean {
+    if (!this.canHoldFor(intoHolder) || !this.allowsHandDraw()) return false;
+    const holder = handHolderOf(card.location.name);
+    if (!holder || holder === intoHolder) return false;
+    if (!this.characterOf(holder) && !PeerCursor.findByUserId(holder)) return false;
+
+    card.toHand(intoHolder);
+    this.noteHand(intoHolder);
+    SoundEffect.play(PresetSound.cardDraw);
+    this.chatMessageService.sendSystemNotice(
+      'card',
+      encodeI18nMessage('feature.card.message.drewFromHand', { from: fromName, to: this.holderName(intoHolder) })
+    );
+    return true;
+  }
+
+  /**
+   * Gives a card from a hand you hold for, yours unless said otherwise, to another hand, keeping it
+   * hidden there. False while the room forbids it.
+   */
+  giveFromHand(card: Card, recipientUserId: string, fromHolder: string = this.myUserId()): boolean {
+    if (!this.canGiveFrom(fromHolder)) return false;
+    const recipient = this.recipientForGive(recipientUserId, fromHolder);
+    if (!recipient || !this.handCardsOf(fromHolder).includes(card)) return false;
+
+    this.finishGiving(card, recipient, true, fromHolder);
+    return true;
+  }
+
+  /**
+   * Sends one loose card from the table to another participant's hand, face down so only they see it.
+   *
+   * False, with nothing moved, for a card already in a hand or inside a stack, or whenever
+   * {@link giveFromHand} would refuse the recipient.
+   */
+  giveFromTable(card: Card, recipientUserId: string): boolean {
+    if (card.isInAnyHand || card.parent?.parent instanceof CardStack) return false;
+    const recipient = this.recipientForGive(recipientUserId);
+    if (!recipient) return false;
+    this.finishGiving(card, recipient, false);
+    return true;
+  }
+
+  /**
+   * Takes the top card off a stack and sends it straight to another participant's hand, face down,
+   * so its front is never shown to the giver or the table.
+   *
+   * False, with the stack untouched, when it is empty or the recipient is refused.
+   */
+  giveFromStackTop(stack: CardStack, recipientUserId: string): boolean {
+    if (!stack.topCard) return false;
+    const recipient = this.recipientForGive(recipientUserId);
+    if (!recipient) return false;
+    const card = stack.drawCard();
+    if (!card) return false;
+    stack.update();
+    this.finishGiving(card, recipient, false);
+    return true;
+  }
+
+  /**
+   * The hands left behind by participants no longer in the room, as saved rooms can bring back.
+   *
+   * Only a user with no cursor at all counts as absent; one who has just dropped keeps their cursor
+   * for a while and may still come back to their hand.
+   */
+  orphanHands(): OrphanHand[] {
+    return selectOrphanHands(
+      this.objectStore.getObjects<Card>(Card),
+      this.presentUserIds(),
+      this.presentCharacterHolders()
+    );
+  }
+
+  /**
+   * What a hand left behind is shown as: a short user id for a participant's, and for a character's
+   * its name while it is still somewhere, or a word saying it is gone.
+   */
+  orphanHandLabel(holder: string): string {
+    if (characterOfHandHolder(holder) === null) return shortUserIdOf(holder);
+    const character = this.characterOf(holder);
+    return character
+      ? this.characterName(character) || this.t('feature.card.hand.unnamed')
+      : this.t('feature.card.orphanHand.characterGone');
+  }
+
+  /** The hands of the characters on the table, which are held for and so never left behind. */
+  private presentCharacterHolders(): Set<string> {
+    return new Set(this.characterSeats().map((seat) => seat.userId));
+  }
+
+  /** Whether you may hand an orphaned hand over to someone: only the game master may. */
+  canRescueOrphanHands(): boolean {
+    return PeerCursor.myRole === PeerRole.GameMaster && this.myUserId().length > 0;
+  }
+
+  /** Who may take over an orphaned hand: participants who can hold cards and are connected right now, yourself included. */
+  orphanHandRecipients(): CardSeat[] {
+    const myUserId = this.myUserId();
+    const connected = new Set(getPeerIds());
+    return this.participants().filter((seat) => {
+      if (seat.userId === myUserId) return true;
+      const peerId = PeerCursor.findByUserId(seat.userId)?.peerId ?? '';
+      return peerId.length > 0 && connected.has(peerId);
+    });
+  }
+
+  /**
+   * Moves every card of an absent participant's hand into a connected participant's hand, face down
+   * and in the same order after the cards they already hold, and says so in chat without naming any
+   * card.
+   *
+   * Everything is checked again at the moment of moving, and nothing moves unless you are still the
+   * game master, the holder is still absent, the recipient may still take it, and the hand still
+   * holds exactly the cards that were confirmed. The room's give and draw rules do not apply: this is
+   * the game master recovering cards nobody could otherwise reach.
+   */
+  rescueOrphanHand(
+    fromUserId: string,
+    toUserId: string,
+    confirmedCardIdentifiers: readonly string[]
+  ): OrphanHandRescueResult {
+    if (!this.canRescueOrphanHands()) return 'notGameMaster';
+    if (this.presentUserIds().has(fromUserId) || this.presentCharacterHolders().has(fromUserId)) return 'sourcePresent';
+    const recipient = this.orphanHandRecipients().find((seat) => seat.userId === toUserId);
+    if (!recipient) return 'recipientUnavailable';
+
+    const cards = this.handCardsOf(fromUserId);
+    const confirmed = new Set(confirmedCardIdentifiers);
+    if (cards.length < 1 || cards.length !== confirmed.size || cards.some((card) => !confirmed.has(card.identifier))) {
+      return 'handChanged';
+    }
+
+    const baseOrder = appendHandOrderAfter(this.handCardsOf(recipient.userId), Date.now());
+    cards.forEach((card, index) => card.toHand(recipient.userId, baseOrder + index));
+
+    SoundEffect.play(PresetSound.cardDraw);
+    this.chatMessageService.sendSystemNotice(
+      'card',
+      encodeI18nMessage('feature.card.message.rescuedOrphanHand', {
+        gm: PeerCursor.myCursor?.name ?? '',
+        from: this.orphanHandLabel(fromUserId),
+        count: cards.length,
+        to: recipient.name,
+      })
+    );
+    return 'moved';
+  }
+
+  private presentUserIds(): Set<string> {
+    // On a room server a guest holds no cards, so a hand left under a guest's user id counts as orphaned.
+    const mayHold = Network.transport === 'server' ? (cursor: PeerCursor) => canRoleEdit(cursor.role) : () => true;
+    const present = new Set(
+      this.objectStore
+        .getObjects<PeerCursor>(PeerCursor)
+        .filter(mayHold)
+        .map((cursor) => cursor.userId)
+    );
+    const myUserId = this.myUserId();
+    if (myUserId.length > 0) present.add(myUserId);
+    return present;
+  }
+
+  private recipientForGive(userId: string, fromHolder: string = this.myUserId()): CardSeat | null {
+    if (!this.canGiveCards()) return null;
+    return this.giveRecipients(fromHolder).find((seat) => seat.userId === userId) ?? null;
+  }
+
+  private finishGiving(card: Card, recipient: CardSeat, fromHand: boolean, fromHolder = this.myUserId()): void {
+    card.toHand(recipient.userId);
+    this.noteHand(recipient.userId);
+    // A card a character gave names the character, so its giver mark shows the piece's picture.
+    card.lastHandGiverUserId = characterOfHandHolder(fromHolder) === null ? this.myUserId() : fromHolder;
+    card.lastHandGiverName = this.holderName(fromHolder);
+    SoundEffect.play(PresetSound.cardDraw);
+    this.chatMessageService.sendSystemNotice(
+      'card',
+      encodeI18nMessage(fromHand ? 'feature.card.message.gaveFromHand' : 'feature.card.message.gaveCard', {
+        from: this.holderName(fromHolder),
+        to: recipient.name,
+      })
+    );
+  }
+
+  /**
+   * Discards every pair of the same rank among the cards, face up, onto the discard stack on the
+   * table, and announces it.
+   *
+   * The discard stack is created if the table has none. Returns the pairs discarded, empty when
+   * there were none.
+   */
+  discardPairs(cards: readonly Card[]): Card[][] {
+    const pairs = findTrumpPairs(cards);
+    if (pairs.length < 1) return [];
+
+    const stack = this.findOrCreateDiscardStack();
+    for (const pair of pairs) {
+      for (const card of pair) {
+        card.faceUp();
+        stack.putOnTop(card);
+      }
+    }
+
+    SoundEffect.play(PresetSound.cardPut);
+    this.chatMessageService.sendSystemNotice(
+      'card',
+      encodeI18nMessage('feature.card.message.discardedPairs', {
+        name: PeerCursor.myCursor?.name ?? '',
+        ranks: pairs.map((pair) => this.rankLabel(pair[0])).join('・'),
+      })
+    );
+    return pairs;
+  }
+
+  /**
+   * Puts the whole of a hand out on the table as a deck of its own, face down, beside the discard
+   * stack, and announces it: for a game that ends a round by gathering the hands in, or a player
+   * who wants their hand out of the way. Returns the deck, or null for a hand with no cards.
+   */
+  discardHand(cards: readonly Card[], holderName: string): CardStack | null {
+    if (cards.length < 1) return null;
+    const stack = CardStack.create(this.t('feature.card.handStackName', { name: holderName }));
+    stack.location.name = 'table';
+    stack.location.x = DISCARD_STACK_OFFSET * 2;
+    stack.location.y = DISCARD_STACK_OFFSET;
+    stack.toTopmost();
+    for (const card of cards) {
+      card.faceDown();
+      stack.putOnTop(card);
+    }
+    SoundEffect.play(PresetSound.cardPut);
+    this.chatMessageService.sendSystemNotice(
+      'card',
+      encodeI18nMessage('feature.card.message.discardedHand', {
+        name: PeerCursor.myCursor?.name ?? '',
+        holder: holderName,
+        count: cards.length,
+      })
+    );
+    return stack;
+  }
+
+  private rankLabel(card: Card): string {
+    const rank = trumpRankOf(card);
+    return typeof rank === 'number' ? String(rank) : '?';
+  }
+
+  private findOrCreateDiscardStack(): CardStack {
+    const name = this.t('feature.card.discardStackName');
+    const existing = this.objectStore
+      .getObjects<CardStack>(CardStack)
+      .find((stack) => stack.name === name && stack.location.name === 'table');
+    if (existing) return existing;
+
+    const stack = CardStack.create(name);
+    stack.location.name = 'table';
+    stack.location.x = DISCARD_STACK_OFFSET;
+    stack.location.y = DISCARD_STACK_OFFSET;
+    stack.toTopmost();
+    return stack;
+  }
+}

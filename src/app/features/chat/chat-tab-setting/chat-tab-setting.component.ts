@@ -1,10 +1,9 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ChatMessageService } from '@axe/application/chat/chat-message.service';
-import { VisibleChatTabsService } from '@axe/application/chat/visible-chat-tabs.service';
+import { ChatLogClearReach, ChatLogClearService } from '@axe/application/chat/chat-log-clear.service';
+import { ChatTabEditService, ChatTabPermissionKey } from '@axe/application/chat/chat-tab-edit.service';
 import { SaveDataService } from '@axe/application/file/save-data.service';
 import { SaveProgress } from '@axe/application/file/save-progress';
-import { encodeI18nMessage } from '@axe/application/i18n/i18n-message';
 import { TRANSLATE_FN } from '@axe/application/i18n/translate.token';
 import { PointerDeviceService } from '@axe/application/input/pointer-device.service';
 import { ObjectChangeService } from '@axe/application/sync/object-change.service';
@@ -16,14 +15,11 @@ import { networkMessage$ } from '@axe/core/network/network-messaging';
 import { AuthorityEvent } from '@axe/core/network/server/server-protocol';
 import { identifiersInXml, ObjectSerializer } from '@axe/core/sync/object-serializer';
 import { ObjectStore } from '@axe/core/sync/object-store';
-import { ChatLogScope } from '@axe/domain/chat/chat-log-rich';
+import { ChatLogScope, formatLogMoment } from '@axe/domain/chat/chat-log-rich';
 import { CHAT_LOG_STYLES, ChatLogStyle } from '@axe/domain/chat/chat-log-style';
-import { ChatMessage } from '@axe/domain/chat/chat-message';
 import { ChatTab } from '@axe/domain/chat/chat-tab';
 import { ChatTabList } from '@axe/domain/chat/chat-tab-list';
-import { canRoleViewTab } from '@axe/domain/chat/chat-tab-permission';
 import { PeerCursor } from '@axe/domain/peer/peer-cursor';
-import { canRoleEdit } from '@axe/domain/peer/peer-role';
 import { ChatLogFormat, ChatLogPreviewComponent } from '@axe/features/chat/chat-log-preview/chat-log-preview.component';
 import { ChatLogStylePreferenceService } from '@axe/features/chat/chat-log-style-preference.service';
 import { TextTooltipDirective } from '@axe/ui/directives/text-tooltip.directive';
@@ -44,7 +40,6 @@ const TURNED_DOWN_WITHIN_MS = 30_000;
 export class ChatTabSettingComponent {
   private readonly panelService = inject(PanelService);
   private readonly pointerDeviceService = inject(PointerDeviceService);
-  private readonly chatMessageService = inject(ChatMessageService);
   private readonly saveDataService = inject(SaveDataService);
   private readonly logStylePreference = inject(ChatLogStylePreferenceService);
   private readonly objectStore = inject(ObjectStore);
@@ -53,10 +48,11 @@ export class ChatTabSettingComponent {
     return ChatTabList.instance;
   }
   private readonly objectChange = inject(ObjectChangeService);
-  private readonly visibleChatTabs = inject(VisibleChatTabsService).tabs;
+  private readonly tabEdit = inject(ChatTabEditService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly t = inject(TRANSLATE_FN);
   private readonly snackbar = inject(SnackbarService);
+  private readonly logClear = inject(ChatLogClearService);
   /** A tab this seat deleted in a room server's room, which the server may put back, and when. */
   private deletedOnServer: { identifier: string; at: number } | null = null;
 
@@ -72,21 +68,6 @@ export class ChatTabSettingComponent {
   /** The entry picked in the format list: plain text, or the html style in use. */
   get logChoice(): ChatLogChoice {
     return this.logFormat() === 'text' ? 'text' : this.logStyle();
-  }
-
-  /**
-   * The position of the tab that system messages go to when the room has no system tab.
-   *
-   * It is kept on the room's tab list, so a change reaches every peer. Writes are ignored for a
-   * seat that may not change the tabs.
-   */
-  get systemTabIndex(): number {
-    return this.chatTabList.systemMessageTabIndex;
-  }
-
-  set systemTabIndex(index: number) {
-    if (!this.canEditTabs) return;
-    this.chatTabList.systemMessageTabIndex = index;
   }
 
   /**
@@ -109,13 +90,13 @@ export class ChatTabSettingComponent {
   }
   set tabName(tabName: string) {
     const tab = this.selectedTab();
-    if (this.isEditable && this.isRenamable && tab) tab.name = tabName;
+    if (this.isEditable && tab) this.tabEdit.rename(tab, tabName);
   }
 
   /**
    * Whether players or guests may read or speak in the selected tab; false when no tab is selected.
    */
-  perm(key: 'plCanView' | 'plCanSpeak' | 'guestCanView' | 'guestCanSpeak'): boolean {
+  perm(key: ChatTabPermissionKey): boolean {
     const tab = this.selectedTab();
     if (!tab) return false;
     this.objectChange.versionOf(tab.identifier)();
@@ -127,30 +108,22 @@ export class ChatTabSettingComponent {
    * Allowing speech also allows reading, and taking reading away also takes speech away. Ignored
    * for the system tab and for a seat that may not change permissions.
    */
-  setPerm(key: 'plCanView' | 'plCanSpeak' | 'guestCanView' | 'guestCanSpeak', value: boolean): void {
+  setPerm(key: ChatTabPermissionKey, value: boolean): void {
     const tab = this.selectedTab();
-    if (!this.canEditPerm(key) || !tab || tab.isSystemTab) return;
-    tab[key] = value;
-    // whoever may speak may read, so speaking without reading cannot happen
-    if (key === 'plCanSpeak' && value) tab.plCanView = true;
-    else if (key === 'plCanView' && !value) tab.plCanSpeak = false;
-    else if (key === 'guestCanSpeak' && value) tab.guestCanView = true;
-    else if (key === 'guestCanView' && !value) tab.guestCanSpeak = false;
+    if (!this.canEditPerm(key) || !tab) return;
+    this.tabEdit.setPermission(tab, key, value);
   }
 
   /**
-   * Every chat tab in the room, in the order they are listed; in a room server's room, only those
-   * this seat may read, for anyone but the game master, since the lines of the others never came.
+   * The chat tabs this seat may read, in the order they are listed, which are the ones it sees and
+   * manages here: every tab for the game master, in a room of peers as on a room server.
    */
   get chatTabs(): readonly ChatTab[] {
-    this.objectChange.collectionOf('chat-tab')();
-    this.objectChange.trackMyCursor();
-    if (Network.authorityPeerId === null || PeerCursor.isMyselfGameMaster) return this.chatMessageService.chatTabs;
-    return this.visibleChatTabs();
+    return this.tabEdit.tabs();
   }
-  /** Whether the room has no chat tabs at all. */
+  /** Whether this seat is offered no chat tab at all. */
   get isEmpty(): boolean {
-    return this.chatMessageService.chatTabs.length < 1;
+    return this.chatTabs.length < 1;
   }
   /**
    * Whether the selected tab no longer exists in the room, which is when the panel offers to
@@ -171,13 +144,8 @@ export class ChatTabSettingComponent {
    * server's room, can anyone but the game master delete one that holds dice the server rolled.
    */
   get isDeletable(): boolean {
-    return (
-      !this.isEmpty &&
-      !!this.selectedTab() &&
-      !this.isSystemTabSelected &&
-      this.canEditTabs &&
-      !this.isDeleteKeptForGameMaster
-    );
+    const tab = this.selectedTab();
+    return !!tab && this.isSelectionInReach() && this.tabEdit.mayDelete(tab);
   }
 
   /**
@@ -186,10 +154,7 @@ export class ChatTabSettingComponent {
    */
   get isDeleteKeptForGameMaster(): boolean {
     const tab = this.selectedTab();
-    if (!tab || !this.isKeptToGameMasterByServer) return false;
-    this.objectChange.collectionOf(ChatMessage.aliasName)();
-    this.objectChange.versionOf(tab.identifier)();
-    return tab.chatMessages.some((message) => message.isServerRoll);
+    return !!tab && this.tabEdit.deleteKeptForGameMaster(tab);
   }
 
   /**
@@ -197,8 +162,7 @@ export class ChatTabSettingComponent {
    * may read a tab, and deleting the dice the server rolled. Among peers nothing is held back.
    */
   get isKeptToGameMasterByServer(): boolean {
-    this.objectChange.trackMyCursor();
-    return Network.authorityPeerId !== null && !PeerCursor.isMyselfGameMaster;
+    return this.tabEdit.heldByServer();
   }
 
   /** Whether the selected tab's name may be changed, which the system tab's may not. */
@@ -208,10 +172,11 @@ export class ChatTabSettingComponent {
 
   /**
    * Whether the selected tab can be moved up or down the list: it still exists, is not the system
-   * tab, and this seat may change the tabs.
+   * tab, and this seat manages it.
    */
   get isMovable(): boolean {
-    return !this.isDeleted && !this.isSystemTabSelected && this.canEditTabs;
+    const tab = this.selectedTab();
+    return !!tab && !this.isDeleted && this.tabEdit.mayRearrange(tab);
   }
 
   /** Whether it travels with the room data. The system tab is no part of the room. */
@@ -226,10 +191,11 @@ export class ChatTabSettingComponent {
 
   /**
    * Whether the selected tab's settings can be changed from this seat: a tab that still exists is
-   * selected and the seat may change the tabs.
+   * selected and the seat manages it.
    */
   get isEditable(): boolean {
-    return !this.isEmpty && !this.isDeleted && this.canEditTabs;
+    const tab = this.selectedTab();
+    return !!tab && !this.isDeleted && this.isSelectionInReach() && this.tabEdit.mayManage(tab);
   }
 
   /**
@@ -240,13 +206,12 @@ export class ChatTabSettingComponent {
    * that is only watching changes neither.
    */
   get canEditTabs(): boolean {
-    this.objectChange.trackMyCursor();
-    return canRoleEdit(PeerCursor.myRole);
+    return this.tabEdit.mayEditTabs();
   }
 
   /** Whether the read and speak permissions of the selected tab can be changed from this seat. */
   get canEditPermission(): boolean {
-    return this.isEditable && this.canEditTabs;
+    return this.isEditable;
   }
 
   /**
@@ -256,12 +221,9 @@ export class ChatTabSettingComponent {
    * holds. Anyone else may change who may speak only where those who would speak may already read,
    * since speaking brings reading with it.
    */
-  canEditPerm(key: 'plCanView' | 'plCanSpeak' | 'guestCanView' | 'guestCanSpeak'): boolean {
-    if (!this.canEditPermission) return false;
-    if (!this.isKeptToGameMasterByServer) return true;
-    if (key === 'plCanSpeak') return this.perm('plCanView');
-    if (key === 'guestCanSpeak') return this.perm('guestCanView');
-    return false;
+  canEditPerm(key: ChatTabPermissionKey): boolean {
+    const tab = this.selectedTab();
+    return !!tab && this.canEditPermission && this.tabEdit.mayChangePermission(tab, key);
   }
 
   private readonly saveProgress = new SaveProgress();
@@ -271,6 +233,14 @@ export class ChatTabSettingComponent {
   readonly progressPercent = this.saveProgress.percent;
 
   allowDeleteLog = false;
+  /** What is written in the box of the log clearing: a local date and time, or nothing. */
+  readonly clearBefore = signal('');
+  /**
+   * Whether a clearing takes only the lines before the moment in the box. It is turned on as the box
+   * is gone into: a date half written reads as an empty box, and a clearing of the whole log must not
+   * follow from that.
+   */
+  readonly clearOnlyBefore = signal(false);
   allowDeleteTab = false;
 
   constructor() {
@@ -328,20 +298,19 @@ export class ChatTabSettingComponent {
    * the tabs.
    */
   create() {
-    if (!this.canEditTabs) return;
-    this.chatTabList.addChatTab(this.t('feature.chat.tabSetting.defaultTabName'));
+    this.tabEdit.create(this.t('feature.chat.tabSetting.defaultTabName'));
   }
 
   /**
    * Downloads the selected tab, log and all, as a save file, showing progress until shortly after
    * it finishes.
    *
-   * Does nothing while a save is running, and nothing for the system tab, which is no part of the
-   * room.
+   * Does nothing while a save is running, nothing for the system tab, which is no part of the
+   * room, and nothing for a tab this seat may no longer read.
    */
   async save() {
     const tab = this.selectedTab();
-    if (!tab || !this.isExportable) return;
+    if (!tab || !this.isExportable || !this.isSelectionInReach()) return;
     await this.saveProgress.run((onProgress) =>
       this.saveDataService.saveGameObjectAsync(tab, 'chat_' + tab.name, onProgress)
     );
@@ -365,8 +334,9 @@ export class ChatTabSettingComponent {
     this.logStylePreference.setOmitDeleted(omit);
   }
 
-  /** Opens a panel previewing the selected tab's log in the chosen format. */
+  /** Opens a panel previewing the selected tab's log in the chosen format, for a tab this seat may read. */
   openLogPreview(): void {
+    if (!this.isSelectionInReach()) return;
     const coordinate = this.pointerDeviceService.pointers[0];
     const component = this.panelService.open<ChatLogPreviewComponent>(ChatLogPreviewComponent, {
       title: this.t('feature.chat.log.previewTitle'),
@@ -378,17 +348,18 @@ export class ChatTabSettingComponent {
 
   /**
    * Downloads the selected tab's log in the chosen format; the system tab falls back to the
-   * standard format where the chosen one does not apply.
+   * standard format where the chosen one does not apply. Does nothing for a tab this seat may no longer
+   * read.
    */
   saveLog() {
     const tab = this.selectedTab();
-    if (!tab) return;
+    if (!tab || !this.isSelectionInReach()) return;
     this.writeLog('tab', [tab], tab.name);
   }
 
-  /** Downloads the logs of every tab together in the chosen format. */
+  /** Downloads the logs of every tab this seat may read together in the chosen format. */
   saveAllLog() {
-    this.writeLog('all', this.chatMessageService.chatTabs, this.t('feature.chat.tabSetting.allTabsLogName'));
+    this.writeLog('all', this.chatTabs, this.t('feature.chat.tabSetting.allTabsLogName'));
   }
 
   private writeLog(scope: ChatLogScope, tabs: readonly ChatTab[], label: string): void {
@@ -407,19 +378,13 @@ export class ChatTabSettingComponent {
    * that follow it. Does nothing for a tab that may not be deleted.
    */
   delete() {
-    if (!this.isDeletable || !this.isSelectionInReach()) return;
     const tab = this.selectedTab();
-    if (this.isEmpty || !tab) return;
-    const parentElement = tab.parent!;
-    const index: number = parentElement.children.indexOf(tab);
-    this.selectedTabXml = tab.toXml();
-    if (this.isKeptToGameMasterByServer) this.deletedOnServer = { identifier: tab.identifier, at: Date.now() };
-    tab.destroy();
-
-    if (this.systemTabIndex > index) {
-      this.systemTabIndex--;
-    }
-    this.chkSystemTabIndex();
+    if (!tab || !this.isDeletable) return;
+    const xml = tab.toXml();
+    const heldByServer = this.isKeptToGameMasterByServer;
+    if (!this.tabEdit.delete(tab)) return;
+    this.selectedTabXml = xml;
+    if (heldByServer) this.deletedOnServer = { identifier: tab.identifier, at: Date.now() };
   }
 
   /** This seat's own peer cursor. */
@@ -428,66 +393,64 @@ export class ChatTabSettingComponent {
   }
 
   /**
-   * Clears every message from the selected tab for every peer and posts who cleared it.
-   *
-   * Needs the confirmation box ticked and a seat that may change the tabs; the tab's portraits are
-   * reset along with the log. In a room server's room, anyone but the game master leaves the dice
-   * the server rolled where they are, since the server keeps them.
+   * The moment written in the box of the log clearing, in epoch milliseconds; null while the box is
+   * empty or holds no whole date and time.
    */
-  deleteLog() {
-    if (!this.allowDeleteLog || !this.canEditTabs || !this.isSelectionInReach()) return;
-
-    const tab = this.selectedTab();
-    if (this.isEmpty || !tab) return;
-    this.clearLogOf(tab);
-    tab.portraitReset();
-    const mess = encodeI18nMessage('common.chat.logClearedBy', { user: this.resolveRequesterName() });
-    this.chatMessageService.sendSystemMessageToTab(tab, mess, undefined, this.requesterUserId());
+  get clearBeforeMoment(): number | null {
+    const written = this.clearBefore().trim();
+    if (!written) return null;
+    const moment = new Date(written).getTime();
+    return Number.isFinite(moment) ? moment : null;
   }
 
   /**
-   * Clears the logs of every tab for every peer, posting who cleared them in each; needs the
-   * confirmation box ticked and a seat that may change the tabs. In a room server's room, anyone but
-   * the game master leaves the dice the server rolled where they are, and leaves alone the tabs
-   * they may not read, whose lines never came to them.
+   * Whether a clearing can be done as it is set: always for the whole log, and for the lines before a
+   * moment only once a whole date and time is written.
+   */
+  get canClearAsSet(): boolean {
+    return !this.clearOnlyBefore() || this.clearBeforeMoment !== null;
+  }
+
+  /** The moment before which lines are cleared, as the hint under the box names it; empty for none. */
+  get clearBeforeText(): string {
+    const moment = this.clearBeforeMoment;
+    return moment === null ? '' : formatLogMoment(moment);
+  }
+
+  /**
+   * Clears the selected tab's log for every peer and posts who cleared it: all of it, or only the
+   * lines said before the moment written in the box.
+   *
+   * Needs the confirmation box ticked and a tab this seat manages; clearing the whole log
+   * resets the tab's portraits along with it. In a room server's room, anyone but the game master
+   * leaves the dice the server rolled where they are, since the server keeps them.
+   */
+  deleteLog() {
+    const tab = this.selectedTab();
+    if (!tab || !this.allowDeleteLog || !this.isSelectionInReach() || !this.canClearAsSet) return;
+    this.logClear.clear(tab, this.clearReach());
+  }
+
+  /**
+   * Clears the logs of every tab this seat may read for every peer, all of each or only the lines said
+   * before the moment written in the box, posting who cleared them in each; needs the confirmation box
+   * ticked and a seat that may change the tabs. The tabs kept from this seat are left alone, and in a
+   * room server's room anyone but the game master leaves the dice the server rolled where they are.
    */
   deleteLogALL() {
-    if (!this.allowDeleteLog || !this.canEditTabs) return;
-
-    const mess = encodeI18nMessage('common.chat.logClearedBy', { user: this.resolveRequesterName() });
-
-    const requester = this.requesterUserId();
-    const readsAll = Network.authorityPeerId === null || PeerCursor.isMyselfGameMaster;
-    const tabs = this.chatTabList.chatTabs.filter((tab) => readsAll || canRoleViewTab(tab, PeerCursor.myRole));
-    for (const child of tabs) {
-      this.clearLogOf(child);
-      child.portraitReset();
-      this.chatMessageService.sendSystemMessageToTab(child, mess, undefined, requester);
-    }
+    if (!this.allowDeleteLog || !this.canEditTabs || !this.canClearAsSet) return;
+    this.tabEdit.clearAll(this.clearReach());
   }
 
-  private clearLogOf(tab: ChatTab): void {
-    const keepServerRolls = this.isKeptToGameMasterByServer;
-    for (const child of [...tab.children]) {
-      if (keepServerRolls && child instanceof ChatMessage && child.isServerRoll) continue;
-      child.destroy();
-    }
+  private clearReach(): ChatLogClearReach | undefined {
+    const moment = this.clearBeforeMoment;
+    return !this.clearOnlyBefore() || moment === null ? undefined : { before: moment };
   }
 
-  /** Whether the picked tab is still one this seat is listed, and so may clear or delete. */
+  /** Whether the picked tab is still one this seat is listed, and so may save, clear or delete. */
   private isSelectionInReach(): boolean {
     const tab = this.selectedTab();
-    return tab !== null && this.chatTabs.includes(tab);
-  }
-
-  private requesterUserId(): string {
-    return this.myPeer?.userId ?? '';
-  }
-
-  private resolveRequesterName(): string {
-    const cursor = this.myPeer;
-    const name = cursor?.name?.trim();
-    return name || cursor?.identifier || '';
+    return tab !== null && this.tabEdit.isOffered(tab);
   }
 
   /**
@@ -507,54 +470,22 @@ export class ChatTabSettingComponent {
     }
   }
 
-  /** Clamps the system message position to the tabs that exist. */
-  chkSystemTabIndex() {
-    if (!this.canEditTabs) return;
-    const list = this.chatTabList;
-    if (this.systemTabIndex >= list.children.length) this.systemTabIndex = list.children.length - 1;
-    if (this.systemTabIndex < 0) this.systemTabIndex = 0;
-  }
-
   /**
-   * Moves the selected tab one place up the list, keeping the system message position on the same
-   * tab.
+   * Moves the selected tab one place up among the tabs this seat may read, keeping the system message
+   * position on the same tab.
    */
   upTabIndex() {
     const tab = this.selectedTab();
-    if (!tab || !this.isMovable) return;
-    const parentElement = tab.parent!;
-    const index: number = parentElement.children.indexOf(tab);
-    if (0 < index) {
-      const prevElement = parentElement.children[index - 1];
-      parentElement.insertBefore(tab, prevElement);
-      if (this.systemTabIndex === index) {
-        this.systemTabIndex--;
-      } else if (this.systemTabIndex === index - 1) {
-        this.systemTabIndex++;
-      }
-      this.chkSystemTabIndex();
-    }
+    if (tab && this.isMovable) this.tabEdit.step(tab, -1);
   }
 
   /**
-   * Moves the selected tab one place down the list, keeping the system message position on the same
-   * tab.
+   * Moves the selected tab one place down among the tabs this seat may read, keeping the system
+   * message position on the same tab.
    */
   downTabIndex() {
     const tab = this.selectedTab();
-    if (!tab || !this.isMovable) return;
-    const parentElement = tab.parent!;
-    const index: number = parentElement.children.indexOf(tab);
-    if (index < parentElement.children.length - 1) {
-      const nextElement = parentElement.children[index + 1];
-      parentElement.insertBefore(nextElement, tab);
-      if (this.systemTabIndex === index) {
-        this.systemTabIndex++;
-      } else if (this.systemTabIndex === index + 1) {
-        this.systemTabIndex--;
-      }
-      this.chkSystemTabIndex();
-    }
+    if (tab && this.isMovable) this.tabEdit.step(tab, 1);
   }
 
   /** Selects the tab whose identifier is the value of the control that fired the event. */

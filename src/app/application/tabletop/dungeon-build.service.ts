@@ -26,16 +26,18 @@ import {
   MapAmbience,
   MapBlock,
   MapBlocks,
+  MapHarm,
   MapLight,
   MapLightKind,
   MapMaterial,
   MapMood,
   MapPaint,
+  MapRect,
   MapSize,
   MapSlowGround,
   MapTrap,
 } from '@axe/domain/tabletop/map-blocks';
-import { blockOrigin, MapGrid, tableSizeFor } from '@axe/domain/tabletop/map-grid';
+import { blockCorner, blockOrigin, MapGrid, tableSizeFor } from '@axe/domain/tabletop/map-grid';
 import { cornerShiftOf } from '@axe/domain/tabletop/move/piece-on-grid';
 import { isBundledModelName } from '@axe/domain/tabletop/placeable-models';
 import { TableAmbience } from '@axe/domain/tabletop/table-ambience';
@@ -45,7 +47,7 @@ import { TableTrigger } from '@axe/domain/tabletop/table-trigger';
 import { DoorStyle, Terrain, TerrainViewState } from '@axe/domain/tabletop/terrain';
 import { trapPresetOf } from '@axe/domain/tabletop/trap-presets';
 import { EYE_HEIGHT_CELLS } from '@axe/domain/tabletop/vision-scene';
-import { applyLightPreset, LightPreset } from '@axe/domain/tabletop/vision-types';
+import { applyLightPresetWith, type GeneratedLightMotion, LightPreset } from '@axe/domain/tabletop/vision-types';
 
 const TERRAIN_IMAGE_TAG = '地形';
 /** What dangerous ground and traps take from, which is what most sheets call it. */
@@ -157,6 +159,8 @@ export interface DungeonBuildOptions {
    * story's clock over open country. Left out, the table's background picture, as under a roof of rock.
    */
   skyKind?: TableSkyKind;
+  /** How the lights stood on the map move. Left out or empty, each as its kind of lamp does. */
+  lightMotion?: GeneratedLightMotion;
 }
 
 /** One piece and the cell of the finished map it is to be standing on. */
@@ -250,8 +254,9 @@ export class DungeonBuildService {
     this.layAmbiences(table, blocks.ambiences, grid);
     this.layHazards(table, blocks.paint);
     this.laySlowGround(table, blocks.slows ?? []);
+    this.layHarms(table, blocks.harms ?? []);
     this.setTraps(table, blocks.traps);
-    this.standLights(table, blocks.lights, options.wallHeight, grid);
+    this.standLights(table, blocks.lights, options.wallHeight, grid, options.lightMotion ?? '');
     this.musterParty(table, options.muster ?? []);
 
     return { table, terrainCount: blocks.blocks.length, summary: options.summary };
@@ -338,13 +343,9 @@ export class DungeonBuildService {
       offsetX = ((rect.w - block.footprint.w) / 2) * GRID_SIZE;
       offsetY = ((rect.h - block.footprint.d) / 2) * GRID_SIZE;
     }
-    if (block.offset) {
-      offsetX += block.offset.x * GRID_SIZE;
-      offsetY += block.offset.y * GRID_SIZE;
-    }
 
     // Writing the whole location goes through setAttribute, which syncs; touching location.x does not.
-    const at = blockOrigin(rect, grid);
+    const at = blockCorner(block, grid);
     terrain.location = { name: 'table', x: at.x + offsetX, y: at.y + offsetY };
     terrain.posZ = 0;
     return terrain;
@@ -445,6 +446,8 @@ export class DungeonBuildService {
         ambience.dirtiness = patch.water.dirt;
         ambience.floatingLeaves = patch.water.leaves;
         ambience.iceCover = patch.water.ice;
+        ambience.flowSpeed = patch.water.flowSpeed ?? 0;
+        ambience.flowDirection = patch.water.flowDirection ?? 0;
       }
       ambience.isLock = true;
       const at = blockOrigin(patch.rect, grid);
@@ -494,22 +497,49 @@ export class DungeonBuildService {
         table.appendChild(dear);
       }
       if (preset.amount.length < 1 && preset.ailment.length < 1) continue;
-      const harm = new TableTrigger();
-      harm.name = name;
-      harm.col = patch.rect.x;
-      harm.row = patch.rect.y;
-      harm.width = patch.rect.w;
-      harm.height = patch.rect.h;
-      harm.moment = preset.moment;
-      harm.element = preset.amount.length > 0 ? HAZARD_RESOURCE : '';
-      harm.amount = preset.amount;
-      harm.ailment = preset.ailment;
-      harm.color = preset.color;
-      // Nobody is meant to be surprised by a lake of lava: the room can see the ground it is
-      // painted on, which is the whole of what makes it a hazard rather than a trap.
-      harm.open = true;
-      harm.initialize();
-      table.appendChild(harm);
+      this.layOpenHarm(table, patch.rect, name, preset);
+    }
+  }
+
+  /**
+   * Lays ground that hurts whoever is caught in it, in the open. Nobody is meant to be surprised by a
+   * lake of lava or by foul water: the room can see the ground it is laid on, which is the whole of
+   * what makes it a hazard rather than a trap.
+   */
+  private layOpenHarm(
+    table: GameTable,
+    rect: MapRect,
+    name: string,
+    harm: {
+      readonly moment: TableTrigger['moment'];
+      readonly amount: string;
+      readonly ailment: string;
+      readonly color: string;
+    }
+  ): void {
+    const laid = new TableTrigger();
+    laid.name = name;
+    laid.col = rect.x;
+    laid.row = rect.y;
+    laid.width = rect.w;
+    laid.height = rect.h;
+    laid.moment = harm.moment;
+    laid.element = harm.amount.length > 0 ? HAZARD_RESOURCE : '';
+    laid.amount = harm.amount;
+    laid.ailment = harm.ailment;
+    laid.color = harm.color;
+    laid.open = true;
+    laid.initialize();
+    table.appendChild(laid);
+  }
+
+  /**
+   * Ground that hurts whoever is caught in it and does nothing else, as the foul water of a sewer: its
+   * look and its going are laid with the rest, so this is the harm, in the open where the room can see it.
+   */
+  private layHarms(table: GameTable, harms: readonly MapHarm[]): void {
+    for (const patch of harms) {
+      this.layOpenHarm(table, patch.rect, this.t(`feature.tabletop.dungeonGenerator.piece.${patch.thing}`), patch);
     }
   }
 
@@ -541,12 +571,23 @@ export class DungeonBuildService {
     }
   }
 
-  /** A light of its own for each spot, a child of the table so the table takes it away again. */
-  private standLights(table: GameTable, lights: readonly MapLight[], wallHeight: number, grid: MapGrid): void {
+  /**
+   * A light of its own for each spot, a child of the table so the table takes it away again, moving
+   * as its kind of lamp does or as the motion asked for.
+   */
+  private standLights(
+    table: GameTable,
+    lights: readonly MapLight[],
+    wallHeight: number,
+    grid: MapGrid,
+    motion: GeneratedLightMotion
+  ): void {
     for (const light of lights) {
       const source = LightSource.create(this.t(`feature.light.skin.${LIGHT_SKIN[light.kind]}`));
-      applyLightPreset(source, LIGHT_PRESET[light.kind]);
-      if (light.color) source.lightColor = light.color;
+      applyLightPresetWith(source, LIGHT_PRESET[light.kind], {
+        ...(motion ? { animation: motion } : {}),
+        ...(light.color ? { color: light.color } : {}),
+      });
       source.lightEnabled = true;
       source.lightDirection = light.kind === 'sconce' ? light.facing : 0;
       source.isLock = true;

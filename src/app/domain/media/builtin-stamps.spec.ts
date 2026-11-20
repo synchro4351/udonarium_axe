@@ -92,7 +92,9 @@ describe('the stamps the tool comes with', () => {
         expect(image.url).toBe(item.imageIdentifier);
         expect(image.name).toBe(stampLabelOf(item));
         expect(ImageTag.get(item.imageIdentifier)?.tag).toBe(SYSTEM_RESERVED_TAG);
-        expect(canBrowseImage(ImageTag.get(item.imageIdentifier)!, true)).toBe(false);
+        expect(canBrowseImage(ImageTag.get(item.imageIdentifier)!, { canSeeSecret: true, hidesTag: () => false })).toBe(
+          false
+        );
       }
     });
 

@@ -35,7 +35,7 @@ import {
   buildPieceResetMenu,
   type PieceResetChoice,
 } from '@axe/features/character/game-character/piece-reset-context-menu';
-import { buildDisclosureContextMenu } from '@axe/features/disclosure/disclosure-context-menu';
+import { buildDisclosureContextMenu, type DisclosureRules } from '@axe/features/disclosure/disclosure-context-menu';
 
 export interface RegisteredRangeShape {
   label: string;
@@ -43,6 +43,8 @@ export interface RegisteredRangeShape {
 }
 
 export interface GameCharacterContextMenuCallbacks {
+  /** Who may change who sees the piece and who owns it, which its disclosure and owner entries are offered by. */
+  disclosure: DisclosureRules;
   onShowDetail: () => void;
   /** Opens the memo kept with the piece. */
   onShowMemo: () => void;
@@ -612,7 +614,7 @@ export function buildGameCharacterContextMenuModel(
     },
   ];
 
-  const disclosureActions = buildDisclosureContextMenu(char, t).filter(
+  const disclosureActions = buildDisclosureContextMenu(char, t, callbacks.disclosure).filter(
     (entry) => entry.type !== ContextMenuType.SEPARATOR
   );
   const objectActions: ContextMenuAction[] = [

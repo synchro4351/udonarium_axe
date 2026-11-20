@@ -8,6 +8,7 @@ import { GROUND_PAINT_LAYERS } from '@axe/domain/tabletop/ground/ground-chunk-da
 import { TABLE_PERSPECTIVE_PX } from '@axe/domain/tabletop/physical-scale';
 import { animationIntensity } from '@axe/domain/tabletop/vision-scene/light-flicker';
 import { lightAxis } from '@axe/domain/tabletop/vision-scene/light-shape';
+import type { WaterSpout } from '@axe/domain/tabletop/water/water-falls';
 import type { GroundMesh } from '@axe/domain/tabletop/world/ground-mesh';
 import type { SkyDome } from '@axe/domain/tabletop/world/sky-dome';
 import { type SkyLight, skyLightAt } from '@axe/domain/tabletop/world/sky-light';
@@ -310,7 +311,7 @@ class ThreeTableEngine implements Table3dEngine {
   private boardBox = { x: 0, y: 0, width: 0, height: 0 };
   private readonly sprites = new SpriteLayer(
     (url) => this.spritePicture(url),
-    (material) => this.veil.cover(material)
+    (material) => this.veil.cover(material, 'unlit', false)
   );
   private readonly floorCanvases = new FloorCanvasLayer();
   private readonly solids = new SolidLayer();
@@ -320,16 +321,22 @@ class ThreeTableEngine implements Table3dEngine {
   /** How hard lightning lights the scene now, from 0 to 1. */
   private flash = 0;
   private readonly models = new ModelLayer(
-    (material) => this.veil.cover(material, 'lit'),
+    (material, moonlit) => this.veil.cover(material, 'lit', moonlit),
     () => {
       this.piecesMoved();
       this.needsFrame();
     },
-    () => this.renderer
+    () => this.renderer,
+    (spouts) => {
+      this.spouts = spouts;
+      this.spoutsHeard?.(spouts);
+    }
   );
+  private spouts: readonly WaterSpout[] = [];
+  private spoutsHeard: ((spouts: readonly WaterSpout[]) => void) | null = null;
   private readonly dice = new TableDiceLayer(
     () => this.renderer,
-    (material, lit) => this.veil.cover(material, lit ? 'lit' : 'unlit'),
+    (material, lit) => this.veil.cover(material, lit ? 'lit' : 'unlit', false),
     BOARD_TO_SCENE
   );
   private readonly skyDome = new SkyLayer();
@@ -343,19 +350,19 @@ class ThreeTableEngine implements Table3dEngine {
   private readonly darkFog = new Fog(0x000000, 0, 1);
   private fadePx = 0;
   private readonly water = new WaterLayer(
-    (material, taking) => this.veil.cover(material, taking),
+    (material, taking) => this.veil.cover(material, taking, true),
     (url) => this.picture(url)
   );
   private readonly layers = new BoardLayers(
     (url) => this.sharedPicture(url, true),
-    (material) => this.veil.cover(material, 'lit')
+    (material) => this.veil.cover(material, 'lit', true)
   );
   private readonly coins = new CoinLayer(
     () => {
       this.changed = true;
       this.needsFrame();
     },
-    (material) => this.veil.cover(material)
+    (material) => this.veil.cover(material, 'unlit', false)
   );
 
   constructor(
@@ -565,6 +572,7 @@ class ThreeTableEngine implements Table3dEngine {
     this.sun.color.set(light.colour);
     this.sky.color.set(light.skyColour);
     this.sky.groundColor.copy(new Color(light.skyColour).multiplyScalar(GROUND_BOUNCE));
+    this.veil.setMoonlit(light.moonlit);
     this.lightSky();
     this.changed = true;
   }
@@ -749,7 +757,7 @@ class ThreeTableEngine implements Table3dEngine {
       drawing.far = depth.far;
       drawing.updateProjectionMatrix();
     }
-    this.skyDome.follow(at);
+    this.skyDome.follow(at, this.camera, view.nearPx !== undefined);
     this.sprites.face(view.axes);
     this.fadePx = view.fadePx ?? 0;
     this.water.lookFromAmongPieces(view.nearPx !== undefined);
@@ -825,12 +833,12 @@ class ThreeTableEngine implements Table3dEngine {
     const flowing = this.water.advance(timeMs);
     const hanging = this.fogAir.advance(timeMs);
     const passing = this.backdrops.advance(timeMs);
-    const walking = this.models.advance(timeMs);
+    const modelled = this.models.advance(timeMs);
     const falling = this.weather.advance(timeMs, this.camera);
     this.strike(timeMs);
     this.takeChanges();
-    if (walking || falling) return true;
-    return drifting || flowing || hanging || passing ? 'slowly' : false;
+    if (modelled === true || falling) return true;
+    return drifting || flowing || hanging || passing || modelled === 'slowly' ? 'slowly' : false;
   }
 
   setSky(sky: SkyDome | null): void {
@@ -860,6 +868,16 @@ class ThreeTableEngine implements Table3dEngine {
         this.post.compileApart(this.scene, this.camera, this.finishing(), staging)
       );
     }
+  }
+
+  onSpouts(heard: (spouts: readonly WaterSpout[]) => void): void {
+    this.spoutsHeard = heard;
+    heard(this.spouts);
+  }
+
+  setModelMotion(moving: boolean): void {
+    this.models.setTurning(moving);
+    this.takeChanges();
   }
 
   setFogAir(sheets: readonly Table3dFogAirSheet[], moving: boolean): void {
@@ -1033,7 +1051,7 @@ class ThreeTableEngine implements Table3dEngine {
       board.veiled,
       board.ground?.paint ? { pictures: this.paintedGround(), tilePx: board.gridSize * GROUND_PAINT_TILE_CELLS } : null
     );
-    this.veil.cover(material, 'lit');
+    this.veil.cover(material, 'lit', true);
     this.board = new Mesh(board.ground ? groundGeometry(board.ground) : boardGeometry(board), material);
     this.board.receiveShadow = true;
     this.boardBox = board.shape.box;
@@ -1167,7 +1185,7 @@ class ThreeTableEngine implements Table3dEngine {
       side: DoubleSide,
       ...LAID_OVER_FACES,
     });
-    this.veil.cover(material);
+    this.veil.cover(material, 'unlit', true);
     return material;
   }
 
@@ -1175,7 +1193,7 @@ class ThreeTableEngine implements Table3dEngine {
     return faceMaterialOf(
       face,
       (url, tiled) => this.sharedPicture(url, tiled),
-      (material, taking) => this.veil.cover(material, taking)
+      (material, taking) => this.veil.cover(material, taking, true)
     );
   }
 
